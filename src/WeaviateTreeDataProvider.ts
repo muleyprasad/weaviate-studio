@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as weaviate from 'weaviate-ts-client';
+import { ConnectionManager, WeaviateConnection } from './services/ConnectionManager';
 
 // Define the structure for our tree items
 export class WeaviateTreeItem extends vscode.TreeItem {
@@ -8,23 +9,22 @@ export class WeaviateTreeItem extends vscode.TreeItem {
         public collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly itemType: 'connection' | 'collection' | 'message' | 'object',
         public readonly connectionId?: string, // To associate collections with a connection
-        public iconPath?: string | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon,
-        public readonly contextValue?: string // Used to show specific commands for items
+        iconPath?: string | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon,
+        contextValue?: string, // Used to show specific commands for items
+        description?: string // Optional description
     ) {
         super(label, collapsibleState);
         this.iconPath = iconPath;
         this.contextValue = contextValue;
+        if (description) {
+            // @ts-ignore - We're setting a read-only property here
+            this.description = description;
+        }
     }
 }
 
-// Type for connection config storage
-interface ConnectionConfig {
-    id: string;
-    name: string;
-    url: string;
-    apiKey?: string;
-    status: 'connected' | 'disconnected';
-}
+// Alias for backward compatibility
+type ConnectionConfig = WeaviateConnection;
 
 export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<WeaviateTreeItem> {
     // Event emitter for tree data changes
@@ -33,18 +33,36 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     private connections: ConnectionConfig[] = [];
     private collections: { [connectionId: string]: WeaviateTreeItem[] } = {};
-    private weaviateClients: { [connectionId: string]: any } = {};
     private context: vscode.ExtensionContext;
+    private connectionManager: ConnectionManager;
     // Filter text for the search box
     private filterText: string = '';
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
-        // Initialize with mock data
-        this.loadMockData();
+        this.connectionManager = ConnectionManager.getInstance(context);
+        
+        // Load saved connections
+        this.loadConnections();
         
         // Set context value for empty connections state (for viewsWelcome)
         vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
+        
+        // Listen for connection changes
+        this.connectionManager.onConnectionsChanged(() => {
+            this.loadConnections();
+            this.refresh();
+        });
+    }
+    
+    private async loadConnections() {
+        this.connections = this.connectionManager.getConnections();
+        // Try to connect to all previously connected instances
+        await Promise.all(
+            this.connections
+                .filter(conn => conn.status === 'connected')
+                .map(conn => this.connect(conn.id))
+        );
     }
 
     // Handle filter text changes
@@ -71,53 +89,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     // Load mock data for demonstration
     loadMockData(): void {
-        // Mock Connections
-        this.connections = [
-            { 
-                id: 'demo-cluster-id', 
-                name: 'demo-cluster', 
-                url: 'http://localhost:8080', 
-                status: 'connected' 
-            },
-            { 
-                id: 'another-cluster-id', 
-                name: 'another-cluster', 
-                url: 'http://localhost:8081', 
-                status: 'disconnected' 
-            }
-        ];
-
-        // Mock Collections for demo-cluster
-        this.collections['demo-cluster-id'] = [
-            new WeaviateTreeItem(
-                'Products', 
-                vscode.TreeItemCollapsibleState.Collapsed, 
-                'collection', 
-                'demo-cluster-id', 
-                new vscode.ThemeIcon('database'), 
-                'weaviateCollection'
-            ),
-            new WeaviateTreeItem(
-                'Cldraces', 
-                vscode.TreeItemCollapsibleState.None, 
-                'collection', 
-                'demo-cluster-id', 
-                new vscode.ThemeIcon('database'), 
-                'weaviateCollection'
-            ),
-            new WeaviateTreeItem(
-                'Users', 
-                vscode.TreeItemCollapsibleState.Collapsed, 
-                'collection', 
-                'demo-cluster-id', 
-                new vscode.ThemeIcon('database'), 
-                'weaviateCollection'
-            )
-        ];
-
-        // Mock Objects for Products collection
-        const productsItem = this.collections['demo-cluster-id'][0];
-        productsItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        // No longer needed as we're using real connections
     }
 
     // TreeDataProvider implementation
@@ -213,117 +185,81 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // --- Connection Management Methods ---
     
     // Add a new connection
-    async addConnection(config: { name: string, url: string, apiKey?: string }): Promise<void> {
-        try {
-            const id = `conn-${Date.now()}`;
-            const newConnection = {
-                id,
-                name: config.name,
-                url: config.url,
-                apiKey: config.apiKey,
-                status: 'disconnected' as 'disconnected'
-            };
-            
-            this.connections.push(newConnection);
-            
-            // Update empty state context
-            vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', false);
-            
-            this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Connection '${config.name}' added.`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to add connection: ${error}`);
+    async addConnection(): Promise<void> {
+        const connection = await this.connectionManager.showAddConnectionDialog();
+        if (connection) {
+            await this.connect(connection.id);
+            this.refresh();
         }
     }
 
     // Connect to a Weaviate instance
-    async connect(connectionId: string): Promise<void> {
-        try {
-            const connection = this.connections.find(c => c.id === connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
-            
-            // Create Weaviate client
-            const clientConfig: any = {
-                host: connection.url,
-                headers: {}
-            };
-            
-            if (connection.apiKey) {
-                clientConfig.headers['Authorization'] = `Bearer ${connection.apiKey}`;
-            }
-            
-            // For mockup demo, just set as connected
-            connection.status = 'connected';
-            
-            // In a real implementation, we'd initialize the client and fetch collections:
-            // this.weaviateClients[connectionId] = weaviate.client(clientConfig);
-            // await this.fetchCollections(connectionId);
-            
-            this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Connected to ${connection.name}.`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to connect: ${error}`);
+    async connect(connectionId: string): Promise<boolean> {
+        const connection = await this.connectionManager.connect(connectionId);
+        if (connection) {
+            await this.fetchCollections(connectionId);
+            this.refresh();
+            vscode.window.showInformationMessage(`Connected to ${connection.name}`);
+            return true;
         }
+        return false;
     }
 
     // Disconnect from a Weaviate instance
-    disconnect(connectionId: string): void {
+    async disconnect(connectionId: string): Promise<void> {
         const connection = this.connections.find(c => c.id === connectionId);
         if (connection) {
-            connection.status = 'disconnected';
-            // Remove client
-            delete this.weaviateClients[connectionId];
-            
-            this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Disconnected from ${connection.name}.`);
+            await this.connectionManager.disconnect(connectionId);
+            this.refresh();
+            vscode.window.showInformationMessage(`Disconnected from ${connection.name}`);
         }
     }
 
     // Edit a connection
-    async editConnection(connectionId: string, config: { name: string, url: string, apiKey?: string }): Promise<void> {
-        const connectionIndex = this.connections.findIndex(c => c.id === connectionId);
-        if (connectionIndex !== -1) {
-            // If connected, disconnect first
-            if (this.connections[connectionIndex].status === 'connected') {
-                this.disconnect(connectionId);
+    async editConnection(connectionId: string): Promise<void> {
+        const connection = this.connections.find(c => c.id === connectionId);
+        if (!connection) return;
+        
+        const name = await vscode.window.showInputBox({
+            value: connection.name,
+            prompt: 'Edit connection name',
+            validateInput: value => !value ? 'Name is required' : null
+        });
+        if (name === undefined) return;
+        
+        const url = await vscode.window.showInputBox({
+            value: connection.url,
+            prompt: 'Edit Weaviate server URL',
+            validateInput: value => !value ? 'URL is required' : null
+        });
+        if (url === undefined) return;
+        
+        const useAuth = await vscode.window.showQuickPick(
+            ['No authentication', 'API Key'],
+            { 
+                placeHolder: connection.apiKey ? 'Using API Key authentication' : 'No authentication',
+                canPickMany: false
             }
-            
-            this.connections[connectionIndex] = {
-                ...this.connections[connectionIndex],
-                ...config
-            };
-            
-            this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Connection '${config.name}' updated.`);
+        );
+        
+        let apiKey = connection.apiKey;
+        if (useAuth === 'API Key') {
+            const key = await vscode.window.showInputBox({
+                prompt: 'Enter your API key (leave empty to keep current)',
+                password: true
+            });
+            if (key === undefined) return;
+            if (key) apiKey = key;
+        } else if (useAuth === 'No authentication') {
+            apiKey = undefined;
         }
+        
+        await this.connectionManager.updateConnection(connectionId, { name, url, apiKey });
+        this.refresh();
+        vscode.window.showInformationMessage(`Updated connection: ${name}`);
     }
 
-    // Delete a connection
-    deleteConnection(connectionId: string): void {
-        const connectionIndex = this.connections.findIndex(c => c.id === connectionId);
-        if (connectionIndex !== -1) {
-            const connectionName = this.connections[connectionIndex].name;
-            
-            // If connected, disconnect first
-            if (this.connections[connectionIndex].status === 'connected') {
-                this.disconnect(connectionId);
-            }
-            
-            // Remove connection
-            this.connections.splice(connectionIndex, 1);
-            
-            // Remove collections for this connection
-            delete this.collections[connectionId];
-            
-            // Update empty state context
-            vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
-            
-            this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Connection '${connectionName}' deleted.`);
-        }
-    }
+
     
     // Get the total number of connections
     getConnectionCount(): number {
@@ -337,72 +273,86 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     // --- Collection Management Methods ---
     
-    // Fetch collections from Weaviate (would be implemented with real API)
+    // Fetch collections from Weaviate
     async fetchCollections(connectionId: string): Promise<void> {
+        const client = this.connectionManager.getClient(connectionId);
+        if (!client) {
+            vscode.window.showErrorMessage('Not connected to Weaviate instance');
+            return;
+        }
+
         try {
-            // In real implementation, would fetch from Weaviate API:
-            // const client = this.weaviateClients[connectionId];
-            // const schema = await client.schema.getter().do();
-            // ...
-            
-            // For demo, do nothing - we're using mock data
-            
-            this._onDidChangeTreeData.fire();
+            const schema = await client.schema.getter().do();
+            this.collections[connectionId] = (schema.classes || []).map((cls: any) => 
+                new WeaviateTreeItem(
+                    cls.class,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'collection',
+                    connectionId,
+                    new vscode.ThemeIcon('database'),
+                    'weaviateCollection',
+                    cls.description
+                )
+            );
+            this.refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to fetch collections: ${error}`);
+        }
+    }
+
+    // Query a collection
+    async queryCollection(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Not connected to this Weaviate instance');
+            }
+            
+            // Open query editor with collection context
+            await vscode.commands.executeCommand('weaviate.queryCollection', connectionId, collectionName);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to query collection: ${error}`);
         }
     }
 
     // View schema for a collection
     async viewSchema(connectionId: string, collectionName: string): Promise<void> {
         try {
-            // In real implementation, would fetch schema from Weaviate API
-            // For demo, show mock schema
-            const mockSchema = {
-                class: collectionName,
-                properties: [
-                    { name: 'name', dataType: ['string'] },
-                    { name: 'description', dataType: ['text'] },
-                    { name: 'price', dataType: ['number'] },
-                    { name: 'image', dataType: ['blob'] }
-                ],
-                vectorizer: 'text2vec-openai'
-            };
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Not connected to this Weaviate instance');
+            }
             
-            // Create a new untitled JSON file with the schema
-            const document = await vscode.workspace.openTextDocument({
-                content: JSON.stringify(mockSchema, null, 2),
+            const schema = await client.schema.getter(collectionName).do();
+            const doc = await vscode.workspace.openTextDocument({
+                content: JSON.stringify(schema, null, 2),
                 language: 'json'
             });
             
-            await vscode.window.showTextDocument(document);
+            await vscode.window.showTextDocument(doc);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to view schema: ${error}`);
         }
     }
 
     // Open query editor for a collection
-    async queryCollection(connectionId: string, collectionName: string): Promise<void> {
+    async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
         try {
             // In real implementation, would open a custom query editor
-            // For demo, open an untitled GraphQL file with a template query
+            // For demo, open a new untitled document with a sample query
             const templateQuery = `{
-  Get {
-    ${collectionName} {
-      name
-      description
-      # Add more properties here
-      _additional {
-        id
-        vector
-      }
+  "query": {
+    "$query": {
+      "class": "${collectionName}",
+      "vector": [0.1, 0.2, 0.3],  // Replace with actual vector
+      "limit": 10
     }
   }
 }`;
             
             const document = await vscode.workspace.openTextDocument({
                 content: templateQuery,
-                language: 'graphql'
+                language: 'json'
             });
             
             await vscode.window.showTextDocument(document);
@@ -411,26 +361,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-    // Delete a collection
-    async deleteCollection(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const connection = this.connections.find(c => c.id === connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
+    // Delete a connection
+    async deleteConnection(connectionId: string): Promise<void> {
+        const connection = this.connections.find(c => c.id === connectionId);
+        if (!connection) return;
+        
+        const confirm = await vscode.window.showWarningMessage(
+            `Are you sure you want to delete the connection "${connection.name}"?`,
+            { modal: true },
+            'Delete'
+        );
+        
+        if (confirm === 'Delete') {
+            await this.connectionManager.deleteConnection(connectionId);
+            this.refresh();
+            vscode.window.showInformationMessage(`Deleted connection: ${connection.name}`);
+            // Remove collections for this connection
+            delete this.collections[connectionId];
             
-            // In real implementation, would delete using Weaviate API
-            // For demo, just remove from our local array
-            const collectionsArray = this.collections[connectionId] || [];
-            const collectionIndex = collectionsArray.findIndex(c => c.label === collectionName);
+            // Update empty state context
+            vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
             
-            if (collectionIndex !== -1) {
-                collectionsArray.splice(collectionIndex, 1);
-                this._onDidChangeTreeData.fire();
-                vscode.window.showInformationMessage(`Collection '${collectionName}' deleted.`);
-            }
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to delete collection: ${error}`);
+            this._onDidChangeTreeData.fire();
+            vscode.window.showInformationMessage(`Connection '${connection.name}' deleted.`);
         }
     }
 }
