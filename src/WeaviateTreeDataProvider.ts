@@ -78,7 +78,26 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
         this.iconPath = iconPath;
-        this.contextValue = contextValue;
+        
+        // Set context value based on itemType if not explicitly provided
+        if (contextValue) {
+            this.contextValue = contextValue;
+        } else {
+            switch (itemType) {
+                case 'connection':
+                    this.contextValue = 'weaviateConnection';
+                    break;
+                case 'collection':
+                    this.contextValue = 'weaviateCollection';
+                    break;
+                case 'property':
+                    this.contextValue = 'weaviateProperty';
+                    break;
+                default:
+                    this.contextValue = itemType;
+            }
+        }
+        
         if (description) {
             // @ts-ignore - We're setting a read-only property here
             this.description = description;
@@ -198,6 +217,362 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this._onDidChangeTreeData.fire();
     }
 
+    // #region Command Handlers
+    
+
+
+    /**
+     * Shows detailed information about a property in a webview
+     * @param item - The tree item representing the property
+     */
+    public async handleViewPropertyDetails(item: WeaviateTreeItem): Promise<void> {
+        if (!item.connectionId || !item.collectionName || !item.label) {
+            vscode.window.showErrorMessage('Cannot view property details: Missing required information');   
+            return;
+        }
+
+        try {
+            // Get the collection schema
+            const collection = this.collections[item.connectionId]?.find(
+                col => col.label === item.collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema?.properties) {
+                vscode.window.showErrorMessage('Could not find property details');
+                return;
+            }
+
+            // Extract just the property name (remove type information in parentheses)
+            const propertyName = item.label.toString().split('(')[0].trim();
+            const property = collection.schema.properties.find(p => p.name === propertyName);
+
+            if (!property) {
+                vscode.window.showErrorMessage(`Property '${propertyName}' not found in schema`);
+                return;
+            }
+
+            // Create and show a webview with the property details
+            const panel = vscode.window.createWebviewPanel(
+                'weaviatePropertyDetails',
+                `Property: ${propertyName}`,
+                vscode.ViewColumn.One,
+                { enableScripts: true }
+            );
+
+            // Format the property details as HTML
+            panel.webview.html = this.getPropertyDetailsHtml(propertyName, property, item.collectionName);
+
+        } catch (error) {
+            console.error('Error viewing property details:', error);
+            vscode.window.showErrorMessage(
+                `Failed to view property details: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+
+    /**
+     * Shows a detailed schema view for a collection in a webview
+     * @param item - The tree item representing the collection
+     */
+    public async handleViewDetailedSchema(item: WeaviateTreeItem): Promise<void> {
+        if (!item.connectionId || !item.label) {
+            vscode.window.showErrorMessage('Cannot view schema: Missing connection or collection name');
+            return;
+        }
+
+        try {
+            const collectionName = item.label.toString();
+            const collection = this.collections[item.connectionId]?.find(
+                col => col.label === collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema) {
+                vscode.window.showErrorMessage('Could not find schema for collection');
+                return;
+            }
+
+            // Create and show a webview with the detailed schema
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateDetailedSchema',
+                `Schema: ${collectionName}`,
+                vscode.ViewColumn.One,
+                { enableScripts: true }
+            );
+
+            // Format the schema as HTML
+            panel.webview.html = this.getDetailedSchemaHtml(collection.schema);
+
+        } catch (error) {
+            console.error('Error viewing detailed schema:', error);
+            vscode.window.showErrorMessage(
+                `Failed to view detailed schema: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+
+    /**
+     * Generates HTML for displaying property details in a webview
+     */
+    private getPropertyDetailsHtml(propertyName: string, property: SchemaProperty, collectionName: string): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Property: ${propertyName}</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        padding: 0 20px;
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                    }
+                    h1 {
+                        color: var(--vscode-textLink-foreground);
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        padding-bottom: 10px;
+                    }
+                    .property-header {
+                        background-color: var(--vscode-editor-lineHighlightBackground);
+                        padding: 10px;
+                        border-radius: 4px;
+                        margin-bottom: 20px;
+                    }
+                    .property-section {
+                        margin-bottom: 20px;
+                    }
+                    .property-section h3 {
+                        margin-bottom: 8px;
+                        color: var(--vscode-textLink-foreground);
+                    }
+                    .property-grid {
+                        display: grid;
+                        grid-template-columns: 150px 1fr;
+                        gap: 10px;
+                    }
+                    .property-grid dt {
+                        font-weight: bold;
+                        color: var(--vscode-textPreformat-foreground);
+                    }
+                    .property-grid dd {
+                        margin: 0;
+                    }
+                    pre {
+                        background-color: var(--vscode-textCodeBlock-background);
+                        padding: 10px;
+                        border-radius: 4px;
+                        overflow-x: auto;
+                    }
+                    code {
+                        font-family: var(--vscode-editor-font-family);
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>${propertyName}</h1>
+                <div class="property-header">
+                    <strong>Collection:</strong> ${collectionName} <br>
+                    <strong>Type:</strong> ${property.dataType?.join(', ') || 'Unknown'}
+                </div>
+
+                <div class="property-section">
+                    <h3>Details</h3>
+                    <div class="property-grid">
+                        <div><strong>Name:</strong></div>
+                        <div>${property.name}</div>
+                        
+                        <div><strong>Data Type:</strong></div>
+                        <div>${property.dataType?.join(', ') || 'Unknown'}</div>
+                        
+                        ${property.description ? `
+                            <div><strong>Description:</strong></div>
+                            <div>${property.description}</div>
+                        ` : ''}
+                        
+                        <div><strong>Indexed:</strong></div>
+                        <div>${property.indexInverted !== false ? 'Yes' : 'No'}</div>
+                    </div>
+                </div>
+
+                ${property.moduleConfig ? `
+                    <div class="property-section">
+                        <h3>Module Configuration</h3>
+                        <pre><code>${JSON.stringify(property.moduleConfig, null, 2)}</code></pre>
+                    </div>
+                ` : ''}
+
+                <div class="property-section">
+                    <h3>Raw Property Definition</h3>
+                    <pre><code>${JSON.stringify(property, null, 2)}</code></pre>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Generates HTML for displaying detailed schema in a webview
+     */
+    private getDetailedSchemaHtml(schema: SchemaClass): string {
+        const formatDataType = (dataType: string[]): string => {
+            return dataType.map(t => {
+                // Make data types more readable
+                switch (t) {
+                    case 'text': return 'Text';
+                    case 'string': return 'String';
+                    case 'int': return 'Integer';
+                    case 'number': return 'Number';
+                    case 'boolean': return 'Boolean';
+                    case 'date': return 'Date';
+                    case 'geoCoordinates': return 'Geo Coordinates';
+                    case 'phoneNumber': return 'Phone Number';
+                    case 'blob': return 'Binary Data';
+                    case 'object': return 'Object';
+                    case 'object[]': return 'Object Array';
+                    default: return t;
+                }
+            }).join(', ');
+        };
+
+        const propertiesHtml = schema.properties?.map(prop => `
+            <div class="property-card">
+                <h3>${prop.name} <span class="data-type">${formatDataType(prop.dataType || ['unknown'])}</span></h3>
+                ${prop.description ? `<p class="description">${prop.description}</p>` : ''}
+                <div class="property-details">
+                    <div><strong>Indexed:</strong> ${prop.indexInverted !== false ? 'Yes' : 'No'}</div>
+                    ${prop.moduleConfig ? `
+                        <div class="module-config">
+                            <strong>Module Config:</strong>
+                            <pre><code>${JSON.stringify(prop.moduleConfig, null, 2)}</code></pre>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('') || '<p>No properties defined</p>';
+
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Schema: ${schema.class}</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        padding: 0 20px 40px 20px;
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                        line-height: 1.5;
+                    }
+                    h1 {
+                        color: var(--vscode-textLink-foreground);
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        padding-bottom: 10px;
+                    }
+                    h2 {
+                        margin-top: 30px;
+                        color: var(--vscode-textLink-foreground);
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        padding-bottom: 5px;
+                    }
+                    h3 {
+                        margin: 0 0 10px 0;
+                        color: var(--vscode-textLink-foreground);
+                    }
+                    .property-card {
+                        background-color: var(--vscode-editor-lineHighlightBackground);
+                        border-left: 3px solid var(--vscode-textLink-foreground);
+                        padding: 15px;
+                        margin-bottom: 15px;
+                        border-radius: 4px;
+                    }
+                    .data-type {
+                        font-size: 0.8em;
+                        color: var(--vscode-descriptionForeground);
+                        font-weight: normal;
+                        font-family: var(--vscode-editor-font-family);
+                        background-color: var(--vscode-textBlockQuote-background);
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        margin-left: 8px;
+                    }
+                    .description {
+                        color: var(--vscode-descriptionForeground);
+                        margin: 8px 0 12px 0;
+                        font-style: italic;
+                    }
+                    .property-details {
+                        font-size: 0.9em;
+                    }
+                    .module-config {
+                        margin-top: 10px;
+                    }
+                    pre, code {
+                        font-family: var(--vscode-editor-font-family);
+                    }
+                    pre {
+                        background-color: var(--vscode-textCodeBlock-background);
+                        padding: 10px;
+                        border-radius: 4px;
+                        overflow-x: auto;
+                        margin: 5px 0 0 0;
+                        font-size: 0.9em;
+                    }
+                    .metadata {
+                        display: grid;
+                        grid-template-columns: 150px 1fr;
+                        gap: 10px;
+                        margin-bottom: 20px;
+                        background-color: var(--vscode-editor-lineHighlightBackground);
+                        padding: 15px;
+                        border-radius: 4px;
+                    }
+                    .metadata dt {
+                        font-weight: bold;
+                        color: var(--vscode-textPreformat-foreground);
+                    }
+                    .metadata dd {
+                        margin: 0;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>${schema.class}</h1>
+                
+                <div class="metadata">
+                    <div><strong>Class Name:</strong></div>
+                    <div>${schema.class}</div>
+                    
+                    ${schema.description ? `
+                        <div><strong>Description:</strong></div>
+                        <div>${schema.description}</div>
+                    ` : ''}
+                    
+                    ${schema.vectorizer ? `
+                        <div><strong>Vectorizer:</strong></div>
+                        <div>${schema.vectorizer}</div>
+                    ` : ''}
+                </div>
+
+                <h2>Properties</h2>
+                ${propertiesHtml}
+
+                ${schema.moduleConfig ? `
+                    <h2>Module Configuration</h2>
+                    <pre><code>${JSON.stringify(schema.moduleConfig, null, 2)}</code></pre>
+                ` : ''}
+
+                <h2>Raw Schema</h2>
+                <pre><code>${JSON.stringify(schema, null, 2)}</code></pre>
+            </body>
+            </html>
+        `;
+    }
+    
+    // #endregion Command Handlers
+
     // Helper to get connected status theme icon
     getStatusIcon(status: 'connected' | 'disconnected'): vscode.ThemeIcon {
         if (status === 'connected') {
@@ -236,19 +611,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         } else if (element.itemType === 'vectors' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('symbol-array');
             element.tooltip = 'View vector configuration';
-        } else if (element.itemType === 'property' && !element.iconPath) {
-            // Set different icons based on property type
-            const label = element.label as string;
-            if (label.includes('(text)') || label.includes('(string)')) {
-                element.iconPath = new vscode.ThemeIcon('symbol-text');
-            } else if (label.includes('(number)') || label.includes('(int)') || label.includes('(float)')) {
-                element.iconPath = new vscode.ThemeIcon('symbol-number');
-            } else if (label.includes('(boolean)') || label.includes('(bool)')) {
-                element.iconPath = new vscode.ThemeIcon('symbol-boolean');
-            } else if (label.includes('(date)') || label.includes('(datetime)')) {
-                element.iconPath = new vscode.ThemeIcon('calendar');
-            } else {
-                element.iconPath = new vscode.ThemeIcon('symbol-property');
+        } else if (element.itemType === 'property') {
+            // Ensure property items have the correct context value
+            if (!element.contextValue) {
+                element.contextValue = 'weaviateProperty';
+            }
+            
+            // Set different icons based on property type if no icon is set
+            if (!element.iconPath) {
+                const label = element.label as string;
+                if (label.includes('(text)') || label.includes('(string)')) {
+                    element.iconPath = new vscode.ThemeIcon('symbol-text');
+                } else if (label.includes('(number)') || label.includes('(int)') || label.includes('(float)')) {
+                    element.iconPath = new vscode.ThemeIcon('symbol-number');
+                } else if (label.includes('(boolean)') || label.includes('(bool)')) {
+                    element.iconPath = new vscode.ThemeIcon('symbol-boolean');
+                } else if (label.includes('(date)') || label.includes('(datetime)')) {
+                    element.iconPath = new vscode.ThemeIcon('calendar');
+                } else {
+                    element.iconPath = new vscode.ThemeIcon('symbol-property');
+                }
             }
         }
         
@@ -480,7 +862,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.connectionId,
                     element.collectionName,
                     prop.name,
-                    icon
+                    icon,
+                    'weaviateProperty',  // contextValue for menu contributions
+                    description.trim()
                 );
             });
             

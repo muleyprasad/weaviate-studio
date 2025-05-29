@@ -113,6 +113,12 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
+        // Property action commands have been removed
+        
+        vscode.commands.registerCommand('weaviate.viewDetailedSchema', (item: any) => {
+            weaviateTreeDataProvider.handleViewDetailedSchema(item);
+        }),
+        
         // Query a collection
         vscode.commands.registerCommand('weaviate.queryCollection', (arg1: any, arg2?: string) => {
             // Handle both call signatures:
