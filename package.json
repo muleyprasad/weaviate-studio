@@ -12,6 +12,7 @@
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
+  "browser": "./out/extension.js",
   "contributes": {
     "commands": [
       {
@@ -56,6 +57,11 @@
       {
         "command": "weaviate.deleteCollection",
         "title": "Delete Collection"
+      },
+      {
+        "command": "weaviate.openQueryEditor",
+        "title": "Open Query Editor",
+        "category": "Weaviate"
       }
     ],
     "viewsContainers": {
@@ -97,6 +103,11 @@
           "command": "weaviate.refreshConnections",
           "when": "view == weaviateConnectionsView",
           "group": "navigation@2"
+        },
+        {
+          "command": "weaviate.openQueryEditor",
+          "when": "view == weaviateConnectionsView",
+          "group": "navigation"
         }
       ],
       "view/item/context": [

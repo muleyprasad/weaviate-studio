@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider';
+import { WeaviateQueryEditor } from './query-editor/WeaviateQueryEditor';
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
@@ -11,6 +12,17 @@ export function activate(context: vscode.ExtensionContext) {
 		treeDataProvider: weaviateTreeDataProvider,
 		showCollapseAll: false,
 		canSelectMany: false
+	});
+
+	// Handle double-click on tree items
+	treeView.onDidChangeSelection(async e => {
+		if (e.selection && e.selection.length > 0) {
+			const item = e.selection[0];
+			if (item.itemType === 'collection' && item.connectionId) {
+				// Open query editor with the selected collection
+				vscode.commands.executeCommand('weaviate.queryCollection', item.connectionId, item.label);
+			}
+		}
 	});
 
 	// Create and show the filter input box (search bar)
@@ -31,6 +43,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register commands
 	context.subscriptions.push(
+		vscode.commands.registerCommand('weaviate.openQueryEditor', () => {
+			WeaviateQueryEditor.createOrShow(context.extensionUri, {});
+		}),
+
+		vscode.commands.registerCommand('weaviate.queryCollection', (connectionId: string, collectionName: string) => {
+			// Open the query editor with the selected collection
+			WeaviateQueryEditor.createOrShow(context.extensionUri, { connectionId, collectionName });
+		}),
+
 		vscode.commands.registerCommand('weaviate.refreshConnections', () => {
 			weaviateTreeDataProvider.refresh();
 			vscode.window.showInformationMessage('Weaviate connections refreshed');
