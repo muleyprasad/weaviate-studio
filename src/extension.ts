@@ -8,7 +8,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Create and register the TreeDataProvider
     const weaviateTreeDataProvider = new WeaviateTreeDataProvider(context);
-    const treeView = vscode.window.createTreeView('weaviateExplorer', {
+    const treeView = vscode.window.createTreeView('weaviateConnectionsView', {
         treeDataProvider: weaviateTreeDataProvider,
         showCollapseAll: true
     });
@@ -43,50 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         // Add connection command
         vscode.commands.registerCommand('weaviate.addConnection', async () => {
-            // Show input box for connection name
-            const name = await vscode.window.showInputBox({
-                placeHolder: 'Connection name (e.g., demo-cluster)',
-                prompt: 'Enter a name for the Weaviate connection',
-                validateInput: (value) => {
-                    return value && value.trim().length > 0 ? null : 'Name cannot be empty';
-                }
-            });
-
-            if (!name) return; // User cancelled
-
-            // Show input box for connection URL
-            const url = await vscode.window.showInputBox({
-                placeHolder: 'http://localhost:8080',
-                prompt: 'Enter the Weaviate URL',
-                validateInput: (value) => {
-                    if (!value || !value.trim()) {
-                        return 'URL is required';
-                    }
-                    try {
-                        new URL(value);
-                        return null;
-                    } catch (e) {
-                        return 'Please enter a valid URL (e.g., http://localhost:8080)';
-                    }
-                }
-            });
-
-            if (!url) return; // User cancelled
-
-            // Show input box for API key (optional)
-            const apiKey = await vscode.window.showInputBox({
-                placeHolder: 'API Key (leave empty if not required)',
-                prompt: 'Enter the API key (if required)',
-                password: true
-            });
-
             try {
-                // Add the new connection
-                await weaviateTreeDataProvider.addConnection({
-                    name: name.trim(),
-                    url: url.trim(),
-                    apiKey: apiKey?.trim() || undefined
-                });
+                await weaviateTreeDataProvider.addConnection();
             } catch (error) {
                 vscode.window.showErrorMessage(
                     `Failed to add connection: ${error instanceof Error ? error.message : String(error)}`

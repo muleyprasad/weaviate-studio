@@ -157,45 +157,227 @@ export class ConnectionManager {
     }
 
     public async showAddConnectionDialog(): Promise<WeaviateConnection | null> {
-        const name = await vscode.window.showInputBox({
-            prompt: 'Enter a name for this connection',
-            placeHolder: 'e.g., Production Cluster',
-            validateInput: value => !value ? 'Name is required' : null
+        return new Promise((resolve) => {
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateAddConnection',
+                'Add Weaviate Connection',
+                vscode.ViewColumn.Active,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: []
+                }
+            );
+
+            // Handle messages from the webview
+            panel.webview.onDidReceiveMessage(
+                async (message) => {
+                    switch (message.command) {
+                        case 'save':
+                            try {
+                                const { name, url, apiKey } = message.connection;
+                                if (!name || !url) {
+                                    panel.webview.postMessage({
+                                        command: 'error',
+                                        message: 'Name and URL are required'
+                                    });
+                                    return;
+                                }
+
+                                // Validate URL format
+                                try {
+                                    new URL(url);
+                                } catch (e) {
+                                    panel.webview.postMessage({
+                                        command: 'error',
+                                        message: 'Please enter a valid URL (e.g., http://localhost:8080)'
+                                    });
+                                    return;
+                                }
+
+                                const connection = await this.addConnection({
+                                    name: name.trim(),
+                                    url: url.trim(),
+                                    apiKey: apiKey?.trim() || undefined
+                                });
+                                
+                                if (connection) {
+                                    panel.dispose();
+                                    resolve(connection);
+                                }
+                            } catch (error) {
+                                const errorMessage = error instanceof Error ? error.message : 'Failed to add connection';
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: errorMessage
+                                });
+                            }
+                            break;
+                        case 'cancel':
+                            panel.dispose();
+                            resolve(null);
+                            break;
+                    }
+                },
+                undefined,
+                this.context.subscriptions
+            );
+
+            // Set the HTML content for the webview
+            panel.webview.html = this.getWebviewContent();
         });
-        if (!name) {
-            return null;
-        }
+    }
 
-        const url = await vscode.window.showInputBox({
-            prompt: 'Enter the Weaviate server URL',
-            placeHolder: 'e.g., localhost:8080 or weaviate.example.com',
-            validateInput: value => !value ? 'URL is required' : null
-        });
-        if (!url) {
-            return null;
-        }
+    private getWebviewContent(): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Add Weaviate Connection</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        padding: 20px;
+                        background-color: var(--vscode-editor-background);
+                        color: var(--vscode-foreground);
+                    }
+                    .form-group {
+                        margin-bottom: 15px;
+                    }
+                    label {
+                        display: block;
+                        margin-bottom: 5px;
+                        font-weight: bold;
+                    }
+                    input[type="text"],
+                    input[type="password"] {
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid var(--vscode-input-border);
+                        background-color: var(--vscode-input-background);
+                        color: var(--vscode-input-foreground);
+                        border-radius: 2px;
+                        box-sizing: border-box;
+                    }
+                    .error {
+                        color: var(--vscode-errorForeground);
+                        margin-top: 5px;
+                        display: none;
+                    }
+                    .button-container {
+                        display: flex;
+                        justify-content: flex-end;
+                        margin-top: 20px;
+                    }
+                    button {
+                        margin-left: 10px;
+                        padding: 5px 12px;
+                        border: none;
+                        border-radius: 2px;
+                        cursor: pointer;
+                    }
+                    .save-button {
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                    }
+                    .cancel-button {
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="form-group">
+                    <label for="connectionName">Connection Name</label>
+                    <input type="text" id="connectionName" placeholder="e.g., Production Cluster">
+                    <div id="nameError" class="error"></div>
+                </div>
+                <div class="form-group">
+                    <label for="connectionUrl">Weaviate URL</label>
+                    <input type="text" id="connectionUrl" placeholder="http://localhost:8080">
+                    <div id="urlError" class="error"></div>
+                </div>
+                <div class="form-group">
+                    <label for="apiKey">API Key (optional)</label>
+                    <input type="password" id="apiKey" placeholder="Leave empty if not required">
+                </div>
+                <div id="formError" class="error"></div>
+                <div class="button-container">
+                    <button class="cancel-button" id="cancelButton">Cancel</button>
+                    <button class="save-button" id="saveButton">Save Connection</button>
+                </div>
 
-        const useAuth = await vscode.window.showQuickPick(
-            ['No authentication', 'API Key'],
-            { placeHolder: 'Does this instance require authentication?' }
-        );
-
-        let apiKey: string | undefined;
-        if (useAuth === 'API Key') {
-            const key = await vscode.window.showInputBox({
-                prompt: 'Enter your API key',
-                password: true
-            });
-            if (key === undefined) {
-                return null;
-            }
-            apiKey = key;
-        }
-
-        if (url) {
-            return this.addConnection({ name, url, apiKey });
-        }
-        return null;
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    
+                    document.getElementById('saveButton').addEventListener('click', () => {
+                        const name = document.getElementById('connectionName').value.trim();
+                        const url = document.getElementById('connectionUrl').value.trim();
+                        const apiKey = document.getElementById('apiKey').value.trim();
+                        
+                        // Clear previous errors
+                        document.querySelectorAll('.error').forEach(el => {
+                            el.style.display = 'none';
+                            el.textContent = '';
+                        });
+                        
+                        // Basic validation
+                        if (!name) {
+                            showError('nameError', 'Name is required');
+                            return;
+                        }
+                        
+                        if (!url) {
+                            showError('urlError', 'URL is required');
+                            return;
+                        }
+                        
+                        // Send data to extension
+                        vscode.postMessage({
+                            command: 'save',
+                            connection: { name, url, apiKey }
+                        });
+                    });
+                    
+                    document.getElementById('cancelButton').addEventListener('click', () => {
+                        vscode.postMessage({
+                            command: 'cancel'
+                        });
+                    });
+                    
+                    // Handle Enter key in input fields
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            document.getElementById('saveButton').click();
+                        } else if (e.key === 'Escape') {
+                            document.getElementById('cancelButton').click();
+                        }
+                    });
+                    
+                    // Listen for messages from the extension
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        if (message.command === 'error') {
+                            showError('formError', message.message);
+                        }
+                    });
+                    
+                    function showError(elementId, message) {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            element.textContent = message;
+                            element.style.display = 'block';
+                        }
+                    }
+                    
+                    // Focus the first input field when the webview loads
+                    document.getElementById('connectionName').focus();
+                </script>
+            </body>
+            </html>
+        `;
     }
 }
 
