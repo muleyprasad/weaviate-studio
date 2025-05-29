@@ -44,17 +44,45 @@ export class ConnectionManager {
         this._onConnectionsChanged.fire();
     }
 
-    public async addConnection(connection: Omit<WeaviateConnection, 'id' | 'status'>) {
-        const newConnection: WeaviateConnection = {
-            ...connection,
-            id: Date.now().toString(),
-            status: 'disconnected',
-            lastUsed: Date.now()
-        };
-        
-        this.connections.push(newConnection);
-        await this.saveConnections();
-        return newConnection;
+    public async addConnection(connection: Omit<WeaviateConnection, 'id' | 'status'>): Promise<WeaviateConnection> {
+        try {
+            // Validate connection URL
+            try {
+                new URL(connection.url);
+            } catch (error) {
+                throw new Error('Invalid URL format. Please include http:// or https://');
+            }
+
+            // Check for duplicate connection names
+            const nameExists = this.connections.some(c => c.name.toLowerCase() === connection.name.toLowerCase());
+            if (nameExists) {
+                throw new Error('A connection with this name already exists');
+            }
+
+            // Check for duplicate URLs
+            const urlExists = this.connections.some(c => c.url === connection.url);
+            if (urlExists) {
+                throw new Error('A connection with this URL already exists');
+            }
+
+            const newConnection: WeaviateConnection = {
+                ...connection,
+                id: Date.now().toString(),
+                status: 'disconnected',
+                lastUsed: Date.now()
+            };
+            
+            this.connections.push(newConnection);
+            await this.saveConnections();
+            this._onConnectionsChanged.fire();
+            
+            return newConnection;
+        } catch (error) {
+            if (error instanceof Error) {
+                throw error;
+            }
+            throw new Error('Failed to add connection');
+        }
     }
 
     public async updateConnection(id: string, updates: Partial<WeaviateConnection>) {

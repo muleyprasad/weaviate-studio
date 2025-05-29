@@ -225,20 +225,35 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // --- Connection Management Methods ---
     
     // Add a new connection
-    async addConnection(connectionDetails?: { name: string; url: string; apiKey?: string }): Promise<void> {
-        let connection: WeaviateConnection | null;
-        
-        if (connectionDetails) {
-            // Use provided connection details
-            connection = await this.connectionManager.addConnection(connectionDetails);
-        } else {
-            // Fall back to showing the dialog
-            connection = await this.connectionManager.showAddConnectionDialog();
-        }
-        
-        if (connection) {
-            await this.connect(connection.id);
-            this.refresh();
+    async addConnection(connectionDetails?: { name: string; url: string; apiKey?: string }): Promise<WeaviateConnection | null> {
+        try {
+            if (!connectionDetails) {
+                // If no details provided, show the dialog
+                return await this.connectionManager.showAddConnectionDialog();
+            }
+
+            // Validate connection details
+            if (!connectionDetails.name || !connectionDetails.url) {
+                throw new Error('Name and URL are required');
+            }
+
+            // Add the connection
+            const connection = await this.connectionManager.addConnection(connectionDetails);
+            
+            if (connection) {
+                // Try to connect to the new connection
+                await this.connect(connection.id);
+                // Refresh the tree view to show the new connection
+                this.refresh();
+                vscode.window.showInformationMessage(`Successfully added connection: ${connection.name}`);
+                return connection;
+            }
+            
+            return null;
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            vscode.window.showErrorMessage(`Failed to add connection: ${errorMessage}`);
+            return null;
         }
     }
 

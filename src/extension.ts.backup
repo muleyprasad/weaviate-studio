@@ -1,0 +1,464 @@
+import * as vscode from 'vscode';
+import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider';
+import { WeaviateQueryEditor } from './query-editor/WeaviateQueryEditor';
+
+interface WebviewMessage {
+    command: string;
+    name?: string;
+    url?: string;
+    apiKey?: string;
+    message?: string;
+}
+
+// Helper function to generate the webview HTML content
+const getConnectionFormWebviewContent = (): string => {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <!-- Rest of the HTML content -->
+    </html>`;
+};
+
+// This method is called when your extension is activated
+export function activate(context: vscode.ExtensionContext) {
+    // Helper function to generate the webview HTML content
+    const getConnectionFormWebviewContent = (): string => `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Add Weaviate Connection</title>
+            <style>
+                body {
+                    font-family: var(--vscode-font-family);
+                    padding: 20px;
+                    color: var(--vscode-foreground);
+                    background-color: var(--vscode-editor-background);
+                }
+                .form-group {
+                    margin-bottom: 15px;
+                }
+                label {
+                    display: block;
+                    margin-bottom: 5px;
+                    font-weight: 600;
+                    color: var(--vscode-foreground);
+                }
+                input[type="text"],
+                input[type="password"] {
+                    width: 100%;
+                    padding: 8px;
+                    margin-bottom: 10px;
+                    box-sizing: border-box;
+                    background-color: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    border: 1px solid var(--vscode-input-border, transparent);
+                    border-radius: 2px;
+                }
+                input[type="text"]:focus,
+                input[type="password"]:focus {
+                    outline: 1px solid var(--vscode-focusBorder);
+                }
+                input[type="text"]:disabled,
+                input[type="password"]:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+                .buttons {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 20px;
+                    gap: 8px;
+                }
+                button {
+                    padding: 6px 12px;
+                    cursor: pointer;
+                    border: 1px solid transparent;
+                    border-radius: 2px;
+                    transition: background-color 0.1s ease-in-out;
+                }
+                button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+                #save {
+                    background-color: var(--vscode-button-background);
+                    color: var(--vscode-button-foreground);
+                }
+                #save:hover:not(:disabled) {
+                    background-color: var(--vscode-button-hoverBackground);
+                }
+                #cancel {
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                }
+                #cancel:hover:not(:disabled) {
+                    background-color: var(--vscode-button-secondaryHoverBackground);
+                }
+                #error {
+                    color: var(--vscode-errorForeground);
+                    background-color: var(--vscode-inputValidation-errorBackground);
+                    border: 1px solid var(--vscode-inputValidation-errorBorder);
+                    padding: 10px;
+                    margin: 10px 0;
+                    border-radius: 2px;
+                    display: none;
+                    word-break: break-word;
+                }
+                .error-visible {
+                    display: block !important;
+                    animation: fadeIn 0.3s ease-in-out;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Add Weaviate Connection</h2>
+            <div id="error"></div>
+            <div class="form-group">
+                <label for="name">Connection Name</label>
+                <input type="text" id="name" placeholder="e.g., demo-cluster" required>
+            </div>
+            <div class="form-group">
+                <label for="url">Weaviate URL</label>
+                <input type="text" id="url" placeholder="e.g., http://localhost:8080" required>
+            </div>
+            <div class="form-group">
+                <label for="apiKey">API Key (optional)</label>
+                <input type="password" id="apiKey" placeholder="Leave empty if not required">
+            </div>
+            <div class="buttons">
+                <button id="cancel">Cancel</button>
+                <button id="save" style="background-color: var(--vscode-button-background); color: var(--vscode-button-foreground);">Save Connection</button>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                const errorElement = document.getElementById('error');
+
+                const saveButton = document.getElementById('save');
+                const nameInput = document.getElementById('name');
+                const urlInput = document.getElementById('url');
+                const apiKeyInput = document.getElementById('apiKey');
+                const formElements = [nameInput, urlInput, apiKeyInput];
+
+                // Disable save button while saving
+                let isSaving = false;
+
+                async function handleSave() {
+                    if (isSaving) return;
+                    
+                    const name = nameInput.value.trim();
+                    const url = urlInput.value.trim();
+                    const apiKey = apiKeyInput.value.trim();
+
+                    // Basic validation
+                    if (!name) {
+                        showError('Please enter a connection name');
+                        nameInput.focus();
+                        return;
+                    }
+
+                    if (!url) {
+                        showError('Please enter a Weaviate URL');
+                        urlInput.focus();
+                        return;
+                    }
+
+                    try {
+                        isSaving = true;
+                        saveButton.disabled = true;
+                        saveButton.textContent = 'Saving...';
+                        
+                        // Disable form elements while saving
+                        formElements.forEach(el => el.disabled = true);
+                        
+                        // Send message to extension
+                        vscode.postMessage({
+                            command: 'save',
+                            name,
+                            url,
+                            apiKey
+                        });
+                    } catch (error) {
+                        console.error('Error saving connection:', error);
+                        showError('An error occurred while saving');
+                        isSaving = false;
+                        saveButton.disabled = false;
+                        saveButton.textContent = 'Save Connection';
+                        formElements.forEach(el => el.disabled = false);
+                    }
+                }
+
+
+                saveButton.addEventListener('click', handleSave);
+
+                document.getElementById('cancel').addEventListener('click', () => {
+                    vscode.postMessage({ command: 'cancel' });
+                });
+
+                function showError(message: string) {
+                    errorElement.textContent = message;
+                    errorElement.classList.add('error-visible');
+                    
+                    // Auto-hide after 5 seconds
+                    clearTimeout(window.errorTimeout);
+                    window.errorTimeout = setTimeout(() => {
+                        errorElement.classList.remove('error-visible');
+                    }, 5000);
+                    
+                    // Also log to console for debugging
+                    console.error('Connection error:', message);
+                }
+                
+                // Handle Enter key in form fields
+                function handleKeyDown(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSave();
+                    }
+                }
+                
+                // Add event listeners for Enter key
+                nameInput.addEventListener('keydown', handleKeyDown);
+                urlInput.addEventListener('keydown', handleKeyDown);
+                apiKeyInput.addEventListener('keydown', handleKeyDown);
+
+
+                // Handle Enter key in form fields
+                document.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('save').click();
+                    }
+                });
+            </script>
+        </body>
+        </html>`;
+	console.log('"Weaviate Manager" extension is now active');
+
+	// Create and register the TreeDataProvider
+	const weaviateTreeDataProvider = new WeaviateTreeDataProvider(context);
+	const treeView = vscode.window.createTreeView('weaviateConnectionsView', {
+		treeDataProvider: weaviateTreeDataProvider,
+		showCollapseAll: false,
+		canSelectMany: false
+	});
+
+	// Handle double-click on tree items
+	treeView.onDidChangeSelection(async e => {
+		if (e.selection && e.selection.length > 0) {
+			const item = e.selection[0];
+			if (item.itemType === 'collection' && item.connectionId) {
+				// Open query editor with the selected collection
+				vscode.commands.executeCommand('weaviate.queryCollection', item.connectionId, item.label);
+			}
+		}
+	});
+
+	// Create and show the filter input box (search bar)
+	const filterBoxContainer = vscode.window.createInputBox();
+	filterBoxContainer.placeholder = 'Filter (e.g., regex, vector distance >=...)';
+	filterBoxContainer.onDidChangeValue((text) => {
+		weaviateTreeDataProvider.setFilterText(text);
+	});
+	
+	// Add title to the tree view showing number of connections
+	treeView.title = `Connections (${weaviateTreeDataProvider.getConnectionCount() || 0})`;
+	// Update title whenever tree data changes
+	weaviateTreeDataProvider.onDidChangeTreeData(() => {
+		treeView.title = `Connections (${weaviateTreeDataProvider.getConnectionCount() || 0})`;
+	});
+	
+	context.subscriptions.push(treeView);
+
+	// Register commands
+	context.subscriptions.push(
+		vscode.commands.registerCommand('weaviate.openQueryEditor', () => {
+			WeaviateQueryEditor.createOrShow(context.extensionUri, {});
+		}),
+
+		vscode.commands.registerCommand('weaviate.queryCollection', (arg1: { connectionId: string; label: string; collectionName?: string }, arg2?: string) => {
+            // Handle both call signatures:
+            // 1. queryCollection(connectionId: string, collectionName: string)
+            // 2. queryCollection({ connectionId: string, label: string })
+            let connectionId: string;
+            let collectionName: string;
+
+            if (typeof arg1 === 'string' && arg2) {
+                // First signature
+                connectionId = arg1;
+                collectionName = arg2;
+            } else if (arg1?.connectionId && (arg1.label || arg1.collectionName)) {
+                // Second signature (from tree view)
+                connectionId = arg1.connectionId;
+                collectionName = arg1.label || arg1.collectionName || '';
+            } else {
+                console.error('Invalid arguments for weaviate.queryCollection:', arg1, arg2);
+                return;
+            }
+        };
+
+        // Register the message handler
+        const disposable = panel.webview.onDidReceiveMessage(messageHandler);
+        context.subscriptions.push(disposable);
+    }),
+
+    vscode.commands.registerCommand('weaviate.connect', async (item: { connectionId: string }) => {
+        if (item?.connectionId) {
+            await weaviateTreeDataProvider.connect(item.connectionId);
+        }
+    }),
+
+    vscode.commands.registerCommand('weaviate.disconnect', (item: { connectionId: string }) => {
+        if (item?.connectionId) {
+            weaviateTreeDataProvider.disconnect(item.connectionId);
+        }
+    }),
+
+    vscode.commands.registerCommand('weaviate.editConnection', async (item: { connectionId: string }) => {
+        if (!item?.connectionId) { return; }
+
+        // Get the current connection details
+        const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+        if (!connection) { return; }
+
+        // Show input box for connection name (pre-filled)
+        const name = await vscode.window.showInputBox({
+            value: connection.name,
+            placeHolder: 'Connection name (e.g., demo-cluster)',
+            prompt: 'Edit the name for the Weaviate connection',
+            validateInput: (value) => {
+                return value.trim().length === 0 ? 'Name cannot be empty' : null;
+
+// This function is now defined at the top of the file
+
+
+		vscode.commands.registerCommand('weaviate.connect', async (item: { connectionId: string }) => {
+            if (item?.connectionId) {
+                await weaviateTreeDataProvider.connect(item.connectionId);
+            }
+        }),
+
+		vscode.commands.registerCommand('weaviate.disconnect', (item: { connectionId: string }) => {
+			if (item?.connectionId) {
+				weaviateTreeDataProvider.disconnect(item.connectionId);
+			}
+		}),
+
+		vscode.commands.registerCommand('weaviate.editConnection', async (item: { connectionId: string }) => {
+			if (!item?.connectionId) { return; }
+
+			// Get the current connection details
+			const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+			if (!connection) { return; }
+
+			// Show input box for connection name (pre-filled)
+			const name = await vscode.window.showInputBox({
+				value: connection.name,
+				placeHolder: 'Connection name (e.g., demo-cluster)',
+				prompt: 'Edit the name for the Weaviate connection',
+				validateInput: (value) => {
+					return value.trim().length === 0 ? 'Name cannot be empty' : null;
+				}
+			});
+
+			if (!name) { return; } // User cancelled
+
+			// Show input box for connection URL (pre-filled)
+			const url = await vscode.window.showInputBox({
+				value: connection.url,
+				placeHolder: 'Weaviate URL (e.g., http://localhost:8080)',
+				prompt: 'Edit the URL of the Weaviate instance',
+				validateInput: (value) => {
+					try {
+						new URL(value);
+						return null;
+					} catch (e) {
+						return 'Please enter a valid URL';
+					}
+				}
+			});
+
+			if (!url) { return; } // User cancelled
+
+			// Show input box for API key (optional, pre-filled if exists)
+			const apiKey = await vscode.window.showInputBox({
+				value: connection.apiKey || '',
+				placeHolder: 'API Key (optional)',
+				prompt: 'Edit the API key for authentication (leave empty if not required)',
+				password: true
+			});
+
+			// Update the connection
+			if (item?.connectionId) {
+				await weaviateTreeDataProvider.editConnection(item.connectionId, { name, url, apiKey });
+			}
+		}),
+
+		vscode.commands.registerCommand('weaviate.deleteConnection', async (item: { connectionId: string }) => {
+			if (!item?.connectionId) { return; }
+
+			// Confirm deletion
+			const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+			if (!connection) { return; }
+
+			const confirm = await vscode.window.showWarningMessage(
+				`Are you sure you want to delete the connection '${connection.name}'?`,
+				{ modal: true },
+				'Yes',
+				'No'
+			);
+
+			if (confirm === 'Yes') {
+				weaviateTreeDataProvider.deleteConnection(item.connectionId);
+			}
+		}),
+
+		vscode.commands.registerCommand('weaviate.addCollection', async (item) => {
+			// This would open a schema designer or input form
+			// For the mockup, we'll just show a message
+			vscode.window.showInformationMessage(
+				`Adding collection to ${item.label} (Schema Designer would open here)`
+			);
+		}),
+
+		vscode.commands.registerCommand('weaviate.viewSchema', (item) => {
+			if (item?.connectionId && item?.label) {
+				weaviateTreeDataProvider.viewSchema(item.connectionId, item.label);
+			}
+		}),
+
+		vscode.commands.registerCommand('weaviate.deleteCollection', async (item) => {
+			if (!item?.connectionId || !item?.label) { 
+                return; 
+            }
+
+			// Confirm deletion
+			const confirm = await vscode.window.showWarningMessage(
+				`Are you sure you want to delete the collection '${item.label}'?`,
+				{ modal: true },
+				'Yes',
+				'No'
+			);
+
+			if (confirm === 'Yes') {
+				// Handle collection deletion through the connection manager
+                vscode.window.showInformationMessage(`Deleting collection ${item.label} is not yet implemented`);
+			}
+		})
+	);
+
+	// Register the filter box command
+	context.subscriptions.push(
+		vscode.commands.registerCommand('weaviate.showFilterBox', () => {
+			filterBoxContainer.show();
+		})
+	);
+}
+
+// This method is called when your extension is deactivated
+export function deactivate() {}
