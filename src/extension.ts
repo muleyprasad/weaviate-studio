@@ -2,8 +2,139 @@ import * as vscode from 'vscode';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider';
 import { WeaviateQueryEditor } from './query-editor/WeaviateQueryEditor';
 
+interface WebviewMessage {
+    command: string;
+    name?: string;
+    url?: string;
+    apiKey?: string;
+    message?: string;
+}
+
+// Helper function to generate the webview HTML content
+const getConnectionFormWebviewContent = (): string => {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <!-- Rest of the HTML content -->
+    </html>`;
+};
+
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
+    // Helper function to generate the webview HTML content
+    const getConnectionFormWebviewContent = (): string => `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Add Weaviate Connection</title>
+            <style>
+                body {
+                    font-family: var(--vscode-font-family);
+                    padding: 20px;
+                }
+                .form-group {
+                    margin-bottom: 15px;
+                }
+                label {
+                    display: block;
+                    margin-bottom: 5px;
+                    font-weight: 600;
+                }
+                input[type="text"],
+                input[type="password"] {
+                    width: 100%;
+                    padding: 6px;
+                    margin-bottom: 10px;
+                    box-sizing: border-box;
+                }
+                .buttons {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 20px;
+                }
+                button {
+                    margin-left: 10px;
+                    padding: 6px 12px;
+                    cursor: pointer;
+                }
+                #error {
+                    color: #f85149;
+                    margin-top: 10px;
+                    display: none;
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Add Weaviate Connection</h2>
+            <div id="error"></div>
+            <div class="form-group">
+                <label for="name">Connection Name</label>
+                <input type="text" id="name" placeholder="e.g., demo-cluster" required>
+            </div>
+            <div class="form-group">
+                <label for="url">Weaviate URL</label>
+                <input type="text" id="url" placeholder="e.g., http://localhost:8080" required>
+            </div>
+            <div class="form-group">
+                <label for="apiKey">API Key (optional)</label>
+                <input type="password" id="apiKey" placeholder="Leave empty if not required">
+            </div>
+            <div class="buttons">
+                <button id="cancel">Cancel</button>
+                <button id="save" style="background-color: var(--vscode-button-background); color: var(--vscode-button-foreground);">Save Connection</button>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                const errorElement = document.getElementById('error');
+
+                document.getElementById('save').addEventListener('click', () => {
+                    const name = document.getElementById('name').value.trim();
+                    const url = document.getElementById('url').value.trim();
+                    const apiKey = document.getElementById('apiKey').value.trim();
+
+                    if (!name) {
+                        showError('Please enter a connection name');
+                        return;
+                    }
+
+                    if (!url) {
+                        showError('Please enter a Weaviate URL');
+                        return;
+                    }
+
+                    vscode.postMessage({
+                        command: 'save',
+                        name,
+                        url,
+                        apiKey
+                    });
+                });
+
+                document.getElementById('cancel').addEventListener('click', () => {
+                    vscode.postMessage({ command: 'cancel' });
+                });
+
+                function showError(message: string) {
+                    errorElement.textContent = message;
+                    errorElement.style.display = 'block';
+                    setTimeout(() => {
+                        errorElement.style.display = 'none';
+                    }, 5000);
+                }
+
+
+                // Handle Enter key in form fields
+                document.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('save').click();
+                    }
+                });
+            </script>
+        </body>
+        </html>`;
 	console.log('"Weaviate Manager" extension is now active');
 
 	// Create and register the TreeDataProvider
@@ -47,10 +178,29 @@ export function activate(context: vscode.ExtensionContext) {
 			WeaviateQueryEditor.createOrShow(context.extensionUri, {});
 		}),
 
-		vscode.commands.registerCommand('weaviate.queryCollection', (connectionId: string, collectionName: string) => {
-			// Open the query editor with the selected collection
-			WeaviateQueryEditor.createOrShow(context.extensionUri, { connectionId, collectionName });
-		}),
+		vscode.commands.registerCommand('weaviate.queryCollection', (arg1: { connectionId: string; label: string; collectionName?: string }, arg2?: string) => {
+            // Handle both call signatures:
+            // 1. queryCollection(connectionId: string, collectionName: string)
+            // 2. queryCollection({ connectionId: string, label: string })
+            let connectionId: string;
+            let collectionName: string;
+
+            if (typeof arg1 === 'string' && arg2) {
+                // First signature
+                connectionId = arg1;
+                collectionName = arg2;
+            } else if (arg1?.connectionId && (arg1.label || arg1.collectionName)) {
+                // Second signature (from tree view)
+                connectionId = arg1.connectionId;
+                collectionName = arg1.label || arg1.collectionName || '';
+            } else {
+                console.error('Invalid arguments for weaviate.queryCollection:', arg1, arg2);
+                return;
+            }
+
+            // Open the query editor with the selected collection
+            WeaviateQueryEditor.createOrShow(context.extensionUri, { connectionId, collectionName });
+        }),
 
 		vscode.commands.registerCommand('weaviate.refreshConnections', () => {
 			weaviateTreeDataProvider.refresh();
@@ -58,57 +208,71 @@ export function activate(context: vscode.ExtensionContext) {
 		}),
 
 		vscode.commands.registerCommand('weaviate.addConnection', async () => {
-			// Show input box for connection name
-			const name = await vscode.window.showInputBox({
-				placeHolder: 'Connection name (e.g., demo-cluster)',
-				prompt: 'Enter a name for the Weaviate connection',
-				validateInput: (value) => {
-					return value.trim().length === 0 ? 'Name cannot be empty' : null;
+			// Create and show a new webview panel for the connection form
+			const panel = vscode.window.createWebviewPanel(
+				'weaviateAddConnection',
+				'Add Weaviate Connection',
+				vscode.ViewColumn.One,
+				{
+					enableScripts: true,
+					retainContextWhenHidden: true
 				}
-			});
+			);
 
-			if (!name) { return; } // User cancelled
+			// Set the HTML content for the webview
+			panel.webview.html = getConnectionFormWebviewContent();
 
-			// Show input box for connection URL
-			const url = await vscode.window.showInputBox({
-				placeHolder: 'Weaviate URL (e.g., http://localhost:8080)',
-				prompt: 'Enter the URL of the Weaviate instance',
-				validateInput: (value) => {
-					try {
-						new URL(value);
-						return null;
-					} catch (e) {
-						return 'Please enter a valid URL';
+			// Handle messages from the webview
+			panel.webview.onDidReceiveMessage(
+				async (message) => {
+					switch (message.command) {
+						case 'save':
+							try {
+								// Validate URL
+								new URL(message.url);
+
+								// Add the connection
+								await weaviateTreeDataProvider.addConnection({
+									name: message.name,
+									url: message.url,
+									apiKey: message.apiKey || undefined
+								});
+
+								panel.dispose(); // Close the panel on success
+							} catch (error) {
+								panel.webview.postMessage({
+									command: 'error',
+									message: 'Please enter a valid URL (e.g., http://localhost:8080)'
+								});
+							}
+							return;
+
+						case 'cancel':
+							panel.dispose();
+							return;
 					}
-				}
-			});
-
-			if (!url) { return; } // User cancelled
-
-			// Show input box for API key (optional)
-			const apiKey = await vscode.window.showInputBox({
-				placeHolder: 'API Key (optional)',
-				prompt: 'Enter the API key for authentication (leave empty if not required)',
-				password: true
-			});
-
-			// Add the connection
-			await weaviateTreeDataProvider.addConnection({ name, url, apiKey });
+				},
+				undefined,
+				context.subscriptions
+			);
 		}),
 
-		vscode.commands.registerCommand('weaviate.connect', async (item) => {
-			if (item?.connectionId) {
-				await weaviateTreeDataProvider.connect(item.connectionId);
-			}
-		}),
+// This function is now defined at the top of the file
 
-		vscode.commands.registerCommand('weaviate.disconnect', (item) => {
+
+		vscode.commands.registerCommand('weaviate.connect', async (item: { connectionId: string }) => {
+            if (item?.connectionId) {
+                await weaviateTreeDataProvider.connect(item.connectionId);
+            }
+        }),
+
+		vscode.commands.registerCommand('weaviate.disconnect', (item: { connectionId: string }) => {
 			if (item?.connectionId) {
 				weaviateTreeDataProvider.disconnect(item.connectionId);
 			}
 		}),
 
-		vscode.commands.registerCommand('weaviate.editConnection', async (item) => {
+		vscode.commands.registerCommand('weaviate.editConnection', async (item: { connectionId: string }) => {
 			if (!item?.connectionId) { return; }
 
 			// Get the current connection details
@@ -153,10 +317,12 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			// Update the connection
-			await weaviateTreeDataProvider.editConnection(item.connectionId, { name, url, apiKey });
+			if (item?.connectionId) {
+				await weaviateTreeDataProvider.editConnection(item.connectionId, { name, url, apiKey });
+			}
 		}),
 
-		vscode.commands.registerCommand('weaviate.deleteConnection', async (item) => {
+		vscode.commands.registerCommand('weaviate.deleteConnection', async (item: { connectionId: string }) => {
 			if (!item?.connectionId) { return; }
 
 			// Confirm deletion
@@ -189,14 +355,10 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		}),
 
-		vscode.commands.registerCommand('weaviate.queryCollection', (item) => {
-			if (item?.connectionId && item?.label) {
-				weaviateTreeDataProvider.queryCollection(item.connectionId, item.label);
-			}
-		}),
-
 		vscode.commands.registerCommand('weaviate.deleteCollection', async (item) => {
-			if (!item?.connectionId || !item?.label) { return; }
+			if (!item?.connectionId || !item?.label) { 
+                return; 
+            }
 
 			// Confirm deletion
 			const confirm = await vscode.window.showWarningMessage(
@@ -207,7 +369,8 @@ export function activate(context: vscode.ExtensionContext) {
 			);
 
 			if (confirm === 'Yes') {
-				await weaviateTreeDataProvider.deleteCollection(item.connectionId, item.label);
+				// Handle collection deletion through the connection manager
+                vscode.window.showInformationMessage(`Deleting collection ${item.label} is not yet implemented`);
 			}
 		})
 	);

@@ -29,9 +29,13 @@ export class ConnectionManager {
         return ConnectionManager.instance;
     }
 
-    private async loadConnections() {
+    private async loadConnections(): Promise<WeaviateConnection[]> {
         const connections = this.context.globalState.get<WeaviateConnection[]>(this.storageKey) || [];
-        this.connections = connections;
+        // Ensure all loaded connections start as disconnected
+        this.connections = connections.map((conn: WeaviateConnection) => ({
+            ...conn,
+            status: 'disconnected' as const
+        }));
         return this.connections;
     }
 
@@ -55,16 +59,20 @@ export class ConnectionManager {
 
     public async updateConnection(id: string, updates: Partial<WeaviateConnection>) {
         const index = this.connections.findIndex(c => c.id === id);
-        if (index === -1) return null;
+        if (index === -1) {
+            return null;
+        }
         
         this.connections[index] = { ...this.connections[index], ...updates, lastUsed: Date.now() };
         await this.saveConnections();
         return this.connections[index];
     }
 
-    public async deleteConnection(id: string) {
-        const index = this.connections.findIndex(c => c.id === id);
-        if (index === -1) return false;
+    public async deleteConnection(id: string): Promise<boolean> {
+        const index = this.connections.findIndex((c: WeaviateConnection) => c.id === id);
+        if (index === -1) {
+            return false;
+        }
         
         await this.disconnect(id);
         this.connections.splice(index, 1);
@@ -107,8 +115,13 @@ export class ConnectionManager {
 
     public async disconnect(id: string): Promise<boolean> {
         this.clients.delete(id);
-        await this.updateConnection(id, { status: 'disconnected' });
-        return true;
+        try {
+            await this.updateConnection(id, { status: 'disconnected' });
+            return true;
+        } catch (error) {
+            console.error(`Error disconnecting connection ${id}:`, error);
+            return false;
+        }
     }
 
     public getClient(id: string): any | undefined {
@@ -130,7 +143,9 @@ export class ConnectionManager {
             placeHolder: 'e.g., localhost:8080 or weaviate.example.com',
             validateInput: value => !value ? 'URL is required' : null
         });
-        if (!url) return null;
+        if (!url) {
+            return null;
+        }
 
         const useAuth = await vscode.window.showQuickPick(
             ['No authentication', 'API Key'],
