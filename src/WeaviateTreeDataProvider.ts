@@ -303,84 +303,27 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     // Edit a connection
     async editConnection(connectionId: string, updates?: { name: string; url: string; apiKey?: string }): Promise<void> {
-        const connection = this.connections.find(c => c.id === connectionId);
-        if (!connection) {
-            return;
-        }
-        
-        let name: string | undefined;
-        let url: string | undefined;
-        let apiKey: string | undefined;
-        
-        if (updates) {
-            // Use provided updates
-            ({ name, url, apiKey } = updates);
-        } else {
-            // Show input dialogs if no updates provided
-            const newName = await vscode.window.showInputBox({
-                value: connection.name,
-                prompt: 'Edit connection name',
-                validateInput: value => {
-                    if (!value) {
-                        return 'Name is required';
-                    }
-                    return null;
+        try {
+            if (updates) {
+                // If updates are provided, apply them directly
+                await this.connectionManager.updateConnection(connectionId, updates);
+                this.refresh();
+                vscode.window.showInformationMessage('Connection updated successfully');
+            } else {
+                // Show the edit dialog
+                const updatedConnection = await this.connectionManager.showEditConnectionDialog(connectionId);
+                if (updatedConnection) {
+                    this.refresh();
+                    vscode.window.showInformationMessage('Connection updated successfully');
                 }
-            });
-            
-            if (!newName) {
-                return;
             }
-            
-            const newUrl = await vscode.window.showInputBox({
-                value: connection.url,
-                prompt: 'Edit Weaviate server URL',
-                validateInput: value => !value ? 'URL is required' : null
-            });
-            
-            if (!newUrl) {
-                return;
-            }
-            
-            const useAuth = await vscode.window.showQuickPick(
-                ['No authentication', 'API Key'],
-                { 
-                    placeHolder: 'Authentication method',
-                    canPickMany: false
-                }
-            );
-            
-            if (useAuth === 'API Key') {
-                const key = await vscode.window.showInputBox({
-                    prompt: 'Enter your API key',
-                    password: true
-                });
-                if (key === undefined) {
-                    return;
-                }
-                if (key) {
-                    apiKey = key;
-                }
-            } else if (useAuth === 'No authentication') {
-                apiKey = undefined;
-            }
-            
-            name = newName;
-            url = newUrl;
-        }
-        
-        if (name && url) {
-            await this.connectionManager.updateConnection(connectionId, { 
-                name, 
-                url, 
-                apiKey: apiKey || connection.apiKey 
-            });
-            this.refresh();
-            vscode.window.showInformationMessage(`Updated connection: ${name}`);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update connection';
+            vscode.window.showErrorMessage(`Failed to update connection: ${errorMessage}`);
         }
     }
 
-
+    // --- Connection Management Methods ---
     
     // Get the total number of connections
     getConnectionCount(): number {

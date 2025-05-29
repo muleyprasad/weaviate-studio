@@ -157,10 +157,23 @@ export class ConnectionManager {
     }
 
     public async showAddConnectionDialog(): Promise<WeaviateConnection | null> {
+        return this.showConnectionDialog();
+    }
+
+    public async showEditConnectionDialog(connectionId: string): Promise<WeaviateConnection | null> {
+        const connection = this.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+        return this.showConnectionDialog(connection);
+    }
+
+    private async showConnectionDialog(connection?: WeaviateConnection): Promise<WeaviateConnection | null> {
         return new Promise((resolve) => {
+            const isEditMode = !!connection;
             const panel = vscode.window.createWebviewPanel(
-                'weaviateAddConnection',
-                'Add Weaviate Connection',
+                'weaviateConnection',
+                isEditMode ? 'Edit Weaviate Connection' : 'Add Weaviate Connection',
                 vscode.ViewColumn.Active,
                 {
                     enableScripts: true,
@@ -195,18 +208,31 @@ export class ConnectionManager {
                                     return;
                                 }
 
-                                const connection = await this.addConnection({
-                                    name: name.trim(),
-                                    url: url.trim(),
-                                    apiKey: apiKey?.trim() || undefined
-                                });
+                                let updatedConnection: WeaviateConnection | null = null;
                                 
-                                if (connection) {
+                                if (isEditMode && connection) {
+                                    // Update existing connection
+                                    updatedConnection = await this.updateConnection(connection.id, {
+                                        name: name.trim(),
+                                        url: url.trim(),
+                                        apiKey: apiKey?.trim() || undefined
+                                    });
+                                } else {
+                                    // Add new connection
+                                    updatedConnection = await this.addConnection({
+                                        name: name.trim(),
+                                        url: url.trim(),
+                                        apiKey: apiKey?.trim() || undefined
+                                    });
+                                }
+                                
+                                if (updatedConnection) {
                                     panel.dispose();
-                                    resolve(connection);
+                                    resolve(updatedConnection);
                                 }
                             } catch (error) {
-                                const errorMessage = error instanceof Error ? error.message : 'Failed to add connection';
+                                const errorMessage = error instanceof Error ? error.message : 
+                                    isEditMode ? 'Failed to update connection' : 'Failed to add connection';
                                 panel.webview.postMessage({
                                     command: 'error',
                                     message: errorMessage
@@ -224,11 +250,11 @@ export class ConnectionManager {
             );
 
             // Set the HTML content for the webview
-            panel.webview.html = this.getWebviewContent();
+            panel.webview.html = this.getWebviewContent(connection);
         });
     }
 
-    private getWebviewContent(): string {
+    private getWebviewContent(connection?: WeaviateConnection): string {
         return `
             <!DOCTYPE html>
             <html lang="en">
@@ -291,22 +317,22 @@ export class ConnectionManager {
             <body>
                 <div class="form-group">
                     <label for="connectionName">Connection Name</label>
-                    <input type="text" id="connectionName" placeholder="e.g., Production Cluster">
+                    <input type="text" id="connectionName" placeholder="e.g., Production Cluster" value="${connection?.name || ''}">
                     <div id="nameError" class="error"></div>
                 </div>
                 <div class="form-group">
                     <label for="connectionUrl">Weaviate URL</label>
-                    <input type="text" id="connectionUrl" placeholder="http://localhost:8080">
+                    <input type="text" id="connectionUrl" placeholder="http://localhost:8080" value="${connection?.url || ''}">
                     <div id="urlError" class="error"></div>
                 </div>
                 <div class="form-group">
                     <label for="apiKey">API Key (optional)</label>
-                    <input type="password" id="apiKey" placeholder="Leave empty if not required">
+                    <input type="password" id="apiKey" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
                 </div>
                 <div id="formError" class="error"></div>
                 <div class="button-container">
                     <button class="cancel-button" id="cancelButton">Cancel</button>
-                    <button class="save-button" id="saveButton">Save Connection</button>
+                    <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'} Connection</button>
                 </div>
 
                 <script>

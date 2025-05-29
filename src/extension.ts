@@ -68,73 +68,29 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Edit an existing connection
         vscode.commands.registerCommand('weaviate.editConnection', async (item: { connectionId: string }) => {
-            if (!item?.connectionId) return;
-
-            // Get the current connection details
-            const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
-            if (!connection) return;
-
-            // Show input box for connection name (pre-filled)
-            const name = await vscode.window.showInputBox({
-                value: connection.name,
-                placeHolder: 'Connection name (e.g., demo-cluster)',
-                prompt: 'Edit the name for the Weaviate connection',
-                validateInput: (value) => {
-                    return value && value.trim().length > 0 ? null : 'Name cannot be empty';
-                }
-            });
-
-            if (name === undefined) return; // User cancelled
-
-            // Show input box for connection URL (pre-filled)
-            const url = await vscode.window.showInputBox({
-                value: connection.url,
-                placeHolder: 'http://localhost:8080',
-                prompt: 'Edit the Weaviate URL',
-                validateInput: (value) => {
-                    if (!value || !value.trim()) {
-                        return 'URL is required';
-                    }
-                    try {
-                        new URL(value);
-                        return null;
-                    } catch (e) {
-                        return 'Please enter a valid URL (e.g., http://localhost:8080)';
-                    }
-                }
-            });
-
-            if (!url) return; // User cancelled
-
-            // Show input box for API key (optional, pre-filled if exists)
-            const apiKey = await vscode.window.showInputBox({
-                value: connection.apiKey || '',
-                placeHolder: 'API Key (leave empty if not required)',
-                prompt: 'Edit the API key (if required)',
-                password: true
-            });
+            if (!item?.connectionId) {
+                return;
+            }
 
             try {
-                // Update the connection
-                await weaviateTreeDataProvider.updateConnection(item.connectionId, {
-                    name: name.trim(),
-                    url: url.trim(),
-                    apiKey: apiKey?.trim() || undefined
-                });
-                vscode.window.showInformationMessage('Connection updated successfully');
+                await weaviateTreeDataProvider.editConnection(item.connectionId);
             } catch (error) {
                 vscode.window.showErrorMessage(
-                    `Failed to update connection: ${error instanceof Error ? error.message : String(error)}`
+                    `Failed to edit connection: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
         }),
 
         // Delete a connection
         vscode.commands.registerCommand('weaviate.deleteConnection', async (item: { connectionId: string }) => {
-            if (!item?.connectionId) return;
+            if (!item?.connectionId) {
+                return;
+            }
 
             const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
-            if (!connection) return;
+            if (!connection) {
+                return;
+            }
 
             const confirm = await vscode.window.showWarningMessage(
                 `Are you sure you want to delete the connection "${connection.name}"?`,
