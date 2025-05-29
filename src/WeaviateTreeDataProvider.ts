@@ -74,36 +74,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     private updateEmptyState() {
         vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
     }
-    
-    private async loadConnections(): Promise<void> {
-        if (this.isRefreshing) {
-            return;
-        }
-        
-        this.isRefreshing = true;
-        try {
-            // Get fresh connections from manager
-            const connections = this.connectionManager.getConnections();
-            
-            // Only update if there are actual changes
-            const hasChanges = JSON.stringify(connections) !== JSON.stringify(this.connections);
-            if (hasChanges) {
-                this.connections = connections;
-                this.updateEmptyState();
-                
-                // Auto-connect to previously connected instances
-                await Promise.all(
-                    this.connections
-                        .filter(conn => conn.status === 'connected')
-                        .map(conn => this.connect(conn.id, true)) // Silent connect
-                );
-            }
-        } catch (error) {
-            console.error('Error loading connections:', error);
-        } finally {
-            this.isRefreshing = false;
-        }
-    }
 
     // Handle filter text changes
     setFilterText(text: string): void {
@@ -189,9 +159,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const collections = this.collections[element.connectionId] || [];
             
             if (collections.length === 0) {
+                const connection = this.connections.find(conn => conn.id === element.connectionId);
+                let message = 'Not connected';
+                
+                if (connection) {
+                    message = connection.status === 'connected' 
+                        ? 'No collections found. Right-click to add a collection.'
+                        : 'Not connected. Right-click and select "Connect" to view collections.';
+                }
+                
                 return Promise.resolve([
                     new WeaviateTreeItem(
-                        'No collections found. Right-click to add a collection.', 
+                        message,
                         vscode.TreeItemCollapsibleState.None, 
                         'message'
                     )
