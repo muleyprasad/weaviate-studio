@@ -425,31 +425,32 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-    // Delete a connection
-    async deleteConnection(connectionId: string): Promise<void> {
+    /**
+     * Deletes a connection without showing any confirmation dialogs.
+     * Callers are responsible for showing confirmation dialogs if needed.
+     * @param connectionId The ID of the connection to delete
+     * @returns The name of the deleted connection
+     * @throws Error if the connection doesn't exist or deletion fails
+     */
+    async deleteConnection(connectionId: string): Promise<string> {
         const connection = this.connections.find(c => c.id === connectionId);
         if (!connection) {
-            return;
+            throw new Error('Connection not found');
         }
         
-        const confirm = await vscode.window.showWarningMessage(
-            `Are you sure you want to delete the connection "${connection.name}"?`,
-            { modal: true },
-            'Delete'
-        );
-        
-        if (confirm === 'Delete') {
+        try {
             await this.connectionManager.deleteConnection(connectionId);
-            this.refresh();
-            vscode.window.showInformationMessage(`Deleted connection: ${connection.name}`);
-            // Remove collections for this connection
+            
+            // Clean up related data
             delete this.collections[connectionId];
             
             // Update empty state context
             vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
             
             this._onDidChangeTreeData.fire();
-            vscode.window.showInformationMessage(`Connection '${connection.name}' deleted.`);
+            return connection.name;
+        } catch (error) {
+            throw new Error(`Failed to delete connection: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 }

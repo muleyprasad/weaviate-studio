@@ -89,6 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
             if (!connection) {
+                vscode.window.showErrorMessage('Connection not found');
                 return;
             }
 
@@ -98,15 +99,17 @@ export function activate(context: vscode.ExtensionContext) {
                 'Delete'
             );
 
-            if (confirm === 'Delete') {
-                try {
-                    await weaviateTreeDataProvider.deleteConnection(item.connectionId);
-                    vscode.window.showInformationMessage(`Connection "${connection.name}" deleted`);
-                } catch (error) {
-                    vscode.window.showErrorMessage(
-                        `Failed to delete connection: ${error instanceof Error ? error.message : String(error)}`
-                    );
-                }
+            if (confirm !== 'Delete') {
+                return;
+            }
+
+            try {
+                const deletedConnectionName = await weaviateTreeDataProvider.deleteConnection(item.connectionId);
+                vscode.window.showInformationMessage(`Connection "${deletedConnectionName}" deleted`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    error instanceof Error ? error.message : 'Failed to delete connection'
+                );
             }
         }),
 
