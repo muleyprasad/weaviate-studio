@@ -103,11 +103,6 @@
           "command": "weaviate.refreshConnections",
           "when": "view == weaviateConnectionsView",
           "group": "navigation@2"
-        },
-        {
-          "command": "weaviate.openQueryEditor",
-          "when": "view == weaviateConnectionsView",
-          "group": "navigation"
         }
       ],
       "view/item/context": [

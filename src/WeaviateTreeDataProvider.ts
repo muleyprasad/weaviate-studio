@@ -7,8 +7,10 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'connection' | 'collection' | 'message' | 'object',
+        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object',
         public readonly connectionId?: string, // To associate collections with a connection
+        public readonly collectionName?: string, // To associate items with a collection
+        public readonly itemId?: string, // For properties/vectors to identify the parent
         iconPath?: string | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon,
         contextValue?: string, // Used to show specific commands for items
         description?: string // Optional description
@@ -104,6 +106,32 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     // TreeDataProvider implementation
     getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
+        // Set appropriate icons and tooltips based on item type
+        if (element.itemType === 'metadata' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('info');
+            element.tooltip = 'View collection metadata';
+        } else if (element.itemType === 'properties' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('symbol-property');
+            element.tooltip = 'View collection properties';
+        } else if (element.itemType === 'vectors' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('symbol-array');
+            element.tooltip = 'View vector configurations';
+        } else if (element.itemType === 'property' && !element.iconPath) {
+            // For property items, use different icons based on property type
+            const label = element.label.toLowerCase();
+            if (label.includes('(text)')) {
+                element.iconPath = new vscode.ThemeIcon('symbol-text');
+            } else if (label.includes('(number)') || label.includes('(int)') || label.includes('(float)')) {
+                element.iconPath = new vscode.ThemeIcon('symbol-number');
+            } else if (label.includes('(boolean)') || label.includes('(bool)')) {
+                element.iconPath = new vscode.ThemeIcon('symbol-boolean');
+            } else if (label.includes('(date)') || label.includes('(datetime)')) {
+                element.iconPath = new vscode.ThemeIcon('calendar');
+            } else {
+                element.iconPath = new vscode.ThemeIcon('symbol-property');
+            }
+        }
+        
         return element;
     }
 
@@ -138,10 +166,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'connection',
                     conn.id,
+                    undefined, // collectionName
+                    undefined, // itemId
                     this.getStatusIcon(conn.status),
                     contextValue
                 );
-                item.description = conn.url;
                 item.tooltip = `${conn.name} (${conn.url})\nStatus: ${conn.status}`;
                 
                 // Only expand connected clusters
@@ -172,30 +201,73 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new WeaviateTreeItem(
                         message,
                         vscode.TreeItemCollapsibleState.None, 
-                        'message'
+                        'message',
+                        element.connectionId
                     )
                 ]);
             }
             
             return Promise.resolve(applyFilter(collections));
         }
-        else if (element.itemType === 'collection' && element.label === 'Products') {
-            // Collection level - show objects (only for Products demo)
-            const objects = [
-                new WeaviateTreeItem('Object A', vscode.TreeItemCollapsibleState.None, 'object', element.connectionId, new vscode.ThemeIcon('symbol-property')),
-                new WeaviateTreeItem('Object B', vscode.TreeItemCollapsibleState.None, 'object', element.connectionId, new vscode.ThemeIcon('symbol-property'))
+        else if (element.itemType === 'collection') {
+            // Collection level - show metadata, properties, and vectors
+            const items = [
+                new WeaviateTreeItem(
+                    'Metadata',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'metadata',
+                    element.connectionId,
+                    element.label,
+                    'metadata',
+                    new vscode.ThemeIcon('info')
+                ),
+                new WeaviateTreeItem(
+                    'Properties',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'properties',
+                    element.connectionId,
+                    element.label,
+                    'properties',
+                    new vscode.ThemeIcon('symbol-property')
+                ),
+                new WeaviateTreeItem(
+                    'Vectors',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'vectors',
+                    element.connectionId,
+                    element.label,
+                    'vectors',
+                    new vscode.ThemeIcon('symbol-array')
+                )
             ];
             
-            return Promise.resolve(applyFilter(objects));
+            return Promise.resolve(applyFilter(items));
         }
-        else if (element.itemType === 'collection' && element.label === 'Users') {
-            // Collection level - show objects (only for Users demo)
-            const objects = [
-                new WeaviateTreeItem('User 1', vscode.TreeItemCollapsibleState.None, 'object', element.connectionId, new vscode.ThemeIcon('symbol-property')),
-                new WeaviateTreeItem('User 2', vscode.TreeItemCollapsibleState.None, 'object', element.connectionId, new vscode.ThemeIcon('symbol-property'))
+        // Handle child nodes for metadata, properties, and vectors
+        else if (element.itemType === 'metadata' && element.connectionId && element.collectionName) {
+            const metadataItems = [
+                new WeaviateTreeItem('Class: ' + element.collectionName, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'class'),
+                new WeaviateTreeItem('Vectorizer: text2vec-transformers', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vectorizer'),
+                new WeaviateTreeItem('Vector Index Type: HNSW', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'indexType')
             ];
-            
-            return Promise.resolve(applyFilter(objects));
+            return Promise.resolve(metadataItems);
+        }
+        else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
+            // In a real implementation, you would fetch these from the Weaviate schema
+            const propertyItems = [
+                new WeaviateTreeItem('title (text)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'title', new vscode.ThemeIcon('symbol-text')),
+                new WeaviateTreeItem('description (text)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'description', new vscode.ThemeIcon('symbol-text')),
+                new WeaviateTreeItem('price (number)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'price', new vscode.ThemeIcon('symbol-number'))
+            ];
+            return Promise.resolve(propertyItems);
+        }
+        else if (element.itemType === 'vectors' && element.connectionId && element.collectionName) {
+            // In a real implementation, you might show actual vector information
+            const vectorItems = [
+                new WeaviateTreeItem('Vector 1 (dense, 768d)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vector1', new vscode.ThemeIcon('symbol-array')),
+                new WeaviateTreeItem('Vector 2 (sparse, 300d)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vector2', new vscode.ThemeIcon('symbol-array'))
+            ];
+            return Promise.resolve(vectorItems);
         }
         
         return Promise.resolve([]);
@@ -332,6 +404,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'collection',
                     connectionId,
+                    cls.class, // collectionName
+                    undefined, // itemId
                     new vscode.ThemeIcon('database'),
                     'weaviateCollection',
                     cls.description
