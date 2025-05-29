@@ -2,18 +2,79 @@ import * as vscode from 'vscode';
 import * as weaviate from 'weaviate-ts-client';
 import { ConnectionManager, WeaviateConnection } from './services/ConnectionManager';
 
-// Define the structure for our tree items
+/**
+ * Represents a property in a Weaviate schema
+ */
+interface SchemaProperty {
+    name: string;
+    dataType: string[];
+    description?: string;
+    indexInverted?: boolean;
+    moduleConfig?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+/**
+ * Represents a class/collection in a Weaviate schema
+ */
+interface SchemaClass {
+    class: string;
+    description?: string;
+    properties?: SchemaProperty[];
+    vectorizer?: string;
+    moduleConfig?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+/**
+ * Extends WeaviateTreeItem to include schema information
+ */
+interface CollectionWithSchema extends WeaviateTreeItem {
+    schema?: SchemaClass;
+}
+
+/**
+ * Maps connection IDs to their respective collections
+ */
+interface CollectionsMap {
+    [connectionId: string]: CollectionWithSchema[];
+}
+
+/**
+ * Configuration for a Weaviate connection
+ */
+interface ConnectionConfig extends WeaviateConnection {
+    /** Last time this connection was used */
+    lastUsed?: number;
+}
+
+/**
+ * Represents an item in the Weaviate Explorer tree view.
+ * Extends vscode.TreeItem to include Weaviate-specific properties.
+ */
 export class WeaviateTreeItem extends vscode.TreeItem {
+    /**
+     * Creates a new instance of WeaviateTreeItem
+     * @param label - The display label for the tree item
+     * @param collapsibleState - The collapsible state of the tree item
+     * @param itemType - The type of the tree item (connection, collection, metadata, etc.)
+     * @param connectionId - Optional ID of the Weaviate connection this item belongs to
+     * @param collectionName - Optional name of the collection this item belongs to
+     * @param itemId - Optional ID for properties/vectors to identify the parent
+     * @param iconPath - Optional icon for the tree item
+     * @param contextValue - Optional context value used for conditional visibility/commands
+     * @param description - Optional description text shown next to the label
+     */
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object',
-        public readonly connectionId?: string, // To associate collections with a connection
-        public readonly collectionName?: string, // To associate items with a collection
-        public readonly itemId?: string, // For properties/vectors to identify the parent
+        public readonly connectionId?: string,
+        public readonly collectionName?: string,
+        public readonly itemId?: string,
         iconPath?: string | vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon,
-        contextValue?: string, // Used to show specific commands for items
-        description?: string // Optional description
+        contextValue?: string,
+        description?: string
     ) {
         super(label, collapsibleState);
         this.iconPath = iconPath;
@@ -25,23 +86,50 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     }
 }
 
-// Alias for backward compatibility
-type ConnectionConfig = WeaviateConnection;
-
+/**
+ * Provides data for the Weaviate Explorer tree view, displaying connections,
+ * collections, and their properties in a hierarchical structure.
+ * 
+ * This class implements the VS Code TreeDataProvider interface to display
+ * Weaviate connections, collections, and their properties in the VS Code
+ * Explorer view. It handles the data retrieval, filtering, and display
+ * of Weaviate schema information.
+ */
 export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<WeaviateTreeItem> {
     // Event emitter for tree data changes
-    private _onDidChangeTreeData: vscode.EventEmitter<WeaviateTreeItem | undefined | null | void> = new vscode.EventEmitter<WeaviateTreeItem | undefined | null | void>();
-    readonly onDidChangeTreeData: vscode.Event<WeaviateTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
+    /** Event emitter for tree data changes */
+    private _onDidChangeTreeData: vscode.EventEmitter<WeaviateTreeItem | undefined | null | void> = 
+        new vscode.EventEmitter<WeaviateTreeItem | undefined | null | void>();
+    
+    /** Event that fires when the tree data changes */
+    readonly onDidChangeTreeData: vscode.Event<WeaviateTreeItem | undefined | null | void> = 
+        this._onDidChangeTreeData.event;
 
+    /** List of Weaviate connections */
     private connections: ConnectionConfig[] = [];
-    private collections: { [connectionId: string]: WeaviateTreeItem[] } = {};
-    private context: vscode.ExtensionContext;
-    private connectionManager: ConnectionManager;
+    
+    /** Map of connection IDs to their collections */
+    private collections: CollectionsMap = {};
+    
+    /** VS Code extension context */
+    private readonly context: vscode.ExtensionContext;
+    
+    /** Manages Weaviate connections */
+    private readonly connectionManager: ConnectionManager;
     // Filter text for the search box
     private filterText: string = '';
 
     private isRefreshing = false;
 
+    /**
+     * Creates a new instance of the WeaviateTreeDataProvider
+     * @param context - The VS Code extension context
+     * 
+     * @remarks
+     * The constructor initializes the connection manager, loads initial connections,
+     * and sets up event listeners for connection changes. It uses a debounce mechanism
+     * to prevent excessive refreshes when multiple connection changes occur in quick succession.
+     */
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.connectionManager = ConnectionManager.getInstance(context);
@@ -73,17 +161,39 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         });
     }
     
-    private updateEmptyState() {
+    /**
+     * Updates the VS Code context to reflect whether there are any connections
+     * 
+     * @remarks
+     * This method sets a VS Code context variable 'weaviateConnectionsEmpty' that can be used
+     * to control the visibility of UI elements based on whether there are any connections.
+     * It's called whenever the connections list changes.
+     */
+    private updateEmptyState(): void {
         vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
     }
 
-    // Handle filter text changes
+    /**
+     * Sets the filter text and refreshes the tree view
+     * @param text - The text to filter tree items by
+     * 
+     * @remarks
+     * This method updates the filter text used to filter the tree view items
+     * and triggers a refresh of the tree view to apply the filter.
+     */
     setFilterText(text: string): void {
         this.filterText = text;
         this._onDidChangeTreeData.fire();
     }
 
-    // Refresh tree view
+    /**
+     * Refreshes the tree view to reflect any changes in the data
+     * 
+     * @remarks
+     * This method triggers a refresh of the tree view by emitting the
+     * `_onDidChangeTreeData` event. It should be called whenever the underlying
+     * data changes and the UI needs to be updated.
+     */
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
@@ -104,7 +214,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         // No longer needed as we're using real connections
     }
 
-    // TreeDataProvider implementation
+    // #region TreeDataProvider Implementation
+    
+    /**
+     * Converts a tree item into a VS Code TreeItem for display in the explorer view
+     * @param element - The tree item to convert
+     * @returns A VS Code TreeItem ready for display
+     * 
+     * @remarks
+     * This method is called by VS Code to get the UI representation of a tree item.
+     * It sets appropriate icons and tooltips based on the item type and properties.
+     */
     getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
         // Set appropriate icons and tooltips based on item type
         if (element.itemType === 'metadata' && !element.iconPath) {
@@ -115,11 +235,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             element.tooltip = 'View collection properties';
         } else if (element.itemType === 'vectors' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('symbol-array');
-            element.tooltip = 'View vector configurations';
+            element.tooltip = 'View vector configuration';
         } else if (element.itemType === 'property' && !element.iconPath) {
-            // For property items, use different icons based on property type
-            const label = element.label.toLowerCase();
-            if (label.includes('(text)')) {
+            // Set different icons based on property type
+            const label = element.label as string;
+            if (label.includes('(text)') || label.includes('(string)')) {
                 element.iconPath = new vscode.ThemeIcon('symbol-text');
             } else if (label.includes('(number)') || label.includes('(int)') || label.includes('(float)')) {
                 element.iconPath = new vscode.ThemeIcon('symbol-number');
@@ -135,6 +255,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return element;
     }
 
+    /**
+     * Gets the children of a tree item, or the root items if no item is provided
+     * @param element - The parent tree item, or undefined to get root items
+     * @returns A promise that resolves to an array of child tree items
+     * 
+     * @remarks
+     * This method is called by VS Code to populate the tree view. It handles:
+     * - Root level: Shows connections or a message if no connections exist
+     * - Connection level: Shows collections for the connection
+     * - Collection level: Shows metadata, properties, and vector configurations
+     */
     getChildren(element?: WeaviateTreeItem): Thenable<WeaviateTreeItem[]> {
         // Apply filtering if needed
         const applyFilter = (items: WeaviateTreeItem[]): WeaviateTreeItem[] => {
@@ -245,29 +376,227 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
         // Handle child nodes for metadata, properties, and vectors
         else if (element.itemType === 'metadata' && element.connectionId && element.collectionName) {
+            // Find the collection schema
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            
+            if (!collection) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No metadata available', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
+            const schema = (collection as any).schema;
+            if (!schema) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No schema data available', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
             const metadataItems = [
-                new WeaviateTreeItem('Class: ' + element.collectionName, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'class'),
-                new WeaviateTreeItem('Vectorizer: text2vec-transformers', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vectorizer'),
-                new WeaviateTreeItem('Vector Index Type: HNSW', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'indexType')
+                new WeaviateTreeItem(`Class: ${schema.class}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'class'),
+                new WeaviateTreeItem(`Vectorizer: ${schema.vectorizer || 'none'}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vectorizer'),
+                new WeaviateTreeItem(`Vector Index Type: ${schema.vectorIndexType || 'hnsw'}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'indexType')
             ];
+            
+            if (schema.moduleConfig) {
+                Object.entries(schema.moduleConfig).forEach(([moduleName, config]) => {
+                    metadataItems.push(
+                        new WeaviateTreeItem(
+                            `Module: ${moduleName}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'property',
+                            element.connectionId,
+                            element.collectionName,
+                            `module-${moduleName}`,
+                            new vscode.ThemeIcon('extensions')
+                        )
+                    );
+                });
+            }
+            
             return Promise.resolve(metadataItems);
         }
         else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
-            // In a real implementation, you would fetch these from the Weaviate schema
-            const propertyItems = [
-                new WeaviateTreeItem('title (text)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'title', new vscode.ThemeIcon('symbol-text')),
-                new WeaviateTreeItem('description (text)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'description', new vscode.ThemeIcon('symbol-text')),
-                new WeaviateTreeItem('price (number)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'price', new vscode.ThemeIcon('symbol-number'))
-            ];
+            // Find the collection schema
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            
+            if (!collection) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No properties available', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
+            const schema = (collection as any).schema;
+            if (!schema || !schema.properties || !Array.isArray(schema.properties)) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No properties defined', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
+            // Map property types to icons
+            const getPropertyIcon = (dataType: string[]): vscode.ThemeIcon => {
+                const type = Array.isArray(dataType) ? dataType[0] : dataType;
+                switch (type) {
+                    case 'text':
+                    case 'string':
+                        return new vscode.ThemeIcon('symbol-text');
+                    case 'int':
+                    case 'number':
+                    case 'float':
+                    case 'number[]':
+                        return new vscode.ThemeIcon('symbol-number');
+                    case 'boolean':
+                        return new vscode.ThemeIcon('symbol-boolean');
+                    case 'date':
+                    case 'dateTime':
+                        return new vscode.ThemeIcon('calendar');
+                    case 'object':
+                    case 'object[]':
+                        return new vscode.ThemeIcon('symbol-object');
+                    case 'geoCoordinates':
+                        return new vscode.ThemeIcon('location');
+                    case 'phoneNumber':
+                        return new vscode.ThemeIcon('device-mobile');
+                    case 'blob':
+                        return new vscode.ThemeIcon('file-binary');
+                    default:
+                        return new vscode.ThemeIcon('symbol-property');
+                }
+            };
+            
+            const propertyItems = schema.properties.map((prop: any) => {
+                const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
+                const icon = getPropertyIcon(prop.dataType);
+                const description = prop.description ? ` - ${prop.description}` : '';
+                
+                return new WeaviateTreeItem(
+                    `${prop.name} (${dataType})${description}`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'property',
+                    element.connectionId,
+                    element.collectionName,
+                    prop.name,
+                    icon
+                );
+            });
+            
             return Promise.resolve(propertyItems);
         }
         else if (element.itemType === 'vectors' && element.connectionId && element.collectionName) {
-            // In a real implementation, you might show actual vector information
-            const vectorItems = [
-                new WeaviateTreeItem('Vector 1 (dense, 768d)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vector1', new vscode.ThemeIcon('symbol-array')),
-                new WeaviateTreeItem('Vector 2 (sparse, 300d)', vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vector2', new vscode.ThemeIcon('symbol-array'))
-            ];
-            return Promise.resolve(vectorItems);
+            // Find the collection schema
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            
+            if (!collection) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No vector configuration available', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
+            const schema = (collection as any).schema;
+            if (!schema) {
+                return Promise.resolve([
+                    new WeaviateTreeItem('No vector configuration available', vscode.TreeItemCollapsibleState.None, 'message')
+                ]);
+            }
+            
+            const vectorItems = [];
+            
+            // Add vector index configuration
+            if (schema.vectorIndexConfig) {
+                vectorItems.push(
+                    new WeaviateTreeItem(
+                        `Distance: ${schema.vectorIndexConfig.distance || 'cosine'}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'property',
+                        element.connectionId,
+                        element.collectionName,
+                        'vector-distance',
+                        new vscode.ThemeIcon('ruler')
+                    )
+                );
+                
+                if (schema.vectorIndexConfig.efConstruction) {
+                    vectorItems.push(
+                        new WeaviateTreeItem(
+                            `EF Construction: ${schema.vectorIndexConfig.efConstruction}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'property',
+                            element.connectionId,
+                            element.collectionName,
+                            'vector-ef-construction',
+                            new vscode.ThemeIcon('settings')
+                        )
+                    );
+                }
+                
+                if (schema.vectorIndexConfig.ef) {
+                    vectorItems.push(
+                        new WeaviateTreeItem(
+                            `EF: ${schema.vectorIndexConfig.ef}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'property',
+                            element.connectionId,
+                            element.collectionName,
+                            'vector-ef',
+                            new vscode.ThemeIcon('settings')
+                        )
+                    );
+                }
+                
+                if (schema.vectorIndexConfig.maxConnections) {
+                    vectorItems.push(
+                        new WeaviateTreeItem(
+                            `Max Connections: ${schema.vectorIndexConfig.maxConnections}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'property',
+                            element.connectionId,
+                            element.collectionName,
+                            'vector-max-connections',
+                            new vscode.ThemeIcon('link')
+                        )
+                    );
+                }
+            }
+            
+            // Add vectorizer information if available
+            if (schema.vectorizer) {
+                vectorItems.push(
+                    new WeaviateTreeItem(
+                        `Vectorizer: ${schema.vectorizer}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'property',
+                        element.connectionId,
+                        element.collectionName,
+                        'vectorizer',
+                        new vscode.ThemeIcon('symbol-function')
+                    )
+                );
+            }
+            
+            // Add vector index type
+            if (schema.vectorIndexType) {
+                vectorItems.push(
+                    new WeaviateTreeItem(
+                        `Index Type: ${schema.vectorIndexType}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'property',
+                        element.connectionId,
+                        element.collectionName,
+                        'vector-index-type',
+                        new vscode.ThemeIcon('list-tree')
+                    )
+                );
+            }
+            
+            return Promise.resolve(vectorItems.length > 0 ? vectorItems : [
+                new WeaviateTreeItem('No vector configuration available', vscode.TreeItemCollapsibleState.None, 'message')
+            ]);
         }
         
         return Promise.resolve([]);
@@ -397,9 +726,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
 
         try {
-            const schema = await client.schema.getter().do();
-            this.collections[connectionId] = (schema.classes || []).map((cls: any) => 
-                new WeaviateTreeItem(
+            const schema = await client.schema.getter().do() as { classes?: SchemaClass[] };
+            this.collections[connectionId] = (schema.classes || []).map((cls: SchemaClass) => {
+                // Store the full schema with the collection for later use
+                const collectionItem = new WeaviateTreeItem(
                     cls.class,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'collection',
@@ -409,46 +739,182 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('database'),
                     'weaviateCollection',
                     cls.description
-                )
-            );
-            this.refresh();
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to fetch collections: ${error}`);
-        }
-    }
-
-    // Query a collection
-    async queryCollection(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Not connected to this Weaviate instance');
-            }
+                ) as CollectionWithSchema;
+                
+                // Store the raw schema data for this collection
+                collectionItem.schema = cls;
+                
+                return collectionItem;
+            });
             
-            // Open query editor with collection context
-            await vscode.commands.executeCommand('weaviate.queryCollection', connectionId, collectionName);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to query collection: ${error}`);
+            this.refresh();
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
         }
     }
 
     // View schema for a collection
     async viewSchema(connectionId: string, collectionName: string): Promise<void> {
+        const client = this.connectionManager.getClient(connectionId);
+        if (!client) {
+            vscode.window.showErrorMessage('Not connected to Weaviate instance');
+            return;
+        }
+
         try {
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Not connected to this Weaviate instance');
+            // First try to get the schema from our cached collection
+            const collection = this.collections[connectionId]?.find(
+                (item: WeaviateTreeItem) => item.label === collectionName
+            ) as CollectionWithSchema | undefined;
+            
+            let schemaData: SchemaClass;
+            
+            if (collection?.schema) {
+                // Use cached schema if available
+                schemaData = collection.schema;
+            } else {
+                // Fall back to fetching from the server
+                const schema = await client.schema.getter(collectionName).do() as SchemaClass;
+                schemaData = schema;
+                
+                // Cache the schema for future use
+                if (collection) {
+                    collection.schema = schemaData;
+                }
             }
             
-            const schema = await client.schema.getter(collectionName).do();
-            const doc = await vscode.workspace.openTextDocument({
-                content: JSON.stringify(schema, null, 2),
-                language: 'json'
-            });
+            // Create a webview panel to display the schema
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateSchemaViewer',
+                `Schema: ${collectionName}`,
+                vscode.ViewColumn.Beside,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true
+                }
+            );
             
-            await vscode.window.showTextDocument(doc);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to view schema: ${error}`);
+            // Format the schema for display
+            const formattedSchema = JSON.stringify(schemaData, null, 2);
+            
+            // Create HTML content with syntax highlighting
+            panel.webview.html = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Schema: ${collectionName}</title>
+                    <style>
+                        body {
+                            font-family: var(--vscode-font-family);
+                            padding: 0 20px;
+                            color: var(--vscode-foreground);
+                            background-color: var(--vscode-editor-background);
+                            margin: 0;
+                            line-height: 1.5;
+                        }
+                        pre {
+                            background-color: var(--vscode-textCodeBlock-background);
+                            border-radius: 3px;
+                            padding: 16px;
+                            overflow: auto;
+                            max-height: calc(100vh - 60px);
+                        }
+                        .header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 16px;
+                            padding-bottom: 8px;
+                            border-bottom: 1px solid var(--vscode-panel-border);
+                        }
+                        .title {
+                            font-size: 1.2em;
+                            font-weight: 600;
+                        }
+                        .actions {
+                            display: flex;
+                            gap: 8px;
+                        }
+                        button {
+                            background-color: var(--vscode-button-background);
+                            color: var(--vscode-button-foreground);
+                            border: none;
+                            padding: 4px 12px;
+                            border-radius: 2px;
+                            cursor: pointer;
+                            font-size: 12px;
+                        }
+                        button:hover {
+                            background-color: var(--vscode-button-hoverBackground);
+                        }
+                        .copy-message {
+                            color: var(--vscode-foreground);
+                            font-size: 12px;
+                            opacity: 0;
+                            transition: opacity 0.3s;
+                        }
+                        .visible {
+                            opacity: 1;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="title">Schema: ${collectionName}</div>
+                        <div class="actions">
+                            <button id="copyButton">Copy to Clipboard</button>
+                            <span id="copyMessage" class="copy-message">Copied!</span>
+                        </div>
+                    </div>
+                    <pre><code id="json">${formattedSchema}</code></pre>
+                    
+                    <script>
+                        // Apply syntax highlighting
+                        document.addEventListener('DOMContentLoaded', () => {
+                            const jsonElement = document.getElementById('json');
+                            const jsonString = jsonElement.textContent;
+                            try {
+                                const json = JSON.parse(jsonString);
+                                jsonElement.textContent = JSON.stringify(json, null, 2);
+                                
+                                // Basic syntax highlighting
+                                let highlighted = jsonElement.textContent
+                                    .replace(/"([^"]+)":/g, '"<span style="color: #9CDCFE;">$1</span>":')
+                                    .replace(/: "([^"]+)"/g, ': "<span style="color: #CE9178;">$1</span>"')
+                                    .replace(/: (true|false|null|\d+)/g, ': <span style="color: #569CD6;">$1</span>');
+                                
+                                jsonElement.innerHTML = highlighted;
+                                
+                                // Copy to clipboard functionality
+                                const copyButton = document.getElementById('copyButton');
+                                const copyMessage = document.getElementById('copyMessage');
+                                
+                                copyButton.addEventListener('click', () => {
+                                    navigator.clipboard.writeText(jsonString)
+                                        .then(() => {
+                                            copyMessage.classList.add('visible');
+                                            setTimeout(() => {
+                                                copyMessage.classList.remove('visible');
+                                            }, 2000);
+                                        })
+                                        .catch(err => {
+                                            console.error('Failed to copy: ', err);
+                                        });
+                                });
+                            } catch (e) {
+                                console.error('Error parsing JSON:', e);
+                            }
+                        });
+                    </script>
+                </body>
+                </html>
+            `;
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to fetch schema: ${errorMessage}`);
         }
     }
 
@@ -473,8 +939,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             });
             
             await vscode.window.showTextDocument(document);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to open query editor: ${error}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to open query editor: ${errorMessage}`);
         }
     }
 
@@ -486,7 +953,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * @throws Error if the connection doesn't exist or deletion fails
      */
     async deleteConnection(connectionId: string): Promise<string> {
-        const connection = this.connections.find(c => c.id === connectionId);
+        const connection = this.connections.find((c: WeaviateConnection) => c.id === connectionId);
         if (!connection) {
             throw new Error('Connection not found');
         }
@@ -498,12 +965,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             delete this.collections[connectionId];
             
             // Update empty state context
-            vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
+            await vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
             
-            this._onDidChangeTreeData.fire();
+            this._onDidChangeTreeData.fire(undefined);
             return connection.name;
-        } catch (error) {
-            throw new Error(`Failed to delete connection: ${error instanceof Error ? error.message : String(error)}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete connection: ${errorMessage}`);
         }
     }
 }
