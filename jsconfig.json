@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "ES2022",
+        "baseUrl": "."
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}

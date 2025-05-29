@@ -1,0 +1,173 @@
+{
+  "name": "weaviate-studio",
+  "displayName": "Weaviate Manager",
+  "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
+  "version": "0.0.1",
+  "icon": "resources/database-icon.png",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "weaviate.refreshConnections",
+        "title": "Refresh Connections",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "weaviate.addConnection",
+        "title": "Add New Weaviate Connection",
+        "icon": "$(add)"
+      },
+      {
+        "command": "weaviate.connect",
+        "title": "Connect"
+      },
+      {
+        "command": "weaviate.disconnect",
+        "title": "Disconnect"
+      },
+      {
+        "command": "weaviate.editConnection",
+        "title": "Edit Connection"
+      },
+      {
+        "command": "weaviate.deleteConnection",
+        "title": "Delete Connection"
+      },
+      {
+        "command": "weaviate.addCollection",
+        "title": "Add Collection",
+        "icon": "$(add)" 
+      },
+      {
+        "command": "weaviate.viewSchema",
+        "title": "View Schema"
+      },
+      {
+        "command": "weaviate.queryCollection",
+        "title": "Query Collection"
+      },
+      {
+        "command": "weaviate.deleteCollection",
+        "title": "Delete Collection"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "weaviate-manager-activitybar",
+          "title": "Weaviate Manager",
+          "icon": "resources/database-icon.png"
+        }
+      ]
+    },
+    "views": {
+      "weaviate-manager-activitybar": [
+        {
+          "id": "weaviateConnectionsView",
+          "name": "Connections",
+          "type": "tree",
+          "when": "true",
+          "icon": "database"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "weaviateConnectionsView",
+        "contents": "No connections found. [Add a Connection](command:weaviate.addConnection)",
+        "when": "weaviateConnectionsEmpty"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "weaviate.addConnection",
+          "when": "view == weaviateConnectionsView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.refreshConnections",
+          "when": "view == weaviateConnectionsView",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "weaviate.connect",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnection && !(viewItem == weaviateConnectionActive)",
+          "group": "1_connection@1"
+        },
+        {
+          "command": "weaviate.disconnect",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
+          "group": "1_connection@2"
+        },
+        {
+          "command": "weaviate.addCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
+          "group": "1_connection@3"
+        },
+        {
+          "command": "weaviate.editConnection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
+          "group": "2_management@1"
+        },
+        {
+          "command": "weaviate.deleteConnection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
+          "group": "2_management@2"
+        },
+        {
+          "command": "weaviate.viewSchema",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "weaviate.queryCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "weaviate.deleteCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "2_management@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.7",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "weaviate-ts-client": "^2.2.0"
+  }
+}
