@@ -1,0 +1,19 @@
+{
+  "iconDefinitions": {
+    "weaviate-logo": {
+      "iconPath": "./weaviate-logo.png"
+    }
+  },
+  "file": "weaviate-logo",
+  "folder": "weaviate-logo",
+  "folderExpanded": "weaviate-logo",
+  "fileExtensions": {
+    "weaviate": "weaviate-logo"
+  },
+  "fileNames": {
+    "weaviate": "weaviate-logo"
+  },
+  "languageIds": {
+    "weaviate": "weaviate-logo"
+  }
+}

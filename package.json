@@ -63,7 +63,7 @@
         {
           "id": "weaviate-manager-activitybar",
           "title": "Weaviate Manager",
-          "icon": "resources/database-icon.png"
+          "icon": "resources/weaviate-logo.png"
         }
       ]
     },
@@ -74,7 +74,8 @@
           "name": "Connections",
           "type": "tree",
           "when": "true",
-          "icon": "database"
+          "icon": "$(database)",
+          "contextualTitle": "Weaviate Manager"
         }
       ]
     },
