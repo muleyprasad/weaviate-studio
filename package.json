@@ -157,17 +157,6 @@
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "2_management@1"
-        },
-        
-        {
-          "command": "weaviate.copyPropertyName",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateProperty",
-          "group": "1_actions@1"
-        },
-        {
-          "command": "weaviate.copyPropertyPath",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateProperty",
-          "group": "1_actions@2"
         }
       ]
     }
