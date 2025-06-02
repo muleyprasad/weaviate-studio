@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from './services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, SchemaProperty, SchemaClass, ExtendedSchemaClass, ExtendedSchemaProperty } from './types';
+import { ViewRenderer } from './views/ViewRenderer';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -32,6 +33,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     
     /** Manages Weaviate connections */
     private readonly connectionManager: ConnectionManager;
+    
+    /** Handles view rendering */
+    private readonly viewRenderer: ViewRenderer;
+    
     // Filter text for the search box
     private filterText: string = '';
 
@@ -49,6 +54,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.connectionManager = ConnectionManager.getInstance(context);
+        this.viewRenderer = ViewRenderer.getInstance(context);
         
         // Initial load of connections
         this.connections = this.connectionManager.getConnections();
@@ -209,263 +215,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     /**
      * Generates HTML for displaying property details in a webview
+     * @param propertyName The name of the property
+     * @param property The property schema
+     * @param collectionName The name of the collection containing this property
      */
     private getPropertyDetailsHtml(propertyName: string, property: SchemaProperty, collectionName: string): string {
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Property: ${propertyName}</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        padding: 0 20px;
-                        color: var(--vscode-foreground);
-                        background-color: var(--vscode-editor-background);
-                    }
-                    h1 {
-                        color: var(--vscode-textLink-foreground);
-                        border-bottom: 1px solid var(--vscode-panel-border);
-                        padding-bottom: 10px;
-                    }
-                    .property-header {
-                        background-color: var(--vscode-editor-lineHighlightBackground);
-                        padding: 10px;
-                        border-radius: 4px;
-                        margin-bottom: 20px;
-                    }
-                    .property-section {
-                        margin-bottom: 20px;
-                    }
-                    .property-section h3 {
-                        margin-bottom: 8px;
-                        color: var(--vscode-textLink-foreground);
-                    }
-                    .property-grid {
-                        display: grid;
-                        grid-template-columns: 150px 1fr;
-                        gap: 10px;
-                    }
-                    .property-grid dt {
-                        font-weight: bold;
-                        color: var(--vscode-textPreformat-foreground);
-                    }
-                    .property-grid dd {
-                        margin: 0;
-                    }
-                    pre {
-                        background-color: var(--vscode-textCodeBlock-background);
-                        padding: 10px;
-                        border-radius: 4px;
-                        overflow-x: auto;
-                    }
-                    code {
-                        font-family: var(--vscode-editor-font-family);
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>${propertyName}</h1>
-                <div class="property-header">
-                    <strong>Collection:</strong> ${collectionName} <br>
-                    <strong>Type:</strong> ${property.dataType?.join(', ') || 'Unknown'}
-                </div>
-
-                <div class="property-section">
-                    <h3>Details</h3>
-                    <div class="property-grid">
-                        <div><strong>Name:</strong></div>
-                        <div>${property.name}</div>
-                        
-                        <div><strong>Data Type:</strong></div>
-                        <div>${property.dataType?.join(', ') || 'Unknown'}</div>
-                        
-                        ${property.description ? `
-                            <div><strong>Description:</strong></div>
-                            <div>${property.description}</div>
-                        ` : ''}
-                        
-                        <div><strong>Indexed:</strong></div>
-                        <div>${property.indexInverted !== false ? 'Yes' : 'No'}</div>
-                    </div>
-                </div>
-
-                ${property.moduleConfig ? `
-                    <div class="property-section">
-                        <h3>Module Configuration</h3>
-                        <pre><code>${JSON.stringify(property.moduleConfig, null, 2)}</code></pre>
-                    </div>
-                ` : ''}
-
-                <div class="property-section">
-                    <h3>Raw Property Definition</h3>
-                    <pre><code>${JSON.stringify(property, null, 2)}</code></pre>
-                </div>
-            </body>
-            </html>
-        `;
+        return this.viewRenderer.renderPropertyDetails(propertyName, property, collectionName);
     }
 
     /**
      * Generates HTML for displaying detailed schema in a webview
+     * @param schema The schema to display
      */
     private getDetailedSchemaHtml(schema: SchemaClass): string {
-        const formatDataType = (dataType: string[]): string => {
-            return dataType.map(t => {
-                // Make data types more readable
-                switch (t) {
-                    case 'text': return 'Text';
-                    case 'string': return 'String';
-                    case 'int': return 'Integer';
-                    case 'number': return 'Number';
-                    case 'boolean': return 'Boolean';
-                    case 'date': return 'Date';
-                    case 'geoCoordinates': return 'Geo Coordinates';
-                    case 'phoneNumber': return 'Phone Number';
-                    case 'blob': return 'Binary Data';
-                    case 'object': return 'Object';
-                    case 'object[]': return 'Object Array';
-                    default: return t;
-                }
-            }).join(', ');
-        };
-
-        const propertiesHtml = schema.properties?.map(prop => `
-            <div class="property-card">
-                <h3>${prop.name} <span class="data-type">${formatDataType(prop.dataType || ['unknown'])}</span></h3>
-                ${prop.description ? `<p class="description">${prop.description}</p>` : ''}
-                <div class="property-details">
-                    <div><strong>Indexed:</strong> ${prop.indexInverted !== false ? 'Yes' : 'No'}</div>
-                    ${prop.moduleConfig ? `
-                        <div class="module-config">
-                            <strong>Module Config:</strong>
-                            <pre><code>${JSON.stringify(prop.moduleConfig, null, 2)}</code></pre>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('') || '<p>No properties defined</p>';
-
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Schema: ${schema.class}</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        padding: 0 20px 40px 20px;
-                        color: var(--vscode-foreground);
-                        background-color: var(--vscode-editor-background);
-                        line-height: 1.5;
-                    }
-                    h1 {
-                        color: var(--vscode-textLink-foreground);
-                        border-bottom: 1px solid var(--vscode-panel-border);
-                        padding-bottom: 10px;
-                    }
-                    h2 {
-                        margin-top: 30px;
-                        color: var(--vscode-textLink-foreground);
-                        border-bottom: 1px solid var(--vscode-panel-border);
-                        padding-bottom: 5px;
-                    }
-                    h3 {
-                        margin: 0 0 10px 0;
-                        color: var(--vscode-textLink-foreground);
-                    }
-                    .property-card {
-                        background-color: var(--vscode-editor-lineHighlightBackground);
-                        border-left: 3px solid var(--vscode-textLink-foreground);
-                        padding: 15px;
-                        margin-bottom: 15px;
-                        border-radius: 4px;
-                    }
-                    .data-type {
-                        font-size: 0.8em;
-                        color: var(--vscode-descriptionForeground);
-                        font-weight: normal;
-                        font-family: var(--vscode-editor-font-family);
-                        background-color: var(--vscode-textBlockQuote-background);
-                        padding: 2px 6px;
-                        border-radius: 4px;
-                        margin-left: 8px;
-                    }
-                    .description {
-                        color: var(--vscode-descriptionForeground);
-                        margin: 8px 0 12px 0;
-                        font-style: italic;
-                    }
-                    .property-details {
-                        font-size: 0.9em;
-                    }
-                    .module-config {
-                        margin-top: 10px;
-                    }
-                    pre, code {
-                        font-family: var(--vscode-editor-font-family);
-                    }
-                    pre {
-                        background-color: var(--vscode-textCodeBlock-background);
-                        padding: 10px;
-                        border-radius: 4px;
-                        overflow-x: auto;
-                        margin: 5px 0 0 0;
-                        font-size: 0.9em;
-                    }
-                    .metadata {
-                        display: grid;
-                        grid-template-columns: 150px 1fr;
-                        gap: 10px;
-                        margin-bottom: 20px;
-                        background-color: var(--vscode-editor-lineHighlightBackground);
-                        padding: 15px;
-                        border-radius: 4px;
-                    }
-                    .metadata dt {
-                        font-weight: bold;
-                        color: var(--vscode-textPreformat-foreground);
-                    }
-                    .metadata dd {
-                        margin: 0;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>${schema.class}</h1>
-                
-                <div class="metadata">
-                    <div><strong>Class Name:</strong></div>
-                    <div>${schema.class}</div>
-                    
-                    ${schema.description ? `
-                        <div><strong>Description:</strong></div>
-                        <div>${schema.description}</div>
-                    ` : ''}
-                    
-                    ${schema.vectorizer ? `
-                        <div><strong>Vectorizer:</strong></div>
-                        <div>${schema.vectorizer}</div>
-                    ` : ''}
-                </div>
-
-                <h2>Properties</h2>
-                ${propertiesHtml}
-
-                ${schema.moduleConfig ? `
-                    <h2>Module Configuration</h2>
-                    <pre><code>${JSON.stringify(schema.moduleConfig, null, 2)}</code></pre>
-                ` : ''}
-
-                <h2>Raw Schema</h2>
-                <pre><code>${JSON.stringify(schema, null, 2)}</code></pre>
-            </body>
-            </html>
-        `;
+        return this.viewRenderer.renderDetailedSchema(schema);
     }
     
     // #endregion Command Handlers
