@@ -37,9 +37,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     /** Handles view rendering */
     private readonly viewRenderer: ViewRenderer;
     
-    // Filter text for the search box
-    private filterText: string = '';
-
     private isRefreshing = false;
 
     /**
@@ -96,19 +93,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
-     * Sets the filter text and refreshes the tree view
-     * @param text - The text to filter tree items by
-     * 
-     * @remarks
-     * This method updates the filter text used to filter the tree view items
-     * and triggers a refresh of the tree view to apply the filter.
-     */
-    setFilterText(text: string): void {
-        this.filterText = text;
-        this._onDidChangeTreeData.fire();
-    }
-
-    /**
      * Refreshes the tree view to reflect any changes in the data
      * 
      * @remarks
@@ -121,57 +105,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     // #region Command Handlers
-    
-
-
-    /**
-     * Shows detailed information about a property in a webview
-     * @param item - The tree item representing the property
-     */
-    public async handleViewPropertyDetails(item: WeaviateTreeItem): Promise<void> {
-        if (!item.connectionId || !item.collectionName || !item.label) {
-            vscode.window.showErrorMessage('Cannot view property details: Missing required information');   
-            return;
-        }
-
-        try {
-            // Get the collection schema
-            const collection = this.collections[item.connectionId]?.find(
-                col => col.label === item.collectionName
-            ) as CollectionWithSchema | undefined;
-
-            if (!collection?.schema?.properties) {
-                vscode.window.showErrorMessage('Could not find property details');
-                return;
-            }
-
-            // Extract just the property name (remove type information in parentheses)
-            const propertyName = item.label.toString().split('(')[0].trim();
-            const property = collection.schema.properties.find(p => p.name === propertyName);
-
-            if (!property) {
-                vscode.window.showErrorMessage(`Property '${propertyName}' not found in schema`);
-                return;
-            }
-
-            // Create and show a webview with the property details
-            const panel = vscode.window.createWebviewPanel(
-                'weaviatePropertyDetails',
-                `Property: ${propertyName}`,
-                vscode.ViewColumn.One,
-                { enableScripts: true }
-            );
-
-            // Format the property details as HTML
-            panel.webview.html = this.getPropertyDetailsHtml(propertyName, property, item.collectionName);
-
-        } catch (error) {
-            console.error('Error viewing property details:', error);
-            vscode.window.showErrorMessage(
-                `Failed to view property details: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
-    }
 
     /**
      * Shows a detailed schema view for a collection in a webview
@@ -214,16 +147,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
-     * Generates HTML for displaying property details in a webview
-     * @param propertyName The name of the property
-     * @param property The property schema
-     * @param collectionName The name of the collection containing this property
-     */
-    private getPropertyDetailsHtml(propertyName: string, property: SchemaProperty, collectionName: string): string {
-        return this.viewRenderer.renderPropertyDetails(propertyName, property, collectionName);
-    }
-
-    /**
      * Generates HTML for displaying detailed schema in a webview
      * @param schema The schema to display
      */
@@ -242,11 +165,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Gray/hollow dot for disconnected
             return new vscode.ThemeIcon('circle-outline');
         }
-    }
-
-    // Load mock data for demonstration
-    loadMockData(): void {
-        // No longer needed as we're using real connections
     }
 
     // #region TreeDataProvider Implementation
@@ -309,16 +227,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * - Collection level: Shows metadata, properties, and vector configurations
      */
     getChildren(element?: WeaviateTreeItem): Thenable<WeaviateTreeItem[]> {
-        // Apply filtering if needed
-        const applyFilter = (items: WeaviateTreeItem[]): WeaviateTreeItem[] => {
-            if (!this.filterText) {
-                return items;
-            }
-            return items.filter(item => 
-                item.label.toLowerCase().includes(this.filterText.toLowerCase())
-            );
-        };
-
         // No connections case
         if (this.connections.length === 0) {
             return Promise.resolve([
@@ -354,7 +262,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 return item;
             });
             
-            return Promise.resolve(applyFilter(connectionItems));
+            return Promise.resolve(connectionItems);
         } 
         else if (element.itemType === 'connection' && element.connectionId) {
             // Connection level - show collections
@@ -380,7 +288,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 ]);
             }
             
-            return Promise.resolve(applyFilter(collections));
+            return Promise.resolve(collections);
         }
         else if (element.itemType === 'collection') {
             // Collection level - show metadata, properties, and vectors
@@ -414,7 +322,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 )
             ];
             
-            return Promise.resolve(applyFilter(items));
+            return Promise.resolve(items);
         }
         // Handle child nodes for metadata, properties, and vectors
         else if (element.itemType === 'metadata' && element.connectionId && element.collectionName) {
@@ -1113,184 +1021,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-    // View schema for a collection
-    async viewSchema(connectionId: string, collectionName: string): Promise<void> {
-        const client = this.connectionManager.getClient(connectionId);
-        if (!client) {
-            vscode.window.showErrorMessage('Not connected to Weaviate instance');
-            return;
-        }
-
-        try {
-            // First try to get the schema from our cached collection
-            const collection = this.collections[connectionId]?.find(
-                (item: WeaviateTreeItem) => item.label === collectionName
-            ) as CollectionWithSchema | undefined;
-            
-            let schemaData: SchemaClass;
-            
-            if (collection?.schema) {
-                // Use cached schema if available
-                schemaData = collection.schema;
-            } else {
-                // Fall back to fetching from the server
-                const schema = await client.schema.getter(collectionName).do() as SchemaClass;
-                schemaData = schema;
-                
-                // Cache the schema for future use
-                if (collection) {
-                    collection.schema = schemaData;
-                }
-            }
-            
-            // Create a webview panel to display the schema
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateSchemaViewer',
-                `Schema: ${collectionName}`,
-                vscode.ViewColumn.Beside,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true
-                }
-            );
-            
-            // Format the schema for display
-            const formattedSchema = JSON.stringify(schemaData, null, 2);
-            
-            // Create HTML content with syntax highlighting
-            panel.webview.html = `
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Schema: ${collectionName}</title>
-                    <style>
-                        body {
-                            font-family: var(--vscode-font-family);
-                            padding: 0 20px;
-                            color: var(--vscode-foreground);
-                            background-color: var(--vscode-editor-background);
-                            margin: 0;
-                            line-height: 1.5;
-                        }
-                        pre {
-                            background-color: var(--vscode-textCodeBlock-background);
-                            border-radius: 3px;
-                            padding: 16px;
-                            overflow: auto;
-                            max-height: calc(100vh - 60px);
-                        }
-                        .header {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                            margin-bottom: 16px;
-                            padding-bottom: 8px;
-                            border-bottom: 1px solid var(--vscode-panel-border);
-                        }
-                        .title {
-                            font-size: 1.2em;
-                            font-weight: 600;
-                        }
-                        .actions {
-                            display: flex;
-                            gap: 8px;
-                        }
-                        button {
-                            background-color: var(--vscode-button-background);
-                            color: var(--vscode-button-foreground);
-                            border: none;
-                            padding: 4px 12px;
-                            border-radius: 2px;
-                            cursor: pointer;
-                            font-size: 12px;
-                        }
-                        button:hover {
-                            background-color: var(--vscode-button-hoverBackground);
-                        }
-                        .copy-message {
-                            color: var(--vscode-foreground);
-                            font-size: 12px;
-                            opacity: 0;
-                            transition: opacity 0.3s;
-                        }
-                        .visible {
-                            opacity: 1;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="title">Schema: ${collectionName}</div>
-                        <div class="actions">
-                            <button id="copyButton">Copy to Clipboard</button>
-                            <span id="copyMessage" class="copy-message">Copied!</span>
-                        </div>
-                    </div>
-                    <pre><code id="json">${formattedSchema}</code></pre>
-                    
-                    <script>
-                        // Apply syntax highlighting
-                        document.addEventListener('DOMContentLoaded', () => {
-                            const jsonElement = document.getElementById('json');
-                            const jsonString = jsonElement.textContent;
-                            try {
-                                const json = JSON.parse(jsonString);
-                                jsonElement.textContent = JSON.stringify(json, null, 2);
-                                
-                                // Basic syntax highlighting
-                                let highlighted = jsonElement.textContent
-                                    .replace(/"([^"]+)":/g, '"<span style="color: #9CDCFE;">$1</span>":')
-                                    .replace(/: "([^"]+)"/g, ': "<span style="color: #CE9178;">$1</span>"')
-                                    .replace(/: (true|false|null|\d+)/g, ': <span style="color: #569CD6;">$1</span>');
-                                
-                                jsonElement.innerHTML = highlighted;
-                                
-                                // Copy to clipboard functionality
-                                const copyButton = document.getElementById('copyButton');
-                                const copyMessage = document.getElementById('copyMessage');
-                                
-                                copyButton.addEventListener('click', () => {
-                                    navigator.clipboard.writeText(jsonString)
-                                        .then(() => {
-                                            copyMessage.classList.add('visible');
-                                            setTimeout(() => {
-                                                copyMessage.classList.remove('visible');
-                                            }, 2000);
-                                        })
-                                        .catch(err => {
-                                            console.error('Failed to copy: ', err);
-                                        });
-                                });
-                            } catch (e) {
-                                console.error('Error parsing JSON:', e);
-                            }
-                        });
-                    </script>
-                </body>
-                </html>
-            `;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to fetch schema: ${errorMessage}`);
-        }
-    }
-
     // Open query editor for a collection
     async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
         try {
             // In real implementation, would open a custom query editor
             // For demo, open a new untitled document with a sample query
             const templateQuery = `{
-  "query": {
-    "$query": {
-      "class": "${collectionName}",
-      "vector": [0.1, 0.2, 0.3],  // Replace with actual vector
-      "limit": 10
-    }
-  }
-}`;
+                "query": {
+                    "$query": {
+                    "class": "${collectionName}",
+                    "vector": [0.1, 0.2, 0.3],  // Replace with actual vector
+                    "limit": 10
+                    }
+                }
+                }`;
             
             const document = await vscode.workspace.openTextDocument({
                 content: templateQuery,

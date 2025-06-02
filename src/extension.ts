@@ -23,13 +23,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
     });
-
-    // Create and show the filter input box (search bar)
-    const filterBoxContainer = vscode.window.createInputBox();
-    filterBoxContainer.placeholder = 'Filter (e.g., regex, vector distance >=...)';
-    filterBoxContainer.onDidChangeValue((text) => {
-        weaviateTreeDataProvider.setFilterText(text);
-    });
     
     // Add title to the tree view showing number of connections
     treeView.title = `Connections (${weaviateTreeDataProvider.getConnectionCount() || 0})`;
@@ -113,8 +106,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        // Property action commands have been removed
-        
         vscode.commands.registerCommand('weaviate.viewDetailedSchema', (item: any) => {
             weaviateTreeDataProvider.handleViewDetailedSchema(item);
         }),

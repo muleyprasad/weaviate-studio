@@ -44,11 +44,7 @@
       {
         "command": "weaviate.addCollection",
         "title": "Add Collection",
-        "icon": "$(add)" 
-      },
-      {
-        "command": "weaviate.viewSchema",
-        "title": "View Schema"
+        "icon": "$(add)"
       },
       {
         "command": "weaviate.queryCollection",
@@ -63,7 +59,6 @@
         "title": "Open Query Editor",
         "category": "Weaviate"
       },
-
       {
         "command": "weaviate.viewDetailedSchema",
         "title": "View Detailed Schema",
@@ -136,12 +131,6 @@
           "command": "weaviate.deleteConnection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
           "group": "2_management@2"
-        },
-        
-        {
-          "command": "weaviate.viewSchema",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "1_actions@1"
         },
         {
           "command": "weaviate.viewDetailedSchema",
