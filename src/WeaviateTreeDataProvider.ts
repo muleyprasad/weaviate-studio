@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from './services/ConnectionManager';
-import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, SchemaProperty, SchemaClass, ExtendedSchemaClass, ExtendedSchemaProperty } from './types';
+import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from './types';
 import { ViewRenderer } from './views/ViewRenderer';
 
 /**
@@ -180,15 +180,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      */
     getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
         // Set appropriate icons and tooltips based on item type
-        if (element.itemType === 'metadata' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('info');
-            element.tooltip = 'View collection metadata';
-        } else if (element.itemType === 'properties' && !element.iconPath) {
+        if (element.itemType === 'properties' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('symbol-property');
             element.tooltip = 'View collection properties';
-        } else if (element.itemType === 'vectors' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('symbol-array');
-            element.tooltip = 'View vector configuration';
         } else if (element.itemType === 'property') {
             // Ensure property items have the correct context value
             if (!element.contextValue) {
@@ -291,17 +285,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return Promise.resolve(collections);
         }
         else if (element.itemType === 'collection') {
-            // Collection level - show metadata, properties, and vectors
+            // Collection level - show properties
             const items = [
-                new WeaviateTreeItem(
-                    'Metadata',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'metadata',
-                    element.connectionId,
-                    element.label,
-                    'metadata',
-                    new vscode.ThemeIcon('info')
-                ),
                 new WeaviateTreeItem(
                     'Properties',
                     vscode.TreeItemCollapsibleState.Collapsed,
@@ -310,64 +295,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.label,
                     'properties',
                     new vscode.ThemeIcon('symbol-property')
-                ),
-                new WeaviateTreeItem(
-                    'Vectors',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'vectors',
-                    element.connectionId,
-                    element.label,
-                    'vectors',
-                    new vscode.ThemeIcon('symbol-array')
                 )
             ];
             
             return Promise.resolve(items);
         }
-        // Handle child nodes for metadata, properties, and vectors
-        else if (element.itemType === 'metadata' && element.connectionId && element.collectionName) {
-            // Find the collection schema
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                return Promise.resolve([
-                    new WeaviateTreeItem('No metadata available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            const schema = (collection as any).schema;
-            if (!schema) {
-                return Promise.resolve([
-                    new WeaviateTreeItem('No schema data available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            const metadataItems = [
-                new WeaviateTreeItem(`Class: ${schema.class}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'class'),
-                new WeaviateTreeItem(`Vectorizer: ${schema.vectorizer || 'none'}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'vectorizer'),
-                new WeaviateTreeItem(`Vector Index Type: ${schema.vectorIndexType || 'hnsw'}`, vscode.TreeItemCollapsibleState.None, 'property', element.connectionId, element.collectionName, 'indexType')
-            ];
-            
-            if (schema.moduleConfig) {
-                Object.entries(schema.moduleConfig).forEach(([moduleName, config]) => {
-                    metadataItems.push(
-                        new WeaviateTreeItem(
-                            `Module: ${moduleName}`,
-                            vscode.TreeItemCollapsibleState.None,
-                            'property',
-                            element.connectionId,
-                            element.collectionName,
-                            `module-${moduleName}`,
-                            new vscode.ThemeIcon('extensions')
-                        )
-                    );
-                });
-            }
-            
-            return Promise.resolve(metadataItems);
-        }
+
         else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
             // Find the collection schema
             const collection = this.collections[element.connectionId]?.find(
@@ -420,8 +353,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             
             const propertyItems = schema.properties.map((prop: any) => {
                 const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
-                const icon = getPropertyIcon(prop.dataType);
                 const description = prop.description ? ` - ${prop.description}` : '';
+                const icon = getPropertyIcon(prop.dataType);
                 
                 return new WeaviateTreeItem(
                     `${prop.name} (${dataType})${description}`,
@@ -431,389 +364,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.collectionName,
                     prop.name,
                     icon,
-                    'weaviateProperty',  // contextValue for menu contributions
+                    'weaviateProperty',
                     description.trim()
                 );
             });
             
             return Promise.resolve(propertyItems);
         }
-        else if (element.itemType === 'vectors' && element.connectionId && element.collectionName) {
-            // Find the collection schema
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            ) as CollectionWithSchema | undefined;
-            
-            if (!collection) {
-                console.error('Collection not found:', element.collectionName);
-                return Promise.resolve([
-                    new WeaviateTreeItem('No vector information available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            const schema = collection.schema;
-            if (!schema) {
-                console.error('Schema not found for collection:', element.collectionName);
-                return Promise.resolve([
-                    new WeaviateTreeItem('No schema information available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            // Debug: Log vector-related information
-            console.log(`Vector info for ${schema.class}:`, {
-                vectorizer: schema.vectorizer,
-                vectorIndexType: schema.vectorIndexType,
-                vectorConfig: schema.vectorConfig,
-                properties: schema.properties?.map(p => ({
-                    name: p.name,
-                    dataType: p.dataType
-                }))
-            });
-            
-            const vectorItems: WeaviateTreeItem[] = [];
-            
-            // Add vector index type
-            if (schema.vectorIndexType) {
-                vectorItems.push(
-                    new WeaviateTreeItem(
-                        `Vector Index Type: ${schema.vectorIndexType}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'property',
-                        element.connectionId,
-                        element.collectionName,
-                        'vector-index-type',
-                        new vscode.ThemeIcon('symbol-enum')
-                    )
-                );
-            }
-            
-            // Add vector index config
-            if (schema.vectorIndexConfig) {
-                vectorItems.push(
-                    new WeaviateTreeItem(
-                        'Vector Index Configuration',
-                        vscode.TreeItemCollapsibleState.Collapsed,
-                        'property',
-                        element.connectionId,
-                        element.collectionName,
-                        'vector-index-config',
-                        new vscode.ThemeIcon('settings-gear')
-                    )
-                );
-            }
-            
-            // Add vectorizer information if present directly on schema
-            if (schema.vectorizer) {
-                vectorItems.push(
-                    new WeaviateTreeItem(
-                        `Vectorizer: ${schema.vectorizer}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'property',
-                        element.connectionId,
-                        element.collectionName,
-                        'vectorizer',
-                        new vscode.ThemeIcon('symbol-function')
-                    )
-                );
-            }
-            
-            // Check for vectorized properties through various possible configurations
-            let vectorizedPropertyNames: string[] = [];
-            
-            // Check in vectorConfig (most common pattern)
-            if (schema.vectorConfig) {
-                console.log('Found vectorConfig:', JSON.stringify(schema.vectorConfig, null, 2));
-                
-                // Helper function to recursively find properties in nested objects
-                const findVectorizedProperties = (obj: any, path: string = '') => {
-                    if (!obj || typeof obj !== 'object') {
-                        return;
-                    }
-                    
-                    // Check if this object has a properties array directly
-                    if (obj.properties && Array.isArray(obj.properties)) {
-                        console.log(`Found vectorized properties at ${path}:`, obj.properties);
-                        vectorizedPropertyNames = [...vectorizedPropertyNames, ...obj.properties];
-                    }
-                    
-                    // Recurse through all child objects
-                    Object.entries(obj).forEach(([key, value]) => {
-                        if (value && typeof value === 'object') {
-                            findVectorizedProperties(value, `${path}.${key}`);
-                        }
-                    });
-                };
-                
-                // Iterate through all possible vectorizer modules
-                Object.entries(schema.vectorConfig).forEach(([key, config]: [string, any]) => {
-                    console.log(`Checking vectorizer module: ${key}`);
-                    findVectorizedProperties(config, key);
-                });
-                
-                // Provide a detailed log of what was found
-                console.log('After scanning vectorConfig, found these vectorized properties:', vectorizedPropertyNames);
-            }
-            
-            // Also check for vectorIndexType config that might indicate vector capabilities
-            if (schema.vectorIndexType) {
-                console.log(`Found vectorIndexType: ${schema.vectorIndexType}`);
-            }
-            
-            // Log what properties we found
-            console.log('Vectorized property names found:', vectorizedPropertyNames);
-            
-            // Find the corresponding property objects
-            const vectorizedProps = schema.properties?.filter((p: any) => {
-                // Check for direct vectorization flags on the property
-                const isDirectlyVectorized = 
-                    p.vectorizer || 
-                    (p.moduleConfig && p.moduleConfig.vectorizer) ||
-                    p.vectorizerConfig ||
-                    p.vector ||
-                    // Check for common vectorizer modules in the property config
-                    (p.moduleConfig && (
-                        p.moduleConfig['text2vec-openai'] ||
-                        p.moduleConfig['text2vec-cohere'] ||
-                        p.moduleConfig['text2vec-huggingface'] ||
-                        p.moduleConfig['text2vec-transformers'] ||
-                        p.moduleConfig['text2vec-contextionary'] ||
-                        p.moduleConfig['multi2vec-clip'] ||
-                        p.moduleConfig['img2vec-neural'] ||
-                        p.moduleConfig['text2vec-weaviate']
-                    ));
-                
-                // Check if this property is in the explicitly listed vectorized properties
-                // ONLY use this if vectorizedPropertyNames actually has values
-                const isListedAsVectorized = vectorizedPropertyNames.length > 0 && 
-                    vectorizedPropertyNames.includes(p.name);
-                
-                if (isDirectlyVectorized || isListedAsVectorized) {
-                    console.log('Found vectorized property:', p.name, p);
-                }
-                
-                // If we have explicit vectorized properties from vectorConfig,
-                // ONLY use those, otherwise fall back to property-level detection
-                return vectorizedPropertyNames.length > 0 ? isListedAsVectorized : isDirectlyVectorized;
-            }) || [];
-            
-            console.log(`Found ${vectorizedProps.length} vectorized properties`);
-            
-            // Add vectorized properties section if any were found
-            if (vectorizedProps.length > 0) {
-                vectorItems.push(
-                    new WeaviateTreeItem(
-                        `Vectorized Properties (${vectorizedProps.length})`,
-                        vscode.TreeItemCollapsibleState.Collapsed,
-                        'vectors', // Changed from 'property' to 'vectors' to match the case in the getChildren method
-                        element.connectionId,
-                        element.collectionName,
-                        'vectorized-properties',
-                        new vscode.ThemeIcon('symbol-array')
-                    )
-                );
-                console.log('Created vectorized properties container node with type: vectors');
-            } else {
-                vectorItems.push(
-                    new WeaviateTreeItem(
-                        'No vectorized properties found',
-                        vscode.TreeItemCollapsibleState.None,
-                        'message'
-                    )
-                );
-            }
-            
-            return Promise.resolve(vectorItems);
-        }
-        // Handle expanded vectorized properties section
-        else if (element.id === 'vectorized-properties' && element.connectionId && element.collectionName) {
-            console.log('Expanding vectorized properties node:', element);
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            ) as CollectionWithSchema | undefined;
-            
-            if (!collection?.schema?.properties) {
-                return Promise.resolve([
-                    new WeaviateTreeItem('No properties available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            // Extract vectorized property names from vectorConfig
-            let vectorizedPropertyNames: string[] = [];
-            
-            // Get property names from vectorConfig if available
-            if (collection.schema.vectorConfig) {
-                console.log('Found vectorConfig in expanded view:', JSON.stringify(collection.schema.vectorConfig, null, 2));
-                
-                // Helper function to recursively find properties in nested objects
-                const findVectorizedProperties = (obj: any, path: string = '') => {
-                    if (!obj || typeof obj !== 'object') {
-                        return;
-                    }
-                    
-                    // Check if this object has a properties array directly
-                    if (obj.properties && Array.isArray(obj.properties)) {
-                        console.log(`Found vectorized properties at ${path}:`, obj.properties);
-                        vectorizedPropertyNames = [...vectorizedPropertyNames, ...obj.properties];
-                    }
-                    
-                    // Recurse through all child objects
-                    Object.entries(obj).forEach(([key, value]) => {
-                        if (value && typeof value === 'object') {
-                            findVectorizedProperties(value, `${path}.${key}`);
-                        }
-                    });
-                };
-                
-                // Process all vectorizer modules
-                Object.entries(collection.schema.vectorConfig).forEach(([key, config]: [string, any]) => {
-                    findVectorizedProperties(config, key);
-                });
-            }
-            
-            // Use the enhanced detection logic to find all vectorized properties
-            let vectorizedProps = collection.schema.properties.filter((p: any) => {
-                // Check for direct vectorization flags on the property
-                const isDirectlyVectorized = 
-                    p.vectorizer || 
-                    (p.moduleConfig && p.moduleConfig.vectorizer) ||
-                    p.vectorizerConfig ||
-                    p.vector ||
-                    // Check for common vectorizer modules in the property config
-                    (p.moduleConfig && (
-                        p.moduleConfig['text2vec-openai'] ||
-                        p.moduleConfig['text2vec-cohere'] ||
-                        p.moduleConfig['text2vec-huggingface'] ||
-                        p.moduleConfig['text2vec-transformers'] ||
-                        p.moduleConfig['text2vec-contextionary'] ||
-                        p.moduleConfig['multi2vec-clip'] ||
-                        p.moduleConfig['img2vec-neural'] ||
-                        p.moduleConfig['text2vec-weaviate']
-                    ));
-                
-                // Check if this property is in the explicitly listed vectorized properties
-                const isListedAsVectorized = vectorizedPropertyNames.length > 0 && 
-                    vectorizedPropertyNames.includes(p.name);
-                
-                // If we have explicit vectorized properties from vectorConfig,
-                // ONLY use those, otherwise fall back to property-level detection
-                return vectorizedPropertyNames.length > 0 ? isListedAsVectorized : isDirectlyVectorized;
-            });
-            
-            console.log(`Found ${vectorizedProps.length} vectorized properties for expansion:`, vectorizedProps.map(p => p.name));
-            
-            // If there are no vectorized properties, show a message
-            if (vectorizedProps.length === 0) {
-                return Promise.resolve([
-                    new WeaviateTreeItem('No vectorized properties found', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            // Force explicit debug of actual property names
-            console.log('The actual property objects for expansion:', JSON.stringify(vectorizedProps));
-            
-            // Directly get property data from schema if filtering produced no results
-            // This fallback ensures at least something is shown
-            if (vectorizedProps.length === 0 && vectorizedPropertyNames.length > 0) {
-                console.log('Using fallback property detection with names:', vectorizedPropertyNames);
-                vectorizedProps = collection.schema.properties.filter(p => 
-                    vectorizedPropertyNames.includes(p.name));
-                console.log('Fallback found properties:', vectorizedProps.map(p => p.name));
-            }
-            
-            // Special hardcoded fallback to handle common case where the property is directly vectorized
-            // but our detection logic is missing it for some reason
-            if (vectorizedProps.length === 0) {
-                console.log('Using special fallback property detection...');
-                // Look for topicName property which is commonly vectorized
-                const topicNameProp = collection.schema.properties.find(p => p.name === 'topicName');
-                if (topicNameProp) {
-                    console.log('Found topicName property as potential vectorized property');
-                    vectorizedProps = [topicNameProp];
-                }
-            }
-            
-            const treeItems = vectorizedProps.map((prop: any) => {
-                // Determine what type of vectorization is being used for this property
-                let vectorizer = 'unknown';
-                
-                if (prop.vectorizer) {
-                    vectorizer = `Direct: ${prop.vectorizer}`;
-                } else if (prop.moduleConfig?.vectorizer) {
-                    vectorizer = `Module: ${JSON.stringify(prop.moduleConfig.vectorizer)}`;
-                } else if (prop.vectorizerConfig) {
-                    vectorizer = `Config: ${JSON.stringify(prop.vectorizerConfig)}`;
-                } else if (prop.vector) {
-                    vectorizer = 'Vector: Custom configuration';
-                } else if (prop.moduleConfig) {
-                    // Check for specific vectorizer modules
-                    const modules = Object.keys(prop.moduleConfig).filter(key => {
-                        return key.includes('vec') || [
-                            'text2vec-openai',
-                            'text2vec-cohere',
-                            'text2vec-huggingface',
-                            'text2vec-transformers',
-                            'text2vec-contextionary',
-                            'multi2vec-clip',
-                            'img2vec-neural',
-                            'text2vec-weaviate'
-                        ].includes(key);
-                    });
-                    
-                    if (modules.length > 0) {
-                        vectorizer = `Modules: ${modules.join(', ')}`;
-                    }
-                } else if (vectorizedPropertyNames.includes(prop.name)) {
-                    vectorizer = 'Defined in vectorConfig';
-                }
-                
-                console.log(`Creating tree item for vectorized property: ${prop.name} with vectorizer: ${vectorizer}`);
-                
-                return new WeaviateTreeItem(
-                    `${prop.name} (${prop.dataType?.join(', ') || 'unknown'})`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'property',
-                    element.connectionId,
-                    element.collectionName,
-                    `vector-prop-${prop.name}`,
-                    new vscode.ThemeIcon('symbol-parameter'),
-                    'weaviateVectorProperty',
-                    `Vectorizer: ${vectorizer}`
-                );
-            });
-            
-            console.log(`Returning ${treeItems.length} vectorized property tree items`);
-            return Promise.resolve(treeItems);
-        }
-        // Handle expanded vector index configuration
-        else if (element.itemType === 'property' && element.id === 'vector-index-config' && element.connectionId && element.collectionName) {
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            ) as CollectionWithSchema | undefined;
-            
-            if (!collection?.schema?.vectorIndexConfig) {
-                return Promise.resolve([
-                    new WeaviateTreeItem('No vector index configuration available', vscode.TreeItemCollapsibleState.None, 'message')
-                ]);
-            }
-            
-            const config = collection.schema.vectorIndexConfig;
-            const configItems = Object.entries(config).map(([key, value]) => 
-                new WeaviateTreeItem(
-                    `${key}: ${JSON.stringify(value)}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'property',
-                    element.connectionId,
-                    element.collectionName,
-                    `vector-config-${key}`,
-                    new vscode.ThemeIcon('settings')
-                )
-            );
-            
-            return Promise.resolve(configItems);
-        }
-        
-        // Vector properties are already handled in the previous section
-        // No additional processing needed here
         
         return Promise.resolve([]);
     }
@@ -948,72 +505,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Get schema from Weaviate
             const schema = await client.schema.getter().do() as { classes?: ExtendedSchemaClass[] };
             
-            // Debug: Log the full schema
-            console.log('Full schema from Weaviate:', JSON.stringify(schema, null, 2));
-            
             // Store collections with their schema
             if (schema.classes && Array.isArray(schema.classes)) {
-                this.collections[connectionId] = schema.classes.map((cls: ExtendedSchemaClass) => {
-                    // Debug: Log each class schema
-                    console.log(`Class ${cls.class} schema:`, JSON.stringify(cls, null, 2));
-                    
-                    // Debug: Log vector-related properties
-                    if (cls.properties) {
-                        const vectorProps = cls.properties.filter((p: ExtendedSchemaProperty) => 
-                            p.vectorizer || 
-                            (p.moduleConfig && p.moduleConfig.vectorizer) ||
-                            p.vectorizerConfig
-                        );
-                        if (vectorProps.length > 0) {
-                            console.log(`Found ${vectorProps.length} vectorized properties in ${cls.class}:`, 
-                                vectorProps.map((p: ExtendedSchemaProperty) => ({
-                                    name: p.name,
-                                    dataType: p.dataType,
-                                    vectorizer: p.vectorizer,
-                                    moduleConfig: p.moduleConfig,
-                                    vectorizerConfig: p.vectorizerConfig
-                                }))
-                            );
-                        }
-                    }
-                    
-                    return {
-                        ...new WeaviateTreeItem(
-                            cls.class,
-                            vscode.TreeItemCollapsibleState.Collapsed,
-                            'collection',
-                            connectionId,
-                            cls.class,
-                            undefined,
-                            new vscode.ThemeIcon('database'),
-                            'weaviateCollection',
-                            cls.description
-                        ),
-                        schema: cls
-                    };
-                });
+                this.collections[connectionId] = schema.classes.map((cls: ExtendedSchemaClass) => ({
+                    label: cls.class,
+                    description: '',
+                    collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                    itemType: 'collection',
+                    connectionId: connectionId,
+                    collectionName: cls.class,
+                    iconPath: new vscode.ThemeIcon('database'),
+                    contextValue: 'weaviateCollection',
+                    tooltip: cls.description,
+                    schema: cls
+                } as CollectionWithSchema));
             } else {
                 this.collections[connectionId] = [];
             }
             
             this.refresh();
             
-            // Show a message if we found vectorized properties
-            if (schema.classes) {
-                const allVectorProps = schema.classes.flatMap((cls: ExtendedSchemaClass) => 
-                    (cls.properties || []).filter((p: ExtendedSchemaProperty) => 
-                        p.vectorizer || 
-                        (p.moduleConfig && p.moduleConfig.vectorizer) ||
-                        p.vectorizerConfig
-                    )
-                );
-                
-                if (allVectorProps.length > 0) {
-                    console.log(`Found ${allVectorProps.length} vectorized properties across all classes`);
-                } else {
-                    console.log('No vectorized properties found in any class');
-                }
-            }
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             console.error('Error in fetchCollections:', error);
@@ -1021,26 +532,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-    // Open query editor for a collection
+    /**
+     * Opens a query editor for the specified collection
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection to query
+     */
     async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
         try {
-            // In real implementation, would open a custom query editor
-            // For demo, open a new untitled document with a sample query
-            const templateQuery = `{
-                "query": {
-                    "$query": {
-                    "class": "${collectionName}",
-                    "vector": [0.1, 0.2, 0.3],  // Replace with actual vector
-                    "limit": 10
+            // Create a sample query for the collection
+            const templateQuery = JSON.stringify({
+                query: {
+                    $query: {
+                        class: collectionName,
+                        limit: 10
                     }
                 }
-                }`;
+            }, null, 4);
             
+            // Open a new document with the sample query
             const document = await vscode.workspace.openTextDocument({
                 content: templateQuery,
                 language: 'json'
             });
             
+            // Show the document in the editor
             await vscode.window.showTextDocument(document);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
