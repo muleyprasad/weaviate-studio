@@ -407,6 +407,12 @@ export class WeaviateQueryEditor {
                         return './monaco-editor-worker.js';
                     }
                 };
+                
+                // Ensure Monaco is loaded before any other scripts
+                require(['vs/editor/editor.main'], function() {
+                    // Monaco is now loaded
+                    console.log('Monaco editor loaded successfully');
+                });
             </script>
         </head>
         <body>
@@ -443,7 +449,19 @@ export class WeaviateQueryEditor {
             <div class="editor-container">
                 <div class="editor-pane">
                     <div class="pane-header">Query</div>
-                    <div id="editor" class="monaco-editor-container"></div>
+                    <div id="editor" class="monaco-editor-container" style="height:300px;">
+                    {
+  Get {
+    Article(limit: 5) {
+      title
+      summary
+      _additional {
+        id
+      }
+    }
+  }
+}
+                    </div>
                 </div>
                 
                 <div class="results-pane">

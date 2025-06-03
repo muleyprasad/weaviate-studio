@@ -99,8 +99,15 @@ input[type="number"] {
 /* Editor container */
 .editor-container {
     display: flex;
-    flex: 1;
+    flex-direction: column;
+    height: calc(100vh - 48px);
     overflow: hidden;
+}
+
+#editor {
+    width: 100%;
+    height: 300px;
+    border: 1px solid var(--vscode-panel-border);
 }
 
 /* Pane styles */

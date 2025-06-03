@@ -9,12 +9,15 @@ let vscode = acquireVsCodeApi();
 
 // Initialize when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', async () => {
-    // Setup Monaco editor
-    setupMonacoEditor();
-    
-    // Setup communication with extension host
-    setupMessageHandling();
-    
+    // Wait for Monaco to be available
+    require(['vs/editor/editor.main'], () => {
+        // Setup Monaco editor
+        setupMonacoEditor();
+        
+        // Setup communication with extension host
+        setupMessageHandling();
+    });
+
     // Tab switching
     const tabs = document.querySelectorAll('.tab');
     tabs.forEach(tab => {
@@ -22,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Remove active class from all tabs and content
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
+
             // Add active class to clicked tab and corresponding content
             tab.classList.add('active');
             const tabId = tab.getAttribute('data-tab');
@@ -38,11 +41,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const distanceMetric = document.getElementById('distance-metric').value;
             const limit = document.getElementById('limit').value;
             const certainty = document.getElementById('certainty').value;
-            
+
             // Show loading state
             const resultsContent = document.querySelector('.results-content');
             resultsContent.innerHTML = '<div class="loading">Running query...</div>';
-            
+
             // Send the query to the extension host
             vscode.postMessage({
                 command: 'runQuery',
@@ -74,9 +77,23 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Setup Monaco Editor with GraphQL language support
  */
 function setupMonacoEditor() {
+    console.log('Setting up Monaco editor...');
+    // Default query to populate in the editor
+    const defaultQuery = `{
+  Get {
+    Article(limit: 5) {
+      title
+      summary
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+
     // Register GraphQL language
     monaco.languages.register({ id: 'graphql' });
-    
+
     // Define GraphQL language tokenizer
     monaco.languages.setMonarchTokensProvider('graphql', {
         defaultToken: 'invalid',
@@ -149,14 +166,14 @@ function setupMonacoEditor() {
             string: [
                 [/[^"\\]+/, 'string'],
                 [/\\"/, 'string'],
-                [/\\./,  'string.escape'],
+                [/\\./, 'string.escape'],
                 [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
             ],
 
             string3: [
                 [/[^"""\\]+/, 'string'],
                 [/\\"/, 'string'],
-                [/\\./,  'string.escape'],
+                [/\\./, 'string.escape'],
                 [/"""/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
             ],
 
@@ -166,7 +183,7 @@ function setupMonacoEditor() {
             ]
         }
     });
-    
+
     // Setup language completion provider
     monaco.languages.registerCompletionItemProvider('graphql', {
         provideCompletionItems: (model, position) => {
@@ -176,24 +193,16 @@ function setupMonacoEditor() {
 
     // Create Monaco Editor instance
     editor = monaco.editor.create(document.getElementById('editor'), {
-        value: `{
-  Get {
-    Things {
-      title
-      description
-    }
-  }
-}`,
+        value: defaultQuery,
         language: 'graphql',
         theme: 'vs-dark',
-        automaticLayout: true,
-        minimap: {
-            enabled: true
-        },
-        fontSize: 14,
+        minimap: { enabled: false },
         scrollBeyondLastLine: false,
+        automaticLayout: true,
+        fontSize: 14,
+        lineNumbers: 'on',
         renderLineHighlight: 'all',
-        tabSize: 2
+        fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'
     });
 
     // Setup resize handling
@@ -208,25 +217,25 @@ function setupMonacoEditor() {
 function setupMessageHandling() {
     window.addEventListener('message', event => {
         const message = event.data;
-        
+
         switch (message.command) {
             case 'setSchema':
                 // Store schema for autocompletion
                 weaviateSchema = message.schema;
                 break;
-                
+
             case 'queryResults':
                 // Update UI with query results
                 updateResults(message.results);
                 break;
-                
+
             case 'explainPlanResult':
                 // Display explanation in the JSON tab
                 document.querySelector('.tab[data-tab="json"]').click();
                 const jsonTab = document.getElementById('json-tab');
                 jsonTab.innerHTML = '<pre>' + JSON.stringify(message.explanation, null, 2) + '</pre>';
                 break;
-                
+
             case 'error':
                 // Display error in the JSON tab
                 document.querySelector('.tab[data-tab="json"]').click();
@@ -235,7 +244,33 @@ function setupMessageHandling() {
                 break;
         }
     });
-    
+
+    // Make sure editor container exists
+    const editorContainer = document.getElementById('editor');
+    if (!editorContainer) {
+        console.error('Editor container not found in the DOM');
+        return;
+    }
+
+    // Create Monaco Editor instance
+    editor = monaco.editor.create(editorContainer, {
+        value: defaultQuery,
+        language: 'graphql',
+        theme: 'vs-dark',
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        fontSize: 14,
+        lineNumbers: 'on',
+        renderLineHighlight: 'all',
+        fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace'
+    });
+
+    // Register our custom completion provider
+    monaco.languages.registerCompletionItemProvider('graphql', {
+        provideCompletionItems
+    });
+
     // Notify extension that webview is ready
     vscode.postMessage({
         command: 'webviewReady'
@@ -254,7 +289,7 @@ function updateResults(results) {
     } else {
         tableTab.innerHTML = '<p>No results found or invalid response format.</p>';
     }
-    
+
     // Update JSON view
     const jsonTab = document.getElementById('json-tab');
     jsonTab.innerHTML = '<pre>' + JSON.stringify(results, null, 2) + '</pre>';
@@ -267,7 +302,7 @@ function generateTableFromResults(results) {
     // Extract data from results
     let data = [];
     let columns = new Set();
-    
+
     try {
         // Handle Weaviate's response structure
         const getResults = results.data.Get;
@@ -278,34 +313,34 @@ function generateTableFromResults(results) {
                 items.forEach(item => {
                     // Add all properties to columns set
                     Object.keys(item).forEach(key => columns.add(key));
-                    data.push({...item, _className: className});
+                    data.push({ ...item, _className: className });
                 });
             });
         }
     } catch (e) {
         return '<p>Error parsing results: ' + e.message + '</p>';
     }
-    
+
     if (data.length === 0) {
         return '<p>No results found.</p>';
     }
-    
+
     // Always include _className first if present
     let columnsList = Array.from(columns);
     if (columns.has('_className')) {
         columnsList = ['_className', ...columnsList.filter(c => c !== '_className')];
     }
-    
+
     // Generate table HTML
     let tableHTML = '<table class="results-table"><thead><tr>';
-    
+
     // Generate headers
     columnsList.forEach(column => {
         tableHTML += `<th>${formatColumnName(column)}</th>`;
     });
-    
+
     tableHTML += '</tr></thead><tbody>';
-    
+
     // Generate rows
     data.forEach(item => {
         tableHTML += '<tr>';
@@ -315,7 +350,7 @@ function generateTableFromResults(results) {
         });
         tableHTML += '</tr>';
     });
-    
+
     tableHTML += '</tbody></table>';
     return tableHTML;
 }
