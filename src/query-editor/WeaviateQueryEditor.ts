@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import weaviate from 'weaviate-ts-client';
 
 interface QueryEditorOptions {
     connectionId?: string;
     collectionName?: string;
+}
+
+interface QueryRunOptions {
+    distanceMetric: string;
+    limit: number;
+    certainty: number;
 }
 
 export class WeaviateQueryEditor {
@@ -12,6 +20,8 @@ export class WeaviateQueryEditor {
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _options: QueryEditorOptions;
+    private _weaviateClient: any | undefined;
+    private _weaviateSchema: any | undefined;
 
     public static createOrShow(extensionUri: vscode.Uri, options: QueryEditorOptions = {}) {
         const column = vscode.window.activeTextEditor
@@ -51,12 +61,221 @@ export class WeaviateQueryEditor {
     private async _update() {
         const webview = this._panel.webview;
         this._panel.webview.html = this._getHtmlForWebview(webview);
+        
+        // Setup message handling
+        this._panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.command) {
+                    case 'webviewReady':
+                        // Initialize webview with schema data
+                        await this._initializeWebview();
+                        break;
+                        
+                    case 'runQuery':
+                        // Execute query and return results
+                        await this._executeQuery(message.query, message.options);
+                        break;
+                        
+                    case 'explainPlan':
+                        // Explain query plan
+                        await this._explainQueryPlan(message.query);
+                        break;
+                }
+            },
+            null,
+            this._disposables
+        );
+    }
+    
+    /**
+     * Initialize webview with schema data
+     */
+    private async _initializeWebview() {
+        try {
+            // If we have a connection and client, fetch the schema
+            if (this._options.connectionId && !this._weaviateSchema) {
+                await this._connectToWeaviate();
+                if (this._weaviateClient) {
+                    const schema = await this._fetchWeaviateSchema();
+                    this._weaviateSchema = schema;
+                    
+                    // Send schema to webview for autocompletion
+                    this._panel.webview.postMessage({
+                        command: 'setSchema',
+                        schema: this._weaviateSchema
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error initializing webview:', error);
+        }
+    }
+    
+    /**
+     * Connect to Weaviate instance
+     */
+    private async _connectToWeaviate() {
+        try {
+            // Get connection details from storage
+            const connectionId = this._options.connectionId;
+            if (!connectionId) {
+                return;
+            }
+            
+            // In a real implementation, you would fetch these from your connection storage
+            // For now, just demonstrate the pattern
+            const connections = await this._getStoredConnections();
+            const connection = connections.find(conn => conn.id === connectionId);
+            
+            if (connection) {
+                // Create Weaviate client
+                this._weaviateClient = weaviate.client({
+                    scheme: connection.scheme || 'https',
+                    host: connection.host,
+                    apiKey: connection.apiKey ? new weaviate.ApiKey(connection.apiKey) : undefined,
+                });
+            }
+        } catch (error) {
+            console.error('Error connecting to Weaviate:', error);
+            this._weaviateClient = undefined;
+        }
+    }
+    
+    /**
+     * Get stored connections from workspace state
+     */
+    private async _getStoredConnections(): Promise<any[]> {
+        // In a real implementation, you would get these from persistent storage
+        const connectionsJson = vscode.workspace.getConfiguration('weaviate').get('connections') as string;
+        return connectionsJson ? JSON.parse(connectionsJson) : [];
+    }
+    
+    /**
+     * Fetch schema from Weaviate
+     */
+    private async _fetchWeaviateSchema() {
+        try {
+            if (!this._weaviateClient) {
+                return null;
+            }
+            
+            // Get schema from Weaviate
+            const schema = await this._weaviateClient.schema.getter().do();
+            
+            // Format schema for autocompletion
+            return {
+                classes: schema.classes || [],
+                types: [
+                    { name: 'Get', kind: 'OBJECT' },
+                    { name: 'Aggregate', kind: 'OBJECT' },
+                    { name: 'Explore', kind: 'OBJECT' }
+                ]
+            };
+        } catch (error) {
+            console.error('Error fetching schema:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Execute GraphQL query against Weaviate
+     */
+    private async _executeQuery(query: string, options: QueryRunOptions) {
+        try {
+            if (!this._weaviateClient) {
+                throw new Error('Not connected to Weaviate');
+            }
+            
+            // Build the query
+            const graphQLClient = this._weaviateClient.graphql;
+            let graphQLQuery = graphQLClient.get();
+            
+            // Apply options
+            if (options) {
+                if (options.limit && options.limit > 0) {
+                    graphQLQuery = graphQLQuery.withLimit(options.limit);
+                }
+                
+                if (options.distanceMetric) {
+                    // Convert string to enum
+                    const metric = options.distanceMetric.toUpperCase();
+                    if (['COSINE', 'DOT', 'L2', 'MANHATTAN', 'HAMMING'].includes(metric)) {
+                        // In a real implementation, you'd apply this to nearVector/nearText queries
+                    }
+                }
+            }
+            
+            // For demonstration, allow using the raw GraphQL
+            const result = await this._weaviateClient.graphql.raw().withQuery(query).do();
+            
+            // Send results to webview
+            this._panel.webview.postMessage({
+                command: 'queryResults',
+                results: result
+            });
+        } catch (error: any) {
+            console.error('Error executing query:', error);
+            this._panel.webview.postMessage({
+                command: 'error',
+                error: `Error executing query: ${error.message || 'Unknown error'}`
+            });
+        }
+    }
+    
+    /**
+     * Explain query plan for GraphQL query
+     */
+    private async _explainQueryPlan(query: string) {
+        try {
+            if (!this._weaviateClient) {
+                throw new Error('Not connected to Weaviate');
+            }
+            
+            // In a production implementation, you would call a Weaviate endpoint that explains the query plan
+            // Since this is a prototype, we'll simulate it
+            const explanation = {
+                queryType: 'GraphQL',
+                plan: {
+                    operations: [
+                        { type: 'Parse GraphQL', cost: 'low' },
+                        { type: 'Validate Schema', cost: 'low' },
+                        { type: 'Plan Execution', cost: 'medium' },
+                        { type: 'Vector Search', cost: 'high', details: 'Using HNSW index' },
+                        { type: 'Filter Results', cost: 'medium' },
+                        { type: 'Format Response', cost: 'low' }
+                    ],
+                    estimatedTimeMs: 120,
+                    estimatedObjectsScanned: 10000,
+                    suggestions: [
+                        'Consider adding a limit to reduce result size',
+                        'Use a more specific class filter to improve performance',
+                        'Add an index on frequently filtered properties'
+                    ]
+                },
+                query: query
+            };
+            
+            // Send explanation to webview
+            this._panel.webview.postMessage({
+                command: 'explainPlanResult',
+                explanation: explanation
+            });
+        } catch (error: any) {
+            console.error('Error explaining query plan:', error);
+            this._panel.webview.postMessage({
+                command: 'error',
+                error: `Error explaining query plan: ${error.message || 'Unknown error'}`
+            });
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
-        // Get the local path to the script and styles
+        // Get the local path to scripts and styles
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'media', 'queryEditor.js')
+        );
+        const languageSupportUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'media', 'weaviate-language-support.js')
         );
         const styleUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'media', 'queryEditor.css')
@@ -64,12 +283,18 @@ export class WeaviateQueryEditor {
         const codiconsUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
         );
+        
+        // Get Monaco Editor resources
+        const monacoEditorUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'monaco-editor', 'min', 'vs')
+        );
 
         return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; script-src ${webview.cspSource} 'unsafe-eval'; style-src ${webview.cspSource} 'unsafe-inline'">
             <title>${this._panel.title}</title>
             <link href="${styleUri}" rel="stylesheet" />
             <link href="${codiconsUri}" rel="stylesheet" />
@@ -172,33 +397,46 @@ export class WeaviateQueryEditor {
 
                 /* Add more styles as needed */
             </style>
+            <!-- Monaco Editor -->
+            <script src="${monacoEditorUri}/loader.js"></script>
+            <script>
+                // Configure Monaco loader
+                require.config({ paths: { 'vs': '${monacoEditorUri.toString()}' } });
+                window.MonacoEnvironment = {
+                    getWorkerUrl: function (moduleId, label) {
+                        return './monaco-editor-worker.js';
+                    }
+                };
+            </script>
         </head>
         <body>
             <div class="toolbar">
                 <div class="toolbar-group">
-                    <vscode-button id="run-query" appearance="primary">
+                    <button id="run-query" class="button primary">
                         <span class="codicon codicon-play"></span> Run Query
-                    </vscode-button>
+                    </button>
                     
-                    <vscode-dropdown id="distance-metric">
-                        <vscode-option value="cosine">Cosine</vscode-option>
-                        <vscode-option value="l2">L2</vscode-option>
-                        <vscode-option value="dot">Dot</vscode-option>
-                    </vscode-dropdown>
+                    <select id="distance-metric" class="dropdown">
+                        <option value="cosine">Cosine</option>
+                        <option value="l2">L2</option>
+                        <option value="dot">Dot</option>
+                    </select>
 
-                    <vscode-text-field id="limit" type="number" value="10" style="width: 80px;">
-                        <span slot="start">Limit</span>
-                    </vscode-text-field>
+                    <div class="input-group">
+                        <label for="limit">Limit</label>
+                        <input id="limit" type="number" value="10" min="1" max="100">
+                    </div>
 
-                    <vscode-text-field id="certainty" type="number" value="0.8" step="0.1" min="0" max="1" style="width: 100px;">
-                        <span slot="start">Certainty</span>
-                    </vscode-text-field>
+                    <div class="input-group">
+                        <label for="certainty">Certainty</label>
+                        <input id="certainty" type="number" value="0.8" step="0.1" min="0" max="1">
+                    </div>
                 </div>
 
                 <div class="toolbar-group">
-                    <vscode-button id="explain-plan" appearance="secondary" title="Explain Query Plan">
+                    <button id="explain-plan" class="button secondary" title="Explain Query Plan">
                         <span class="codicon codicon-graph"></span> Explain Plan
-                    </vscode-button>
+                    </button>
                 </div>
             </div>
 
@@ -233,7 +471,9 @@ export class WeaviateQueryEditor {
                 </div>
             </div>
 
-            <script src="${scriptUri}"></script>
+            <!-- Load scripts -->
+            <script type="module" src="${languageSupportUri}"></script>
+            <script type="module" src="${scriptUri}"></script>
         </body>
         </html>`;
     }
