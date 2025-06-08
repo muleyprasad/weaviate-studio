@@ -1,11 +1,23 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
-import weaviate from 'weaviate-ts-client';
+import { URL } from 'url';
+import * as path from 'path';
+import weaviate, { WeaviateClient } from 'weaviate-ts-client';
+
+// Helper function to generate a nonce
+function getNonce() {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+}
 
 interface QueryEditorOptions {
     connectionId?: string;
     collectionName?: string;
+    client?: WeaviateClient;
 }
 
 interface QueryRunOptions {
@@ -20,13 +32,11 @@ export class WeaviateQueryEditor {
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _options: QueryEditorOptions;
-    private _weaviateClient: any | undefined;
+    private _weaviateClient: WeaviateClient | undefined;
     private _weaviateSchema: any | undefined;
 
     public static createOrShow(extensionUri: vscode.Uri, options: QueryEditorOptions = {}) {
-        const column = vscode.window.activeTextEditor
-            ? vscode.window.activeTextEditor.viewColumn
-            : undefined;
+        const column = vscode.window.activeTextEditor?.viewColumn;
 
         if (WeaviateQueryEditor.currentPanel) {
             WeaviateQueryEditor.currentPanel._panel.reveal(column);
@@ -43,7 +53,7 @@ export class WeaviateQueryEditor {
                 retainContextWhenHidden: true,
                 localResourceRoots: [
                     vscode.Uri.joinPath(extensionUri, 'media'),
-                    vscode.Uri.joinPath(extensionUri, 'out/compiled')
+                    vscode.Uri.joinPath(extensionUri, 'dist')
                 ]
             }
         );
@@ -55,454 +65,281 @@ export class WeaviateQueryEditor {
         this._options = options;
         this._panel = panel;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        this._update();
+        this._initializeWebview();
     }
 
-    private async _update() {
-        const webview = this._panel.webview;
-        this._panel.webview.html = this._getHtmlForWebview(webview);
-        
-        // Setup message handling
-        this._panel.webview.onDidReceiveMessage(
-            async (message) => {
-                switch (message.command) {
-                    case 'webviewReady':
-                        // Initialize webview with schema data
-                        await this._initializeWebview();
-                        break;
-                        
-                    case 'runQuery':
-                        // Execute query and return results
-                        await this._executeQuery(message.query, message.options);
-                        break;
-                        
-                    case 'explainPlan':
-                        // Explain query plan
-                        await this._explainQueryPlan(message.query);
-                        break;
-                }
-            },
-            null,
-            this._disposables
-        );
-    }
-    
-    /**
-     * Initialize webview with schema data
-     */
     private async _initializeWebview() {
+        this._panel.webview.html = await this._getHtmlForWebview(this._panel.webview);
+        this._setupMessageHandlers();
+    }
+
+    private _setupMessageHandlers() {
+        this._panel.webview.onDidReceiveMessage(async (message) => {
+            switch (message.type) {
+                case 'ready':
+                    if (this._options.collectionName) {
+                        await this._sendInitialData();
+                    }
+                    break;
+                
+                case 'runQuery':
+                    await this._executeQuery(message.query, message.options);
+                    break;
+                
+                case 'explainPlan':
+                    await this._explainQueryPlan(message.query);
+                    break;
+            }
+        });
+    }
+
+    private async _connectToWeaviate(): Promise<boolean> {
         try {
-            // If we have a connection and client, fetch the schema
-            if (this._options.connectionId && !this._weaviateSchema) {
-                await this._connectToWeaviate();
-                if (this._weaviateClient) {
-                    const schema = await this._fetchWeaviateSchema();
-                    this._weaviateSchema = schema;
-                    
-                    // Send schema to webview for autocompletion
-                    this._panel.webview.postMessage({
-                        command: 'setSchema',
-                        schema: this._weaviateSchema
-                    });
+            const ConnectionManager = require('../services/ConnectionManager').ConnectionManager;
+            const connectionManager = ConnectionManager.getInstance(this.extensionUri);
+
+            if (this._options.connectionId) {
+                this._weaviateClient = connectionManager.getClient(this._options.connectionId);
+                if (!this._weaviateClient) {
+                    await connectionManager.connect(this._options.connectionId);
+                    this._weaviateClient = connectionManager.getClient(this._options.connectionId);
                 }
             }
-        } catch (error) {
-            console.error('Error initializing webview:', error);
+
+            if (!this._weaviateClient) {
+                const connections = connectionManager.getConnections();
+                const activeConnection = connections.find((c: { status: string; id: string }) => c.status === 'connected');
+                if (activeConnection) {
+                    this._weaviateClient = connectionManager.getClient(activeConnection.id);
+                    this._options.connectionId = activeConnection.id;
+                }
+            }
+
+            return !!this._weaviateClient;
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Connection failed: ${error.message}`);
+            return false;
         }
     }
-    
-    /**
-     * Connect to Weaviate instance
-     */
-    private async _connectToWeaviate() {
+
+    private async _executeQuery(query: string, options: QueryRunOptions) {
+        if (!this._weaviateClient) {
+            vscode.window.showErrorMessage('Not connected to Weaviate');
+            return;
+        }
+
         try {
-            // Get connection details from storage
-            const connectionId = this._options.connectionId;
-            if (!connectionId) {
+            // Handle different Weaviate client API versions using type-safe approach
+            let result;
+            const client = this._weaviateClient as any; // Use any to bypass type checking for compatibility
+            
+            try {
+                if (client.graphql && typeof client.graphql.raw === 'function') {
+                    // Try newer API style first (most common)
+                    result = await client.graphql.raw({ query });
+                } else if (client.graphql && client.graphql.get) {
+                    // Try another common API pattern
+                    const graphqlQuery = client.graphql.get();
+                    result = await graphqlQuery.do();
+                } else if (client.query && typeof client.query.raw === 'function') {
+                    // Last resort - query interface
+                    result = await client.query.raw(query);
+                } else {
+                    // If no known method works, throw an informative error
+                    throw new Error('Could not find compatible GraphQL query method on Weaviate client');
+                }
+            } catch (apiError: any) {
+                console.error('API call failed:', apiError);
+                throw new Error(`GraphQL query failed: ${apiError.message}`);
+            }
+            
+            this._panel.webview.postMessage({
+                type: 'queryResult',
+                data: result,
+                collection: this._options.collectionName
+            });
+        } catch (error: any) {
+            this._panel.webview.postMessage({
+                type: 'queryError',
+                error: error.message
+            });
+        }
+    }
+
+    private async _getHtmlForWebview(webview: vscode.Webview): Promise<string> {
+        const webviewHtmlPath = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'index.html');
+        let htmlContent = await fs.promises.readFile(webviewHtmlPath.fsPath, 'utf-8');
+
+        const nonce = getNonce(); 
+
+        htmlContent = htmlContent.replace(/{{nonce}}/g, nonce);
+        console.log('[WeaviateQueryEditor] webview.cspSource:', webview.cspSource);
+    htmlContent = htmlContent.replace(/{{cspSource}}/g, webview.cspSource);
+        const extensionRootFileUri = vscode.Uri.file(this.extensionUri.fsPath);
+        const webviewExtensionRootUri = webview.asWebviewUri(extensionRootFileUri);
+
+        // Generate URI for webview.bundle.js
+        const scriptPathOnDisk = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'webview.bundle.js');
+        const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
+        console.log('[WeaviateQueryEditor] Generated scriptUri for webview.bundle.js:', scriptUri.toString());
+        htmlContent = htmlContent.replace(/{{webviewBundleUri}}/g, scriptUri.toString());
+
+        // Calculate baseHref for the <base> tag
+        const webviewDistPath = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
+        const baseHrefUri = webview.asWebviewUri(webviewDistPath);
+        let baseHrefString = baseHrefUri.toString();
+        if (!baseHrefString.endsWith('/')) {
+            baseHrefString += '/';
+        }
+        console.log('[WeaviateQueryEditor] Generated baseHref:', baseHrefString);
+        htmlContent = htmlContent.replace(/{{baseHref}}/g, baseHrefString);
+
+        return htmlContent;
+    }
+    private async _sendInitialData() {
+        if (!this._weaviateClient) {
+            const connected = await this._connectToWeaviate();
+            if (!connected) {
                 return;
             }
-            
-            // In a real implementation, you would fetch these from your connection storage
-            // For now, just demonstrate the pattern
-            const connections = await this._getStoredConnections();
-            const connection = connections.find(conn => conn.id === connectionId);
-            
-            if (connection) {
-                // Create Weaviate client
-                this._weaviateClient = weaviate.client({
-                    scheme: connection.scheme || 'https',
-                    host: connection.host,
-                    apiKey: connection.apiKey ? new weaviate.ApiKey(connection.apiKey) : undefined,
-                });
-            }
-        } catch (error) {
-            console.error('Error connecting to Weaviate:', error);
-            this._weaviateClient = undefined;
         }
-    }
-    
-    /**
-     * Get stored connections from workspace state
-     */
-    private async _getStoredConnections(): Promise<any[]> {
-        // In a real implementation, you would get these from persistent storage
-        const connectionsJson = vscode.workspace.getConfiguration('weaviate').get('connections') as string;
-        return connectionsJson ? JSON.parse(connectionsJson) : [];
-    }
-    
-    /**
-     * Fetch schema from Weaviate
-     */
-    private async _fetchWeaviateSchema() {
+
         try {
             if (!this._weaviateClient) {
-                return null;
+                throw new Error('Not connected to Weaviate');
+            }
+            const schema = await this._weaviateClient.schema.getter().do();
+            this._panel.webview.postMessage({
+                type: 'initialData',
+                schema,
+                collection: this._options.collectionName
+            });
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
+        }
+    }
+
+    private async _explainQueryPlan(query: string) {
+        if (!this._weaviateClient) {
+            vscode.window.showErrorMessage('Not connected to Weaviate');
+            return;
+        }
+
+        try {
+            // Different Weaviate client versions have different API structures for explanations
+            let explainResult;
+            const client = this._weaviateClient as any; // Use any for API version compatibility
+            
+            try {
+                // First try the standard approach if available
+                if (client.graphql && client.graphql.get) {
+                    // Use a standard GraphQL query with _additional.explain
+                    const className = this._options.collectionName || 'Things';
+                    const explainQuery = `{
+                        Get {
+                            ${className}(limit: 1) {
+                                _additional { explain }
+                            }
+                        }
+                    }`;
+                    
+                    if (typeof client.graphql.raw === 'function') {
+                        explainResult = await client.graphql.raw({ query: explainQuery });
+                    } else {
+                        explainResult = { 
+                            message: 'Explain query not supported by this version of Weaviate client',
+                            clientInfo: {
+                                hasGraphQL: !!client.graphql,
+                                hasRaw: client.graphql ? !!client.graphql.raw : false,
+                                methods: Object.keys(client.graphql || {}).join(', ')
+                            }
+                        };
+                    }
+                }
+            } catch (explainError) {
+                console.error('Explain operation failed:', explainError);
+                explainResult = { 
+                    error: 'Explain functionality failed', 
+                    message: explainError instanceof Error ? explainError.message : 'Unknown error'
+                };
+            }
+            this._panel.webview.postMessage({
+                type: 'explainResult',
+                data: explainResult
+            });
+        } catch (error: any) {
+            this._panel.webview.postMessage({
+                type: 'explainError',
+                error: error.message
+            });
+        }
+    }
+
+    private async _getSchemaForCompletion(): Promise<{ classes: any[], types: any[] } | null> {
+        try {
+            if (!this._weaviateClient && this._options.client) {
+                this._weaviateClient = this._options.client;
             }
             
-            // Get schema from Weaviate
+            if (!this._weaviateClient) {
+                const weaviateUrlConfig = vscode.workspace.getConfiguration('weaviate').get<string>('url');
+                const weaviateUrl = weaviateUrlConfig || 'http://localhost:8080';
+                
+                let weaviateImport;
+                try {
+                    weaviateImport = await import('weaviate-ts-client');
+                } catch (e) {
+                    console.error('Failed to import weaviate-ts-client:', e);
+                    vscode.window.showErrorMessage('Weaviate TS Client not found. Please ensure it is installed in your project.');
+                    return null;
+                }
+
+                const ClientFactory = (weaviateImport as any).default?.client || (weaviateImport as any).client;
+                if (!ClientFactory) {
+                    console.error('Could not find client factory in weaviate-ts-client.');
+                    vscode.window.showErrorMessage('Invalid Weaviate TS Client structure.');
+                    return null;
+                }
+
+                const url = new URL(weaviateUrl);
+                const protocol = url.protocol.slice(0, -1);
+                const host = url.host;
+                
+                this._weaviateClient = ClientFactory({ 
+                    scheme: protocol,
+                    host: host,
+                });
+
+                if (!this._weaviateClient) {
+                    console.error('Failed to initialize Weaviate client for schema completion.');
+                    vscode.window.showErrorMessage('Failed to initialize Weaviate client. Check Weaviate server connection and configuration.');
+                    return null;
+                }
+            }
+            
             const schema = await this._weaviateClient.schema.getter().do();
             
-            // Format schema for autocompletion
             return {
                 classes: schema.classes || [],
-                types: [
+                types: [ 
                     { name: 'Get', kind: 'OBJECT' },
                     { name: 'Aggregate', kind: 'OBJECT' },
-                    { name: 'Explore', kind: 'OBJECT' }
                 ]
             };
-        } catch (error) {
-            console.error('Error fetching schema:', error);
+        } catch (error: any) {
+            console.error('Error fetching schema for completion:', error);
+            vscode.window.showErrorMessage(`Error fetching Weaviate schema: ${error.message}`);
             return null;
         }
-    }
-    
-    /**
-     * Execute GraphQL query against Weaviate
-     */
-    private async _executeQuery(query: string, options: QueryRunOptions) {
-        try {
-            if (!this._weaviateClient) {
-                throw new Error('Not connected to Weaviate');
-            }
-            
-            // Build the query
-            const graphQLClient = this._weaviateClient.graphql;
-            let graphQLQuery = graphQLClient.get();
-            
-            // Apply options
-            if (options) {
-                if (options.limit && options.limit > 0) {
-                    graphQLQuery = graphQLQuery.withLimit(options.limit);
-                }
-                
-                if (options.distanceMetric) {
-                    // Convert string to enum
-                    const metric = options.distanceMetric.toUpperCase();
-                    if (['COSINE', 'DOT', 'L2', 'MANHATTAN', 'HAMMING'].includes(metric)) {
-                        // In a real implementation, you'd apply this to nearVector/nearText queries
-                    }
-                }
-            }
-            
-            // For demonstration, allow using the raw GraphQL
-            const result = await this._weaviateClient.graphql.raw().withQuery(query).do();
-            
-            // Send results to webview
-            this._panel.webview.postMessage({
-                command: 'queryResults',
-                results: result
-            });
-        } catch (error: any) {
-            console.error('Error executing query:', error);
-            this._panel.webview.postMessage({
-                command: 'error',
-                error: `Error executing query: ${error.message || 'Unknown error'}`
-            });
-        }
-    }
-    
-    /**
-     * Explain query plan for GraphQL query
-     */
-    private async _explainQueryPlan(query: string) {
-        try {
-            if (!this._weaviateClient) {
-                throw new Error('Not connected to Weaviate');
-            }
-            
-            // In a production implementation, you would call a Weaviate endpoint that explains the query plan
-            // Since this is a prototype, we'll simulate it
-            const explanation = {
-                queryType: 'GraphQL',
-                plan: {
-                    operations: [
-                        { type: 'Parse GraphQL', cost: 'low' },
-                        { type: 'Validate Schema', cost: 'low' },
-                        { type: 'Plan Execution', cost: 'medium' },
-                        { type: 'Vector Search', cost: 'high', details: 'Using HNSW index' },
-                        { type: 'Filter Results', cost: 'medium' },
-                        { type: 'Format Response', cost: 'low' }
-                    ],
-                    estimatedTimeMs: 120,
-                    estimatedObjectsScanned: 10000,
-                    suggestions: [
-                        'Consider adding a limit to reduce result size',
-                        'Use a more specific class filter to improve performance',
-                        'Add an index on frequently filtered properties'
-                    ]
-                },
-                query: query
-            };
-            
-            // Send explanation to webview
-            this._panel.webview.postMessage({
-                command: 'explainPlanResult',
-                explanation: explanation
-            });
-        } catch (error: any) {
-            console.error('Error explaining query plan:', error);
-            this._panel.webview.postMessage({
-                command: 'error',
-                error: `Error explaining query plan: ${error.message || 'Unknown error'}`
-            });
-        }
-    }
-
-    private _getHtmlForWebview(webview: vscode.Webview) {
-        // Get the local path to scripts and styles
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'media', 'queryEditor.js')
-        );
-        const languageSupportUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'media', 'weaviate-language-support.js')
-        );
-        const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'media', 'queryEditor.css')
-        );
-        const codiconsUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
-        );
-        
-        // Get Monaco Editor resources
-        const monacoEditorUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'monaco-editor', 'min', 'vs')
-        );
-
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; script-src ${webview.cspSource} 'unsafe-eval'; style-src ${webview.cspSource} 'unsafe-inline'">
-            <title>${this._panel.title}</title>
-            <link href="${styleUri}" rel="stylesheet" />
-            <link href="${codiconsUri}" rel="stylesheet" />
-            <style>
-                :root {
-                    --vscode-font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Ubuntu', 'Droid Sans', sans-serif;
-                    --vscode-editor-background: #1e1e1e;
-                    --vscode-editor-foreground: #d4d4d4;
-                    --vscode-editor-selectionBackground: #264f78;
-                    --vscode-button-background: #0e639c;
-                    --vscode-button-foreground: #ffffff;
-                    --vscode-button-hoverBackground: #1177bb;
-                    --vscode-input-background: #3c3c3c;
-                    --vscode-input-foreground: #cccccc;
-                    --vscode-panel-background: #1e1e1e;
-                    --vscode-panel-border: #454545;
-                }
-
-                body {
-                    margin: 0;
-                    padding: 0;
-                    font-family: var(--vscode-font-family);
-                    color: var(--vscode-foreground);
-                    background: var(--vscode-editor-background);
-                    height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                }
-
-                .toolbar {
-                    display: flex;
-                    justify-content: space-between;
-                    padding: 8px 12px;
-                    background: var(--vscode-editor-background);
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                }
-
-                .toolbar-group {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .editor-container {
-                    display: flex;
-                    flex: 1;
-                    overflow: hidden;
-                }
-
-
-                .editor-pane, .results-pane {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                }
-
-                .editor-pane {
-                    border-right: 1px solid var(--vscode-panel-border);
-                }
-
-                .pane-header {
-                    padding: 8px 12px;
-                    font-weight: 600;
-                    background: var(--vscode-editor-background);
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                }
-
-                .monaco-editor-container, .results-content {
-                    flex: 1;
-                    overflow: auto;
-                    padding: 12px;
-                }
-
-                .tab-bar {
-                    display: flex;
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                }
-
-                .tab {
-                    padding: 8px 16px;
-                    cursor: pointer;
-                    border-bottom: 2px solid transparent;
-                    user-select: none;
-                }
-
-                .tab.active {
-                    border-bottom-color: var(--vscode-button-background);
-                }
-
-                .tab-content {
-                    display: none;
-                    height: 100%;
-                }
-
-                .tab-content.active {
-                    display: block;
-                }
-
-                /* Add more styles as needed */
-            </style>
-            <!-- Monaco Editor -->
-            <script src="${monacoEditorUri}/loader.js"></script>
-            <script>
-                // Configure Monaco loader
-                require.config({ paths: { 'vs': '${monacoEditorUri.toString()}' } });
-                window.MonacoEnvironment = {
-                    getWorkerUrl: function (moduleId, label) {
-                        return './monaco-editor-worker.js';
-                    }
-                };
-                
-                // Ensure Monaco is loaded before any other scripts
-                require(['vs/editor/editor.main'], function() {
-                    // Monaco is now loaded
-                    console.log('Monaco editor loaded successfully');
-                });
-            </script>
-        </head>
-        <body>
-            <div class="toolbar">
-                <div class="toolbar-group">
-                    <button id="run-query" class="button primary">
-                        <span class="codicon codicon-play"></span> Run Query
-                    </button>
-                    
-                    <select id="distance-metric" class="dropdown">
-                        <option value="cosine">Cosine</option>
-                        <option value="l2">L2</option>
-                        <option value="dot">Dot</option>
-                    </select>
-
-                    <div class="input-group">
-                        <label for="limit">Limit</label>
-                        <input id="limit" type="number" value="10" min="1" max="100">
-                    </div>
-
-                    <div class="input-group">
-                        <label for="certainty">Certainty</label>
-                        <input id="certainty" type="number" value="0.8" step="0.1" min="0" max="1">
-                    </div>
-                </div>
-
-                <div class="toolbar-group">
-                    <button id="explain-plan" class="button secondary" title="Explain Query Plan">
-                        <span class="codicon codicon-graph"></span> Explain Plan
-                    </button>
-                </div>
-            </div>
-
-            <div class="editor-container">
-                <div class="editor-pane">
-                    <div class="pane-header">Query</div>
-                    <div id="editor" class="monaco-editor-container" style="height:300px;">
-                    {
-  Get {
-    Article(limit: 5) {
-      title
-      summary
-      _additional {
-        id
-      }
-    }
-  }
-}
-                    </div>
-                </div>
-                
-                <div class="results-pane">
-                    <div class="tab-bar">
-                        <div class="tab active" data-tab="table">Table</div>
-                        <div class="tab" data-tab="json">JSON</div>
-                        <div class="tab" data-tab="vector">3D Vector</div>
-                    </div>
-                    
-                    <div class="results-content">
-                        <div id="table-tab" class="tab-content active">
-                            <!-- Table results will be rendered here -->
-                        </div>
-                        <div id="json-tab" class="tab-content">
-                            <!-- JSON results will be rendered here -->
-                        </div>
-                        <div id="vector-tab" class="tab-content">
-                            <!-- 3D Vector visualization will be rendered here -->
-                            <div style="padding: 20px; text-align: center;">
-                                <p>3D Vector Visualization</p>
-                                <p><small>Vector visualization will be implemented here</small></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Load scripts -->
-            <script type="module" src="${languageSupportUri}"></script>
-            <script type="module" src="${scriptUri}"></script>
-        </body>
-        </html>`;
     }
 
     public dispose() {
         WeaviateQueryEditor.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
-            const x = this._disposables.pop();
-            if (x) {
-                x.dispose();
+            const disposable = this._disposables.pop();
+            if (disposable) {
+                disposable.dispose();
             }
         }
     }
