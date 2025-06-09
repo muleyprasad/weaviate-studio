@@ -34,19 +34,19 @@ const sanitizeDataForDisplay = (data: any): any => {
   if (!data || typeof data !== 'object') {
     return data;
   }
-  
+
   // Create a deep copy to avoid modifying the original
   const sanitized = JSON.parse(JSON.stringify(data));
-  
+
   // Function to recursively scrub sensitive data
   const scrub = (obj: any) => {
     if (!obj || typeof obj !== 'object') {
       return;
     }
-    
+
     // List of keys that might contain sensitive information
     const sensitiveKeys = ['apiKey', 'api_key', 'key', 'token', 'password', 'secret', 'auth', 'authorization'];
-    
+
     // Check if object is an array
     if (Array.isArray(obj)) {
       obj.forEach(item => {
@@ -56,18 +56,18 @@ const sanitizeDataForDisplay = (data: any): any => {
       });
       return;
     }
-    
+
     // Process object properties
     for (const key of Object.keys(obj)) {
       // Check for sensitive key names (case insensitive)
       if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
         // Redact the value
         obj[key] = '[REDACTED]';
-      } 
+      }
       // Special handling for client object which often contains credentials
       else if (key === 'client' && obj[key] && typeof obj[key] === 'object') {
         // Either remove client entirely or sanitize it
-        if (Object.keys(obj[key]).some(clientKey => 
+        if (Object.keys(obj[key]).some(clientKey =>
           sensitiveKeys.some(sk => clientKey.toLowerCase().includes(sk.toLowerCase())))) {
           // If client contains sensitive keys, replace with safe version
           const host = obj[key].host || 'unknown';
@@ -79,53 +79,137 @@ const sanitizeDataForDisplay = (data: any): any => {
           // Still recursively check other client properties
           scrub(obj[key]);
         }
-      } 
+      }
       // Recursively check nested objects
       else if (obj[key] && typeof obj[key] === 'object') {
         scrub(obj[key]);
       }
     }
   };
-  
+
   // Apply the sanitization
   scrub(sanitized);
   return sanitized;
 };
 
 // Define styles for various UI elements
-const containerStyle: React.CSSProperties = {
-  padding: '10px',
-  fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace',
-  height: '100vh',
-  overflow: 'auto',
-  backgroundColor: '#1E1E1E',
-  color: '#D4D4D4'
-};
-
-const jsonContainerStyle: React.CSSProperties = {
-  marginTop: '20px',
-  border: '1px solid #333',
-  borderRadius: '4px',
-  padding: '10px',
-  overflow: 'auto'
-};
-
-const headerStyle: React.CSSProperties = {
-  borderBottom: '1px solid #333',
-  paddingBottom: '10px',
-  marginBottom: '20px',
-  fontSize: '18px',
-  fontWeight: 500
-};
-
-const emptyStateStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: '300px',
-  color: '#666',
-  textAlign: 'center'
+// Styles for the UI components
+const styles = {
+  container: {
+    padding: '10px',
+    fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace',
+    height: '100vh',
+    overflow: 'auto',
+    backgroundColor: '#1E1E1E',
+    color: '#D4D4D4',
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '15px'
+  },
+  header: {
+    borderBottom: '1px solid #333',
+    paddingBottom: '10px',
+    marginBottom: '5px',
+    fontSize: '18px',
+    fontWeight: 500 as 500
+  },
+  splitContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    height: 'calc(100vh - 80px)'
+  },
+  queryContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    minHeight: '200px',
+    flex: '0 0 40%'
+  },
+  queryHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #333',
+    paddingBottom: '5px'
+  },
+  resultContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    flex: '1',
+    overflow: 'auto'
+  },
+  resultHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #333',
+    paddingBottom: '5px'
+  },
+  textarea: {
+    backgroundColor: '#252526',
+    color: '#D4D4D4',
+    border: '1px solid #333',
+    borderRadius: '4px',
+    padding: '10px',
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    resize: 'none' as 'none',
+    flex: '1',
+    minHeight: '150px',
+    outline: 'none',
+    overflowY: 'auto' as 'auto'
+  },
+  jsonContainer: {
+    border: '1px solid #333',
+    borderRadius: '4px',
+    padding: '10px',
+    overflow: 'auto',
+    backgroundColor: '#252526',
+    flex: '1',
+    minHeight: '200px'
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: '#666',
+    textAlign: 'center' as 'center'
+  },
+  button: {
+    backgroundColor: '#0E639C',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '6px 12px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 500 as 500
+  },
+  toolbar: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'flex-end',
+    marginTop: '5px'
+  },
+  error: {
+    color: '#e74c3c',
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    padding: '10px 15px',
+    borderRadius: '4px',
+    marginBottom: '10px',
+    border: '1px solid rgba(231, 76, 60, 0.3)'
+  },
+  loading: {
+    color: '#3498db',
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  }
 };
 
 const App = () => {
@@ -133,7 +217,67 @@ const App = () => {
   const [title, setTitle] = useState<string>('Weaviate Data Viewer');
   const [collection, setCollection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [queryText, setQueryText] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
+
+  // Generate a default GraphQL query template when collection is set and query is empty
+  useEffect(() => {
+    if (collection && !queryText && !initialQuerySent) {
+      const defaultQuery = `{
+                              Get {
+                                ${collection} (limit: 10) {
+                                  _additional {
+                                    id
+                                  }
+                                  # Add your properties here
+                                }
+                              }
+                            }`;
+      setQueryText(defaultQuery);
+    }
+  }, [collection, queryText, initialQuerySent]);
+
+  // Handle running the query
+  const handleRunQuery = () => {
+    if (!queryText.trim()) {
+      setError('Query cannot be empty');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setInitialQuerySent(true);
+
+    // Send the query to the extension host
+    if (vscode) {
+      vscode.postMessage({
+        type: 'runQuery',
+        query: queryText,
+        options: {}
+      });
+    }
+  };
+
+  // Generate sample query button handler
+  const handleGenerateQuery = () => {
+    if (collection) {
+      const defaultQuery = `{
+  Get {
+    ${collection} (limit: 10) {
+      _additional {
+        id
+      }
+      # Add your properties here
+    }
+  }
+}`;
+      setQueryText(defaultQuery);
+    } else {
+      setError('No collection selected');
+    }
+  };
+
   // Setup message listener to receive data from extension
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
@@ -144,28 +288,34 @@ const App = () => {
         sanitizedMessage.data = sanitizeDataForDisplay(sanitizedMessage.data);
       }
       console.log('Received message:', sanitizedMessage);
-      
+
       // Process different message types from the backend
-      switch(sanitizedMessage.type) {
+      switch (sanitizedMessage.type) {
         case 'update':
           setJsonData(sanitizedMessage.data);
+          setIsLoading(false);
           if (sanitizedMessage.title) {
             setTitle(sanitizedMessage.title);
           }
           break;
 
         case 'initialData':
-          // Just store the schema, don't display yet
+          // Store the schema and setup a default query
           console.log('Received schema for collection:', sanitizedMessage.collection);
           setCollection(sanitizedMessage.collection);
           setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+
+          // Don't reset loading here as we might be waiting for sample data
           break;
 
         case 'queryResult':
           // Display the query results
           console.log('Received query results for collection:', sanitizedMessage.collection);
           console.log('Sanitized query result data:', JSON.stringify(sanitizeDataForDisplay(sanitizedMessage.data), null, 2));
-          
+
+          // Always stop loading when we get results
+          setIsLoading(false);
+
           // Extract the actual data from Weaviate's response structure
           // Weaviate typically returns a nested structure with results inside data.data.Get[Collection]
           let extractedData;
@@ -174,7 +324,7 @@ const App = () => {
             if (sanitizedMessage.data && sanitizedMessage.data.collection && sanitizedMessage.data.results) {
               console.log('Using pre-extracted collection data');
               extractedData = sanitizedMessage.data.results;
-            } 
+            }
             // Check for standard Weaviate nested response format with data.Get
             else if (sanitizedMessage.data && sanitizedMessage.data.data && sanitizedMessage.data.data.Get && sanitizedMessage.collection) {
               console.log('Extracting from nested data.data.Get structure');
@@ -185,7 +335,7 @@ const App = () => {
                 console.log('Collection data not found in expected structure, using raw data');
                 extractedData = sanitizedMessage.data;
               }
-            } 
+            }
             // Alternative format sometimes returned
             else if (message.data && message.data.Get && message.collection) {
               console.log('Extracting from data.Get structure');
@@ -196,7 +346,7 @@ const App = () => {
                 console.log('Collection data not found in expected structure, using raw data');
                 extractedData = message.data;
               }
-            } 
+            }
             // If all else fails, use the raw data
             else {
               console.log('Using raw message data as fallback');
@@ -209,7 +359,7 @@ const App = () => {
             // Fallback to using the entire response if extraction fails
             setJsonData(message.data);
           }
-          
+
           if (message.collection) {
             setCollection(message.collection);
             setTitle(`Weaviate Collection: ${message.collection}`);
@@ -221,6 +371,7 @@ const App = () => {
           // Show error message
           console.error('Query error:', message.error);
           setError(message.error);
+          setIsLoading(false);
           break;
 
         case 'explainResult':
@@ -229,22 +380,23 @@ const App = () => {
           setJsonData(message.data);
           setTitle('Query Plan Explanation');
           setError(null);
+          setIsLoading(false);
           break;
       }
     };
-    
+
     window.addEventListener('message', messageHandler);
-    
+
     // Send ready message to extension
     if (vscode) {
       vscode.postMessage({ type: 'ready' });
     }
-    
+
     return () => {
       window.removeEventListener('message', messageHandler);
     };
   }, []);
-  
+
   // Error message styling
   const errorStyle: React.CSSProperties = {
     color: '#e74c3c',
@@ -259,60 +411,85 @@ const App = () => {
   const loadingStyle: React.CSSProperties = {
     color: '#3498db',
     marginBottom: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
   };
 
   return (
-    <div style={containerStyle}>
-      <h1 style={headerStyle}>{title}</h1>
-      
+    <div style={styles.container}>
+      <h1 style={styles.header}>{title}</h1>
+
       {/* Display error messages if present */}
       {error && (
-        <div style={errorStyle}>
+        <div style={styles.error}>
           <strong>Error:</strong> {error}
         </div>
       )}
-      
-      {/* Display JSON data when available */}
-      {jsonData ? (
-        <div style={jsonContainerStyle}>
-          {/* Check if we have an empty result with just _errors array */}
-          {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
-            <div style={emptyStateStyle}>
-              <p>No data found in collection: {collection}</p>
-              <p>This collection exists but appears to be empty.</p>
-              <p style={{fontSize: '14px', color: '#888'}}>
-                Try adding some data to this collection or select a different collection.
-              </p>
+
+      {/* Main split container for query and results */}
+      <div style={styles.splitContainer}>
+        {/* Query editor section */}
+        <div style={styles.queryContainer}>
+          <div style={styles.queryHeader}>
+            <span>Query Editor</span>
+            <div style={styles.toolbar}>
+              <button style={styles.button} onClick={handleGenerateQuery}>Generate Sample</button>
+              <button style={styles.button} onClick={handleRunQuery}>Run Query</button>
+            </div>
+          </div>
+
+          <textarea
+            style={styles.textarea}
+            value={queryText}
+            onChange={(e) => setQueryText(e.target.value)}
+            placeholder="Enter your GraphQL query here..."
+          />
+        </div>
+
+        {/* Results section */}
+        <div style={styles.resultContainer}>
+          <div style={styles.resultHeader}>
+            <span>Results</span>
+            {isLoading && <span style={styles.loading}>Loading...</span>}
+          </div>
+
+          {/* Display JSON data when available */}
+          {jsonData ? (
+            <div style={styles.jsonContainer}>
+              {/* Check if we have an empty result with just _errors array */}
+              {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <p>No data found in collection: {collection}</p>
+                  <p>This collection exists but appears to be empty.</p>
+                  <p style={{ fontSize: '14px', color: '#888' }}>
+                    Try adding some data to this collection or select a different collection.
+                  </p>
+                </div>
+              ) : (
+                /* Use a simple pre-formatted JSON display as a reliable fallback */
+                <pre style={{
+                  backgroundColor: '#252526',
+                  color: '#D4D4D4',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  overflow: 'auto',
+                  height: '100%'
+                }}>
+                  {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
+                </pre>
+              )}
             </div>
           ) : (
-            /* Use a simple pre-formatted JSON display as a reliable fallback */
-            <pre style={{
-              backgroundColor: '#1E1E1E',
-              color: '#D4D4D4',
-              padding: '12px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              overflow: 'auto',
-              maxHeight: '70vh'
-            }}>
-              {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
-            </pre>
+            <div style={styles.emptyState}>
+              <p>No results to display yet</p>
+              {collection ? (
+                <p>Try running a query for collection: {collection}</p>
+              ) : (
+                <p>Select a collection from the sidebar to view data</p>
+              )}
+            </div>
           )}
         </div>
-      ) : (
-        <div style={emptyStateStyle}>
-          {/* Context-aware empty state message based on state */}
-          <p>No data to display</p>
-          {collection ? (
-            <p>Loading data for collection: {collection}...</p>
-          ) : (
-            <p>Select a Weaviate collection to view data</p>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

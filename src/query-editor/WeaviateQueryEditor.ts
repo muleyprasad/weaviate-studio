@@ -99,19 +99,58 @@ export class WeaviateQueryEditor {
 
     private _setupMessageHandlers() {
         this._panel.webview.onDidReceiveMessage(async (message) => {
+            console.log(`Received message of type: ${message.type}`, message);
+            
             switch (message.type) {
                 case 'ready':
+                    console.log('Webview is ready, sending initial data');
                     if (this._options.collectionName) {
                         await this._sendInitialData();
+                    } else {
+                        // Send a message that no collection is selected
+                        this._panel.webview.postMessage({
+                            type: 'update',
+                            title: 'No Collection Selected',
+                            data: { message: 'Select a collection from the Weaviate Explorer' }
+                        });
                     }
                     break;
                 
                 case 'runQuery':
-                    await this._executeQuery(message.query, message.options);
+                    console.log('Running query', message.query);
+                    try {
+                        await this._executeQuery(message.query, message.options || {});
+                    } catch (error: any) {
+                        this._panel.webview.postMessage({
+                            type: 'queryError',
+                            error: `Error executing query: ${error.message}`
+                        });
+                    }
                     break;
                 
                 case 'explainPlan':
+                    console.log('Explaining query plan', message.query);
                     await this._explainQueryPlan(message.query);
+                    break;
+                    
+                case 'getSchema':
+                    console.log('Getting schema for collection', this._options.collectionName);
+                    try {
+                        if (!this._weaviateClient) {
+                            throw new Error('Not connected to Weaviate');
+                        }
+                        const schema = await this._weaviateClient.schema.getter().do();
+                        this._panel.webview.postMessage({
+                            type: 'schemaResult',
+                            schema,
+                            collection: this._options.collectionName
+                        });
+                    } catch (error: any) {
+                        this._panel.webview.postMessage({
+                            type: 'queryError',
+                            error: `Error fetching schema: ${error.message}`
+                        });
+                    }
                     break;
             }
         });
@@ -288,7 +327,7 @@ export class WeaviateQueryEditor {
     }
     
     /**
-     * Fetch sample data from the selected collection
+     * Fetch sample data from the selected collection and provide a sample query
      * This is used to automatically display data when a collection is selected
      */
     private async _fetchSampleData() {
@@ -299,14 +338,50 @@ export class WeaviateQueryEditor {
         const client = this._weaviateClient;
 
         try {
-            const sampleData = await client.data.getter().withClassName(collection).withLimit(10).do();
+            // Create a sample GraphQL query for this collection
+            const sampleQuery = `{
+                Get {
+                    ${collection} (limit: 10) {
+                    _additional {
+                        id
+                    }
+                    # Add your properties here
+                    }
+                }
+                }`;
+
+            // First, send the collection info and sample query
             this._panel.webview.postMessage({
-                type: 'queryResult',
-                data: sampleData,
+                type: 'update',
+                data: {
+                    collectionName: collection,
+                    sampleQuery: sampleQuery
+                },
                 collection
             });
+
+            // Then fetch and send actual sample data
+            try {
+                const sampleData = await client.data.getter().withClassName(collection).withLimit(10).do();
+                this._panel.webview.postMessage({
+                    type: 'queryResult',
+                    data: sampleData,
+                    collection
+                });
+            } catch (dataError: any) {
+                console.log(`Note: Could not fetch sample data using data.getter(): ${dataError.message}`);
+                console.log('This is normal for empty collections or if permissions are limited');
+                
+                // If getting data fails, we'll still show the UI but without sample data
+                this._panel.webview.postMessage({
+                    type: 'queryResult',
+                    data: { objects: [] },
+                    collection,
+                    message: 'No sample data available. Use the query editor to run your own query.'
+                });
+            }
         } catch (error: any) {
-            console.error(`Failed to fetch sample data for collection ${collection}: ${error.message}`);
+            console.error(`Failed to handle collection ${collection}: ${error.message}`);
             this._panel.webview.postMessage({
                 type: 'queryError',
                 error: error.message,
@@ -314,7 +389,7 @@ export class WeaviateQueryEditor {
             });
         }
     }
-    
+
     /**
      * Sanitizes query results to remove sensitive information before sending to webview
      * @param result The raw query result from Weaviate
