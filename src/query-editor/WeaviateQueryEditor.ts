@@ -98,11 +98,8 @@ export class WeaviateQueryEditor {
 
     private _setupMessageHandlers() {
         this._panel.webview.onDidReceiveMessage(async (message) => {
-            console.log(`Received message of type: ${message.type}`, message);
-            
             switch (message.type) {
                 case 'ready':
-                    console.log('Webview is ready, sending initial data');
                     if (this._options.collectionName) {
                         await this._sendInitialData();
                     } else {
@@ -116,7 +113,6 @@ export class WeaviateQueryEditor {
                     break;
                 
                 case 'runQuery':
-                    console.log('Running query', message.query);
                     try {
                         await this._executeQuery(message.query, message.options || {});
                     } catch (error: any) {
@@ -128,17 +124,14 @@ export class WeaviateQueryEditor {
                     break;
                 
                 case 'explainPlan':
-                    console.log('Explaining query plan', message.query);
                     await this._explainQueryPlan(message.query);
                     break;
                 
                 case 'requestSampleQuery':
-                    console.log('Generating sample query for collection:', message.collection || this._options.collectionName);
                     await this._sendSampleQuery(message.collection || this._options.collectionName);
                     break;
                     
                 case 'getSchema':
-                    console.log('Getting schema for collection', this._options.collectionName);
                     try {
                         if (!this._weaviateClient) {
                             throw new Error('Not connected to Weaviate');
@@ -167,7 +160,6 @@ export class WeaviateQueryEditor {
             
             // Use the connection manager we initialized in the constructor
             if (!this._connectionManager) {
-                console.log('ConnectionManager not initialized, attempting to get it again');
                 try {
                     const extension = vscode.extensions.getExtension('muleyprasad.weaviate-studio');
                     if (extension) {
@@ -207,47 +199,67 @@ export class WeaviateQueryEditor {
         }
     }
 
-    private async _executeQuery(query: string, options: QueryRunOptions) {
+    private async _executeQuery(query: string, options: QueryRunOptions): Promise<void> {
+        // Early validation
         if (!this._weaviateClient) {
-            vscode.window.showErrorMessage('Not connected to Weaviate');
+            const errorMsg = 'Not connected to Weaviate';
+            vscode.window.showErrorMessage(errorMsg);
+            this._sendErrorToWebview(errorMsg);
             return;
         }
-
-        try {
-            // Handle different Weaviate client API versions using type-safe approach
-            let result;
-            const client = this._weaviateClient as any; // Use any to bypass type checking for compatibility
-            
-            try {
-                console.log('Executing GraphQL query with client:', client.basePath || client.host || 'unknown host');
-                
-                // Use the chain method as required by the API
-                result = await client.graphql.raw().withQuery(query).do();
-                
-                console.log('Query result:', JSON.stringify(result, null, 2));
-                
-            } catch (apiError: any) {
-                console.error('API call failed:', apiError);
-                throw new Error(`GraphQL query failed: ${apiError.message}`);
-            }
-            
-            // Make sure we're sending meaningful data to the webview
-            if (!result || (typeof result === 'object' && Object.keys(result).length === 0)) {
-                throw new Error('Query returned empty result');
-            }
-            
-            this._panel.webview.postMessage({
-                type: 'queryResult',
-                data: result,
-                collection: this._options.collectionName
-            });
-        } catch (error: any) {
-            console.error('Error executing query:', error);
-            this._panel.webview.postMessage({
-                type: 'queryError',
-                error: error.message
-            });
+    
+        if (!query?.trim()) {
+            const errorMsg = 'Query cannot be empty';
+            this._sendErrorToWebview(errorMsg);
+            return;
         }
+    
+        try {
+            const result = await this._performGraphQLQuery(query);
+            this._sendResultToWebview(result);
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+            this._sendErrorToWebview(errorMsg);
+        }
+    }
+    
+    private async _performGraphQLQuery(query: string): Promise<any> {
+        const client = this._weaviateClient as any;
+        
+        try {
+            const result = await client.graphql.raw().withQuery(query).do();
+            
+            if (this._isEmptyResult(result)) {
+                throw new Error('Query returned empty or invalid result');
+            }
+            
+            return result;
+        } catch (apiError: any) {
+            throw new Error(`GraphQL query failed: ${apiError.message || 'Unknown API error'}`);
+        }
+    }
+    
+    private _isEmptyResult(result: any): boolean {
+        return !result || 
+               (typeof result === 'object' && Object.keys(result).length === 0) ||
+               (Array.isArray(result) && result.length === 0);
+    }
+    
+    private _sendResultToWebview(result: any): void {
+        this._panel.webview.postMessage({
+            type: 'queryResult',
+            data: result,
+            collection: this._options.collectionName,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    private _sendErrorToWebview(errorMessage: string): void {
+        this._panel.webview.postMessage({
+            type: 'queryError',
+            error: errorMessage,
+            timestamp: new Date().toISOString()
+        });
     }
 
     private async _getHtmlForWebview(webview: vscode.Webview): Promise<string> {
@@ -257,7 +269,6 @@ export class WeaviateQueryEditor {
         const nonce = getNonce(); 
 
         htmlContent = htmlContent.replace(/{{nonce}}/g, nonce);
-        console.log('[WeaviateQueryEditor] webview.cspSource:', webview.cspSource);
         htmlContent = htmlContent.replace(/{{cspSource}}/g, webview.cspSource);
         const extensionRootFileUri = vscode.Uri.file(this.context.extensionUri.fsPath);
         const webviewExtensionRootUri = webview.asWebviewUri(extensionRootFileUri);
@@ -265,7 +276,6 @@ export class WeaviateQueryEditor {
         // Generate URI for webview.bundle.js
         const scriptPathOnDisk = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'webview.bundle.js');
         const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
-        console.log('[WeaviateQueryEditor] Generated scriptUri for webview.bundle.js:', scriptUri.toString());
         htmlContent = htmlContent.replace(/{{webviewBundleUri}}/g, scriptUri.toString());
 
         // Calculate baseHref for the <base> tag
@@ -275,7 +285,6 @@ export class WeaviateQueryEditor {
         if (!baseHrefString.endsWith('/')) {
             baseHrefString += '/';
         }
-        console.log('[WeaviateQueryEditor] Generated baseHref:', baseHrefString);
         htmlContent = htmlContent.replace(/{{baseHref}}/g, baseHrefString);
 
         return htmlContent;
@@ -299,10 +308,6 @@ export class WeaviateQueryEditor {
                 collection: this._options.collectionName
             });
             
-            // After sending schema, automatically fetch sample data if collection is provided
-            if (this._options.collectionName) {
-                await this._fetchSampleData();
-            }
         } catch (error: any) {
             vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
         }
@@ -313,10 +318,8 @@ export class WeaviateQueryEditor {
      * @param collectionName Collection to generate query for
      */
     private async _sendSampleQuery(collectionName: string) {
-        console.log(`Generating sample query for collection: ${collectionName}`);
         
         if (!this._weaviateClient) {
-            console.error('No Weaviate client available');
             this._panel.webview.postMessage({
                 type: 'queryError',
                 error: 'Not connected to Weaviate'
@@ -324,19 +327,46 @@ export class WeaviateQueryEditor {
             return;
         }
 
-        // Use a hardcoded query with common fields that will work in most cases
-        const sampleQuery = `{
-                                    Get {
-                                        ${collectionName} (limit: 10) {
-                                        id
-                                        name
-                                        title
-                                        description
-                                        }
-                                    }
-                                    }`;
+        // Build a proper schema-based query using the collection's actual properties
+        let sampleQuery = '';
         
-        console.log('Sending hardcoded sample query to webview:', sampleQuery);
+        try {
+            // Fetch the schema to get actual properties for this collection
+            const schema = await this._weaviateClient.schema.getter().do();
+            
+            // Extract the properties from the schema for this collection
+            const classObj = schema?.classes?.find((c: any) => c.class === collectionName);
+            const properties = classObj?.properties || [];
+            
+            
+            // Extract all property names from schema
+            const allPropNames = properties
+                .map((p: any) => p.name || p.propertyName || null)
+                .filter(Boolean);
+                
+            
+            // Build the query
+            sampleQuery = `{
+  Get {
+    ${collectionName} (limit: 10) {
+      ${allPropNames.join('\n      ')}
+    }
+  }
+}`;
+            
+        } catch (err) {
+            
+            // Fallback to basic query if schema query fails
+            sampleQuery = `{
+  Get {
+    ${collectionName} (limit: 10) {
+      // TODO: Add all properties from schema
+      _additional { id }
+    }
+  }
+}`;
+            
+        }
         
         // Send sample query to webview
         try {
@@ -347,155 +377,11 @@ export class WeaviateQueryEditor {
                 }
             });
         } catch (error: any) {
-            console.error('Error sending sample query to webview:', error);
             this._panel.webview.postMessage({
                 type: 'queryError',
                 error: `Failed to send sample query: ${error.message || 'Unknown error'}`
             });
         }
-    }
-
-    /**
-     * Fetch sample data from the selected collection and provide a sample query
-     * This is used to automatically display data when a collection is selected
-     */
-    private async _fetchSampleData() {
-        if (!this._weaviateClient || !this._options.collectionName) {
-            return;
-        }
-        const collection = this._options.collectionName;
-        const client = this._weaviateClient;
-
-        try {
-            // Skip schema based query generation entirely and use hardcoded query
-            // This ensures we always get a valid query in the editor
-            const sampleQuery = `{
-                                    Get {
-                                        ${collection} (limit: 10) {
-                                            id
-                                            name
-                                            title
-                                            description
-                                            }
-                                        }
-                                        }`;
-            
-            console.log('Using hardcoded query with common fields:', sampleQuery);
-
-            // First, send the collection info and sample query
-            this._panel.webview.postMessage({
-                type: 'update',
-                data: {
-                    collectionName: collection,
-                    sampleQuery: sampleQuery
-                },
-                collection
-            });
-
-            // Then fetch and send actual sample data
-            try {
-                const sampleData = await client.data.getter().withClassName(collection).withLimit(10).do();
-                this._panel.webview.postMessage({
-                    type: 'queryResult',
-                    data: sampleData,
-                    collection
-                });
-            } catch (dataError: any) {
-                console.log(`Note: Could not fetch sample data using data.getter(): ${dataError.message}`);
-                console.log('This is normal for empty collections or if permissions are limited');
-                
-                // If getting data fails, we'll still show the UI but without sample data
-                this._panel.webview.postMessage({
-                    type: 'queryResult',
-                    data: { objects: [] },
-                    collection,
-                    message: 'No sample data available. Use the query editor to run your own query.'
-                });
-            }
-        } catch (error: any) {
-            console.error(`Failed to handle collection ${collection}: ${error.message}`);
-            this._panel.webview.postMessage({
-                type: 'queryError',
-                error: error.message,
-                collection
-            });
-        }
-    }
-
-    /**
-     * Sanitizes query results to remove sensitive information before sending to webview
-     * @param result The raw query result from Weaviate
-     * @returns A sanitized result object safe to send to the webview
-     */
-    private _sanitizeResult(result: any): any {
-        if (!result) {
-            return {};
-        }
-        
-        // Make a deep copy to avoid modifying the original
-        let sanitized;
-        try {
-            sanitized = JSON.parse(JSON.stringify(result));
-        } catch (e) {
-            console.error('Error cloning result:', e);
-            sanitized = { ...result };
-        }
-        
-        // SECURITY: Recursively remove all instances of apiKey, API keys, auth tokens, etc.
-        const sanitizeObject = (obj: any) => {
-            if (!obj || typeof obj !== 'object') {
-                return;
-            }
-            
-            // Remove any sensitive fields directly at this level
-            const sensitiveFields = ['apiKey', 'api_key', 'token', 'auth', 'authorization', 'password', 'client'];
-            sensitiveFields.forEach(field => {
-                if (Object.prototype.hasOwnProperty.call(obj, field)) {
-                    if (field === 'client' && obj.client) {
-                        // For 'client' object specifically, we might want to keep some info but remove sensitive parts
-                        if (obj.client.apiKey) {
-                            delete obj.client.apiKey;
-                        }
-                        if (obj.client.api_key) {
-                            delete obj.client.api_key;
-                        }
-                        // Additional sensitive fields that could be in client
-                        ['token', 'auth', 'authorization', 'password', 'key', 'secret'].forEach(subField => {
-                            if (obj.client[subField]) {
-                                delete obj.client[subField];
-                            }
-                        });
-                    } else {
-                        // For other sensitive fields, just delete them entirely
-                        delete obj[field];
-                    }
-                }
-            });
-            
-            // Recursively check all nested objects and arrays
-            Object.keys(obj).forEach(key => {
-                if (obj[key] && typeof obj[key] === 'object') {
-                    sanitizeObject(obj[key]);
-                }
-            });
-        };
-        
-        // Apply the sanitization recursively
-        sanitizeObject(sanitized);
-        
-        // If we have data.data (nested structure), extract just what we need
-        if (sanitized && sanitized.data && sanitized.data.Get && this._options.collectionName) {
-            const collectionData = sanitized.data.Get[this._options.collectionName];
-            if (Array.isArray(collectionData)) {
-                // Return just the array of results for cleaner display
-                return { 
-                    collection: this._options.collectionName,
-                    results: collectionData 
-                };
-            }
-        }
-        
-        return sanitized;
     }
     
     private async _explainQueryPlan(query: string) {
@@ -536,7 +422,6 @@ export class WeaviateQueryEditor {
                     }
                 }
             } catch (explainError) {
-                console.error('Explain operation failed:', explainError);
                 explainResult = { 
                     error: 'Explain functionality failed', 
                     message: explainError instanceof Error ? explainError.message : 'Unknown error'
@@ -569,14 +454,12 @@ export class WeaviateQueryEditor {
                 try {
                     weaviateImport = await import('weaviate-ts-client');
                 } catch (e) {
-                    console.error('Failed to import weaviate-ts-client:', e);
                     vscode.window.showErrorMessage('Weaviate TS Client not found. Please ensure it is installed in your project.');
                     return null;
                 }
 
                 const ClientFactory = (weaviateImport as any).default?.client || (weaviateImport as any).client;
                 if (!ClientFactory) {
-                    console.error('Could not find client factory in weaviate-ts-client.');
                     vscode.window.showErrorMessage('Invalid Weaviate TS Client structure.');
                     return null;
                 }
@@ -594,7 +477,6 @@ export class WeaviateQueryEditor {
                 ]
             };
         } catch (error: any) {
-            console.error('Error fetching schema for completion:', error);
             vscode.window.showErrorMessage(`Error fetching Weaviate schema: ${error.message}`);
             return null;
         }
