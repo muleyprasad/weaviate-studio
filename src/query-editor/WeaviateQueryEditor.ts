@@ -40,7 +40,8 @@ function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
 
 export class WeaviateQueryEditor {
     public static readonly viewType = 'weaviate.queryEditor';
-    private static currentPanel: WeaviateQueryEditor | undefined;
+    // Map to store all open panels by collection name
+    private static readonly panels = new Map<string, WeaviateQueryEditor>();
     private _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _options: QueryEditorOptions;
@@ -50,35 +51,36 @@ export class WeaviateQueryEditor {
     private _connectionManager: any;
     
     /**
-     * Opens a new query editor instance
+     * Opens a new query editor instance for the specified collection
+     * Creates a new tab for each unique collection
      */
     public static createOrShow(context: vscode.ExtensionContext, options: QueryEditorOptions = {}) {
-        const column = vscode.window.activeTextEditor?.viewColumn;
-
-        if (WeaviateQueryEditor.currentPanel) {
-            WeaviateQueryEditor.currentPanel._panel.reveal(column);
+        const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+        const collectionName = options.collectionName || 'Default';
+        const connectionId = options.connectionId || '';
+        // Use both connection ID and collection name as the key to handle same collection name across different connections
+        const panelKey = `${connectionId}:${collectionName}`;
+        
+        // Check if we already have a panel for this collection
+        if (WeaviateQueryEditor.panels.has(panelKey)) {
+            // If yes, reveal the existing panel
+            const existingPanel = WeaviateQueryEditor.panels.get(panelKey);
+            existingPanel?._panel.reveal(column);
             return;
         }
 
-        const title = `Weaviate Query Editor${options.collectionName ? ` - ${options.collectionName}` : ''}`;
-        let panel: vscode.WebviewPanel;
-        if (column) {
-            panel = vscode.window.createWebviewPanel(
-                WeaviateQueryEditor.viewType,
-                `${title}`,
-                column,
-                getWebviewOptions(context.extensionUri)
-            );
-        } else {
-            panel = vscode.window.createWebviewPanel(
-                WeaviateQueryEditor.viewType,
-                `${title}`,
-                vscode.ViewColumn.One,
-                getWebviewOptions(context.extensionUri)
-            );
-        }
+        // Otherwise create a new panel for this collection
+        const title = `Weaviate: ${collectionName}`;
+        const panel = vscode.window.createWebviewPanel(
+            WeaviateQueryEditor.viewType,
+            title,
+            column,
+            getWebviewOptions(context.extensionUri)
+        );
 
-        WeaviateQueryEditor.currentPanel = new WeaviateQueryEditor(panel, context, options);
+        // Create new editor instance and store in our map
+        const newEditor = new WeaviateQueryEditor(panel, context, options);
+        WeaviateQueryEditor.panels.set(panelKey, newEditor);
     }
 
     private constructor(panel: vscode.WebviewPanel, private readonly context: vscode.ExtensionContext, options: QueryEditorOptions) {
@@ -630,13 +632,32 @@ export class WeaviateQueryEditor {
     }
 
     public dispose() {
-        WeaviateQueryEditor.currentPanel = undefined;
+        // Find and remove this panel from the panels map
+        const panelKey = this._getPanelKey();
+        if (panelKey) {
+            WeaviateQueryEditor.panels.delete(panelKey);
+        }
+        
         this._panel.dispose();
+        
         while (this._disposables.length) {
             const disposable = this._disposables.pop();
             if (disposable) {
                 disposable.dispose();
             }
         }
+    }
+    
+    /**
+     * Gets the unique key for this panel based on connection and collection
+     */
+    private _getPanelKey(): string | undefined {
+        const connectionId = this._options.connectionId || '';
+        const collectionName = this._options.collectionName;
+        if (!collectionName) {
+            return undefined;
+        }
+        
+        return `${connectionId}:${collectionName}`;
     }
 }
