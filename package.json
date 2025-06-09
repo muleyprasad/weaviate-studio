@@ -151,31 +151,48 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
+    "vscode:prepublish": "npm run package && npm run package:webview",
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
+    "build:webview": "webpack --config webpack.webview.config.js --mode development",
+    "watch:webview": "webpack --config webpack.webview.config.js --mode development --watch",
+    "package:webview": "webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "pretest": "npm run compile-tests && npm run compile && npm run build:webview && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
     "@types/vscode": "^1.100.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
+    "css-loader": "^7.1.2",
     "eslint": "^9.25.1",
+    "html-webpack-plugin": "^5.6.3",
+    "monaco-editor-webpack-plugin": "^7.1.0",
+    "path-browserify": "^1.0.1",
+    "style-loader": "^4.0.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "webpack": "^5.99.7",
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "graphql-language-service-interface": "^2.10.2",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-json-tree": "^0.20.0",
+    "react-json-view-lite": "^2.4.1",
     "weaviate-ts-client": "^2.2.0"
   }
 }

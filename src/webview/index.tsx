@@ -1,0 +1,580 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { JsonView } from 'react-json-view-lite';
+import 'react-json-view-lite/dist/index.css';
+
+// Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
+// due to webview bundle isolation
+/**
+ * Interface for type safety in component props and state
+ */
+interface SchemaProperty {
+  name: string;
+  dataType: string[];
+}
+
+interface SchemaClass {
+  class: string;
+  properties: SchemaProperty[];
+}
+
+type JsonData = Record<string, any> | null;
+
+// Setup VS Code API for message passing with the extension host
+declare global {
+  interface Window {
+    acquireVsCodeApi: () => {
+      postMessage: (message: any) => void;
+      getState: () => any;
+      setState: (state: any) => void;
+    };
+  }
+}
+
+// Get VS Code API reference for messaging
+let vscode: any;
+try {
+  vscode = window.acquireVsCodeApi();
+} catch (error) {
+  console.error('Failed to acquire VS Code API', error);
+}
+
+// Custom styles defined inline
+
+/**
+ * Sanitizes data for display by removing any potential sensitive information
+ * This acts as a second layer of security in case any sensitive data made it through the backend filtering
+ */
+const sanitizeDataForDisplay = (data: any): any => {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+
+  // Create a deep copy to avoid modifying the original
+  const sanitized = JSON.parse(JSON.stringify(data));
+
+  // Function to recursively scrub sensitive data
+  const scrub = (obj: any) => {
+    if (!obj || typeof obj !== 'object') {
+      return;
+    }
+
+    // List of keys that might contain sensitive information
+    const sensitiveKeys = ['apiKey', 'api_key', 'key', 'token', 'password', 'secret', 'auth', 'authorization'];
+
+    // Check if object is an array
+    if (Array.isArray(obj)) {
+      obj.forEach(item => {
+        if (item && typeof item === 'object') {
+          scrub(item);
+        }
+      });
+      return;
+    }
+
+    // Process object properties
+    for (const key of Object.keys(obj)) {
+      // Check for sensitive key names (case insensitive)
+      if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
+        // Redact the value
+        obj[key] = '[REDACTED]';
+      }
+      // Special handling for client object which often contains credentials
+      else if (key === 'client' && obj[key] && typeof obj[key] === 'object') {
+        // Either remove client entirely or sanitize it
+        if (Object.keys(obj[key]).some(clientKey =>
+          sensitiveKeys.some(sk => clientKey.toLowerCase().includes(sk.toLowerCase())))) {
+          // If client contains sensitive keys, replace with safe version
+          const host = obj[key].host || 'unknown';
+          obj[key] = {
+            host: host,
+            info: 'Connection details redacted for security',
+          };
+        } else {
+          // Still recursively check other client properties
+          scrub(obj[key]);
+        }
+      }
+      // Recursively check nested objects
+      else if (obj[key] && typeof obj[key] === 'object') {
+        scrub(obj[key]);
+      }
+    }
+  };
+
+  // Apply the sanitization
+  scrub(sanitized);
+  return sanitized;
+};
+
+// Define styles for various UI elements
+// Styles for the UI components
+const styles = {
+  container: {
+    padding: '10px',
+    fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace',
+    height: '100vh',
+    overflow: 'auto',
+    backgroundColor: '#1E1E1E',
+    color: '#D4D4D4',
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '15px'
+  },
+  header: {
+    borderBottom: '1px solid #333',
+    paddingBottom: '10px',
+    marginBottom: '5px',
+    fontSize: '18px',
+    fontWeight: 500 as 500
+  },
+  splitContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    height: 'calc(100vh - 80px)'
+  },
+  queryContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    minHeight: '200px',
+    flex: '0 0 40%'
+  },
+  queryHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #333',
+    paddingBottom: '5px'
+  },
+  resultContainer: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    gap: '10px',
+    flex: '1',
+    overflow: 'auto'
+  },
+  resultHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #333',
+    paddingBottom: '5px'
+  },
+  textarea: {
+    backgroundColor: '#252526',
+    color: '#D4D4D4',
+    border: '1px solid #333',
+    borderRadius: '4px',
+    padding: '10px',
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    resize: 'none' as 'none',
+    flex: '1',
+    minHeight: '150px',
+    outline: 'none',
+    overflowY: 'auto' as 'auto'
+  },
+  jsonContainer: {
+    border: '1px solid #333',
+    borderRadius: '4px',
+    padding: '10px',
+    overflow: 'auto',
+    backgroundColor: '#252526',
+    flex: '1',
+    minHeight: '200px'
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: '#666',
+    textAlign: 'center' as 'center'
+  },
+  button: {
+    backgroundColor: '#0E639C',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '6px 12px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 500 as 500
+  },
+  toolbar: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'flex-end',
+    marginTop: '5px'
+  },
+  error: {
+    color: '#e74c3c',
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    padding: '10px 15px',
+    borderRadius: '4px',
+    marginBottom: '10px',
+    border: '1px solid rgba(231, 76, 60, 0.3)'
+  },
+  loading: {
+    color: '#3498db',
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  }
+};
+
+const App = () => {
+  const [jsonData, setJsonData] = useState<JsonData>(null);
+  const [title, setTitle] = useState<string>('Weaviate Data Viewer');
+  const [collection, setCollection] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [queryText, setQueryText] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
+  const [schema, setSchema] = useState<any>(null);
+
+  // Request a default query from the backend when collection is set and query is empty
+  useEffect(() => {
+    if (collection && !queryText && !initialQuerySent && vscode) {
+      // Request sample query from backend instead of generating it here
+      vscode.postMessage({ type: 'requestSampleQuery', collection });
+      // We'll receive the sample query via the message handler
+    }
+  }, [collection, queryText, initialQuerySent]);
+
+  // Handle running the query
+  const handleRunQuery = () => {
+    if (!queryText.trim()) {
+      setError('Query cannot be empty');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setInitialQuerySent(true);
+
+    // Send the query to the extension host
+    if (vscode) {
+      vscode.postMessage({
+        type: 'runQuery',
+        query: queryText,
+        options: {}
+      });
+    }
+  };
+
+  // Generate sample query button handler - requests from backend
+  const handleGenerateQuery = () => {
+    if (collection && vscode) {
+      // Request sample query from backend instead of generating it
+      vscode.postMessage({ type: 'requestSampleQuery', collection });
+    } else {
+      setError('No collection selected');
+    }
+  };
+
+  // Setup message listener to receive data from extension
+  // Helper function to extract data from Weaviate response formats
+  const extractWeaviateData = (data: any, collection?: string): any => {
+    // Case 1: Pre-extracted collection data
+    if (data?.collection && data?.results) {
+      console.log('Using pre-extracted collection data');
+      return data.results;
+    }
+    
+    // Case 2: Standard nested Weaviate response format
+    if (data?.data?.Get && collection) {
+      console.log('Extracting from nested data.data.Get structure');
+      const collectionData = data.data.Get[collection];
+      if (Array.isArray(collectionData) && collectionData.length > 0) {
+        return collectionData;
+      }
+    }
+    
+    // Case 3: Alternative format sometimes returned
+    if (data?.Get && collection) {
+      console.log('Extracting from data.Get structure');
+      const collectionData = data.Get[collection];
+      if (Array.isArray(collectionData) && collectionData.length > 0) {
+        return collectionData;
+      }
+    }
+    
+    // Fallback: Return the raw data
+    console.log('Using raw data as fallback');
+    return data;
+  };
+
+  useEffect(() => {
+    const messageHandler = (event: MessageEvent) => {
+      const message = event.data;
+      // SECURITY: Sanitize message before logging
+      const sanitizedMessage = { ...message };
+      if (sanitizedMessage.data) {
+        sanitizedMessage.data = sanitizeDataForDisplay(sanitizedMessage.data);
+      }
+      console.log('Received message:', sanitizedMessage);
+
+      // Process different message types from the backend
+      switch (sanitizedMessage.type) {
+        case 'update':
+          setJsonData(sanitizedMessage.data);
+          setIsLoading(false);
+          if (sanitizedMessage.title) {
+            setTitle(sanitizedMessage.title);
+          }
+          // Check if the update includes a sample query to display
+          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
+            console.log('Setting query from update message:', sanitizedMessage.data.sampleQuery);
+            setQueryText(sanitizedMessage.data.sampleQuery);
+            setInitialQuerySent(true); // Mark that we've received an initial query
+          }
+          break;
+
+        case 'initialData':
+          // Store the schema and setup a default query
+          console.log('Received schema for collection:', sanitizedMessage.collection);
+          setCollection(sanitizedMessage.collection);
+          setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          
+          // Store schema for backend query generation (via requestSampleQuery)
+          if (sanitizedMessage.schema) {
+            console.log('Received schema data for initialData');
+            try {
+              // Store schema for future use
+              setSchema(sanitizedMessage.schema);
+              
+              // We'll get the query from backend
+              if (sanitizedMessage.collection && !initialQuerySent) {
+                // Request a sample query if one wasn't sent already
+                vscode.postMessage({ 
+                  type: 'requestSampleQuery', 
+                  collection: sanitizedMessage.collection 
+                });
+                setInitialQuerySent(true);  // Mark that we've requested an initial query
+              }
+            } catch (err) {
+              console.error('Error processing schema:', err);
+            }
+          } else {
+            console.log('No schema in initialData message');
+          }
+          
+          // Don't reset loading here as we might be waiting for sample data
+          break;
+
+        case 'queryResult':
+          // Display the query results
+          console.log('Received query results for collection:', sanitizedMessage.collection);
+          
+          // Always stop loading when we get results
+          setIsLoading(false);
+          
+          try {
+            const extractedData = extractWeaviateData(sanitizedMessage.data, sanitizedMessage.collection);
+            console.log('Extracted data:', extractedData);
+            setJsonData(extractedData);
+          } catch (err) {
+            console.error('Error extracting data from response:', err);
+            setJsonData(sanitizedMessage.data);
+          }
+
+          if (sanitizedMessage.collection) {
+            setCollection(sanitizedMessage.collection);
+            setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          }
+          setError(null); // Clear any previous errors
+          break;
+
+        case 'sampleQuery':
+          // Handle sample query message from backend
+          console.log('Received sample query from backend:', sanitizedMessage.data?.sampleQuery);
+          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
+            setQueryText(sanitizedMessage.data.sampleQuery);
+            console.log('Query text state updated with sample query');
+          } else {
+            console.warn('Received sampleQuery message but no query was included');
+          }
+          setIsLoading(false);
+          break;
+
+        case 'queryError':
+        case 'explainError': // Restored handler for explainError
+          // Display error message from failed query
+          console.error(`${sanitizedMessage.type}:`, sanitizedMessage.error);
+          setError(sanitizedMessage.error || 'Unknown query error');
+          setIsLoading(false);
+          break;
+
+        case 'explainResult':
+          // Handle explain plan results
+          console.log('Received explain plan:', sanitizedMessage.data);
+          setJsonData(sanitizedMessage.data);
+          setTitle('Query Plan Explanation');
+          setError(null);
+          setIsLoading(false);
+          break;
+          
+        case 'schemaResult': // Added handler for schemaResult
+          // Handle schema results
+          console.log('Received schema for collection:', sanitizedMessage.collection);
+          setJsonData(sanitizedMessage.schema);
+          
+          // Store schema (backend will handle query generation)
+          console.log('Processing schema from schemaResult:',
+            sanitizedMessage.schema ? 'Schema received' : 'No schema received');
+          try {
+            // Log some info about the schema structure
+            console.log('Schema keys:', Object.keys(sanitizedMessage.schema));
+            if (sanitizedMessage.schema.classes) {
+              console.log('Classes count:', sanitizedMessage.schema.classes.length);
+              const matchingClass = sanitizedMessage.schema.classes.find(
+                (c: any) => c.class === sanitizedMessage.collection
+              );
+              if (matchingClass) {
+                console.log('Found matching class with properties:', matchingClass.properties?.length || 0);
+              }
+            }
+            
+            setSchema(sanitizedMessage.schema);
+            
+            // We'll rely on backend for query generation
+            if (sanitizedMessage.collection && !initialQuerySent) {
+              // Request a sample query if one wasn't sent already
+              vscode.postMessage({ 
+                type: 'requestSampleQuery', 
+                collection: sanitizedMessage.collection 
+              });
+              setInitialQuerySent(true);  // Mark that we've requested an initial query
+            }
+          } catch (err) {
+            console.error('Error processing schema in schemaResult:', err);
+          }
+          
+          setTitle(`Schema: ${sanitizedMessage.collection}`);
+          setError(null);
+          setIsLoading(false);
+          break;
+      }
+    };
+
+    window.addEventListener('message', messageHandler);
+
+    // Send ready message to extension
+    if (vscode) {
+      vscode.postMessage({ type: 'ready' });
+    }
+
+    return () => {
+      window.removeEventListener('message', messageHandler);
+    };
+  }, []);
+
+  // Error message styling
+  const errorStyle: React.CSSProperties = {
+    color: '#e74c3c',
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    padding: '10px 15px',
+    borderRadius: '4px',
+    marginBottom: '20px',
+    border: '1px solid rgba(231, 76, 60, 0.3)',
+  };
+
+  // Load indicator styling
+  const loadingStyle: React.CSSProperties = {
+    color: '#3498db',
+    marginBottom: '20px',
+  };
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.header}>{title}</h1>
+
+      {/* Display error messages if present */}
+      {error && (
+        <div style={styles.error}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {/* Main split container for query and results */}
+      <div style={styles.splitContainer}>
+        {/* Query editor section */}
+        <div style={styles.queryContainer}>
+          <div style={styles.queryHeader}>
+            <span>Query Editor</span>
+            <div style={styles.toolbar}>
+              <button style={styles.button} onClick={handleGenerateQuery}>Generate Sample</button>
+              <button style={styles.button} onClick={handleRunQuery}>Run Query</button>
+            </div>
+          </div>
+
+          <textarea
+            style={styles.textarea}
+            value={queryText}
+            onChange={(e) => setQueryText(e.target.value)}
+            placeholder="Enter your GraphQL query here..."
+          />
+        </div>
+
+        {/* Results section */}
+        <div style={styles.resultContainer}>
+          <div style={styles.resultHeader}>
+            <span>Results</span>
+            {isLoading && <span style={styles.loading}>Loading...</span>}
+          </div>
+
+          {/* Display JSON data when available */}
+          {jsonData ? (
+            <div style={styles.jsonContainer}>
+              {/* Check if we have an empty result with just _errors array */}
+              {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <p>No data found in collection: {collection}</p>
+                  <p>This collection exists but appears to be empty.</p>
+                  <p style={{ fontSize: '14px', color: '#888' }}>
+                    Try adding some data to this collection or select a different collection.
+                  </p>
+                </div>
+              ) : (
+                /* Use a simple pre-formatted JSON display as a reliable fallback */
+                <pre style={{
+                  backgroundColor: '#252526',
+                  color: '#D4D4D4',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  overflow: 'auto',
+                  height: '100%'
+                }}>
+                  {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
+                </pre>
+              )}
+            </div>
+          ) : (
+            <div style={styles.emptyState}>
+              <p>No results to display yet</p>
+              {collection ? (
+                <p>Try running a query for collection: {collection}</p>
+              ) : (
+                <p>Select a collection from the sidebar to view data</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(<App />);
+} else {
+  console.error('Failed to find the root element for the webview.');
+}

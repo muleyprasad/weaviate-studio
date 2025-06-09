@@ -424,6 +424,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     vscode.window.showInformationMessage(`Connected to ${connection.name}`);
                 }
                 
+                // Update the connection in our local list to update the UI state
+                const connectionIndex = this.connections.findIndex(c => c.id === connectionId);
+                if (connectionIndex >= 0) {
+                    this.connections[connectionIndex].status = 'connected';
+                    
+                    // Fire tree change event to update connection state right away
+                    // This makes the connection item rerender with 'connected' status icon
+                    this._onDidChangeTreeData.fire();
+                }
+                
                 // Only fetch collections if we're not in a refresh loop
                 if (!this.isRefreshing) {
                     await this.fetchCollections(connectionId);
@@ -539,24 +549,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      */
     async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
         try {
-            // Create a sample query for the collection
-            const templateQuery = JSON.stringify({
-                query: {
-                    $query: {
-                        class: collectionName,
-                        limit: 10
-                    }
-                }
-            }, null, 4);
-            
-            // Open a new document with the sample query
-            const document = await vscode.workspace.openTextDocument({
-                content: templateQuery,
-                language: 'json'
-            });
-            
-            // Show the document in the editor
-            await vscode.window.showTextDocument(document);
+            // Use the registered command that's already wired up in extension.ts
+            // This will open a new tab if this collection isn't already open
+            await vscode.commands.executeCommand(
+                'weaviate.queryCollection', 
+                connectionId, 
+                collectionName
+            );
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to open query editor: ${errorMessage}`);
