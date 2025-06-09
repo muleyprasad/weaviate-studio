@@ -279,6 +279,37 @@ const App = () => {
   };
 
   // Setup message listener to receive data from extension
+  // Helper function to extract data from Weaviate response formats
+  const extractWeaviateData = (data: any, collection?: string): any => {
+    // Case 1: Pre-extracted collection data
+    if (data?.collection && data?.results) {
+      console.log('Using pre-extracted collection data');
+      return data.results;
+    }
+    
+    // Case 2: Standard nested Weaviate response format
+    if (data?.data?.Get && collection) {
+      console.log('Extracting from nested data.data.Get structure');
+      const collectionData = data.data.Get[collection];
+      if (Array.isArray(collectionData) && collectionData.length > 0) {
+        return collectionData;
+      }
+    }
+    
+    // Case 3: Alternative format sometimes returned
+    if (data?.Get && collection) {
+      console.log('Extracting from data.Get structure');
+      const collectionData = data.Get[collection];
+      if (Array.isArray(collectionData) && collectionData.length > 0) {
+        return collectionData;
+      }
+    }
+    
+    // Fallback: Return the raw data
+    console.log('Using raw data as fallback');
+    return data;
+  };
+
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
@@ -304,81 +335,54 @@ const App = () => {
           console.log('Received schema for collection:', sanitizedMessage.collection);
           setCollection(sanitizedMessage.collection);
           setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
-
           // Don't reset loading here as we might be waiting for sample data
           break;
 
         case 'queryResult':
           // Display the query results
           console.log('Received query results for collection:', sanitizedMessage.collection);
-          console.log('Sanitized query result data:', JSON.stringify(sanitizeDataForDisplay(sanitizedMessage.data), null, 2));
-
+          
           // Always stop loading when we get results
           setIsLoading(false);
-
-          // Extract the actual data from Weaviate's response structure
-          // Weaviate typically returns a nested structure with results inside data.data.Get[Collection]
-          let extractedData;
+          
           try {
-            // First check if we already have a simplified result structure
-            if (sanitizedMessage.data && sanitizedMessage.data.collection && sanitizedMessage.data.results) {
-              console.log('Using pre-extracted collection data');
-              extractedData = sanitizedMessage.data.results;
-            }
-            // Check for standard Weaviate nested response format with data.Get
-            else if (sanitizedMessage.data && sanitizedMessage.data.data && sanitizedMessage.data.data.Get && sanitizedMessage.collection) {
-              console.log('Extracting from nested data.data.Get structure');
-              const collectionData = sanitizedMessage.data.data.Get[sanitizedMessage.collection];
-              if (Array.isArray(collectionData) && collectionData.length > 0) {
-                extractedData = collectionData;
-              } else {
-                console.log('Collection data not found in expected structure, using raw data');
-                extractedData = sanitizedMessage.data;
-              }
-            }
-            // Alternative format sometimes returned
-            else if (message.data && message.data.Get && message.collection) {
-              console.log('Extracting from data.Get structure');
-              const collectionData = message.data.Get[message.collection];
-              if (Array.isArray(collectionData) && collectionData.length > 0) {
-                extractedData = collectionData;
-              } else {
-                console.log('Collection data not found in expected structure, using raw data');
-                extractedData = message.data;
-              }
-            }
-            // If all else fails, use the raw data
-            else {
-              console.log('Using raw message data as fallback');
-              extractedData = message.data;
-            }
+            const extractedData = extractWeaviateData(sanitizedMessage.data, sanitizedMessage.collection);
             console.log('Extracted data:', extractedData);
             setJsonData(extractedData);
           } catch (err) {
             console.error('Error extracting data from response:', err);
-            // Fallback to using the entire response if extraction fails
-            setJsonData(message.data);
+            setJsonData(sanitizedMessage.data);
           }
 
-          if (message.collection) {
-            setCollection(message.collection);
-            setTitle(`Weaviate Collection: ${message.collection}`);
+          if (sanitizedMessage.collection) {
+            setCollection(sanitizedMessage.collection);
+            setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
           }
           setError(null); // Clear any previous errors
           break;
 
         case 'queryError':
+        case 'explainError': // Added handler for explainError
           // Show error message
-          console.error('Query error:', message.error);
-          setError(message.error);
+          console.error(`${sanitizedMessage.type}:`, sanitizedMessage.error);
+          setError(sanitizedMessage.error);
           setIsLoading(false);
           break;
 
         case 'explainResult':
           // Handle explain plan results
-          console.log('Received explain plan:', message.data);
-          setJsonData(message.data);
+          console.log('Received explain plan:', sanitizedMessage.data);
+          setJsonData(sanitizedMessage.data);
           setTitle('Query Plan Explanation');
+          setError(null);
+          setIsLoading(false);
+          break;
+          
+        case 'schemaResult': // Added handler for schemaResult
+          // Handle schema results
+          console.log('Received schema for collection:', sanitizedMessage.collection);
+          setJsonData(sanitizedMessage.schema);
+          setTitle(`Schema: ${sanitizedMessage.collection}`);
           setError(null);
           setIsLoading(false);
           break;
