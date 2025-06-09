@@ -133,7 +133,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 
             // Open the query editor with the selected collection
-            WeaviateQueryEditor.createOrShow(context.extensionUri, { connectionId, collectionName });
+            WeaviateQueryEditor.createOrShow(context, { connectionId, collectionName });
         }),
 
         // Refresh the tree view
