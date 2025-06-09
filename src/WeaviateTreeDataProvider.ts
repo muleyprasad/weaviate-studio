@@ -424,6 +424,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     vscode.window.showInformationMessage(`Connected to ${connection.name}`);
                 }
                 
+                // Update the connection in our local list to update the UI state
+                const connectionIndex = this.connections.findIndex(c => c.id === connectionId);
+                if (connectionIndex >= 0) {
+                    this.connections[connectionIndex].status = 'connected';
+                    
+                    // Fire tree change event to update connection state right away
+                    // This makes the connection item rerender with 'connected' status icon
+                    this._onDidChangeTreeData.fire();
+                }
+                
                 // Only fetch collections if we're not in a refresh loop
                 if (!this.isRefreshing) {
                     await this.fetchCollections(connectionId);

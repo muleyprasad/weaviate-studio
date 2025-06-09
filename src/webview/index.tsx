@@ -1,7 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JsonView } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
+
+// Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
+// due to webview bundle isolation
+/**
+ * Interface for type safety in component props and state
+ */
+interface SchemaProperty {
+  name: string;
+  dataType: string[];
+}
+
+interface SchemaClass {
+  class: string;
+  properties: SchemaProperty[];
+}
 
 type JsonData = Record<string, any> | null;
 
@@ -220,21 +235,14 @@ const App = () => {
   const [queryText, setQueryText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
+  const [schema, setSchema] = useState<any>(null);
 
-  // Generate a default GraphQL query template when collection is set and query is empty
+  // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
-    if (collection && !queryText && !initialQuerySent) {
-      const defaultQuery = `{
-                              Get {
-                                ${collection} (limit: 10) {
-                                  _additional {
-                                    id
-                                  }
-                                  # Add your properties here
-                                }
-                              }
-                            }`;
-      setQueryText(defaultQuery);
+    if (collection && !queryText && !initialQuerySent && vscode) {
+      // Request sample query from backend instead of generating it here
+      vscode.postMessage({ type: 'requestSampleQuery', collection });
+      // We'll receive the sample query via the message handler
     }
   }, [collection, queryText, initialQuerySent]);
 
@@ -259,20 +267,11 @@ const App = () => {
     }
   };
 
-  // Generate sample query button handler
+  // Generate sample query button handler - requests from backend
   const handleGenerateQuery = () => {
-    if (collection) {
-      const defaultQuery = `{
-  Get {
-    ${collection} (limit: 10) {
-      _additional {
-        id
-      }
-      # Add your properties here
-    }
-  }
-}`;
-      setQueryText(defaultQuery);
+    if (collection && vscode) {
+      // Request sample query from backend instead of generating it
+      vscode.postMessage({ type: 'requestSampleQuery', collection });
     } else {
       setError('No collection selected');
     }
@@ -328,6 +327,12 @@ const App = () => {
           if (sanitizedMessage.title) {
             setTitle(sanitizedMessage.title);
           }
+          // Check if the update includes a sample query to display
+          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
+            console.log('Setting query from update message:', sanitizedMessage.data.sampleQuery);
+            setQueryText(sanitizedMessage.data.sampleQuery);
+            setInitialQuerySent(true); // Mark that we've received an initial query
+          }
           break;
 
         case 'initialData':
@@ -335,6 +340,30 @@ const App = () => {
           console.log('Received schema for collection:', sanitizedMessage.collection);
           setCollection(sanitizedMessage.collection);
           setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          
+          // Store schema for backend query generation (via requestSampleQuery)
+          if (sanitizedMessage.schema) {
+            console.log('Received schema data for initialData');
+            try {
+              // Store schema for future use
+              setSchema(sanitizedMessage.schema);
+              
+              // We'll get the query from backend
+              if (sanitizedMessage.collection && !initialQuerySent) {
+                // Request a sample query if one wasn't sent already
+                vscode.postMessage({ 
+                  type: 'requestSampleQuery', 
+                  collection: sanitizedMessage.collection 
+                });
+                setInitialQuerySent(true);  // Mark that we've requested an initial query
+              }
+            } catch (err) {
+              console.error('Error processing schema:', err);
+            }
+          } else {
+            console.log('No schema in initialData message');
+          }
+          
           // Don't reset loading here as we might be waiting for sample data
           break;
 
@@ -361,11 +390,23 @@ const App = () => {
           setError(null); // Clear any previous errors
           break;
 
+        case 'sampleQuery':
+          // Handle sample query message from backend
+          console.log('Received sample query from backend:', sanitizedMessage.data?.sampleQuery);
+          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
+            setQueryText(sanitizedMessage.data.sampleQuery);
+            console.log('Query text state updated with sample query');
+          } else {
+            console.warn('Received sampleQuery message but no query was included');
+          }
+          setIsLoading(false);
+          break;
+
         case 'queryError':
-        case 'explainError': // Added handler for explainError
-          // Show error message
+        case 'explainError': // Restored handler for explainError
+          // Display error message from failed query
           console.error(`${sanitizedMessage.type}:`, sanitizedMessage.error);
-          setError(sanitizedMessage.error);
+          setError(sanitizedMessage.error || 'Unknown query error');
           setIsLoading(false);
           break;
 
@@ -382,6 +423,38 @@ const App = () => {
           // Handle schema results
           console.log('Received schema for collection:', sanitizedMessage.collection);
           setJsonData(sanitizedMessage.schema);
+          
+          // Store schema (backend will handle query generation)
+          console.log('Processing schema from schemaResult:',
+            sanitizedMessage.schema ? 'Schema received' : 'No schema received');
+          try {
+            // Log some info about the schema structure
+            console.log('Schema keys:', Object.keys(sanitizedMessage.schema));
+            if (sanitizedMessage.schema.classes) {
+              console.log('Classes count:', sanitizedMessage.schema.classes.length);
+              const matchingClass = sanitizedMessage.schema.classes.find(
+                (c: any) => c.class === sanitizedMessage.collection
+              );
+              if (matchingClass) {
+                console.log('Found matching class with properties:', matchingClass.properties?.length || 0);
+              }
+            }
+            
+            setSchema(sanitizedMessage.schema);
+            
+            // We'll rely on backend for query generation
+            if (sanitizedMessage.collection && !initialQuerySent) {
+              // Request a sample query if one wasn't sent already
+              vscode.postMessage({ 
+                type: 'requestSampleQuery', 
+                collection: sanitizedMessage.collection 
+              });
+              setInitialQuerySent(true);  // Mark that we've requested an initial query
+            }
+          } catch (err) {
+            console.error('Error processing schema in schemaResult:', err);
+          }
+          
           setTitle(`Schema: ${sanitizedMessage.collection}`);
           setError(null);
           setIsLoading(false);

@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { URL } from 'url';
-import * as path from 'path';
 import { ConnectionManager } from '../services/ConnectionManager';
-import weaviate, { WeaviateClient } from 'weaviate-ts-client';
+import { WeaviateClient } from 'weaviate-ts-client';
 
 // Helper function to generate a nonce
 function getNonce() {
@@ -132,6 +131,11 @@ export class WeaviateQueryEditor {
                     console.log('Explaining query plan', message.query);
                     await this._explainQueryPlan(message.query);
                     break;
+                
+                case 'requestSampleQuery':
+                    console.log('Generating sample query for collection:', message.collection || this._options.collectionName);
+                    await this._sendSampleQuery(message.collection || this._options.collectionName);
+                    break;
                     
                 case 'getSchema':
                     console.log('Getting schema for collection', this._options.collectionName);
@@ -217,30 +221,8 @@ export class WeaviateQueryEditor {
             try {
                 console.log('Executing GraphQL query with client:', client.basePath || client.host || 'unknown host');
                 
-                if (client.graphql && typeof client.graphql.raw === 'function') {
-                    // Try newer API style first (most common)
-                    console.log('Using graphql.raw() method');
-                    result = await client.graphql.raw({ query });
-                } else if (client.graphql && client.graphql.get) {
-                    // Try another common API pattern
-                    console.log('Using graphql.get().do() method');
-                    const graphqlQuery = client.graphql.get();
-                    // Set the query text on the graphql query builder
-                    if (typeof graphqlQuery.withRawQuery === 'function') {
-                        graphqlQuery.withRawQuery(query);
-                    } else {
-                        // Some versions may have a different method name
-                        graphqlQuery.raw(query);
-                    }
-                    result = await graphqlQuery.do();
-                } else if (client.query && typeof client.query.raw === 'function') {
-                    // Last resort - query interface
-                    console.log('Using query.raw() method');
-                    result = await client.query.raw(query);
-                } else {
-                    // If no known method works, throw an informative error
-                    throw new Error('Could not find compatible GraphQL query method on Weaviate client');
-                }
+                // Use the chain method as required by the API
+                result = await client.graphql.raw().withQuery(query).do();
                 
                 console.log('Query result:', JSON.stringify(result, null, 2));
                 
@@ -327,6 +309,53 @@ export class WeaviateQueryEditor {
     }
     
     /**
+     * Sends a sample query to the webview
+     * @param collectionName Collection to generate query for
+     */
+    private async _sendSampleQuery(collectionName: string) {
+        console.log(`Generating sample query for collection: ${collectionName}`);
+        
+        if (!this._weaviateClient) {
+            console.error('No Weaviate client available');
+            this._panel.webview.postMessage({
+                type: 'queryError',
+                error: 'Not connected to Weaviate'
+            });
+            return;
+        }
+
+        // Use a hardcoded query with common fields that will work in most cases
+        const sampleQuery = `{
+                                    Get {
+                                        ${collectionName} (limit: 10) {
+                                        id
+                                        name
+                                        title
+                                        description
+                                        }
+                                    }
+                                    }`;
+        
+        console.log('Sending hardcoded sample query to webview:', sampleQuery);
+        
+        // Send sample query to webview
+        try {
+            this._panel.webview.postMessage({
+                type: 'sampleQuery',
+                data: {
+                    sampleQuery
+                }
+            });
+        } catch (error: any) {
+            console.error('Error sending sample query to webview:', error);
+            this._panel.webview.postMessage({
+                type: 'queryError',
+                error: `Failed to send sample query: ${error.message || 'Unknown error'}`
+            });
+        }
+    }
+
+    /**
      * Fetch sample data from the selected collection and provide a sample query
      * This is used to automatically display data when a collection is selected
      */
@@ -338,17 +367,20 @@ export class WeaviateQueryEditor {
         const client = this._weaviateClient;
 
         try {
-            // Create a sample GraphQL query for this collection
+            // Skip schema based query generation entirely and use hardcoded query
+            // This ensures we always get a valid query in the editor
             const sampleQuery = `{
-                Get {
-                    ${collection} (limit: 10) {
-                    _additional {
-                        id
-                    }
-                    # Add your properties here
-                    }
-                }
-                }`;
+                                    Get {
+                                        ${collection} (limit: 10) {
+                                            id
+                                            name
+                                            title
+                                            description
+                                            }
+                                        }
+                                        }`;
+            
+            console.log('Using hardcoded query with common fields:', sampleQuery);
 
             // First, send the collection info and sample query
             this._panel.webview.postMessage({
@@ -466,145 +498,6 @@ export class WeaviateQueryEditor {
         return sanitized;
     }
     
-    /**
-     * Check if the result contains actual usable data
-     * @param result Sanitized query result
-     * @returns True if the result contains meaningful data
-     */
-    private _hasActualData(result: any): boolean {
-        // Check for top-level results structure
-        if (result && result.results && Array.isArray(result.results) && result.results.length > 0) {
-            return true;
-        }
-        
-        // Check for data in typical nested structures
-        if (result && result.data && result.data.Get) {
-            const collections = Object.keys(result.data.Get);
-            for (const collection of collections) {
-                const data = result.data.Get[collection];
-                if (Array.isArray(data) && data.length > 0) {
-                    return true;
-                }
-            }
-        }
-        
-        // Check if we have empty result with just errors array
-        if (result && result._errors && Array.isArray(result._errors) && result._errors.length === 0 
-            && Object.keys(result).length === 1) {
-            return false;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Try a simpler fallback query when the main query fails
-     * This uses a hardcoded minimal approach to ensure we at least get IDs
-     */
-    /**
-     * Redacts any sensitive information that might be in query strings
-     * This ensures we don't log API keys or other credentials that might be in queries
-     * @param query The query string to sanitize
-     * @returns A sanitized version of the query string
-     */
-    private _redactSensitiveQueryInfo(query: string): string {
-        if (!query) {
-            return '';
-        }
-        
-        // Create a copy to avoid modifying the original
-        let sanitizedQuery = query;
-        
-        // List of patterns to redact (using regex)
-        const sensitivePatterns = [
-            // API key patterns
-            /apiKey\s*:\s*["']([^"']+)["']/gi,
-            /api_key\s*:\s*["']([^"']+)["']/gi,
-            /apiKey\s*=\s*["']([^"']+)["']/gi,
-            /api_key\s*=\s*["']([^"']+)["']/gi,
-            /api[-_]?key["']?\s*:\s*["']([^"']+)["']/gi,
-            
-            // Auth token patterns
-            /authorization\s*:\s*["']([^"']+)["']/gi,
-            /auth[-_]?token\s*:\s*["']([^"']+)["']/gi,
-            /bearer\s+([^"'\s]+)/gi,
-            
-            // Password patterns
-            /password\s*:\s*["']([^"']+)["']/gi,
-            /password\s*=\s*["']([^"']+)["']/gi,
-            
-            // General key/secret patterns
-            /key\s*:\s*["']([^"']{8,})["']/gi, // Only match keys at least 8 chars long to avoid false positives
-            /secret\s*:\s*["']([^"']+)["']/gi,
-        ];
-        
-        // Apply all redaction patterns
-        for (const pattern of sensitivePatterns) {
-            sanitizedQuery = sanitizedQuery.replace(pattern, (match, group) => {
-                // Replace the sensitive part with [REDACTED]
-                return match.replace(group, '[REDACTED]');
-            });
-        }
-        
-        return sanitizedQuery;
-    }
-    
-    private async _tryFallbackQuery() {
-        if (!this._weaviateClient || !this._options.collectionName) {
-            return;
-        }
-        
-        try {
-            const client = this._weaviateClient as any;
-            console.log('Attempting fallback query with minimal properties');
-            
-            // Extremely simple query that should work on any collection
-            const fallbackQuery = `{
-                Get {
-                    ${this._options.collectionName}(limit: 3) {
-                        _additional { id }
-                    }
-                }
-            }`;
-            
-            let result;
-            if (client.graphql && typeof client.graphql.raw === 'function') {
-                result = await client.graphql.raw({ query: fallbackQuery });
-            } else if (client.query && typeof client.query.raw === 'function') {
-                result = await client.query.raw(fallbackQuery);
-            } else {
-                console.error('No compatible query method available for fallback query');
-                return;
-            }
-            
-            if (result) {
-                // Add debug info to help troubleshoot but sanitize sensitive data
-                const sanitizedResult = this._sanitizeResult(result);
-                const enhancedResult = {
-                    ...sanitizedResult,
-                    _debug: {
-                        timestamp: new Date().toISOString(),
-                        isFallback: true,
-                        queryExecuted: this._redactSensitiveQueryInfo(fallbackQuery),
-                        message: 'This is a fallback query result with minimal properties after main query returned no data'
-                    }
-                };
-                
-                this._panel.webview.postMessage({
-                    type: 'queryResult',
-                    data: enhancedResult,
-                    collection: this._options.collectionName
-                });
-            }
-        } catch (error: any) {
-            console.error('Fallback query failed:', error);
-            this._panel.webview.postMessage({
-                type: 'queryError',
-                error: `Both main and fallback queries failed. This may indicate an empty collection or connection issue: ${error.message}`
-            });
-        }
-    }
-    
     private async _explainQueryPlan(query: string) {
         if (!this._weaviateClient) {
             vscode.window.showErrorMessage('Not connected to Weaviate');
@@ -649,6 +542,7 @@ export class WeaviateQueryEditor {
                     message: explainError instanceof Error ? explainError.message : 'Unknown error'
                 };
             }
+            
             this._panel.webview.postMessage({
                 type: 'explainResult',
                 data: explainResult

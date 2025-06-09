@@ -13,13 +13,26 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
     });
 
-    // Handle double-click on tree items
+    // Handle selection of tree items
     treeView.onDidChangeSelection(async e => {
         if (e.selection && e.selection.length > 0) {
             const item = e.selection[0];
+            
+            // Handle collection selection
             if (item.itemType === 'collection' && item.connectionId) {
                 // Open query editor with the selected collection
                 vscode.commands.executeCommand('weaviate.queryCollection', item.connectionId, item.label);
+            }
+            // Handle connection selection - auto connect if not connected
+            else if (item.itemType === 'connection' && item.connectionId) {
+                // Get connection status
+                const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+                
+                // If disconnected, connect to it automatically
+                if (connection && connection.status !== 'connected') {
+                    console.log(`Auto-connecting to ${connection.name} (${item.connectionId})`);
+                    await weaviateTreeDataProvider.connect(item.connectionId, true); // silent=true to avoid notification on success
+                }
             }
         }
     });
