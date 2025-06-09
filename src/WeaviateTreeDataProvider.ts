@@ -561,6 +561,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             vscode.window.showErrorMessage(`Failed to open query editor: ${errorMessage}`);
         }
     }
+    
+    /**
+     * Deletes a collection from the Weaviate instance
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection to delete
+     * @throws Error if deletion fails
+     */
+    async deleteCollection(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            // Get client for this connection
+            const connection = this.connectionManager.getConnection(connectionId);
+            if (!connection) {
+                throw new Error('Connection not found');
+            }
+            
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Client not initialized');
+            }
+            
+            // Delete the collection using the schema API
+            await client.schema.classDeleter()
+                .withClassName(collectionName)
+                .do();
+            
+            // Update local state
+            if (this.collections[connectionId]) {
+                this.collections[connectionId] = this.collections[connectionId].filter(
+                    collection => collection.collectionName !== collectionName
+                );
+            }
+            
+            // Refresh the tree view
+            this.refresh();
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error in deleteCollection:', error);
+            vscode.window.showErrorMessage(`Failed to delete collection: ${errorMessage}`);
+            throw new Error(`Failed to delete collection: ${errorMessage}`);
+        }
+    }
 
     /**
      * Deletes a connection without showing any confirmation dialogs.

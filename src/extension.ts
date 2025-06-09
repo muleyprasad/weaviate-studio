@@ -152,6 +152,33 @@ export function activate(context: vscode.ExtensionContext) {
         // Refresh the tree view
         vscode.commands.registerCommand('weaviate.refresh', () => {
             weaviateTreeDataProvider.refresh();
+        }),
+        
+        // Delete collection command
+        vscode.commands.registerCommand('weaviate.deleteCollection', async (item: { connectionId: string; collectionName: string }) => {
+            if (!item?.connectionId || !item?.collectionName) {
+                vscode.window.showErrorMessage('Missing connection ID or collection name');
+                return;
+            }
+            
+            const confirm = await vscode.window.showWarningMessage(
+                `Are you sure you want to delete the collection "${item.collectionName}"? This action cannot be undone.`,
+                { modal: true },
+                'Delete'
+            );
+            
+            if (confirm !== 'Delete') {
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.deleteCollection(item.connectionId, item.collectionName);
+                vscode.window.showInformationMessage(`Collection "${item.collectionName}" deleted successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to delete collection: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
         })
     );
 
