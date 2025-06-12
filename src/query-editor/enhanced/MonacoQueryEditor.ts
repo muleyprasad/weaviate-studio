@@ -1,15 +1,10 @@
 import * as monaco from 'monaco-editor';
 import { SchemaProvider, GraphQLSchema } from './schemaProvider';
 
-// Use direct import for monaco-graphql
-let monacoGraphQLAPI: any = null;
-try {
-  // Try to load the module dynamically to avoid import errors
-  const monacoGraphQL = require('monaco-graphql');
-  monacoGraphQLAPI = monacoGraphQL.initializeMode;
-} catch (error) {
-  console.error('Failed to load monaco-graphql:', error);
-}
+// Import monaco-graphql inline mode (runs without web-workers)
+import { initializeMode as initGraphQLMode } from 'monaco-graphql/esm/initializeMode';
+
+let monacoGraphQLAPI: any = initGraphQLMode;
 
 /**
  * Monaco-based GraphQL query editor with schema-aware features
@@ -36,18 +31,7 @@ export class MonacoQueryEditor {
    * @param initialValue Initial query text
    */
   private initializeEditor(initialValue: string): void {
-    // Configure Monaco environment for web workers
-    // This is crucial for GraphQL language features to work
-    if (!window.MonacoEnvironment) {
-      window.MonacoEnvironment = {
-        getWorkerUrl: (moduleId, label) => {
-          if (label === 'graphql') {
-            return './graphql.worker.js';
-          }
-          return './editor.worker.js';
-        }
-      };
-    }
+    // No custom worker configuration needed – using inline GraphQL language service
 
     // Create Monaco editor instance
     this.editor = monaco.editor.create(this.container, {
@@ -117,7 +101,9 @@ export class MonacoQueryEditor {
               fileMatch: schemaConfig.fileMatch || ['*.graphql', '*.gql'],
               schema: schemaConfig.introspectionJSON
             }
-          ]
+          ],
+          // run language service on UI thread
+          worker: false
         });
       } else {
         console.warn('Monaco GraphQL API not available, language features will be limited');
