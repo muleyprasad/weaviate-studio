@@ -189,6 +189,7 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
     "monaco-editor": "^0.52.2",
+    "monaco-graphql": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JsonView } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
+import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
+import * as monaco from 'monaco-editor';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
 // due to webview bundle isolation
@@ -37,6 +39,23 @@ try {
   vscode = window.acquireVsCodeApi();
 } catch (error) {
   console.error('Failed to acquire VS Code API', error);
+}
+
+// Configure Monaco environment for web workers
+try {
+  // Only set up the Monaco environment if it hasn't been configured yet
+  if (!window.MonacoEnvironment) {
+    window.MonacoEnvironment = {
+      getWorkerUrl: function (moduleId, label) {
+        if (label === 'graphql') {
+          return './graphql.worker.js';
+        }
+        return './editor.worker.js';
+      }
+    };
+  }
+} catch (error) {
+  console.error('Failed to configure Monaco environment:', error);
 }
 
 // Custom styles defined inline
@@ -236,6 +255,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
+  const [schemaConfig, setSchemaConfig] = useState<any>(null);
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
@@ -442,6 +462,49 @@ const App = () => {
             
             setSchema(sanitizedMessage.schema);
             
+            // Create GraphQL schema config for Monaco editor
+            if (sanitizedMessage.schema && sanitizedMessage.schema.classes && sanitizedMessage.schema.classes.length > 0) {
+              // Build a simplified GraphQL introspection schema for monaco-graphql
+              const introspectionJSON = {
+                __schema: {
+                  types: [
+                    // Add standard Weaviate query types
+                    { name: 'Query', kind: 'OBJECT' },
+                    { name: 'Get', kind: 'OBJECT' },
+                    { name: 'Aggregate', kind: 'OBJECT' },
+                    { name: 'Explore', kind: 'OBJECT' },
+                    // Add all collection classes as types
+                    ...(sanitizedMessage.schema.classes || []).map((cls: any) => ({
+                      name: cls.class,
+                      kind: 'OBJECT',
+                      fields: [
+                        // Add standard fields available on all objects
+                        { name: 'id', type: { name: 'String', kind: 'SCALAR' } },
+                        { name: '_additional', type: { name: 'Additional', kind: 'OBJECT' } },
+                        // Add all properties as fields
+                        ...(cls.properties || []).map((prop: any) => ({
+                          name: prop.name,
+                          type: {
+                            name: prop.dataType[0],
+                            kind: 'SCALAR'
+                          },
+                          description: prop.description || `${prop.name} (${prop.dataType.join(', ')})`
+                        }))
+                      ]
+                    }))
+                  ]
+                }
+              };
+              
+              // Set the schema configuration for the Monaco editor
+              setSchemaConfig({
+                uri: 'weaviate://graphql',
+                schema: sanitizedMessage.schema,
+                fileMatch: ['*.graphql', '*.gql'],
+                introspectionJSON
+              });
+            }
+            
             // We'll rely on backend for query generation
             if (sanitizedMessage.collection && !initialQuerySent) {
               // Request a sample query if one wasn't sent already
@@ -507,18 +570,18 @@ const App = () => {
         <div style={styles.queryContainer}>
           <div style={styles.queryHeader}>
             <span>Query Editor</span>
-            <div style={styles.toolbar}>
-              <button style={styles.button} onClick={handleGenerateQuery}>Generate Sample</button>
-              <button style={styles.button} onClick={handleRunQuery}>Run Query</button>
-            </div>
           </div>
 
-          <textarea
-            style={styles.textarea}
-            value={queryText}
-            onChange={(e) => setQueryText(e.target.value)}
-            placeholder="Enter your GraphQL query here..."
-          />
+          <div style={{ flex: 1, minHeight: '200px' }}>
+            <MonacoGraphQLEditor
+              initialValue={queryText}
+              onChange={(value) => setQueryText(value)}
+              onRunQuery={handleRunQuery}
+              onGenerateSample={handleGenerateQuery}
+              schemaConfig={schemaConfig}
+              collectionName={collection || undefined}
+            />
+          </div>
         </div>
 
         {/* Results section */}
