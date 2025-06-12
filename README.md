@@ -1,71 +1,106 @@
-# weaviate-studio README
+# Weaviate Studio - VS Code Extension
 
-This is the README for your extension "weaviate-studio". After writing up a brief description, we recommend including the following sections.
+A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data with an intuitive interface.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Connect to Weaviate instances
+- Browse and manage collections
+- Run GraphQL queries with syntax highlighting
+- View query results in a structured format
+- Visualize vector data
+- Manage schema and data models
 
-For example if there is an image subfolder under your extension project workspace:
+## Prerequisites
 
-\!\[feature X\]\(images/feature-x.png\)
+- Node.js (v14 or later)
+- npm (v7 or later) or yarn
+- VS Code (v1.85.0 or later)
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Getting Started
 
-## Requirements
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/weaviate-studio.git
+   cd weaviate-studio
+   ```
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-## Extension Settings
+## Development Workflow
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+### Development Mode
 
-For example:
+To start the development environment with automatic rebuilding:
 
-This extension contributes the following settings:
+```bash
+# In the project root directory
+npm run dev
+```
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+This will start two processes in parallel:
+1. TypeScript compiler in watch mode for the extension code
+2. Webpack in watch mode for the webview
 
-## Known Issues
+### Launching the Extension
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+1. Open the project in VS Code
+2. Press `F5` to start debugging
+   - This will open a new VS Code window with the extension loaded
 
-## Release Notes
+### Making Changes
 
-Users appreciate release notes as you update your extension.
+- **Extension Code**: Changes to `.ts` files will be automatically compiled
+- **Webview Code**: Changes to files in `src/webview/` will be automatically rebuilt
 
-### 1.0.0
+### Building for Production
 
-Initial release of ...
+To create a production build:
 
-### 1.0.1
+```bash
+npm run package
+```
 
-Fixed issue #.
+This will create a VSIX package in the project root that can be installed in VS Code.
 
-### 1.1.0
+## Project Structure
 
-Added features X, Y, and Z.
+- `src/extension.ts` - Main extension entry point
+- `src/webview/` - Webview UI source code
+  - `index.tsx` - Main webview component
+  - `components/` - Reusable React components
+  - `styles/` - CSS/SCSS files
+- `resources/` - Icons and other static assets
 
----
+## Available Scripts
 
-## Following extension guidelines
+- `npm run dev` - Start development mode (watch both extension and webview)
+- `npm run watch:extension` - Watch extension TypeScript files
+- `npm run watch:webview` - Watch webview files and rebuild
+- `npm run build` - Build the extension for production
+- `npm run package` - Create VSIX package for distribution
+- `npm run lint` - Run ESLint
+- `npm run format` - Format code with Prettier
+- `npm test` - Run tests
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+## Contributing
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Working with Markdown
+## License
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## Acknowledgments
 
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+- [Weaviate](https://weaviate.io/) - Vector database
+- [VS Code Extension API](https://code.visualstudio.com/api)
+- [React](https://reactjs.org/) - UI library
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor

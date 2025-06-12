@@ -60,71 +60,7 @@ try {
 
 // Custom styles defined inline
 
-/**
- * Sanitizes data for display by removing any potential sensitive information
- * This acts as a second layer of security in case any sensitive data made it through the backend filtering
- */
-const sanitizeDataForDisplay = (data: any): any => {
-  if (!data || typeof data !== 'object') {
-    return data;
-  }
 
-  // Create a deep copy to avoid modifying the original
-  const sanitized = JSON.parse(JSON.stringify(data));
-
-  // Function to recursively scrub sensitive data
-  const scrub = (obj: any) => {
-    if (!obj || typeof obj !== 'object') {
-      return;
-    }
-
-    // List of keys that might contain sensitive information
-    const sensitiveKeys = ['apiKey', 'api_key', 'key', 'token', 'password', 'secret', 'auth', 'authorization'];
-
-    // Check if object is an array
-    if (Array.isArray(obj)) {
-      obj.forEach(item => {
-        if (item && typeof item === 'object') {
-          scrub(item);
-        }
-      });
-      return;
-    }
-
-    // Process object properties
-    for (const key of Object.keys(obj)) {
-      // Check for sensitive key names (case insensitive)
-      if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
-        // Redact the value
-        obj[key] = '[REDACTED]';
-      }
-      // Special handling for client object which often contains credentials
-      else if (key === 'client' && obj[key] && typeof obj[key] === 'object') {
-        // Either remove client entirely or sanitize it
-        if (Object.keys(obj[key]).some(clientKey =>
-          sensitiveKeys.some(sk => clientKey.toLowerCase().includes(sk.toLowerCase())))) {
-          // If client contains sensitive keys, replace with safe version
-          const host = obj[key].host || 'unknown';
-          obj[key] = {
-            host: host,
-            info: 'Connection details redacted for security',
-          };
-        } else {
-          // Still recursively check other client properties
-          scrub(obj[key]);
-        }
-      }
-      // Recursively check nested objects
-      else if (obj[key] && typeof obj[key] === 'object') {
-        scrub(obj[key]);
-      }
-    }
-  };
-
-  // Apply the sanitization
-  scrub(sanitized);
-  return sanitized;
-};
 
 // Define styles for various UI elements
 // Styles for the UI components
@@ -332,48 +268,43 @@ const App = () => {
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
-      // SECURITY: Sanitize message before logging
-      const sanitizedMessage = { ...message };
-      if (sanitizedMessage.data) {
-        sanitizedMessage.data = sanitizeDataForDisplay(sanitizedMessage.data);
-      }
-      console.log('Received message:', sanitizedMessage);
+      console.log('Received message:', message);
 
       // Process different message types from the backend
-      switch (sanitizedMessage.type) {
+      switch (message.type) {
         case 'update':
-          setJsonData(sanitizedMessage.data);
+          setJsonData(message.data);
           setIsLoading(false);
-          if (sanitizedMessage.title) {
-            setTitle(sanitizedMessage.title);
+          if (message.title) {
+            setTitle(message.title);
           }
           // Check if the update includes a sample query to display
-          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
-            console.log('Setting query from update message:', sanitizedMessage.data.sampleQuery);
-            setQueryText(sanitizedMessage.data.sampleQuery);
+          if (message.data && message.data.sampleQuery) {
+            console.log('Setting query from update message:', message.data.sampleQuery);
+            setQueryText(message.data.sampleQuery);
             setInitialQuerySent(true); // Mark that we've received an initial query
           }
           break;
 
         case 'initialData':
           // Store the schema and setup a default query
-          console.log('Received schema for collection:', sanitizedMessage.collection);
-          setCollection(sanitizedMessage.collection);
-          setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          console.log('Received schema for collection:', message.collection);
+          setCollection(message.collection);
+          setTitle(`Weaviate Collection: ${message.collection}`);
           
           // Store schema for backend query generation (via requestSampleQuery)
-          if (sanitizedMessage.schema) {
+          if (message.schema) {
             console.log('Received schema data for initialData');
             try {
               // Store schema for future use
-              setSchema(sanitizedMessage.schema);
+              setSchema(message.schema);
               
               // We'll get the query from backend
-              if (sanitizedMessage.collection && !initialQuerySent) {
+              if (message.collection && !initialQuerySent) {
                 // Request a sample query if one wasn't sent already
                 vscode.postMessage({ 
                   type: 'requestSampleQuery', 
-                  collection: sanitizedMessage.collection 
+                  collection: message.collection 
                 });
                 setInitialQuerySent(true);  // Mark that we've requested an initial query
               }
@@ -389,32 +320,32 @@ const App = () => {
 
         case 'queryResult':
           // Display the query results
-          console.log('Received query results for collection:', sanitizedMessage.collection);
+          console.log('Received query results for collection:', message.collection);
           
           // Always stop loading when we get results
           setIsLoading(false);
           
           try {
-            const extractedData = extractWeaviateData(sanitizedMessage.data, sanitizedMessage.collection);
+            const extractedData = extractWeaviateData(message.data, message.collection);
             console.log('Extracted data:', extractedData);
             setJsonData(extractedData);
           } catch (err) {
             console.error('Error extracting data from response:', err);
-            setJsonData(sanitizedMessage.data);
+            setJsonData(message.data);
           }
 
-          if (sanitizedMessage.collection) {
-            setCollection(sanitizedMessage.collection);
-            setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          if (message.collection) {
+            setCollection(message.collection);
+            setTitle(`Weaviate Collection: ${message.collection}`);
           }
           setError(null); // Clear any previous errors
           break;
 
         case 'sampleQuery':
           // Handle sample query message from backend
-          console.log('Received sample query from backend:', sanitizedMessage.data?.sampleQuery);
-          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
-            setQueryText(sanitizedMessage.data.sampleQuery);
+          console.log('Received sample query from backend:', message.data?.sampleQuery);
+          if (message.data && message.data.sampleQuery) {
+            setQueryText(message.data.sampleQuery);
             console.log('Query text state updated with sample query');
           } else {
             console.warn('Received sampleQuery message but no query was included');
@@ -425,15 +356,15 @@ const App = () => {
         case 'queryError':
         case 'explainError': // Restored handler for explainError
           // Display error message from failed query
-          console.error(`${sanitizedMessage.type}:`, sanitizedMessage.error);
-          setError(sanitizedMessage.error || 'Unknown query error');
+          console.error(`${message.type}:`, message.error);
+          setError(message.error || 'Unknown query error');
           setIsLoading(false);
           break;
 
         case 'explainResult':
           // Handle explain plan results
-          console.log('Received explain plan:', sanitizedMessage.data);
-          setJsonData(sanitizedMessage.data);
+          console.log('Received explain plan:', message.data);
+          setJsonData(message.data);
           setTitle('Query Plan Explanation');
           setError(null);
           setIsLoading(false);
@@ -441,29 +372,29 @@ const App = () => {
           
         case 'schemaResult': // Added handler for schemaResult
           // Handle schema results
-          console.log('Received schema for collection:', sanitizedMessage.collection);
-          setJsonData(sanitizedMessage.schema);
+          console.log('Received schema for collection:', message.collection);
+          setJsonData(message.schema);
           
           // Store schema (backend will handle query generation)
           console.log('Processing schema from schemaResult:',
-            sanitizedMessage.schema ? 'Schema received' : 'No schema received');
+            message.schema ? 'Schema received' : 'No schema received');
           try {
             // Log some info about the schema structure
-            console.log('Schema keys:', Object.keys(sanitizedMessage.schema));
-            if (sanitizedMessage.schema.classes) {
-              console.log('Classes count:', sanitizedMessage.schema.classes.length);
-              const matchingClass = sanitizedMessage.schema.classes.find(
-                (c: any) => c.class === sanitizedMessage.collection
+            console.log('Schema keys:', Object.keys(message.schema));
+            if (message.schema.classes) {
+              console.log('Classes count:', message.schema.classes.length);
+              const matchingClass = message.schema.classes.find(
+                (c: any) => c.class === message.collection
               );
               if (matchingClass) {
                 console.log('Found matching class with properties:', matchingClass.properties?.length || 0);
               }
             }
             
-            setSchema(sanitizedMessage.schema);
+            setSchema(message.schema);
             
             // Create GraphQL schema config for Monaco editor
-            if (sanitizedMessage.schema && sanitizedMessage.schema.classes && sanitizedMessage.schema.classes.length > 0) {
+            if (message.schema && message.schema.classes && message.schema.classes.length > 0) {
               // Build a simplified GraphQL introspection schema for monaco-graphql
               const introspectionJSON = {
                 __schema: {
@@ -474,7 +405,7 @@ const App = () => {
                     { name: 'Aggregate', kind: 'OBJECT' },
                     { name: 'Explore', kind: 'OBJECT' },
                     // Add all collection classes as types
-                    ...(sanitizedMessage.schema.classes || []).map((cls: any) => ({
+                    ...(message.schema.classes || []).map((cls: any) => ({
                       name: cls.class,
                       kind: 'OBJECT',
                       fields: [
@@ -499,18 +430,18 @@ const App = () => {
               // Set the schema configuration for the Monaco editor
               setSchemaConfig({
                 uri: 'weaviate://graphql',
-                schema: sanitizedMessage.schema,
+                schema: message.schema,
                 fileMatch: ['*.graphql', '*.gql'],
                 introspectionJSON
               });
             }
             
             // We'll rely on backend for query generation
-            if (sanitizedMessage.collection && !initialQuerySent) {
+            if (message.collection && !initialQuerySent) {
               // Request a sample query if one wasn't sent already
               vscode.postMessage({ 
                 type: 'requestSampleQuery', 
-                collection: sanitizedMessage.collection 
+                collection: message.collection 
               });
               setInitialQuerySent(true);  // Mark that we've requested an initial query
             }
@@ -518,7 +449,7 @@ const App = () => {
             console.error('Error processing schema in schemaResult:', err);
           }
           
-          setTitle(`Schema: ${sanitizedMessage.collection}`);
+          setTitle(`Schema: ${message.collection}`);
           setError(null);
           setIsLoading(false);
           break;
@@ -614,7 +545,7 @@ const App = () => {
                   overflow: 'auto',
                   height: '100%'
                 }}>
-                  {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
+                  {JSON.stringify(jsonData, null, 2)}
                 </pre>
               )}
             </div>
