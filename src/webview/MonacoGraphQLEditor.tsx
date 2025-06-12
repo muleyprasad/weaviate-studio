@@ -1,39 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import { MonacoQueryEditor } from '../query-editor/enhanced/MonacoQueryEditor';
-import { processTemplate, queryTemplates } from '../query-editor/enhanced/queryTemplates';
-import FormatButton from './FormatButton';
 import ErrorBoundary from './ErrorBoundary';
 import LoadingIndicator from './LoadingIndicator';
-import './FormatButton.css';
-
-interface QuickInsertButtonProps {
-  label: string;
-  template: string;
-  description?: string;
-  onClick: (template: string) => void;
-}
-
-const QuickInsertButton: React.FC<QuickInsertButtonProps> = ({ label, template, description, onClick }) => {
-  return (
-    <button
-      className="quick-insert-button"
-      title={description || label}
-      onClick={() => onClick(template)}
-      style={{
-        backgroundColor: '#3c3c3c',
-        color: '#cccccc',
-        border: '1px solid #555',
-        borderRadius: '4px',
-        padding: '4px 8px',
-        marginRight: '8px',
-        cursor: 'pointer'
-      }}
-    >
-      {label}
-    </button>
-  );
-};
 
 interface MonacoGraphQLEditorProps {
   initialValue: string;
@@ -58,7 +27,6 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<MonacoQueryEditor | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Initializing editor...');
 
@@ -135,171 +103,76 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
     }
   }, [initialValue, isEditorReady]);
 
-  // Set selected collection name in the queryContext when it changes
+  // Set collection name when it changes
   useEffect(() => {
-    if (editorRef.current) {
-      // Update the query template when the collection name changes
-      // setQueryContext(prevContext => ({
-      //   ...prevContext,
-      //   collection: collectionName || ''
-      // }));
-      
-      // Set collection name for template system
-      editorRef.current.setCollectionName(collectionName || 'Article');
+    if (editorRef.current && collectionName) {
+      editorRef.current.setCollectionName(collectionName);
     }
   }, [collectionName, editorRef]);
 
-  // Handle template selection
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const templateName = e.target.value;
-    setSelectedTemplate(templateName);
-    
-    if (templateName && collectionName && editorRef.current) {
-      const template = queryTemplates.find(t => t.name === templateName);
-      if (template) {
-        const processedTemplate = processTemplate(template.template, collectionName);
-        editorRef.current.setValue(processedTemplate);
-      }
-    }
-  };
-
-  // Format the current query
-  const handleFormatQuery = async () => {
-    if (editorRef.current) {
-      try {
-        setIsLoading(true);
-        setLoadingMessage('Formatting query...');
-        await editorRef.current.formatQuery();
-      } catch (error) {
-        console.error('Error formatting query:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  };
+  // No formatting functionality needed
 
   return (
     <ErrorBoundary>
       <div className="monaco-graphql-editor-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      <div className="editor-toolbar" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        padding: '8px',
-        backgroundColor: '#252526',
-        borderBottom: '1px solid #333'
-      }}>
-        <div className="left-tools">
-          <select
-            value={selectedTemplate}
-            onChange={handleTemplateChange}
-            style={{
-              backgroundColor: '#3c3c3c',
-              color: '#cccccc',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              marginRight: '8px'
-            }}
-          >
-            <option value="">Select Template...</option>
-            {queryTemplates.map((template, index) => (
-              <option key={index} value={template.name}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-          
-          <FormatButton onClick={handleFormatQuery} disabled={!isEditorReady} />
+        {/* Simple toolbar with essential controls */}
+        <div className="editor-toolbar" style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          padding: '6px 10px',
+          backgroundColor: '#1E1E1E',
+          borderBottom: '1px solid #333'
+        }}>
+          <div className="right-tools" style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              onClick={onGenerateSample}
+              style={{
+                backgroundColor: '#2D2D2D',
+                color: '#E0E0E0',
+                border: '1px solid #444',
+                borderRadius: '3px',
+                padding: '3px 8px',
+                marginRight: '8px',
+                fontSize: '12px',
+                height: '24px'
+              }}
+            >
+              Sample
+            </button>
+            
+            <button
+              onClick={onRunQuery}
+              style={{
+                backgroundColor: '#0E639C',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                padding: '3px 10px',
+                fontSize: '12px',
+                height: '24px',
+                fontWeight: 'bold'
+              }}
+            >
+              Run
+            </button>
+          </div>
         </div>
         
-        <div className="right-tools">
-          <button
-            onClick={onGenerateSample}
-            style={{
-              backgroundColor: '#3c3c3c',
-              color: '#cccccc',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              marginRight: '8px'
-            }}
-          >
-            Generate Sample
-          </button>
-          
-          <button
-            onClick={onRunQuery}
-            style={{
-              backgroundColor: '#0e639c',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '4px 12px'
-            }}
-          >
-            Run Query
-          </button>
-        </div>
-      </div>
-      
-      <div
-        ref={containerRef}
-        className="monaco-editor-container"
-        style={{ flex: 1, minHeight: '200px' }}
-      />
-      
-      <div className="quick-insert-toolbar" style={{
-        display: 'flex',
-        padding: '8px',
-        backgroundColor: '#252526',
-        borderTop: '1px solid #333',
-        overflowX: 'auto'
-      }}>
-        {isEditorReady && editorRef.current && (
-          <>
-            <QuickInsertButton
-              label="Add Vector Search"
-              template={`nearVector: {
-  vector: []
-}`}
-              description="Insert a nearVector search parameter"
-              onClick={(template) => editorRef.current?.insertTextAtCursor(template)}
-            />
-            
-            <QuickInsertButton
-              label="Add Text Search"
-              template={`nearText: {
-  concepts: [""]
-}`}
-              description="Insert a nearText search parameter"
-              onClick={(template) => editorRef.current?.insertTextAtCursor(template)}
-            />
-            
-            <QuickInsertButton
-              label="Add Filter"
-              template={`where: {
-  operator: Equal,
-  path: [""],
-  valueString: ""
-}`}
-              description="Insert a where filter clause"
-              onClick={(template) => editorRef.current?.insertTextAtCursor(template)}
-            />
-            
-            <QuickInsertButton
-              label="Add Metadata"
-              template={`_additional {
-  id
-  certainty
-  distance
-}`}
-              description="Insert _additional metadata fields"
-              onClick={(template) => editorRef.current?.insertTextAtCursor(template)}
-            />
-          </>
-        )}
-      </div>
-      <LoadingIndicator isVisible={isLoading} message={loadingMessage} />
+        {/* Editor container */}
+        <div 
+          ref={containerRef} 
+          className="monaco-editor-container"
+          style={{ 
+            flex: 1, 
+            position: 'relative',
+            overflow: 'hidden',
+            border: '1px solid #333',
+            borderTop: 'none',
+            minHeight: '200px'
+          }}
+        />
+        
+        <LoadingIndicator isVisible={isLoading} message={loadingMessage} />
       </div>
     </ErrorBoundary>
   );

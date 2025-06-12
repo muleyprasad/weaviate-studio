@@ -1,8 +1,8 @@
 .query-history-panel {
-  width: 220px;
-  min-width: 220px;
-  background-color: var(--vscode-sideBar-background);
-  border-right: 1px solid var(--vscode-sideBar-border);
+  width: 200px;
+  min-width: 200px;
+  background-color: #1E1E1E;
+  border-right: 1px solid #333;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -19,18 +19,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  background-color: var(--vscode-sideBarSectionHeader-background);
-  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
+  padding: 6px 10px;
+  background-color: #1E1E1E;
+  border-bottom: 1px solid #333;
 }
 
 .query-history-header h3 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #E0E0E0;
 }
 
 .query-history-controls {
@@ -39,13 +40,14 @@
 }
 
 .query-history-save-button {
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border: none;
-  padding: 4px 8px;
-  margin-right: 8px;
+  background-color: #2D2D2D;
+  color: #E0E0E0;
+  border: 1px solid #444;
+  padding: 3px 8px;
+  margin-right: 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 10px;
+  height: 24px;
   cursor: pointer;
 }
 
@@ -80,18 +82,19 @@
 
 .query-history-filter {
   display: flex;
-  padding: 8px;
-  border-bottom: 1px solid var(--vscode-sideBar-border);
+  padding: 6px 10px;
+  border-bottom: 1px solid #333;
 }
 
 .query-history-filter button {
-  background: none;
-  border: 1px solid var(--vscode-button-border);
-  color: var(--vscode-foreground);
-  padding: 4px 8px;
-  font-size: 11px;
+  background: #2D2D2D;
+  border: 1px solid #444;
+  color: #E0E0E0;
+  padding: 3px 8px;
+  font-size: 10px;
   cursor: pointer;
   flex: 1;
+  height: 24px;
 }
 
 .query-history-filter button:first-child {
@@ -106,8 +109,9 @@
 }
 
 .query-history-filter button.active {
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background-color: #0E639C;
+  color: white;
+  border-color: #0E639C;
 }
 
 .query-history-list {
@@ -125,17 +129,17 @@
 }
 
 .query-history-item {
-  background-color: var(--vscode-editor-background);
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  margin-bottom: 8px;
-  padding: 8px;
+  background-color: #252526;
+  border: 1px solid #333;
+  border-radius: 3px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .query-history-item:hover {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: #2A2A2A;
 }
 
 .query-history-item-header {
@@ -146,57 +150,63 @@
 }
 
 .query-history-item-title {
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 500;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  color: #E0E0E0;
 }
 
 .query-history-item-actions {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
 .history-action {
   background: none;
   border: none;
-  color: var(--vscode-disabledForeground);
+  color: #888;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   padding: 2px;
   border-radius: 2px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-action:hover {
-  color: var(--vscode-foreground);
-  background-color: var(--vscode-list-hoverBackground);
+  color: #E0E0E0;
+  background-color: #3D3D3D;
 }
 
 .history-action.saved {
-  color: var(--vscode-terminal-ansiYellow);
+  color: #FFCC66;
 }
 
 .history-action.delete:hover {
-  color: var(--vscode-errorForeground);
+  color: #F44747;
 }
 
 .query-history-item-collection,
 .query-history-item-time {
-  font-size: 10px;
-  color: var(--vscode-disabledForeground);
-  margin-bottom: 4px;
+  font-size: 9px;
+  color: #888;
+  margin-bottom: 3px;
 }
 
 .query-history-item-preview {
-  font-family: monospace;
-  font-size: 11px;
+  font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Ubuntu Mono', 'Liberation Mono', monospace;
+  font-size: 10px;
   padding: 4px;
-  background-color: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
+  background-color: #1E1E1E;
+  color: #D4D4D4;
   border-radius: 2px;
-  max-height: 60px;
+  max-height: 40px;
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-all;

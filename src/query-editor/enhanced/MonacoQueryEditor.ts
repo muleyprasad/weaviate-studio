@@ -125,29 +125,44 @@ export class MonacoQueryEditor {
       this.disposables.forEach(d => d.dispose());
       this.disposables = [];
 
+      // Register the schema with Monaco
+      const modelUri = monaco.Uri.parse('inmemory://weaviate-graphql.graphql');
+      const model = monaco.editor.getModel(modelUri) || 
+                    monaco.editor.createModel('', 'graphql', modelUri);
+      
+      // Set the model before configuring GraphQL language support
+      this.editor.setModel(model);
+      
       // Initialize Monaco GraphQL mode with schema
       if (monacoGraphQLAPI) {
+        console.log('Initializing Monaco GraphQL API with schema', schemaConfig.uri);
+        
+        // Ensure schema is valid before initializing
+        if (!schemaConfig.introspectionJSON) {
+          console.error('Schema introspection JSON is missing');
+          return;
+        }
+        
         this.monacoGraphQLAPI = monacoGraphQLAPI({
           schemas: [
             {
               uri: schemaConfig.uri,
-              fileMatch: schemaConfig.fileMatch || ['*.graphql', '*.gql'],
+              fileMatch: ['*.graphql', '*.gql', modelUri.toString()],
               schema: schemaConfig.introspectionJSON
             }
           ],
           // run language service on UI thread
           worker: false
         });
+        
+        // Force language features to initialize
+        monaco.editor.setModelLanguage(model, 'graphql');
+        
+        // Log success for debugging
+        console.log('Monaco GraphQL language features initialized');
       } else {
         console.warn('Monaco GraphQL API not available, language features will be limited');
       }
-
-      // Register the schema with Monaco
-      const modelUri = monaco.Uri.parse('inmemory://weaviate-graphql.graphql');
-      const model = monaco.editor.getModel(modelUri) || 
-                    monaco.editor.createModel('', 'graphql', modelUri);
-      
-      this.editor.setModel(model);
 
       console.log('GraphQL language features configured with schema');
     } catch (error) {
