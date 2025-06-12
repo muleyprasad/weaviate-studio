@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { JsonView } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
+import SplitPanelLayout from './SplitPanelLayout';
+import QueryHistoryPanel from './QueryHistoryPanel';
 import * as monaco from 'monaco-editor';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
@@ -563,72 +565,89 @@ const App = () => {
           <strong>Error:</strong> {error}
         </div>
       )}
+      
+      {/* Main layout with history sidebar */}
+      <div style={{ display: 'flex', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+        {/* Query history sidebar */}
+        <QueryHistoryPanel 
+          onSelectQuery={(query) => setQueryText(query)}
+          currentQuery={queryText}
+          currentCollection={collection}
+        />
+        
+        {/* Main split container for query and results */}
+        <SplitPanelLayout
+          className="main-split-panel"
+          initialTopHeightRatio={0.5}
+          minTopHeight={150}
+          minBottomHeight={100}
+          topContent={
+            /* Query editor section */
+            <div style={styles.queryContainer}>
+              <div style={styles.queryHeader}>
+                <span>Query Editor</span>
+              </div>
 
-      {/* Main split container for query and results */}
-      <div style={styles.splitContainer}>
-        {/* Query editor section */}
-        <div style={styles.queryContainer}>
-          <div style={styles.queryHeader}>
-            <span>Query Editor</span>
-          </div>
+              <div style={{ flex: 1, minHeight: '200px' }}>
+                <MonacoGraphQLEditor
+                  initialValue={queryText}
+                  onChange={(value) => setQueryText(value)}
+                  onRunQuery={handleRunQuery}
+                  onGenerateSample={handleGenerateQuery}
+                  schemaConfig={schemaConfig}
+                  collectionName={collection || undefined}
+                />
+              </div>
+            </div>
+          }
+          bottomContent={
+            /* Results section */
+            <div style={styles.resultContainer}>
+              <div style={styles.resultHeader}>
+                <span>Results</span>
+                {isLoading && <span style={styles.loading}>Loading...</span>}
+              </div>
 
-          <div style={{ flex: 1, minHeight: '200px' }}>
-            <MonacoGraphQLEditor
-              initialValue={queryText}
-              onChange={(value) => setQueryText(value)}
-              onRunQuery={handleRunQuery}
-              onGenerateSample={handleGenerateQuery}
-              schemaConfig={schemaConfig}
-              collectionName={collection || undefined}
-            />
-          </div>
-        </div>
-
-        {/* Results section */}
-        <div style={styles.resultContainer}>
-          <div style={styles.resultHeader}>
-            <span>Results</span>
-            {isLoading && <span style={styles.loading}>Loading...</span>}
-          </div>
-
-          {/* Display JSON data when available */}
-          {jsonData ? (
-            <div style={styles.jsonContainer}>
-              {/* Check if we have an empty result with just _errors array */}
-              {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <p>No data found in collection: {collection}</p>
-                  <p>This collection exists but appears to be empty.</p>
-                  <p style={{ fontSize: '14px', color: '#888' }}>
-                    Try adding some data to this collection or select a different collection.
-                  </p>
+              {/* Display JSON data when available */}
+              {jsonData ? (
+                <div style={styles.jsonContainer}>
+                  {/* Check if we have an empty result with just _errors array */}
+                  {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <p>No data found in collection: {collection}</p>
+                      <p>This collection exists but appears to be empty.</p>
+                      <p style={{ fontSize: '14px', color: '#888' }}>
+                        Try adding some data to this collection or select a different collection.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Use a simple pre-formatted JSON display as a reliable fallback */
+                    <pre style={{
+                      backgroundColor: '#252526',
+                      color: '#D4D4D4',
+                      padding: '12px',
+                      borderRadius: '4px',
+                      fontFamily: 'monospace',
+                      overflow: 'auto',
+                      height: '100%'
+                    }}>
+                      {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
+                    </pre>
+                  )}
                 </div>
               ) : (
-                /* Use a simple pre-formatted JSON display as a reliable fallback */
-                <pre style={{
-                  backgroundColor: '#252526',
-                  color: '#D4D4D4',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                  overflow: 'auto',
-                  height: '100%'
-                }}>
-                  {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
-                </pre>
+                <div style={styles.emptyState}>
+                  <p>No results to display yet</p>
+                  {collection ? (
+                    <p>Try running a query for collection: {collection}</p>
+                  ) : (
+                    <p>Select a collection from the sidebar to view data</p>
+                  )}
+                </div>
               )}
             </div>
-          ) : (
-            <div style={styles.emptyState}>
-              <p>No results to display yet</p>
-              {collection ? (
-                <p>Try running a query for collection: {collection}</p>
-              ) : (
-                <p>Select a collection from the sidebar to view data</p>
-              )}
-            </div>
-          )}
-        </div>
+          }
+        />
       </div>
     </div>
   );

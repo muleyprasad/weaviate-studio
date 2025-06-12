@@ -1,0 +1,33 @@
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  height: 100%;
+  width: 100%;
+  background-color: rgba(30, 30, 30, 0.7);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+.loading-spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid var(--vscode-progressBar-background, #0e70c0);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  margin-left: 12px;
+  font-size: 14px;
+  color: var(--vscode-foreground);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

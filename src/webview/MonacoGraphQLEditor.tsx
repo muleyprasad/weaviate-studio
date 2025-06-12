@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as monaco from 'monaco-editor';
 import { MonacoQueryEditor } from '../query-editor/enhanced/MonacoQueryEditor';
 import { processTemplate, queryTemplates } from '../query-editor/enhanced/queryTemplates';
+import FormatButton from './FormatButton';
+import ErrorBoundary from './ErrorBoundary';
+import LoadingIndicator from './LoadingIndicator';
+import './FormatButton.css';
 
 interface QuickInsertButtonProps {
   label: string;
@@ -55,19 +59,47 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   const editorRef = useRef<MonacoQueryEditor | null>(null);
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing editor...');
 
   // Initialize editor when component mounts
   useEffect(() => {
     if (containerRef.current && !editorRef.current) {
-      const editor = new MonacoQueryEditor(containerRef.current, initialValue);
-      editorRef.current = editor;
-      setIsEditorReady(true);
-
-      // Set up change handler
-      const model = editor.getValue();
-      monaco.editor.getModels()[0]?.onDidChangeContent(() => {
-        onChange(editor.getValue());
-      });
+      setIsLoading(true);
+      setLoadingMessage('Initializing editor...');
+      
+      try {
+        const editor = new MonacoQueryEditor(containerRef.current, initialValue);
+        
+        const handleEditorDidMount = (editor: MonacoQueryEditor) => {
+          editorRef.current = editor;
+          setIsEditorReady(true);
+          setIsLoading(false);
+          
+          // Register change listener using our custom method
+          editor.onDidChangeModelContent((newValue: string) => {
+            // Update parent with new content
+            onChange(newValue);
+            
+            // Trigger parameter validation
+            editor.validateQueryParameters();
+          });
+          
+          // Initial validation
+          editor.validateQueryParameters();
+          
+          // Set initial value if provided
+          if (initialValue) {
+            editor.setValue(initialValue);
+          }
+        };
+        
+        handleEditorDidMount(editor);
+      } catch (error) {
+        console.error('Error initializing Monaco editor:', error);
+        setIsLoading(false);
+        throw error; // Let the error boundary catch this
+      }
     }
 
     return () => {
@@ -82,7 +114,17 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   // Configure GraphQL schema when it changes
   useEffect(() => {
     if (isEditorReady && editorRef.current && schemaConfig) {
-      editorRef.current.configureGraphQLLanguage(schemaConfig);
+      setIsLoading(true);
+      setLoadingMessage('Configuring GraphQL language features...');
+      
+      editorRef.current.configureGraphQLLanguage(schemaConfig)
+        .then(() => {
+          setIsLoading(false);
+        })
+        .catch(error => {
+          console.error('Error configuring GraphQL language:', error);
+          setIsLoading(false);
+        });
     }
   }, [isEditorReady, schemaConfig]);
 
@@ -92,6 +134,20 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
       editorRef.current.setValue(initialValue);
     }
   }, [initialValue, isEditorReady]);
+
+  // Set selected collection name in the queryContext when it changes
+  useEffect(() => {
+    if (editorRef.current) {
+      // Update the query template when the collection name changes
+      // setQueryContext(prevContext => ({
+      //   ...prevContext,
+      //   collection: collectionName || ''
+      // }));
+      
+      // Set collection name for template system
+      editorRef.current.setCollectionName(collectionName || 'Article');
+    }
+  }, [collectionName, editorRef]);
 
   // Handle template selection
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -108,14 +164,23 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   };
 
   // Format the current query
-  const handleFormatQuery = () => {
+  const handleFormatQuery = async () => {
     if (editorRef.current) {
-      editorRef.current.formatQuery();
+      try {
+        setIsLoading(true);
+        setLoadingMessage('Formatting query...');
+        await editorRef.current.formatQuery();
+      } catch (error) {
+        console.error('Error formatting query:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   return (
-    <div className="monaco-graphql-editor-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <ErrorBoundary>
+      <div className="monaco-graphql-editor-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       <div className="editor-toolbar" style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -144,19 +209,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
             ))}
           </select>
           
-          <button
-            onClick={handleFormatQuery}
-            style={{
-              backgroundColor: '#3c3c3c',
-              color: '#cccccc',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              marginRight: '8px'
-            }}
-          >
-            Format
-          </button>
+          <FormatButton onClick={handleFormatQuery} disabled={!isEditorReady} />
         </div>
         
         <div className="right-tools">
@@ -246,7 +299,9 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
           </>
         )}
       </div>
-    </div>
+      <LoadingIndicator isVisible={isLoading} message={loadingMessage} />
+      </div>
+    </ErrorBoundary>
   );
 };
 
