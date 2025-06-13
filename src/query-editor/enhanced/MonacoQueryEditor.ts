@@ -256,8 +256,16 @@ export class MonacoQueryEditor {
     const templateOption = this.templateOptions.find(option => option.name === templateName);
     if (!templateOption) { return; }
     
-    // Process the template with current collection name
-    const processedTemplate = processTemplate(templateName, this.currentCollectionName);
+    // Process the template with current collection name and schema information
+    // Pass the schema config to enable proper relationship field handling
+    const weaviateSchema = this.schemaConfig?.schema as { classes?: any[] } || undefined;
+    
+    const processedTemplate = processTemplate(
+      templateName, 
+      this.currentCollectionName, 
+      10, // Use default limit
+      weaviateSchema // Pass Weaviate schema to handle relationship fields
+    );
     
     // Replace editor content with template
     // Editor won't be null here due to the early return check above
