@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { JsonView } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
 import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
+import ResultsTable from './components/ResultsTable';
 import * as monaco from 'monaco-editor';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
@@ -192,6 +193,7 @@ const App = () => {
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
+  const [viewType, setViewType] = useState<'json' | 'table'>('json');
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
@@ -486,7 +488,7 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.header}>{title}</h1>
+      <h1 style={styles.header}>{title || 'Weaviate Studio - GraphQL Query Interface'}</h1>
 
       {/* Display error messages if present */}
       {error && (
@@ -495,12 +497,17 @@ const App = () => {
         </div>
       )}
       
-      {/* Simple layout with query editor and results */}
+      {/* Split layout with GraphQL editor and query results */}
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
-        {/* Query editor section */}
+        {/* GraphQL Query Editor Section */}
         <div style={{ ...styles.queryContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
           <div style={styles.queryHeader}>
-            <span>Query Editor</span>
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>
+              📝 GraphQL Query Editor
+              {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+                for {collection}
+              </span>}
+            </span>
           </div>
 
           <div style={{ flex: 1, minHeight: '200px' }}>
@@ -515,48 +522,87 @@ const App = () => {
           </div>
         </div>
 
-        {/* Results section */}
+        {/* Query Results Section */}
         <div style={{ ...styles.resultContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
           <div style={styles.resultHeader}>
-            <span>Results</span>
-            {isLoading && <span style={styles.loading}>Loading...</span>}
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>
+              📊 Query Results
+              {jsonData && (
+                <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+                  {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
+                    ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
+                    : 'Data loaded'
+                  }
+                </span>
+              )}
+            </span>
+            {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button 
+                style={{
+                  ...styles.button,
+                  backgroundColor: viewType === 'json' ? '#0E639C' : '#2D2D2D',
+                  border: viewType === 'json' ? 'none' : '1px solid #444'
+                }} 
+                onClick={() => setViewType('json')}
+              >
+                📄 JSON
+              </button>
+              <button 
+                style={{
+                  ...styles.button,
+                  backgroundColor: viewType === 'table' ? '#0E639C' : '#2D2D2D',
+                  border: viewType === 'table' ? 'none' : '1px solid #444'
+                }} 
+                onClick={() => setViewType('table')}
+              >
+                📋 Table
+              </button>
+            </div>
           </div>
 
-          {/* Display JSON data when available */}
+          {/* Display data in selected format when available */}
           {jsonData ? (
-            <div style={styles.jsonContainer}>
-              {/* Check if we have an empty result with just _errors array */}
-              {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <p>No data found in collection: {collection}</p>
-                  <p>This collection exists but appears to be empty.</p>
-                  <p style={{ fontSize: '14px', color: '#888' }}>
-                    Try adding some data to this collection or select a different collection.
-                  </p>
-                </div>
-              ) : (
-                /* Use a simple pre-formatted JSON display as a reliable fallback */
-                <pre style={{
-                  backgroundColor: '#252526',
-                  color: '#D4D4D4',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                  overflow: 'auto',
-                  height: '100%'
-                }}>
-                  {JSON.stringify(jsonData, null, 2)}
-                </pre>
-              )}
-            </div>
+            viewType === 'json' ? (
+              <div style={styles.jsonContainer}>
+                {/* Check if we have an empty result with just _errors array */}
+                {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <p>📭 No data found in collection: {collection}</p>
+                    <p>This collection exists but appears to be empty.</p>
+                    <p style={{ fontSize: '14px', color: '#888' }}>
+                      💡 Try adding some data to this collection or select a different collection.
+                    </p>
+                  </div>
+                ) : (
+                  /* Use a simple pre-formatted JSON display as a reliable fallback */
+                  <pre style={{
+                    backgroundColor: '#252526',
+                    color: '#D4D4D4',
+                    padding: '12px',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    overflow: 'auto',
+                    height: '100%'
+                  }}>
+                    {JSON.stringify(jsonData, null, 2)}
+                  </pre>
+                )}
+              </div>
+            ) : (
+              collection && <ResultsTable data={jsonData} collectionName={collection} />
+            )
           ) : (
             <div style={styles.emptyState}>
-              <p>No results to display yet</p>
+              <p>🚀 Ready to execute your first query</p>
               {collection ? (
-                <p>Try running a query for collection: {collection}</p>
+                <p>Try running a query for collection: <strong>{collection}</strong></p>
               ) : (
-                <p>Select a collection from the sidebar to view data</p>
+                <p>Select a collection from the sidebar to get started</p>
               )}
+              <p style={{ fontSize: '14px', color: '#888', marginTop: '10px' }}>
+                💡 Use the "Sample" button to generate example queries
+              </p>
             </div>
           )}
         </div>

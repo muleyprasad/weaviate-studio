@@ -4,6 +4,24 @@
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
   "version": "0.0.1",
   "icon": "resources/database-icon.png",
+  "publisher": "weaviate",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/weaviate/weaviate-studio.git"
+  },
+  "homepage": "https://github.com/weaviate/weaviate-studio#readme",
+  "bugs": {
+    "url": "https://github.com/weaviate/weaviate-studio/issues"
+  },
+  "keywords": [
+    "weaviate",
+    "vector-database",
+    "graphql",
+    "database",
+    "ai",
+    "machine-learning",
+    "semantic-search"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },

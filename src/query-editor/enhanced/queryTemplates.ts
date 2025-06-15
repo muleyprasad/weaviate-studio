@@ -235,77 +235,144 @@ export function generateSampleQuery(
   limit: number = 10,
   schema?: { classes?: ClassSchema[] }
 ): string {
-  // If no properties provided, use placeholder comment
-  if (properties.length === 0) {
-    return `{
-  Get {
-    ${collectionName} (limit: ${limit}) {
-      # Add your properties here
-    }
-  }
-}`;
-  }
-
   // Find the class definition from schema if available
   const classSchema = schema?.classes?.find(c => c.class === collectionName);
   
-  // Generate property strings, handling relationship fields if schema is available
-  const propertyStrings = properties.map(propName => {
-    // If we have schema information, check if this is a relationship field
-    if (classSchema?.properties) {
-      const propSchema = classSchema.properties.find(p => p.name === propName);
+  let propertyStrings: string[] = [];
+  
+  // If no specific properties provided, generate from schema
+  if (properties.length === 0 && classSchema?.properties) {
+    // Get all properties from schema, prioritizing simple types first
+    const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'geoCoordinates', 'phoneNumber'];
+    
+    // Separate primitive and reference properties
+    const primitiveProps = classSchema.properties.filter(p => 
+      p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()))
+    );
+    const referenceProps = classSchema.properties.filter(p => 
+      !p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()))
+    );
+    
+    // Add primitive properties first (up to 5)
+    primitiveProps.slice(0, 5).forEach(prop => {
+      propertyStrings.push(prop.name);
+    });
+    
+    // Add reference properties with proper nested structure (up to 3)
+    referenceProps.slice(0, 3).forEach(prop => {
+      const referencedClassName = prop.dataType[0];
+      const referencedClass = schema?.classes?.find(c => c.class === referencedClassName);
       
-      // Check if this is a reference/cross-reference property
-      if (propSchema && propSchema.dataType && propSchema.dataType.length > 0) {
-        // Cross-references in Weaviate have dataType starting with the class name
-        const referencedClassName = propSchema.dataType[0];
-        
-        // If it's not a primitive type, it's likely a reference
-        const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'geoCoordinates', 'phoneNumber'];
-        if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
-          // Find the referenced class's schema
-          const referencedClass = schema?.classes?.find(c => c.class === referencedClassName);
+      if (referencedClass && referencedClass.properties) {
+        // Get up to 3 primitive properties from the referenced class
+        const refPrimitiveProps = referencedClass.properties
+          .filter(p => p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase())))
+          .slice(0, 3);
           
-          // If we found the referenced class, include a few of its properties
-          if (referencedClass && referencedClass.properties) {
-            console.log('Referenced class:', referencedClass);
-            // Get up to 3 non-reference properties from the referenced class
-            const refProperties = referencedClass.properties
-              .filter(p => primitiveTypes.includes(p.dataType[0].toLowerCase()))
-              .slice(0, 3)
-              .map(p => p.name);
-              
-            // If we have properties to include
-            if (refProperties.length > 0) {
-              return `${propName} {
+        if (refPrimitiveProps.length > 0) {
+          const nestedProps = refPrimitiveProps.map(p => `          ${p.name}`).join('\n');
+          propertyStrings.push(`${prop.name} {
         ... on ${referencedClassName} {
-          ${refProperties.join('\n          ')}
+${nestedProps}
+          _additional {
+            id
+          }
+        }
+      }`);
+        } else {
+          // No suitable properties found, use a basic structure
+          propertyStrings.push(`${prop.name} {
+        ... on ${referencedClassName} {
+          _additional {
+            id
+          }
+        }
+      }`);
+        }
+      } else {
+        // We couldn't find schema info for the referenced class
+        propertyStrings.push(`${prop.name} {
+        ... on ${referencedClassName} {
+          _additional {
+            id
+          }
+        }
+      }`);
+      }
+    });
+  } else {
+    // Use provided properties or generate property strings with schema info
+    const propsToUse = properties.length > 0 ? properties : ['# Add your properties here'];
+    
+    propertyStrings = propsToUse.map(propName => {
+      // If we have schema information, check if this is a relationship field
+      if (classSchema?.properties) {
+        const propSchema = classSchema.properties.find(p => p.name === propName);
+        
+        // Check if this is a reference/cross-reference property
+        if (propSchema && propSchema.dataType && propSchema.dataType.length > 0) {
+          // Cross-references in Weaviate have dataType starting with the class name
+          const referencedClassName = propSchema.dataType[0];
+          
+          // If it's not a primitive type, it's likely a reference
+          const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'geoCoordinates', 'phoneNumber'];
+          if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
+            // Find the referenced class's schema
+            const referencedClass = schema?.classes?.find(c => c.class === referencedClassName);
+            
+            // If we found the referenced class, include a few of its properties
+            if (referencedClass && referencedClass.properties) {
+              // Get up to 3 non-reference properties from the referenced class
+              const refProperties = referencedClass.properties
+                .filter(p => primitiveTypes.includes(p.dataType[0].toLowerCase()))
+                .slice(0, 3)
+                .map(p => p.name);
+                
+              // If we have properties to include
+              if (refProperties.length > 0) {
+                const nestedProps = refProperties.map(p => `          ${p}`).join('\n');
+                return `${propName} {
+        ... on ${referencedClassName} {
+${nestedProps}
+          _additional {
+            id
+          }
         }
       }`;
+              } else {
+                // No suitable properties found, use a placeholder
+                return `${propName} {
+        ... on ${referencedClassName} {
+          _additional {
+            id
+          }
+        }
+      }`;
+              }
             } else {
-              // No suitable properties found, use a placeholder
+              // We couldn't find schema info for the referenced class
               return `${propName} {
         ... on ${referencedClassName} {
-          # Add properties for ${referencedClassName}
+          _additional {
+            id
+          }
         }
       }`;
             }
-          } else {
-            // We couldn't find schema info for the referenced class
-            return `${propName} {
-        ... on ${referencedClassName} {
-          # Add properties for ${referencedClassName}
-        }
-      }`;
           }
         }
       }
-    }
-    
-    // If we couldn't determine it's a relationship or don't have schema info,
-    // just return the property name
-    return propName;
-  });
+      
+      // If we couldn't determine it's a relationship or don't have schema info,
+      // just return the property name
+      return propName;
+    });
+  }
+
+  // Always include _additional.id for object identification
+  if (!propertyStrings.some(p => p.includes('_additional'))) {
+    propertyStrings.unshift('_additional {\n        id\n      }');
+  }
 
   return `{
   Get {
