@@ -18,10 +18,13 @@ export function generateBasicGetQuery(collectionName: string, limit: number = 10
   return `{
   Get {
     ${collectionName} (limit: ${limit}) {
+      # Replace with actual properties from your schema
+      # Example: title, description, createdAt
       _additional {
         id
+        creationTimeUnix
+        lastUpdateTimeUnix
       }
-      # Add your properties here
     }
   }
 }`;
@@ -38,15 +41,18 @@ export function generateNearVectorQuery(collectionName: string, limit: number = 
   Get {
     ${collectionName} (
       nearVector: {
-        vector: [0.1, 0.2, 0.3, ...] # Replace with your vector
+        vector: [0.1, 0.2, 0.3] # Replace with your actual vector (must match vectorizer dimensions)
+        certainty: 0.7 # Minimum similarity threshold (0-1)
       }
       limit: ${limit}
     ) {
+      # Replace with actual properties from your schema
       _additional {
         id
         distance
+        certainty
+        vector # Include if you want to see the object's vector
       }
-      # Add your properties here
     }
   }
 }`;
@@ -63,15 +69,26 @@ export function generateNearTextQuery(collectionName: string, limit: number = 10
   Get {
     ${collectionName} (
       nearText: {
-        concepts: ["example", "search", "terms"]
+        concepts: ["search terms", "semantic concepts"]
+        certainty: 0.7 # Minimum similarity threshold (0-1)
+        moveAwayFrom: {
+          concepts: ["unwanted terms"]
+          force: 0.45
+        }
+        moveTo: {
+          concepts: ["desired terms"]
+          force: 0.85
+        }
       }
       limit: ${limit}
     ) {
+      # Replace with actual properties from your schema
       _additional {
         id
         distance
+        certainty
+        explainScore
       }
-      # Add your properties here
     }
   }
 }`;
@@ -88,16 +105,19 @@ export function generateHybridQuery(collectionName: string, limit: number = 10):
   Get {
     ${collectionName} (
       hybrid: {
-        query: "your search query"
-        alpha: 0.5 # Balance between vector (0) and keyword (1) search
+        query: "your search query here"
+        alpha: 0.5 # Balance: 0=pure vector, 1=pure keyword search
+        vector: [0.1, 0.2, 0.3] # Optional: provide custom vector
+        properties: ["title", "description"] # Optional: limit search to specific properties
       }
       limit: ${limit}
     ) {
+      # Replace with actual properties from your schema
       _additional {
         id
-        distance
+        score
+        explainScore
       }
-      # Add your properties here
     }
   }
 }`;
@@ -117,19 +137,28 @@ export function generateFilterQuery(collectionName: string, limit: number = 10):
         operator: And
         operands: [
           {
-            path: ["propertyName"]
-            operator: Equal
-            valueText: "value"
+            path: ["propertyName"] # Replace with actual property name
+            operator: Equal # Options: Equal, NotEqual, GreaterThan, LessThan, Like, etc.
+            valueText: "example value" # Use valueText, valueInt, valueBoolean, etc.
           }
-          # Add more operands as needed
+          {
+            path: ["numericProperty"]
+            operator: GreaterThan
+            valueNumber: 100
+          }
+          {
+            path: ["booleanProperty"]
+            operator: Equal
+            valueBoolean: true
+          }
         ]
       }
       limit: ${limit}
     ) {
+      # Replace with actual properties from your schema
       _additional {
         id
       }
-      # Add your properties here
     }
   }
 }`;
@@ -147,15 +176,137 @@ export function generateAggregationQuery(collectionName: string): string {
       meta {
         count
       }
-      # Add aggregation fields as needed
-      # Example for numeric property:
-      # propertyName {
+      # For text properties:
+      # textProperty {
+      #   count
+      #   topOccurrences(limit: 5) {
+      #     value
+      #     occurs
+      #   }
+      # }
+      
+      # For numeric properties:
+      # numericProperty {
       #   count
       #   minimum
       #   maximum
       #   mean
+      #   median
+      #   mode
       #   sum
       # }
+      
+      # For date properties:
+      # dateProperty {
+      #   count
+      #   minimum
+      #   maximum
+      # }
+      
+      # For boolean properties:
+      # booleanProperty {
+      #   count
+      #   totalTrue
+      #   totalFalse
+      #   percentageTrue
+      #   percentageFalse
+      # }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a query to explore object relationships
+ * @param collectionName The name of the collection to query
+ * @param limit Optional limit for the query (default: 5)
+ * @returns GraphQL query string
+ */
+export function generateRelationshipQuery(collectionName: string, limit: number = 5): string {
+  return `{
+  Get {
+    ${collectionName} (limit: ${limit}) {
+      # Replace with actual properties from your schema
+      
+      # Example reference properties (replace with actual ones):
+      # hasAuthor {
+      #   ... on Author {
+      #     name
+      #     email
+      #     _additional { id }
+      #   }
+      # }
+      
+      # belongsToCategory {
+      #   ... on Category {
+      #     name
+      #     description
+      #     _additional { id }
+      #   }
+      # }
+      
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a query with sorting
+ * @param collectionName The name of the collection to query
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateSortQuery(collectionName: string, limit: number = 10): string {
+  return `{
+  Get {
+    ${collectionName} (
+      sort: [
+        {
+          path: ["propertyName"] # Replace with actual property name
+          order: desc # Options: asc, desc
+        }
+        {
+          path: ["secondarySort"]
+          order: asc
+        }
+      ]
+      limit: ${limit}
+    ) {
+      # Replace with actual properties from your schema
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a query to check object existence and get metadata
+ * @param collectionName The name of the collection to query
+ * @returns GraphQL query string
+ */
+export function generateExploreQuery(collectionName: string): string {
+  return `{
+  Get {
+    ${collectionName} (limit: 1) {
+      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+        vector
+        generate(
+          singleResult: {
+            prompt: "Summarize this object in one sentence: {title} {description}"
+          }
+        ) {
+          singleResult
+          error
+        }
+      }
     }
   }
 }`;
@@ -167,33 +318,48 @@ export function generateAggregationQuery(collectionName: string): string {
 export const queryTemplates: QueryTemplate[] = [
   {
     name: 'Basic Get Query',
-    description: 'Simple query to retrieve data from a collection',
+    description: 'Simple query to retrieve data from a collection with metadata',
     template: '{collectionName}' // Will be replaced with actual collection name
   },
   {
     name: 'Vector Search (nearVector)',
-    description: 'Search for similar objects using a vector',
+    description: 'Search for similar objects using a vector with similarity scoring',
     template: '{nearVectorQuery}'
   },
   {
     name: 'Semantic Search (nearText)',
-    description: 'Search for similar objects using text concepts',
+    description: 'Search for similar objects using text concepts with move operations',
     template: '{nearTextQuery}'
   },
   {
     name: 'Hybrid Search',
-    description: 'Combine vector and keyword search',
+    description: 'Combine vector and keyword search with configurable balance',
     template: '{hybridQuery}'
   },
   {
     name: 'Filter Query',
-    description: 'Filter objects based on property values',
+    description: 'Filter objects based on property values with multiple operators',
     template: '{filterQuery}'
   },
   {
     name: 'Aggregation Query',
-    description: 'Calculate statistics across objects',
+    description: 'Calculate comprehensive statistics across objects by property type',
     template: '{aggregationQuery}'
+  },
+  {
+    name: 'Relationship Query',
+    description: 'Explore object relationships and cross-references',
+    template: '{relationshipQuery}'
+  },
+  {
+    name: 'Sort Query',
+    description: 'Sort objects by property values with multiple sort criteria',
+    template: '{sortQuery}'
+  },
+  {
+    name: 'Explore Query',
+    description: 'Get object metadata, vectors, and AI-generated summaries',
+    template: '{exploreQuery}'
   }
 ];
 
@@ -473,7 +639,10 @@ export function processTemplate(
     .replace('{nearTextQuery}', generateNearTextQuery(collectionName, limit))
     .replace('{hybridQuery}', generateHybridQuery(collectionName, limit))
     .replace('{filterQuery}', generateFilterQuery(collectionName, limit))
-    .replace('{aggregationQuery}', generateAggregationQuery(collectionName));
+    .replace('{aggregationQuery}', generateAggregationQuery(collectionName))
+    .replace('{relationshipQuery}', generateRelationshipQuery(collectionName, limit))
+    .replace('{sortQuery}', generateSortQuery(collectionName, limit))
+    .replace('{exploreQuery}', generateExploreQuery(collectionName));
 
   return query;
 }

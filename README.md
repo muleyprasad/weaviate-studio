@@ -30,8 +30,11 @@
 ### Intelligent GraphQL Editor
 - **Syntax Highlighting**: Full GraphQL syntax support with Monaco Editor
 - **Auto-completion**: Context-aware suggestions based on your schema
-- **Schema-Aware Queries**: Automatic generation of sample queries with proper reference handling
+- **Schema-Aware Queries**: Automatic generation of sample queries with proper reference handling and geo-coordinate support
 - **Error Detection**: Real-time validation and error highlighting
+- **Enhanced Query Templates**: 9 comprehensive templates covering all major Weaviate operations
+- **Reference Field Support**: Intelligent detection and proper sub-selection generation for cross-references
+- **Type-Safe Generation**: Handles all Weaviate data types including geoCoordinates, vectors, and primitives
 - **Query Templates**: Pre-built templates for common operations
 
 ### Schema Management
@@ -137,14 +140,33 @@ The extension provides intelligent auto-completion and validation:
 
 ### Query Templates
 
-Built-in templates for common operations:
+Built-in templates for comprehensive Weaviate operations:
 
-- **Basic Get Query**: Simple data retrieval
-- **Vector Search**: Similarity search using `nearVector`
-- **Semantic Search**: Text-based search using `nearText`
-- **Hybrid Search**: Combined BM25 + Vector search
-- **Filtered Queries**: Complex filtering with `where` clauses
-- **Aggregation**: Statistical operations across your data
+#### **Core Query Templates**
+- **Basic Get Query**: Simple data retrieval with metadata and timestamps
+- **Vector Search (nearVector)**: Similarity search using vectors with certainty thresholds
+- **Semantic Search (nearText)**: Text-based search with move operations and concept refinement
+- **Hybrid Search**: Combined BM25 + Vector search with configurable balance and custom vectors
+
+#### **Advanced Query Templates**
+- **Filter Query**: Complex filtering with multiple operators (Equal, GreaterThan, Like, etc.)
+- **Aggregation Query**: Comprehensive statistics by property type (text, numeric, date, boolean)
+- **Relationship Query**: Explore object cross-references and nested relationships
+- **Sort Query**: Multi-level sorting with primary and secondary criteria
+- **Explore Query**: Object metadata, vectors, and AI-generated content summaries
+
+#### **Template Features**
+- **Schema-Aware**: Automatically detects and handles reference fields with proper sub-selections
+- **Type-Safe**: Proper handling of all Weaviate data types including `geoCoordinates`
+- **Educational**: Comprehensive examples and parameter documentation
+- **Error Prevention**: Syntactically correct templates reduce query errors
+- **Customizable**: Easy modification for specific use cases
+
+Each template includes:
+- Detailed parameter explanations
+- Multiple usage examples
+- Best practice recommendations
+- Error handling guidance
 
 ## Development
 
