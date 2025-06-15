@@ -243,19 +243,27 @@ export function generateSampleQuery(
   // If no specific properties provided, generate from schema
   if (properties.length === 0 && classSchema?.properties) {
     // Get all properties from schema, prioritizing simple types first
-    const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'geoCoordinates', 'phoneNumber'];
+    const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'phoneNumber', 'uuid', 'blob'];
     
     // Separate primitive and reference properties
     const primitiveProps = classSchema.properties.filter(p => 
-      p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()))
+      p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates')
     );
     const referenceProps = classSchema.properties.filter(p => 
-      !p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()))
+      !p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates')
     );
     
     // Add primitive properties first (up to 5)
     primitiveProps.slice(0, 5).forEach(prop => {
-      propertyStrings.push(prop.name);
+      // Special handling for geoCoordinates - they need latitude and longitude sub-fields
+      if (prop.dataType.some(dt => dt.toLowerCase() === 'geocoordinates')) {
+        propertyStrings.push(`${prop.name} {
+        latitude
+        longitude
+      }`);
+      } else {
+        propertyStrings.push(prop.name);
+      }
     });
     
     // Add reference properties with proper nested structure (up to 3)
@@ -291,6 +299,7 @@ ${nestedProps}
         }
       } else {
         // We couldn't find schema info for the referenced class
+        // Use a generic structure with _additional.id
         propertyStrings.push(`${prop.name} {
         ... on ${referencedClassName} {
           _additional {
@@ -315,7 +324,7 @@ ${nestedProps}
           const referencedClassName = propSchema.dataType[0];
           
           // If it's not a primitive type, it's likely a reference
-          const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'geoCoordinates', 'phoneNumber'];
+          const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'phoneNumber', 'uuid', 'blob'];
           if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
             // Find the referenced class's schema
             const referencedClass = schema?.classes?.find(c => c.class === referencedClassName);
@@ -360,9 +369,24 @@ ${nestedProps}
         }
       }`;
             }
+          } else {
+            // This is a primitive type - check if it's geoCoordinates which needs special handling
+            if (referencedClassName.toLowerCase() === 'geocoordinates') {
+              return `${propName} {
+        latitude
+        longitude
+      }`;
+            }
           }
         } else if (propSchema) {
           // We found the property in schema but it has no dataType or it's a primitive
+          // Check if it's geoCoordinates
+          if (propSchema.dataType && propSchema.dataType.some(dt => dt.toLowerCase() === 'geocoordinates')) {
+            return `${propName} {
+        latitude
+        longitude
+      }`;
+          }
           return propName;
         } else {
           // Property not found in schema - could be a reference field with naming convention
