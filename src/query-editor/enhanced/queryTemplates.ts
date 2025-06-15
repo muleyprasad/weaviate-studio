@@ -350,7 +350,8 @@ ${nestedProps}
       }`;
               }
             } else {
-              // We couldn't find schema info for the referenced class
+              // We couldn't find schema info for the referenced class, but we know it's a reference
+              // Use a generic structure with _additional.id
               return `${propName} {
         ... on ${referencedClassName} {
           _additional {
@@ -359,6 +360,43 @@ ${nestedProps}
         }
       }`;
             }
+          }
+        } else if (propSchema) {
+          // We found the property in schema but it has no dataType or it's a primitive
+          return propName;
+        } else {
+          // Property not found in schema - could be a reference field with naming convention
+          // Check if it looks like a reference field (camelCase ending with class name or common patterns)
+          const referencePatterns = [
+            /^[a-z]+[A-Z][a-zA-Z]*$/,  // camelCase pattern
+            /^(wrote|writes|has|belongs|contains|references)[A-Z]/i,  // common relationship verbs
+            /[A-Z][a-z]*$/  // ends with capitalized word (likely class name)
+          ];
+          
+          const looksLikeReference = referencePatterns.some(pattern => pattern.test(propName));
+          
+          if (looksLikeReference) {
+            // Try to infer the referenced class name from the property name
+            // Common patterns: wroteArticles -> Article, writesFor -> Publication, etc.
+            let inferredClassName = '';
+            
+            if (propName.includes('Articles')) {
+              inferredClassName = 'Article';
+            } else if (propName.includes('For')) {
+              inferredClassName = 'Publication'; // or Organization, etc.
+            } else {
+              // Extract the capitalized part at the end
+              const match = propName.match(/[A-Z][a-z]*$/);
+              inferredClassName = match ? match[0] : 'Unknown';
+            }
+            
+            return `${propName} {
+        ... on ${inferredClassName} {
+          _additional {
+            id
+          }
+        }
+      }`;
           }
         }
       }
