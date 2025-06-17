@@ -4,6 +4,24 @@
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
   "version": "0.0.1",
   "icon": "resources/database-icon.png",
+  "publisher": "weaviate",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/weaviate/weaviate-studio.git"
+  },
+  "homepage": "https://github.com/weaviate/weaviate-studio#readme",
+  "bugs": {
+    "url": "https://github.com/weaviate/weaviate-studio/issues"
+  },
+  "keywords": [
+    "weaviate",
+    "vector-database",
+    "graphql",
+    "database",
+    "ai",
+    "machine-learning",
+    "semantic-search"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -154,15 +172,20 @@
     "vscode:prepublish": "npm run package && npm run package:webview",
     "compile": "webpack",
     "watch": "webpack --watch",
+    "watch:extension": "tsc -p . --watch",
+    "watch:webview": "webpack --config webpack.webview.config.js --mode development --watch",
+    "dev": "concurrently \"npm:watch:extension\" \"npm:watch:webview\"",
     "package": "webpack --mode production --devtool hidden-source-map",
     "build:webview": "webpack --config webpack.webview.config.js --mode development",
-    "watch:webview": "webpack --config webpack.webview.config.js --mode development --watch",
-    "package:webview": "webpack --config webpack.webview.config.js --mode production --devtool hidden-source-map",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run build:webview && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "package:webview": "webpack --config webpack.webview.config.js --mode production",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prepare": "husky install",
+    "format": "prettier --write \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"src/**/*.tsx\""
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -174,11 +197,13 @@
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
+    "concurrently": "^9.1.2",
     "css-loader": "^7.1.2",
     "eslint": "^9.25.1",
     "html-webpack-plugin": "^5.6.3",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "path-browserify": "^1.0.1",
+    "prettier": "^3.5.3",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
@@ -189,6 +214,7 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
     "monaco-editor": "^0.52.2",
+    "monaco-graphql": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",

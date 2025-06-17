@@ -334,25 +334,9 @@ export class WeaviateQueryEditor {
             // Fetch the schema to get actual properties for this collection
             const schema = await this._weaviateClient.schema.getter().do();
             
-            // Extract the properties from the schema for this collection
-            const classObj = schema?.classes?.find((c: any) => c.class === collectionName);
-            const properties = classObj?.properties || [];
-            
-            
-            // Extract all property names from schema
-            const allPropNames = properties
-                .map((p: any) => p.name || p.propertyName || null)
-                .filter(Boolean);
-                
-            
-            // Build the query
-            sampleQuery = `{
-  Get {
-    ${collectionName} (limit: 10) {
-      ${allPropNames.join('\n      ')}
-    }
-  }
-}`;
+            // Use the enhanced generateSampleQuery function that properly handles reference types
+            const { generateSampleQuery } = require('./enhanced/queryTemplates');
+            sampleQuery = generateSampleQuery(collectionName, [], 10, schema);
             
         } catch (err) {
             
@@ -360,8 +344,9 @@ export class WeaviateQueryEditor {
             sampleQuery = `{
   Get {
     ${collectionName} (limit: 10) {
-      // TODO: Add all properties from schema
-      _additional { id }
+      _additional {
+        id
+      }
     }
   }
 }`;

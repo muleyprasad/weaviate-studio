@@ -1,71 +1,325 @@
-# weaviate-studio README
+# Weaviate Studio
 
-This is the README for your extension "weaviate-studio". After writing up a brief description, we recommend including the following sections.
+<div align="center">
+
+![Weaviate Studio Logo](resources/weaviate-logo.png)
+
+**A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL interface**
+
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=weaviate.weaviate-studio)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+
+</div>
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### Connection Management
+- Connect to multiple Weaviate instances simultaneously
+- Secure credential storage with VS Code's built-in secret storage
+- Support for both local and cloud-hosted Weaviate deployments
+- Connection health monitoring and automatic reconnection
 
-For example if there is an image subfolder under your extension project workspace:
+### Advanced Data Visualization
+- **Table View**: Intelligent flattening of nested JSON data into readable tables
+- **JSON View**: Syntax-highlighted, collapsible JSON viewer
+- **Schema Explorer**: Interactive browsing of your Weaviate schema
+- **Real-time Results**: Live query execution with instant feedback
 
-\!\[feature X\]\(images/feature-x.png\)
+### Intelligent GraphQL Editor
+- **Syntax Highlighting**: Full GraphQL syntax support with Monaco Editor
+- **Auto-completion**: Context-aware suggestions based on your schema
+- **Schema-Aware Queries**: Automatic generation of sample queries with proper reference handling and geo-coordinate support
+- **Error Detection**: Real-time validation and error highlighting
+- **Enhanced Query Templates**: 9 comprehensive templates covering all major Weaviate operations
+- **Reference Field Support**: Intelligent detection and proper sub-selection generation for cross-references
+- **Type-Safe Generation**: Handles all Weaviate data types including geoCoordinates, vectors, and primitives
+- **Query Templates**: Pre-built templates for common operations
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### Schema Management
+- Browse collections and their properties
+- View detailed schema information including data types and relationships
+- Support for cross-references and nested object structures
+- Visual representation of your data model
 
-## Requirements
+### Developer Experience
+- **Hot Reload**: Instant updates during development
+- **TypeScript Support**: Full type safety and IntelliSense
+- **Modern UI**: Dark theme optimized for VS Code
+- **Responsive Design**: Works seamlessly across different screen sizes
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Screenshots
 
-## Extension Settings
+### Connection Management
+![Connection Management](docs/images/connections.png)
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+### GraphQL Query Interface
+![Query Interface](docs/images/query-interface.png)
 
-For example:
+### Table View Results
+![Table View](docs/images/table-view.png)
 
-This extension contributes the following settings:
+### Schema Explorer
+![Schema Explorer](docs/images/schema-explorer.png)
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## Quick Start
 
-## Known Issues
+### Installation
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+1. **From VS Code Marketplace** (Recommended)
+   - Open VS Code
+   - Go to Extensions (Ctrl+Shift+X)
+   - Search for "Weaviate Studio"
+   - Click Install
 
-## Release Notes
+2. **From VSIX Package**
+   ```bash
+   code --install-extension weaviate-studio-0.0.1.vsix
+   ```
 
-Users appreciate release notes as you update your extension.
+### First Steps
 
-### 1.0.0
+1. **Open Weaviate Studio**
+   - Click the Weaviate icon in the Activity Bar
+   - Or use Command Palette: `Ctrl+Shift+P` → "Weaviate: Open Query Editor"
 
-Initial release of ...
+2. **Add Your First Connection**
+   - Click "Add New Weaviate Connection"
+   - Enter your Weaviate instance details:
+     - **Name**: A friendly name for your connection
+     - **URL**: Your Weaviate endpoint (e.g., `http://localhost:8080`)
+     - **API Key**: (Optional) Your Weaviate API key
 
-### 1.0.1
+3. **Start Querying**
+   - Connect to your instance
+   - Browse collections in the sidebar
+   - Click "Query Collection" to open the GraphQL editor
+   - Use the "Sample" button to generate example queries
 
-Fixed issue #.
+## Usage Guide
 
-### 1.1.0
+### Managing Connections
 
-Added features X, Y, and Z.
+```typescript
+// Example connection configuration
+{
+  "name": "Local Development",
+  "url": "http://localhost:8080",
+  "apiKey": "optional-api-key"
+}
+```
+
+### Writing GraphQL Queries
+
+The extension provides intelligent auto-completion and validation:
+
+```graphql
+{
+  Get {
+    Article(limit: 10) {
+      title
+      content
+      author {
+        ... on Person {
+          name
+          email
+          _additional {
+            id
+          }
+        }
+      }
+      _additional {
+        id
+        distance
+      }
+    }
+  }
+}
+```
+
+### Query Templates
+
+Built-in templates for comprehensive Weaviate operations:
+
+#### **Core Query Templates**
+- **Basic Get Query**: Simple data retrieval with metadata and timestamps
+- **Vector Search (nearVector)**: Similarity search using vectors with certainty thresholds
+- **Semantic Search (nearText)**: Text-based search with move operations and concept refinement
+- **Hybrid Search**: Combined BM25 + Vector search with configurable balance and custom vectors
+
+#### **Advanced Query Templates**
+- **Filter Query**: Complex filtering with multiple operators (Equal, GreaterThan, Like, etc.)
+- **Aggregation Query**: Comprehensive statistics by property type (text, numeric, date, boolean)
+- **Relationship Query**: Explore object cross-references and nested relationships
+- **Sort Query**: Multi-level sorting with primary and secondary criteria
+- **Explore Query**: Object metadata, vectors, and AI-generated content summaries
+
+#### **Template Features**
+- **Schema-Aware**: Automatically detects and handles reference fields with proper sub-selections
+- **Type-Safe**: Proper handling of all Weaviate data types including `geoCoordinates`
+- **Educational**: Comprehensive examples and parameter documentation
+- **Error Prevention**: Syntactically correct templates reduce query errors
+- **Customizable**: Easy modification for specific use cases
+
+Each template includes:
+- Detailed parameter explanations
+- Multiple usage examples
+- Best practice recommendations
+- Error handling guidance
+
+## Development
+
+### Prerequisites
+
+- **Node.js** (v16 or later)
+- **npm** (v8 or later)
+- **VS Code** (v1.85.0 or later)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/weaviate/weaviate-studio.git
+cd weaviate-studio
+
+# Install dependencies
+npm install
+
+# Start development mode
+npm run dev
+```
+
+### Development Workflow
+
+1. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+   This runs both the extension and webview in watch mode.
+
+2. **Launch Extension**
+   - Press `F5` in VS Code
+   - Or use "Run Extension" from the Run and Debug panel
+
+3. **Debug Webview**
+   - Right-click in the webview → "Inspect Element"
+   - Use Chrome DevTools for debugging
+
+### Building
+
+```bash
+# Build for production
+npm run package
+
+# Build webview only
+npm run package:webview
+
+# Create VSIX package
+vsce package
+```
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+## Architecture
+
+### Extension Structure
+
+```
+src/
+├── extension.ts              # Main extension entry point
+├── WeaviateTreeDataProvider.ts # Tree view provider for connections
+├── services/                 # Business logic and API services
+├── types/                    # TypeScript type definitions
+├── views/                    # Custom views and panels
+├── query-editor/             # GraphQL editor components
+│   ├── enhanced/             # Monaco editor integration
+│   │   ├── MonacoQueryEditor.ts
+│   │   ├── queryTemplates.ts # Query generation logic
+│   │   └── schemaProvider.ts # Schema integration
+│   └── WeaviateQueryEditor.ts
+└── webview/                  # React-based webview components
+    ├── index.tsx             # Main webview application
+    ├── components/           # Reusable React components
+    │   └── ResultsTable.tsx  # Table view component
+    ├── MonacoGraphQLEditor.tsx
+    └── ErrorBoundary.tsx
+```
+
+### Key Components
+
+- **Extension Host**: Manages VS Code integration and commands
+- **Tree Data Provider**: Handles the sidebar connection tree
+- **Webview**: React-based UI for query editing and results
+- **Monaco Editor**: GraphQL editor with syntax highlighting
+- **Results Table**: Intelligent data visualization component
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Contribution Steps
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite: `npm test`
+6. Commit your changes: `git commit -m 'Add amazing feature'`
+7. Push to the branch: `git push origin feature/amazing-feature`
+8. Open a Pull Request
+
+### Development Guidelines
+
+- Follow the existing code style
+- Add tests for new features
+- Update documentation as needed
+- Ensure all tests pass before submitting
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Weaviate](https://weaviate.io/) for the amazing vector database
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) for the code editor
+- [React](https://reactjs.org/) for the UI framework
+- The VS Code team for the excellent extension API
+
+## Support
+
+- **Documentation**: [Full Documentation](docs/README.md)
+- **Issues**: [GitHub Issues](https://github.com/weaviate/weaviate-studio/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/weaviate/weaviate-studio/discussions)
+- **Weaviate Community**: [Slack](https://weaviate.io/slack)
+
+## Roadmap
+
+- [ ] **Enhanced Visualizations**: Graph view for relationships
+- [ ] **Batch Operations**: Bulk import/export functionality
+- [ ] **Query History**: Save and manage query history
+- [ ] **Performance Monitoring**: Query performance analytics
+- [ ] **Collaborative Features**: Share queries and connections
+- [ ] **Plugin System**: Extensible architecture for custom features
 
 ---
 
-## Following extension guidelines
+<div align="center">
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+**Made with ❤️ by the Weaviate Community**
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+[Website](https://weaviate.io) • [Documentation](https://weaviate.io/developers/weaviate) • [Community](https://weaviate.io/slack)
 
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+</div>

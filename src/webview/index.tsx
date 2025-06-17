@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JsonView } from 'react-json-view-lite';
 import 'react-json-view-lite/dist/index.css';
+import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
+import ResultsTable from './components/ResultsTable';
+import * as monaco from 'monaco-editor';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
 // due to webview bundle isolation
@@ -39,73 +42,26 @@ try {
   console.error('Failed to acquire VS Code API', error);
 }
 
+// Configure Monaco environment for web workers
+try {
+  // Only set up the Monaco environment if it hasn't been configured yet
+  if (!window.MonacoEnvironment) {
+    window.MonacoEnvironment = {
+      getWorkerUrl: function (moduleId, label) {
+        if (label === 'graphql') {
+          return './graphql.worker.js';
+        }
+        return './editor.worker.js';
+      }
+    };
+  }
+} catch (error) {
+  console.error('Failed to configure Monaco environment:', error);
+}
+
 // Custom styles defined inline
 
-/**
- * Sanitizes data for display by removing any potential sensitive information
- * This acts as a second layer of security in case any sensitive data made it through the backend filtering
- */
-const sanitizeDataForDisplay = (data: any): any => {
-  if (!data || typeof data !== 'object') {
-    return data;
-  }
 
-  // Create a deep copy to avoid modifying the original
-  const sanitized = JSON.parse(JSON.stringify(data));
-
-  // Function to recursively scrub sensitive data
-  const scrub = (obj: any) => {
-    if (!obj || typeof obj !== 'object') {
-      return;
-    }
-
-    // List of keys that might contain sensitive information
-    const sensitiveKeys = ['apiKey', 'api_key', 'key', 'token', 'password', 'secret', 'auth', 'authorization'];
-
-    // Check if object is an array
-    if (Array.isArray(obj)) {
-      obj.forEach(item => {
-        if (item && typeof item === 'object') {
-          scrub(item);
-        }
-      });
-      return;
-    }
-
-    // Process object properties
-    for (const key of Object.keys(obj)) {
-      // Check for sensitive key names (case insensitive)
-      if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
-        // Redact the value
-        obj[key] = '[REDACTED]';
-      }
-      // Special handling for client object which often contains credentials
-      else if (key === 'client' && obj[key] && typeof obj[key] === 'object') {
-        // Either remove client entirely or sanitize it
-        if (Object.keys(obj[key]).some(clientKey =>
-          sensitiveKeys.some(sk => clientKey.toLowerCase().includes(sk.toLowerCase())))) {
-          // If client contains sensitive keys, replace with safe version
-          const host = obj[key].host || 'unknown';
-          obj[key] = {
-            host: host,
-            info: 'Connection details redacted for security',
-          };
-        } else {
-          // Still recursively check other client properties
-          scrub(obj[key]);
-        }
-      }
-      // Recursively check nested objects
-      else if (obj[key] && typeof obj[key] === 'object') {
-        scrub(obj[key]);
-      }
-    }
-  };
-
-  // Apply the sanitization
-  scrub(sanitized);
-  return sanitized;
-};
 
 // Define styles for various UI elements
 // Styles for the UI components
@@ -236,6 +192,8 @@ const App = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
+  const [schemaConfig, setSchemaConfig] = useState<any>(null);
+  const [viewType, setViewType] = useState<'json' | 'table'>('json');
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
@@ -312,48 +270,43 @@ const App = () => {
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
-      // SECURITY: Sanitize message before logging
-      const sanitizedMessage = { ...message };
-      if (sanitizedMessage.data) {
-        sanitizedMessage.data = sanitizeDataForDisplay(sanitizedMessage.data);
-      }
-      console.log('Received message:', sanitizedMessage);
+      console.log('Received message:', message);
 
       // Process different message types from the backend
-      switch (sanitizedMessage.type) {
+      switch (message.type) {
         case 'update':
-          setJsonData(sanitizedMessage.data);
+          setJsonData(message.data);
           setIsLoading(false);
-          if (sanitizedMessage.title) {
-            setTitle(sanitizedMessage.title);
+          if (message.title) {
+            setTitle(message.title);
           }
           // Check if the update includes a sample query to display
-          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
-            console.log('Setting query from update message:', sanitizedMessage.data.sampleQuery);
-            setQueryText(sanitizedMessage.data.sampleQuery);
+          if (message.data && message.data.sampleQuery) {
+            console.log('Setting query from update message:', message.data.sampleQuery);
+            setQueryText(message.data.sampleQuery);
             setInitialQuerySent(true); // Mark that we've received an initial query
           }
           break;
 
         case 'initialData':
           // Store the schema and setup a default query
-          console.log('Received schema for collection:', sanitizedMessage.collection);
-          setCollection(sanitizedMessage.collection);
-          setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          console.log('Received schema for collection:', message.collection);
+          setCollection(message.collection);
+          setTitle(`Weaviate Collection: ${message.collection}`);
           
           // Store schema for backend query generation (via requestSampleQuery)
-          if (sanitizedMessage.schema) {
+          if (message.schema) {
             console.log('Received schema data for initialData');
             try {
               // Store schema for future use
-              setSchema(sanitizedMessage.schema);
+              setSchema(message.schema);
               
               // We'll get the query from backend
-              if (sanitizedMessage.collection && !initialQuerySent) {
+              if (message.collection && !initialQuerySent) {
                 // Request a sample query if one wasn't sent already
                 vscode.postMessage({ 
                   type: 'requestSampleQuery', 
-                  collection: sanitizedMessage.collection 
+                  collection: message.collection 
                 });
                 setInitialQuerySent(true);  // Mark that we've requested an initial query
               }
@@ -369,32 +322,32 @@ const App = () => {
 
         case 'queryResult':
           // Display the query results
-          console.log('Received query results for collection:', sanitizedMessage.collection);
+          console.log('Received query results for collection:', message.collection);
           
           // Always stop loading when we get results
           setIsLoading(false);
           
           try {
-            const extractedData = extractWeaviateData(sanitizedMessage.data, sanitizedMessage.collection);
+            const extractedData = extractWeaviateData(message.data, message.collection);
             console.log('Extracted data:', extractedData);
             setJsonData(extractedData);
           } catch (err) {
             console.error('Error extracting data from response:', err);
-            setJsonData(sanitizedMessage.data);
+            setJsonData(message.data);
           }
 
-          if (sanitizedMessage.collection) {
-            setCollection(sanitizedMessage.collection);
-            setTitle(`Weaviate Collection: ${sanitizedMessage.collection}`);
+          if (message.collection) {
+            setCollection(message.collection);
+            setTitle(`Weaviate Collection: ${message.collection}`);
           }
           setError(null); // Clear any previous errors
           break;
 
         case 'sampleQuery':
           // Handle sample query message from backend
-          console.log('Received sample query from backend:', sanitizedMessage.data?.sampleQuery);
-          if (sanitizedMessage.data && sanitizedMessage.data.sampleQuery) {
-            setQueryText(sanitizedMessage.data.sampleQuery);
+          console.log('Received sample query from backend:', message.data?.sampleQuery);
+          if (message.data && message.data.sampleQuery) {
+            setQueryText(message.data.sampleQuery);
             console.log('Query text state updated with sample query');
           } else {
             console.warn('Received sampleQuery message but no query was included');
@@ -405,15 +358,15 @@ const App = () => {
         case 'queryError':
         case 'explainError': // Restored handler for explainError
           // Display error message from failed query
-          console.error(`${sanitizedMessage.type}:`, sanitizedMessage.error);
-          setError(sanitizedMessage.error || 'Unknown query error');
+          console.error(`${message.type}:`, message.error);
+          setError(message.error || 'Unknown query error');
           setIsLoading(false);
           break;
 
         case 'explainResult':
           // Handle explain plan results
-          console.log('Received explain plan:', sanitizedMessage.data);
-          setJsonData(sanitizedMessage.data);
+          console.log('Received explain plan:', message.data);
+          setJsonData(message.data);
           setTitle('Query Plan Explanation');
           setError(null);
           setIsLoading(false);
@@ -421,33 +374,76 @@ const App = () => {
           
         case 'schemaResult': // Added handler for schemaResult
           // Handle schema results
-          console.log('Received schema for collection:', sanitizedMessage.collection);
-          setJsonData(sanitizedMessage.schema);
+          console.log('Received schema for collection:', message.collection);
+          setJsonData(message.schema);
           
           // Store schema (backend will handle query generation)
           console.log('Processing schema from schemaResult:',
-            sanitizedMessage.schema ? 'Schema received' : 'No schema received');
+            message.schema ? 'Schema received' : 'No schema received');
           try {
             // Log some info about the schema structure
-            console.log('Schema keys:', Object.keys(sanitizedMessage.schema));
-            if (sanitizedMessage.schema.classes) {
-              console.log('Classes count:', sanitizedMessage.schema.classes.length);
-              const matchingClass = sanitizedMessage.schema.classes.find(
-                (c: any) => c.class === sanitizedMessage.collection
+            console.log('Schema keys:', Object.keys(message.schema));
+            if (message.schema.classes) {
+              console.log('Classes count:', message.schema.classes.length);
+              const matchingClass = message.schema.classes.find(
+                (c: any) => c.class === message.collection
               );
               if (matchingClass) {
                 console.log('Found matching class with properties:', matchingClass.properties?.length || 0);
               }
             }
             
-            setSchema(sanitizedMessage.schema);
+            setSchema(message.schema);
+            
+            // Create GraphQL schema config for Monaco editor
+            if (message.schema && message.schema.classes && message.schema.classes.length > 0) {
+              // Build a simplified GraphQL introspection schema for monaco-graphql
+              const introspectionJSON = {
+                __schema: {
+                  types: [
+                    // Add standard Weaviate query types
+                    { name: 'Query', kind: 'OBJECT' },
+                    { name: 'Get', kind: 'OBJECT' },
+                    { name: 'Aggregate', kind: 'OBJECT' },
+                    { name: 'Explore', kind: 'OBJECT' },
+                    // Add all collection classes as types
+                    ...(message.schema.classes || []).map((cls: any) => ({
+                      name: cls.class,
+                      kind: 'OBJECT',
+                      fields: [
+                        // Add standard fields available on all objects
+                        { name: 'id', type: { name: 'String', kind: 'SCALAR' } },
+                        { name: '_additional', type: { name: 'Additional', kind: 'OBJECT' } },
+                        // Add all properties as fields
+                        ...(cls.properties || []).map((prop: any) => ({
+                          name: prop.name,
+                          type: {
+                            name: prop.dataType[0],
+                            kind: 'SCALAR'
+                          },
+                          description: prop.description || `${prop.name} (${prop.dataType.join(', ')})`
+                        }))
+                      ]
+                    }))
+                  ]
+                }
+              };
+              
+              // Set the schema configuration for the Monaco editor
+              setSchemaConfig({
+                uri: 'weaviate://graphql',
+                schema: message.schema,
+                fileMatch: ['*.graphql', '*.gql'],
+                introspectionJSON
+              });
+            }
             
             // We'll rely on backend for query generation
-            if (sanitizedMessage.collection && !initialQuerySent) {
+            if (message.collection && !initialQuerySent) {
               // Request a sample query if one wasn't sent already
               vscode.postMessage({ 
                 type: 'requestSampleQuery', 
-                collection: sanitizedMessage.collection 
+                collection: message.collection 
               });
               setInitialQuerySent(true);  // Mark that we've requested an initial query
             }
@@ -455,7 +451,7 @@ const App = () => {
             console.error('Error processing schema in schemaResult:', err);
           }
           
-          setTitle(`Schema: ${sanitizedMessage.collection}`);
+          setTitle(`Schema: ${message.collection}`);
           setError(null);
           setIsLoading(false);
           break;
@@ -492,7 +488,7 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.header}>{title}</h1>
+      <h1 style={styles.header}>{title || 'Weaviate Studio - GraphQL Query Interface'}</h1>
 
       {/* Display error messages if present */}
       {error && (
@@ -500,69 +496,113 @@ const App = () => {
           <strong>Error:</strong> {error}
         </div>
       )}
-
-      {/* Main split container for query and results */}
-      <div style={styles.splitContainer}>
-        {/* Query editor section */}
-        <div style={styles.queryContainer}>
+      
+      {/* Split layout with GraphQL editor and query results */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+        {/* GraphQL Query Editor Section */}
+        <div style={{ ...styles.queryContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
           <div style={styles.queryHeader}>
-            <span>Query Editor</span>
-            <div style={styles.toolbar}>
-              <button style={styles.button} onClick={handleGenerateQuery}>Generate Sample</button>
-              <button style={styles.button} onClick={handleRunQuery}>Run Query</button>
-            </div>
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>
+              📝 GraphQL Query Editor
+              {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+                for {collection}
+              </span>}
+            </span>
           </div>
 
-          <textarea
-            style={styles.textarea}
-            value={queryText}
-            onChange={(e) => setQueryText(e.target.value)}
-            placeholder="Enter your GraphQL query here..."
-          />
+          <div style={{ flex: 1, minHeight: '200px' }}>
+            <MonacoGraphQLEditor
+              initialValue={queryText}
+              onChange={(value) => setQueryText(value)}
+              onRunQuery={handleRunQuery}
+              onGenerateSample={handleGenerateQuery}
+              schemaConfig={schemaConfig}
+              collectionName={collection || undefined}
+            />
+          </div>
         </div>
 
-        {/* Results section */}
-        <div style={styles.resultContainer}>
+        {/* Query Results Section */}
+        <div style={{ ...styles.resultContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
           <div style={styles.resultHeader}>
-            <span>Results</span>
-            {isLoading && <span style={styles.loading}>Loading...</span>}
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>
+              📊 Query Results
+              {jsonData && (
+                <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+                  {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
+                    ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
+                    : 'Data loaded'
+                  }
+                </span>
+              )}
+            </span>
+            {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button 
+                style={{
+                  ...styles.button,
+                  backgroundColor: viewType === 'json' ? '#0E639C' : '#2D2D2D',
+                  border: viewType === 'json' ? 'none' : '1px solid #444'
+                }} 
+                onClick={() => setViewType('json')}
+              >
+                📄 JSON
+              </button>
+              <button 
+                style={{
+                  ...styles.button,
+                  backgroundColor: viewType === 'table' ? '#0E639C' : '#2D2D2D',
+                  border: viewType === 'table' ? 'none' : '1px solid #444'
+                }} 
+                onClick={() => setViewType('table')}
+              >
+                📋 Table
+              </button>
+            </div>
           </div>
 
-          {/* Display JSON data when available */}
+          {/* Display data in selected format when available */}
           {jsonData ? (
-            <div style={styles.jsonContainer}>
-              {/* Check if we have an empty result with just _errors array */}
-              {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <p>No data found in collection: {collection}</p>
-                  <p>This collection exists but appears to be empty.</p>
-                  <p style={{ fontSize: '14px', color: '#888' }}>
-                    Try adding some data to this collection or select a different collection.
-                  </p>
-                </div>
-              ) : (
-                /* Use a simple pre-formatted JSON display as a reliable fallback */
-                <pre style={{
-                  backgroundColor: '#252526',
-                  color: '#D4D4D4',
-                  padding: '12px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                  overflow: 'auto',
-                  height: '100%'
-                }}>
-                  {JSON.stringify(sanitizeDataForDisplay(jsonData), null, 2)}
-                </pre>
-              )}
-            </div>
+            viewType === 'json' ? (
+              <div style={styles.jsonContainer}>
+                {/* Check if we have an empty result with just _errors array */}
+                {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <p>📭 No data found in collection: {collection}</p>
+                    <p>This collection exists but appears to be empty.</p>
+                    <p style={{ fontSize: '14px', color: '#888' }}>
+                      💡 Try adding some data to this collection or select a different collection.
+                    </p>
+                  </div>
+                ) : (
+                  /* Use a simple pre-formatted JSON display as a reliable fallback */
+                  <pre style={{
+                    backgroundColor: '#252526',
+                    color: '#D4D4D4',
+                    padding: '12px',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    overflow: 'auto',
+                    height: '100%'
+                  }}>
+                    {JSON.stringify(jsonData, null, 2)}
+                  </pre>
+                )}
+              </div>
+            ) : (
+              collection && <ResultsTable data={jsonData} collectionName={collection} />
+            )
           ) : (
             <div style={styles.emptyState}>
-              <p>No results to display yet</p>
+              <p>🚀 Ready to execute your first query</p>
               {collection ? (
-                <p>Try running a query for collection: {collection}</p>
+                <p>Try running a query for collection: <strong>{collection}</strong></p>
               ) : (
-                <p>Select a collection from the sidebar to view data</p>
+                <p>Select a collection from the sidebar to get started</p>
               )}
+              <p style={{ fontSize: '14px', color: '#888', marginTop: '10px' }}>
+                💡 Use the "Sample" button to generate example queries
+              </p>
             </div>
           )}
         </div>
