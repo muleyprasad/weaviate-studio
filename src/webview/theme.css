@@ -1,0 +1,90 @@
+/* VS Code Theme Integration for Webview */
+
+/* Ensure webview inherits VS Code theme variables */
+:root {
+  /* Fallback colors for when VS Code variables are not available */
+  --fallback-background: #1E1E1E;
+  --fallback-foreground: #D4D4D4;
+  --fallback-border: #333;
+  --fallback-button-bg: #0E639C;
+  --fallback-button-fg: white;
+}
+
+/* Main webview styling */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+  background-color: var(--vscode-editor-background, var(--fallback-background));
+  color: var(--vscode-editor-foreground, var(--fallback-foreground));
+  font-size: var(--vscode-font-size, 13px);
+}
+
+/* Scrollbar styling to match VS Code */
+::-webkit-scrollbar {
+  width: var(--vscode-scrollbarSlider-background, 14px);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--vscode-scrollbar-shadow, transparent);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, #424242);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, #4f4f4f);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground, #5a5a5a);
+}
+
+/* Button hover effects */
+button:hover {
+  background-color: var(--vscode-button-hoverBackground, #1177bb) !important;
+}
+
+/* Focus styles */
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder, #0e639c);
+  outline-offset: -1px;
+}
+
+/* Selection styles */
+::selection {
+  background-color: var(--vscode-editor-selectionBackground, #264f78);
+}
+
+/* Link styles */
+a {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+a:hover {
+  color: var(--vscode-textLink-activeForeground, #4daafc);
+}
+
+/* Error text */
+.error-text {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+/* Warning text */
+.warning-text {
+  color: var(--vscode-notificationsWarningIcon-foreground, #ffab2c);
+}
+
+/* Success text */
+.success-text {
+  color: var(--vscode-terminal-ansiGreen, #16c60c);
+}
+
+/* Muted text */
+.muted-text {
+  color: var(--vscode-descriptionForeground, #999999);
+} 

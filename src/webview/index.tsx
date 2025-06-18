@@ -59,26 +59,21 @@ try {
   console.error('Failed to configure Monaco environment:', error);
 }
 
-// Custom styles defined inline
-
-
-
-// Define styles for various UI elements
-// Styles for the UI components
+// Styles using VS Code theme variables for proper theme integration
 const styles = {
   container: {
     padding: '10px',
-    fontFamily: '"SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace',
+    fontFamily: 'var(--vscode-font-family, "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace)',
     height: '100vh',
     overflow: 'auto',
-    backgroundColor: '#1E1E1E',
-    color: '#D4D4D4',
+    backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
+    color: 'var(--vscode-editor-foreground, #D4D4D4)',
     display: 'flex',
     flexDirection: 'column' as 'column',
     gap: '15px'
   },
   header: {
-    borderBottom: '1px solid #333',
+    borderBottom: '1px solid var(--vscode-panel-border, #333)',
     paddingBottom: '10px',
     marginBottom: '5px',
     fontSize: '18px',
@@ -101,8 +96,10 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid #333',
-    paddingBottom: '5px'
+    borderBottom: '1px solid var(--vscode-panel-border, #333)',
+    padding: '8px 0 5px 0',
+    backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
+    color: 'var(--vscode-editor-foreground, #D4D4D4)'
   },
   resultContainer: {
     display: 'flex',
@@ -115,16 +112,18 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid #333',
-    paddingBottom: '5px'
+    borderBottom: '1px solid var(--vscode-panel-border, #333)',
+    padding: '8px 0 5px 0',
+    backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
+    color: 'var(--vscode-editor-foreground, #D4D4D4)'
   },
   textarea: {
-    backgroundColor: '#252526',
-    color: '#D4D4D4',
-    border: '1px solid #333',
+    backgroundColor: 'var(--vscode-input-background, #252526)',
+    color: 'var(--vscode-input-foreground, #D4D4D4)',
+    border: '1px solid var(--vscode-input-border, #333)',
     borderRadius: '4px',
     padding: '10px',
-    fontFamily: 'monospace',
+    fontFamily: 'var(--vscode-editor-font-family, monospace)',
     fontSize: '14px',
     resize: 'none' as 'none',
     flex: '1',
@@ -133,11 +132,11 @@ const styles = {
     overflowY: 'auto' as 'auto'
   },
   jsonContainer: {
-    border: '1px solid #333',
+    border: '1px solid var(--vscode-panel-border, #333)',
     borderRadius: '4px',
     padding: '10px',
     overflow: 'auto',
-    backgroundColor: '#252526',
+    backgroundColor: 'var(--vscode-editor-background, #252526)',
     flex: '1',
     minHeight: '200px'
   },
@@ -147,12 +146,12 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    color: '#666',
+    color: 'var(--vscode-descriptionForeground, #666)',
     textAlign: 'center' as 'center'
   },
   button: {
-    backgroundColor: '#0E639C',
-    color: 'white',
+    backgroundColor: 'var(--vscode-button-background, #0E639C)',
+    color: 'var(--vscode-button-foreground, white)',
     border: 'none',
     borderRadius: '4px',
     padding: '6px 12px',
@@ -167,15 +166,15 @@ const styles = {
     marginTop: '5px'
   },
   error: {
-    color: '#e74c3c',
-    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    color: 'var(--vscode-errorForeground, #e74c3c)',
+    backgroundColor: 'var(--vscode-inputValidation-errorBackground, rgba(231, 76, 60, 0.1))',
     padding: '10px 15px',
     borderRadius: '4px',
     marginBottom: '10px',
-    border: '1px solid rgba(231, 76, 60, 0.3)'
+    border: '1px solid var(--vscode-inputValidation-errorBorder, rgba(231, 76, 60, 0.3))'
   },
   loading: {
-    color: '#3498db',
+    color: 'var(--vscode-progressBar-background, #3498db)',
     marginBottom: '10px',
     display: 'flex',
     alignItems: 'center',
@@ -193,7 +192,7 @@ const App = () => {
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
-  const [viewType, setViewType] = useState<'json' | 'table'>('json');
+  const [viewType, setViewType] = useState<'json' | 'table'>('table');
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
@@ -472,17 +471,17 @@ const App = () => {
 
   // Error message styling
   const errorStyle: React.CSSProperties = {
-    color: '#e74c3c',
-    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    color: 'var(--vscode-errorForeground, #e74c3c)',
+    backgroundColor: 'var(--vscode-inputValidation-errorBackground, rgba(231, 76, 60, 0.1))',
     padding: '10px 15px',
     borderRadius: '4px',
     marginBottom: '20px',
-    border: '1px solid rgba(231, 76, 60, 0.3)',
+    border: '1px solid var(--vscode-inputValidation-errorBorder, rgba(231, 76, 60, 0.3))',
   };
 
   // Load indicator styling
   const loadingStyle: React.CSSProperties = {
-    color: '#3498db',
+    color: 'var(--vscode-progressBar-background, #3498db)',
     marginBottom: '20px',
   };
 
@@ -504,7 +503,7 @@ const App = () => {
           <div style={styles.queryHeader}>
             <span style={{ fontSize: '16px', fontWeight: 600 }}>
               📝 GraphQL Query Editor
-              {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+              {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
                 for {collection}
               </span>}
             </span>
@@ -528,7 +527,7 @@ const App = () => {
             <span style={{ fontSize: '16px', fontWeight: 600 }}>
               📊 Query Results
               {jsonData && (
-                <span style={{ fontSize: '14px', fontWeight: 400, color: '#888', marginLeft: '10px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
                   {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
                     ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
                     : 'Data loaded'
@@ -541,8 +540,9 @@ const App = () => {
               <button 
                 style={{
                   ...styles.button,
-                  backgroundColor: viewType === 'json' ? '#0E639C' : '#2D2D2D',
-                  border: viewType === 'json' ? 'none' : '1px solid #444'
+                  backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-button-secondaryBackground, #2D2D2D)',
+                  border: viewType === 'json' ? 'none' : '1px solid var(--vscode-widget-border, #444)',
+                  color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-button-secondaryForeground, #E0E0E0)'
                 }} 
                 onClick={() => setViewType('json')}
               >
@@ -551,8 +551,9 @@ const App = () => {
               <button 
                 style={{
                   ...styles.button,
-                  backgroundColor: viewType === 'table' ? '#0E639C' : '#2D2D2D',
-                  border: viewType === 'table' ? 'none' : '1px solid #444'
+                  backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-button-secondaryBackground, #2D2D2D)',
+                  border: viewType === 'table' ? 'none' : '1px solid var(--vscode-widget-border, #444)',
+                  color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-button-secondaryForeground, #E0E0E0)'
                 }} 
                 onClick={() => setViewType('table')}
               >
@@ -570,18 +571,18 @@ const App = () => {
                   <div style={styles.emptyState}>
                     <p>📭 No data found in collection: {collection}</p>
                     <p>This collection exists but appears to be empty.</p>
-                    <p style={{ fontSize: '14px', color: '#888' }}>
+                    <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)' }}>
                       💡 Try adding some data to this collection or select a different collection.
                     </p>
                   </div>
                 ) : (
                   /* Use a simple pre-formatted JSON display as a reliable fallback */
                   <pre style={{
-                    backgroundColor: '#252526',
-                    color: '#D4D4D4',
+                    backgroundColor: 'var(--vscode-editor-background, #252526)',
+                    color: 'var(--vscode-editor-foreground, #D4D4D4)',
                     padding: '12px',
                     borderRadius: '4px',
-                    fontFamily: 'monospace',
+                    fontFamily: 'var(--vscode-editor-font-family, monospace)',
                     overflow: 'auto',
                     height: '100%'
                   }}>
@@ -600,7 +601,7 @@ const App = () => {
               ) : (
                 <p>Select a collection from the sidebar to get started</p>
               )}
-              <p style={{ fontSize: '14px', color: '#888', marginTop: '10px' }}>
+              <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)', marginTop: '10px' }}>
                 💡 Use the "Sample" button to generate example queries
               </p>
             </div>

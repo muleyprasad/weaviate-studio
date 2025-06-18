@@ -347,6 +347,26 @@ export const queryTemplates: QueryTemplate[] = [
     template: '{aggregationQuery}'
   },
   {
+    name: 'Collection Statistics',
+    description: 'Get detailed statistics and insights about collection data',
+    template: '{collectionStatsQuery}'
+  },
+  {
+    name: 'Data Quality Check',
+    description: 'Inspect data quality and completeness across properties',
+    template: '{dataQualityQuery}'
+  },
+  {
+    name: 'Vector Analysis',
+    description: 'Analyze vector data completeness and quality',
+    template: '{vectorAnalysisQuery}'
+  },
+  {
+    name: 'Performance Test',
+    description: 'Test query performance with various search patterns',
+    template: '{performanceTestQuery}'
+  },
+  {
     name: 'Relationship Query',
     description: 'Explore object relationships and cross-references',
     template: '{relationshipQuery}'
@@ -625,24 +645,657 @@ export function processTemplate(
   limit: number = 10,
   schema?: { classes?: ClassSchema[] }
 ): string {
+  // Find the class schema for the current collection
+  const classSchema = schema?.classes?.find(c => c.class === collectionName);
+  
   // Check if the template is a predefined template name
   const predefinedTemplate = queryTemplates.find(t => t.name === template);
   if (predefinedTemplate) {
     template = predefinedTemplate.template;
   }
 
-  // Replace placeholders with actual values
+  // Replace placeholders with actual values using dynamic generation when possible
   let query = template
-    // Use generateSampleQuery for the basic collection query to properly handle relationships
-    .replace('{collectionName}', generateSampleQuery(collectionName, [], limit, schema))
-    .replace('{nearVectorQuery}', generateNearVectorQuery(collectionName, limit))
-    .replace('{nearTextQuery}', generateNearTextQuery(collectionName, limit))
+    // Use dynamic generation for better schema-aware queries
+    .replace('{collectionName}', classSchema ? 
+      generateDynamicSampleQuery(collectionName, classSchema, limit) :
+      generateSampleQuery(collectionName, [], limit, schema))
+    .replace('{nearVectorQuery}', classSchema ?
+      generateDynamicNearVectorQuery(collectionName, classSchema, limit) :
+      generateNearVectorQuery(collectionName, limit))
+    .replace('{nearTextQuery}', classSchema ?
+      generateDynamicNearTextQuery(collectionName, classSchema, limit) :
+      generateNearTextQuery(collectionName, limit))
     .replace('{hybridQuery}', generateHybridQuery(collectionName, limit))
-    .replace('{filterQuery}', generateFilterQuery(collectionName, limit))
-    .replace('{aggregationQuery}', generateAggregationQuery(collectionName))
+    .replace('{filterQuery}', classSchema ?
+      generateDynamicFilterQuery(collectionName, classSchema, limit) :
+      generateFilterQuery(collectionName, limit))
+    .replace('{aggregationQuery}', classSchema ?
+      generateDynamicAggregationQuery(collectionName, classSchema) :
+      generateAggregationQuery(collectionName))
+    .replace('{collectionStatsQuery}', generateCollectionStatsQuery(collectionName, classSchema))
+    .replace('{dataQualityQuery}', generateDataQualityQuery(collectionName, classSchema))
+    .replace('{vectorAnalysisQuery}', generateVectorAnalysisQuery(collectionName, classSchema))
+    .replace('{performanceTestQuery}', generatePerformanceTestQuery(collectionName, classSchema))
     .replace('{relationshipQuery}', generateRelationshipQuery(collectionName, limit))
     .replace('{sortQuery}', generateSortQuery(collectionName, limit))
     .replace('{exploreQuery}', generateExploreQuery(collectionName));
 
   return query;
+}
+
+/**
+ * Generate a dynamic sample query for a collection based on its schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string with properties based on actual schema
+ */
+export function generateDynamicSampleQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10
+): string {
+  if (!classSchema || !classSchema.properties) {
+    return generateBasicGetQuery(collectionName, limit);
+  }
+
+  const properties = classSchema.properties;
+  
+  // Categorize properties
+  const primitiveProps: PropertySchema[] = [];
+  const referenceProps: PropertySchema[] = [];
+  const geoProps: PropertySchema[] = [];
+  
+  properties.forEach(prop => {
+    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    
+    if (dataType === 'geocoordinates') {
+      geoProps.push(prop);
+    } else if (['text', 'string', 'int', 'number', 'boolean', 'date', 'phonenumber', 'uuid', 'blob'].includes(dataType)) {
+      primitiveProps.push(prop);
+    } else {
+      // It's likely a reference to another class
+      referenceProps.push(prop);
+    }
+  });
+
+  let propertyLines: string[] = [];
+
+  // Add up to 5 primitive properties
+  const selectedPrimitives = primitiveProps.slice(0, 5);
+  selectedPrimitives.forEach(prop => {
+    propertyLines.push(`      ${prop.name}`);
+  });
+
+  // Add up to 2 geo coordinate properties
+  const selectedGeoProps = geoProps.slice(0, 2);
+  selectedGeoProps.forEach(prop => {
+    propertyLines.push(`      ${prop.name} {
+        latitude
+        longitude
+      }`);
+  });
+
+  // Add up to 2 reference properties with nested selection
+  const selectedReferenceProps = referenceProps.slice(0, 2);
+  selectedReferenceProps.forEach(prop => {
+    const referencedClassName = prop.dataType?.[0] || 'Unknown';
+    propertyLines.push(`      ${prop.name} {
+        ... on ${referencedClassName} {
+          _additional {
+            id
+          }
+        }
+      }`);
+  });
+
+  // Always include _additional for metadata
+  propertyLines.unshift(`      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+      }`);
+
+  return `{
+  Get {
+    ${collectionName}(limit: ${limit}) {
+${propertyLines.join('\n')}
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic vector search query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateDynamicNearVectorQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  
+  return `{
+  Get {
+    ${collectionName}(
+      nearVector: {
+        vector: [0.1, 0.2, 0.3] # Replace with your actual vector (${getVectorDimensions(classSchema)} dimensions)
+        certainty: 0.7 # Minimum similarity threshold (0-1)
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        distance
+        certainty
+        vector # Include the object's vector
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic semantic search query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateDynamicNearTextQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const textProperties = getTextProperties(classSchema);
+  
+  return `{
+  Get {
+    ${collectionName}(
+      nearText: {
+        concepts: ["search terms", "semantic concepts"]
+        certainty: 0.7 # Minimum similarity threshold (0-1)
+        ${textProperties.length > 0 ? `properties: [${textProperties.map(p => `"${p}"`).join(', ')}] # Search in specific text fields` : ''}
+        moveAwayFrom: {
+          concepts: ["unwanted terms"]
+          force: 0.45
+        }
+        moveTo: {
+          concepts: ["desired terms"]
+          force: 0.85
+        }
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        distance
+        certainty
+        explainScore
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic filter query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateDynamicFilterQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const filterExamples = generateFilterExamples(classSchema);
+  
+  return `{
+  Get {
+    ${collectionName}(
+      where: {
+        operator: And
+        operands: [
+${filterExamples.join(',\n')}
+        ]
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic aggregation query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string
+ */
+export function generateDynamicAggregationQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  if (!classSchema?.properties) {
+    return generateAggregationQuery(collectionName);
+  }
+
+  const aggregationFields = generateAggregationFields(classSchema);
+  
+  return `{
+  Aggregate {
+    ${collectionName} {
+      meta {
+        count
+      }
+${aggregationFields.join('\n')}
+    }
+  }
+}`;
+}
+
+/**
+ * Helper function to get top properties for display
+ */
+function getTopPropertiesForDisplay(classSchema?: ClassSchema, maxCount: number = 5): string[] {
+  if (!classSchema?.properties) {
+    return ['      # Add your properties here'];
+  }
+
+  const properties = classSchema.properties;
+  const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date', 'phonenumber', 'uuid'];
+  
+  // Prioritize primitive types, then geo coordinates, then references
+  const primitives = properties.filter(p => 
+    primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || '')
+  ).slice(0, Math.min(maxCount, 3));
+  
+  const geoProps = properties.filter(p => 
+    p.dataType?.[0]?.toLowerCase() === 'geocoordinates'
+  ).slice(0, 1);
+  
+  const remainingSlots = maxCount - primitives.length - geoProps.length;
+  const references = properties.filter(p => 
+    !primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || '') && 
+    p.dataType?.[0]?.toLowerCase() !== 'geocoordinates'
+  ).slice(0, Math.max(0, remainingSlots));
+
+  const result: string[] = [];
+  
+  primitives.forEach(prop => {
+    result.push(`      ${prop.name}`);
+  });
+  
+  geoProps.forEach(prop => {
+    result.push(`      ${prop.name} {
+        latitude
+        longitude
+      }`);
+  });
+  
+  references.forEach(prop => {
+    const refClassName = prop.dataType?.[0] || 'Unknown';
+    result.push(`      ${prop.name} {
+        ... on ${refClassName} {
+          _additional { id }
+        }
+      }`);
+  });
+
+  return result.length > 0 ? result : ['      # No properties found in schema'];
+}
+
+/**
+ * Helper function to get text properties from schema
+ */
+function getTextProperties(classSchema?: ClassSchema): string[] {
+  if (!classSchema?.properties) {
+    return [];
+  }
+
+  return classSchema.properties
+    .filter(p => ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || ''))
+    .map(p => p.name)
+    .slice(0, 3);
+}
+
+/**
+ * Helper function to estimate vector dimensions from schema
+ */
+function getVectorDimensions(classSchema?: ClassSchema): string {
+  // Try to extract from vectorizer config
+  if (classSchema?.moduleConfig) {
+    const configs = Object.values(classSchema.moduleConfig);
+    for (const config of configs) {
+      if (typeof config === 'object' && config && 'model' in config) {
+        // Common dimension sizes for popular models
+        const model = String(config.model).toLowerCase();
+        if (model.includes('openai') || model.includes('ada-002')) return '1536';
+        if (model.includes('sentence-transformers') || model.includes('all-mpnet')) return '768';
+        if (model.includes('cohere')) return '4096';
+      }
+    }
+  }
+  
+  return 'match your vectorizer dimensions';
+}
+
+/**
+ * Helper function to generate filter examples based on schema
+ */
+function generateFilterExamples(classSchema?: ClassSchema): string[] {
+  if (!classSchema?.properties) {
+    return [
+      '          {\n            path: ["propertyName"]\n            operator: Equal\n            valueText: "example value"\n          }'
+    ];
+  }
+
+  const examples: string[] = [];
+  const properties = classSchema.properties.slice(0, 3); // Limit to 3 examples
+  
+  properties.forEach(prop => {
+    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    let example = '';
+    
+    switch (dataType) {
+      case 'text':
+      case 'string':
+        example = `          {
+            path: ["${prop.name}"]
+            operator: Like
+            valueText: "*search term*"
+          }`;
+        break;
+      case 'int':
+      case 'number':
+        example = `          {
+            path: ["${prop.name}"]
+            operator: GreaterThan
+            valueNumber: 100
+          }`;
+        break;
+      case 'boolean':
+        example = `          {
+            path: ["${prop.name}"]
+            operator: Equal
+            valueBoolean: true
+          }`;
+        break;
+      case 'date':
+        example = `          {
+            path: ["${prop.name}"]
+            operator: GreaterThan
+            valueDate: "2023-01-01T00:00:00Z"
+          }`;
+        break;
+      default:
+        example = `          {
+            path: ["${prop.name}"]
+            operator: Equal
+            valueText: "filter value"
+          }`;
+    }
+    
+    if (example) {
+      examples.push(example);
+    }
+  });
+
+  return examples.length > 0 ? examples : [
+    '          {\n            path: ["propertyName"]\n            operator: Equal\n            valueText: "example value"\n          }'
+  ];
+}
+
+/**
+ * Helper function to generate aggregation fields based on schema
+ */
+function generateAggregationFields(classSchema: ClassSchema): string[] {
+  if (!classSchema.properties) {
+    return [];
+  }
+
+  const fields: string[] = [];
+  
+  classSchema.properties.slice(0, 5).forEach(prop => {
+    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    
+    switch (dataType) {
+      case 'text':
+      case 'string':
+        fields.push(`      ${prop.name} {
+        count
+        topOccurrences(limit: 5) {
+          value
+          occurs
+        }
+      }`);
+        break;
+      case 'int':
+      case 'number':
+        fields.push(`      ${prop.name} {
+        count
+        minimum
+        maximum
+        mean
+        median
+        sum
+      }`);
+        break;
+      case 'boolean':
+        fields.push(`      ${prop.name} {
+        count
+        totalTrue
+        totalFalse
+        percentageTrue
+        percentageFalse
+      }`);
+        break;
+      case 'date':
+        fields.push(`      ${prop.name} {
+        count
+        minimum
+        maximum
+      }`);
+        break;
+    }
+  });
+
+  return fields;
+}
+
+/**
+ * Generate a collection statistics query
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string for collection statistics
+ */
+export function generateCollectionStatsQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  if (!classSchema?.properties) {
+    return `{
+  Aggregate {
+    ${collectionName} {
+      meta {
+        count
+      }
+    }
+  }
+}`;
+  }
+
+  const propertyStats = classSchema.properties.slice(0, 3).map(prop => {
+    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    
+    switch (dataType) {
+      case 'text':
+      case 'string':
+        return `      ${prop.name} {
+        count
+        topOccurrences(limit: 10) {
+          value
+          occurs
+        }
+      }`;
+      case 'int':
+      case 'number':
+        return `      ${prop.name} {
+        count
+        minimum
+        maximum
+        mean
+        median
+        sum
+      }`;
+      case 'boolean':
+        return `      ${prop.name} {
+        count
+        totalTrue
+        totalFalse
+        percentageTrue
+      }`;
+      default:
+        return `      ${prop.name} {
+        count
+      }`;
+    }
+  });
+
+  return `{
+  Aggregate {
+    ${collectionName} {
+      meta {
+        count
+      }
+${propertyStats.join('\n')}
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a data quality inspection query
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string for data quality inspection
+ */
+export function generateDataQualityQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 5);
+  
+  return `{
+  Get {
+    ${collectionName}(limit: 50) {
+${properties.join('\n')}
+      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+        vector # Check if vectors are populated
+        certainty # Available if this was from a search
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a vector analysis query
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string for vector analysis
+ */
+export function generateVectorAnalysisQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  return `{
+  Get {
+    ${collectionName}(limit: 10) {
+      _additional {
+        id
+        vector
+        # Check vector completeness and dimensions
+      }
+    }
+  }
+}
+
+# To analyze vector quality, also run:
+# {
+#   Aggregate {
+#     ${collectionName} {
+#       meta {
+#         count
+#       }
+#     }
+#   }
+# }`;
+}
+
+/**
+ * Generate a performance test query
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string for performance testing
+ */
+export function generatePerformanceTestQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  const textProperties = getTextProperties(classSchema);
+  const firstTextProp = textProperties[0] || 'content';
+  
+  return `{
+  Get {
+    ${collectionName}(
+      where: {
+        path: ["${firstTextProp}"]
+        operator: Like
+        valueText: "*"
+      }
+      limit: 1000
+    ) {
+      _additional {
+        id
+      }
+    }
+  }
+}
+
+# Performance comparison - Vector search:
+# {
+#   Get {
+#     ${collectionName}(
+#       nearText: {
+#         concepts: ["sample query"]
+#         certainty: 0.5
+#       }
+#       limit: 100
+#     ) {
+#       _additional {
+#         id
+#         distance
+#       }
+#     }
+#   }
+# }`;
 }

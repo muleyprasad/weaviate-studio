@@ -62,11 +62,59 @@ export class MonacoQueryEditor {
       return;
     }
 
+    // Detect VS Code theme
+    const getVSCodeTheme = (): string => {
+      // Check for VS Code CSS custom properties to determine theme
+      const body = document.body;
+      const computedStyle = getComputedStyle(body);
+      
+      // Try to get VS Code theme from CSS variables
+      const backgroundColor = computedStyle.getPropertyValue('--vscode-editor-background').trim();
+      const foregroundColor = computedStyle.getPropertyValue('--vscode-editor-foreground').trim();
+      
+      // If we can't get CSS variables, fall back to checking computed styles
+      if (!backgroundColor) {
+        const actualBg = computedStyle.backgroundColor;
+        const rgb = actualBg.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          const [r, g, b] = rgb.map(Number);
+          // If background is dark (low luminance), use dark theme
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          return luminance < 0.5 ? 'vs-dark' : 'vs';
+        }
+      }
+      
+      // Parse background color to determine if it's dark or light
+      if (backgroundColor) {
+        // Handle hex colors
+        if (backgroundColor.startsWith('#')) {
+          const hex = backgroundColor.slice(1);
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          return luminance < 0.5 ? 'vs-dark' : 'vs';
+        }
+        // Handle rgb/rgba colors
+        const rgbMatch = backgroundColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbMatch) {
+          const [, r, g, b] = rgbMatch.map(Number);
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          return luminance < 0.5 ? 'vs-dark' : 'vs';
+        }
+      }
+      
+      // Default to dark theme if we can't determine
+      return 'vs-dark';
+    };
+
+    const currentTheme = getVSCodeTheme();
+
     // Create Monaco editor instance
     this.editor = monaco.editor.create(this.container, {
       value: '',
       language: 'graphql',
-      theme: 'vs-dark',
+      theme: currentTheme,
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
@@ -80,7 +128,26 @@ export class MonacoQueryEditor {
         horizontalScrollbarSize: 10
       },
       fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: 'var(--vscode-editor-font-family, "Menlo", "Monaco", "Courier New", monospace)',
+    });
+    
+    // Listen for theme changes and update editor theme accordingly
+    const observer = new MutationObserver(() => {
+      const newTheme = getVSCodeTheme();
+      if (this.editor && newTheme !== currentTheme) {
+        monaco.editor.setTheme(newTheme);
+      }
+    });
+    
+    // Observe changes to body class and style attributes that might indicate theme changes
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+    
+    // Store observer for cleanup
+    this.disposables.push({
+      dispose: () => observer.disconnect()
     });
     
     // Set up change event listener
@@ -214,16 +281,25 @@ export class MonacoQueryEditor {
       button.textContent = template.name;
       button.title = template.description;
       button.className = 'template-button';
-      button.style.cssText = 
-        'background-color: #2d2d30; color: #cccccc; border: 1px solid #3c3c3c; ' +
-        'border-radius: 3px; padding: 4px 8px; cursor: pointer; font-size: 12px;';
       
-      // Add hover effect
+      // Use CSS variables for theme-aware styling
+      const buttonStyles = [
+        'background-color: var(--vscode-button-secondaryBackground, #2d2d30)',
+        'color: var(--vscode-button-secondaryForeground, #cccccc)',
+        'border: 1px solid var(--vscode-widget-border, #3c3c3c)',
+        'border-radius: 3px',
+        'padding: 4px 8px',
+        'cursor: pointer',
+        'font-size: 12px'
+      ];
+      button.style.cssText = buttonStyles.join('; ') + ';';
+      
+      // Add hover effect with theme variables
       button.addEventListener('mouseover', () => {
-        button.style.backgroundColor = '#3e3e42';
+        button.style.backgroundColor = 'var(--vscode-button-hoverBackground, #3e3e42)';
       });
       button.addEventListener('mouseout', () => {
-        button.style.backgroundColor = '#2d2d30';
+        button.style.backgroundColor = 'var(--vscode-button-secondaryBackground, #2d2d30)';
       });
       
       // Add click handler to insert template
@@ -445,10 +521,10 @@ export class MonacoQueryEditor {
       this.insertTextAtCursor(template);
     });
     
-    // Apply styling
-    button.style.backgroundColor = '#3c3c3c';
-    button.style.color = '#cccccc';
-    button.style.border = '1px solid #555';
+    // Apply theme-aware styling
+    button.style.backgroundColor = 'var(--vscode-button-secondaryBackground, #3c3c3c)';
+    button.style.color = 'var(--vscode-button-secondaryForeground, #cccccc)';
+    button.style.border = '1px solid var(--vscode-widget-border, #555)';
     button.style.borderRadius = '4px';
     button.style.padding = '4px 8px';
     button.style.marginRight = '8px';

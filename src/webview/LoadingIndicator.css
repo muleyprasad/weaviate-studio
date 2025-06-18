@@ -5,7 +5,7 @@
   padding: 16px;
   height: 100%;
   width: 100%;
-  background-color: rgba(30, 30, 30, 0.7);
+  background-color: var(--vscode-editor-background, rgba(30, 30, 30, 0.7));
   position: absolute;
   top: 0;
   left: 0;
@@ -13,7 +13,7 @@
 }
 
 .loading-spinner {
-  border: 3px solid rgba(255, 255, 255, 0.1);
+  border: 3px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
   border-top: 3px solid var(--vscode-progressBar-background, #0e70c0);
   border-radius: 50%;
   width: 24px;

@@ -205,7 +205,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
         alignItems: 'center',
         justifyContent: 'center',
         height: '200px',
-        color: '#666',
+        color: 'var(--vscode-descriptionForeground, #666)',
         textAlign: 'center'
       }}>
         <p>No data to display</p>
@@ -222,16 +222,16 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '13px',
-    backgroundColor: '#252526',
-    color: '#D4D4D4'
+    backgroundColor: 'var(--vscode-editor-background, #252526)',
+    color: 'var(--vscode-editor-foreground, #D4D4D4)'
   };
   
   const headerStyle: React.CSSProperties = {
-    backgroundColor: '#1E1E1E',
-    color: '#E0E0E0',
+    backgroundColor: 'var(--vscode-list-headerBackground, #1E1E1E)',
+    color: 'var(--vscode-list-headerForeground, #E0E0E0)',
     padding: '8px 12px',
     textAlign: 'left',
-    borderBottom: '2px solid #333',
+    borderBottom: '2px solid var(--vscode-panel-border, #333)',
     fontWeight: 600,
     position: 'sticky',
     top: 0,
@@ -240,7 +240,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   
   const cellStyle: React.CSSProperties = {
     padding: '6px 12px',
-    borderBottom: '1px solid #333',
+    borderBottom: '1px solid var(--vscode-panel-border, #333)',
     verticalAlign: 'top',
     maxWidth: '300px',
     overflow: 'hidden',
@@ -251,7 +251,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   const containerStyle: React.CSSProperties = {
     height: '100%',
     overflow: 'auto',
-    border: '1px solid #333',
+    border: '1px solid var(--vscode-panel-border, #333)',
     borderRadius: '4px'
   };
   

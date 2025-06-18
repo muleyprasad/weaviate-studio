@@ -307,12 +307,59 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-- [ ] **Enhanced Visualizations**: Graph view for relationships
-- [ ] **Batch Operations**: Bulk import/export functionality
-- [ ] **Query History**: Save and manage query history
-- [ ] **Performance Monitoring**: Query performance analytics
-- [ ] **Collaborative Features**: Share queries and connections
-- [ ] **Plugin System**: Extensible architecture for custom features
+### Core Features (High Priority)
+- [x] **Dynamic Query Templates**: Schema-aware query generation based on actual collection properties
+- [x] **Table View Default**: Intelligent data visualization with table view as default
+- [x] **Theme Integration**: Monaco editor follows VS Code theme settings
+- [ ] **Data Import/Export**: Bulk operations for data management
+  - CSV/JSON import with automatic schema mapping
+  - Export query results to various formats
+  - Batch operations with progress tracking
+- [ ] **Vector Operations**: Enhanced vector database functionality
+  - Vector similarity search with visual distance indicators
+  - Vector upload and management interface
+  - Embedding generation from text inputs
+  - Vector dimension visualization
+
+### Schema Management (High Priority)
+- [ ] **Visual Schema Designer**: Drag-and-drop schema creation and editing
+- [ ] **Schema Validation**: Real-time validation with helpful error messages
+- [ ] **Class Relationships**: Visual graph of cross-references and relationships
+- [ ] **Property Analytics**: Statistics and insights about property usage
+- [ ] **Schema Versioning**: Track and manage schema changes over time
+
+### Query Enhancement (Medium Priority)
+- [ ] **Query Builder**: Visual query constructor for non-GraphQL users
+- [ ] **Query History**: Save, organize, and share frequently used queries
+- [ ] **Query Performance**: Execution time tracking and optimization suggestions
+- [ ] **Query Templates Library**: Community-contributed query patterns
+- [ ] **Auto-completion**: Enhanced GraphQL intellisense with Weaviate-specific features
+
+### Data Visualization (Medium Priority)
+- [ ] **Vector Space Visualization**: 2D/3D plots of vector embeddings using t-SNE/UMAP
+- [ ] **Graph View**: Visual representation of object relationships and cross-references
+- [ ] **Clustering Visualization**: Show data clusters and similarity groups
+- [ ] **Property Distribution**: Charts and histograms for data analysis
+- [ ] **Geospatial Maps**: Interactive maps for geoCoordinates properties
+
+### Development Tools (Medium Priority)
+- [ ] **API Code Generation**: Generate client code in multiple languages
+- [ ] **Test Data Generator**: Create realistic test datasets for development
+- [ ] **Schema Migration Tools**: Assist with schema changes and data migration
+- [ ] **Performance Monitoring**: Real-time metrics and health indicators
+- [ ] **Backup and Restore**: Database backup and restoration tools
+
+### Collaboration Features (Lower Priority)
+- [ ] **Shared Workspaces**: Team collaboration on queries and schemas
+- [ ] **Query Sharing**: Export/import query collections
+- [ ] **Documentation Generator**: Auto-generate API documentation from schema
+- [ ] **Version Control Integration**: Git-like tracking for schema and queries
+
+### Advanced Features (Lower Priority)
+- [ ] **Custom Modules**: Extension system for custom Weaviate modules
+- [ ] **Multi-tenant Support**: Manage multiple tenants in a single interface
+- [ ] **Kubernetes Integration**: Deploy and manage Weaviate clusters
+- [ ] **Monitoring Dashboard**: Advanced analytics and monitoring tools
 
 ---
 

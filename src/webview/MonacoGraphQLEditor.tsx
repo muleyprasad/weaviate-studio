@@ -120,16 +120,16 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
           display: 'flex',
           justifyContent: 'flex-end',
           padding: '6px 10px',
-          backgroundColor: '#1E1E1E',
-          borderBottom: '1px solid #333'
+          backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
+          borderBottom: '1px solid var(--vscode-panel-border, #333)'
         }}>
           <div className="right-tools" style={{ display: 'flex', alignItems: 'center' }}>
             <button
               onClick={onGenerateSample}
               style={{
-                backgroundColor: '#2D2D2D',
-                color: '#E0E0E0',
-                border: '1px solid #444',
+                backgroundColor: 'var(--vscode-button-secondaryBackground, #2D2D2D)',
+                color: 'var(--vscode-button-secondaryForeground, #E0E0E0)',
+                border: '1px solid var(--vscode-widget-border, #444)',
                 borderRadius: '3px',
                 padding: '3px 8px',
                 marginRight: '8px',
@@ -143,8 +143,8 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
             <button
               onClick={onRunQuery}
               style={{
-                backgroundColor: '#0E639C',
-                color: 'white',
+                backgroundColor: 'var(--vscode-button-background, #0E639C)',
+                color: 'var(--vscode-button-foreground, white)',
                 border: 'none',
                 borderRadius: '3px',
                 padding: '3px 10px',
@@ -166,7 +166,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
             flex: 1, 
             position: 'relative',
             overflow: 'hidden',
-            border: '1px solid #333',
+            border: '1px solid var(--vscode-panel-border, #333)',
             borderTop: 'none',
             minHeight: '200px'
           }}
