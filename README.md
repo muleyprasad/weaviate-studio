@@ -43,6 +43,26 @@
 - Support for cross-references and nested object structures
 - Visual representation of your data model
 
+### Enhanced Tree View
+The Weaviate Explorer now provides comprehensive information about your collections:
+
+- **Properties**: View all collection properties with their data types and descriptions
+- **Vector Configuration**: 
+  - Vectorizer settings (text2vec-openai, text2vec-transformers, etc.)
+  - Module configurations 
+  - Vector index type (HNSW, Flat, etc.)
+- **Indexes**: 
+  - Inverted index status
+  - Vector index configuration
+  - Count of indexed properties
+- **Statistics**: 
+  - Live object count
+  - Tenant count (for multi-tenant collections)
+- **Sharding & Replication**:
+  - Sharding configuration (virtual per physical, desired/actual shard count)
+  - Replication factor
+  - Multi-tenancy status
+
 ### Developer Experience
 - **Hot Reload**: Instant updates during development
 - **TypeScript Support**: Full type safety and IntelliSense
