@@ -195,6 +195,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         } else if (element.itemType === 'sharding' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('layout');
             element.tooltip = 'Sharding and replication configuration';
+        } else if (element.itemType === 'serverInfo' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('server');
+            element.tooltip = 'Server version and information';
+        } else if (element.itemType === 'clusterHealth' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('pulse');
+            element.tooltip = 'Cluster status and health';
+        } else if (element.itemType === 'modules' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('extensions');
+            element.tooltip = 'Available Weaviate modules';
+        } else if (element.itemType === 'collectionsGroup' && !element.iconPath) {
+            element.iconPath = new vscode.ThemeIcon('database');
+            element.tooltip = 'Collections in this instance';
         } else if (element.itemType === 'property') {
             // Ensure property items have the correct context value
             if (!element.contextValue) {
@@ -271,22 +283,89 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return connectionItems;
         } 
         else if (element.itemType === 'connection' && element.connectionId) {
-            // Connection level - show collections
-            const collections = this.collections[element.connectionId] || [];
+            // Connection level - show server info and collections
+            const connection = this.connections.find(conn => conn.id === element.connectionId);
             
-            if (collections.length === 0) {
-                const connection = this.connections.find(conn => conn.id === element.connectionId);
-                let message = 'Not connected';
-                
-                if (connection) {
-                    message = connection.status === 'connected' 
-                        ? 'No collections found. Right-click to add a collection.'
-                        : 'Not connected. Right-click and select "Connect" to view collections.';
-                }
+            if (!connection || connection.status !== 'connected') {
+                const message = connection?.status === 'connected' 
+                    ? 'Loading...'
+                    : 'Not connected. Right-click and select "Connect" to view information.';
                 
                 return [
                     new WeaviateTreeItem(
                         message,
+                        vscode.TreeItemCollapsibleState.None, 
+                        'message',
+                        element.connectionId
+                    )
+                ];
+            }
+
+            const items: WeaviateTreeItem[] = [];
+
+            // Add server information section
+            items.push(new WeaviateTreeItem(
+                'Server Information',
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'serverInfo',
+                element.connectionId,
+                undefined,
+                'serverInfo',
+                new vscode.ThemeIcon('server'),
+                'weaviateServerInfo'
+            ));
+
+            // Add cluster health section
+            items.push(new WeaviateTreeItem(
+                'Cluster Health',
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'clusterHealth',
+                element.connectionId,
+                undefined,
+                'clusterHealth',
+                new vscode.ThemeIcon('pulse'),
+                'weaviateClusterHealth'
+            ));
+
+            // Add modules section
+            items.push(new WeaviateTreeItem(
+                'Available Modules',
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'modules',
+                element.connectionId,
+                undefined,
+                'modules',
+                new vscode.ThemeIcon('extensions'),
+                'weaviateModules'
+            ));
+
+            // Add collections section
+            const collections = this.collections[element.connectionId] || [];
+            const collectionsLabel = collections.length > 0 
+                ? `Collections (${collections.length})`
+                : 'Collections';
+            
+            items.push(new WeaviateTreeItem(
+                collectionsLabel,
+                vscode.TreeItemCollapsibleState.Expanded,
+                'collectionsGroup',
+                element.connectionId,
+                undefined,
+                'collections',
+                new vscode.ThemeIcon('database'),
+                'weaviateCollectionsGroup'
+            ));
+
+            return items;
+        }
+        else if (element.itemType === 'collectionsGroup' && element.connectionId) {
+            // Collections group - show actual collections
+            const collections = this.collections[element.connectionId] || [];
+            
+            if (collections.length === 0) {
+                return [
+                    new WeaviateTreeItem(
+                        'No collections found. Right-click parent connection to add a collection.',
                         vscode.TreeItemCollapsibleState.None, 
                         'message',
                         element.connectionId
@@ -727,10 +806,212 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  ];
              }
 
-             return shardingItems;
-        }
-        
-        return [];
+                          return shardingItems;
+         }
+         else if (element.itemType === 'serverInfo' && element.connectionId) {
+             // Server information section
+             try {
+                 const client = this.connectionManager.getClient(element.connectionId);
+                 if (!client) {
+                     return [
+                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
+                     ];
+                 }
+
+                 const serverItems: WeaviateTreeItem[] = [];
+
+                 // Get server meta information
+                 try {
+                     const meta = await client.misc.metaGetter().do();
+                     
+                     if (meta.version) {
+                         serverItems.push(new WeaviateTreeItem(
+                             `Version: ${meta.version}`,
+                             vscode.TreeItemCollapsibleState.None,
+                             'object',
+                             element.connectionId,
+                             undefined,
+                             'version',
+                             new vscode.ThemeIcon('tag'),
+                             'weaviateServerDetail'
+                         ));
+                     }
+
+                     if (meta.gitHash) {
+                         serverItems.push(new WeaviateTreeItem(
+                             `Git Hash: ${meta.gitHash.substring(0, 8)}`,
+                             vscode.TreeItemCollapsibleState.None,
+                             'object',
+                             element.connectionId,
+                             undefined,
+                             'gitHash',
+                             new vscode.ThemeIcon('git-commit'),
+                             'weaviateServerDetail'
+                         ));
+                     }
+
+                     if (meta.hostname) {
+                         serverItems.push(new WeaviateTreeItem(
+                             `Hostname: ${meta.hostname}`,
+                             vscode.TreeItemCollapsibleState.None,
+                             'object',
+                             element.connectionId,
+                             undefined,
+                             'hostname',
+                             new vscode.ThemeIcon('server'),
+                             'weaviateServerDetail'
+                         ));
+                     }
+
+                 } catch (error) {
+                     console.warn('Could not fetch server meta:', error);
+                     serverItems.push(new WeaviateTreeItem(
+                         'Unable to fetch server information',
+                         vscode.TreeItemCollapsibleState.None,
+                         'message'
+                     ));
+                 }
+
+                 return serverItems;
+             } catch (error) {
+                 console.error('Error fetching server information:', error);
+                 return [
+                     new WeaviateTreeItem('Error fetching server information', vscode.TreeItemCollapsibleState.None, 'message')
+                 ];
+             }
+         }
+         else if (element.itemType === 'clusterHealth' && element.connectionId) {
+             // Cluster health section
+             try {
+                 const client = this.connectionManager.getClient(element.connectionId);
+                 if (!client) {
+                     return [
+                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
+                     ];
+                 }
+
+                 const healthItems: WeaviateTreeItem[] = [];
+
+                 try {
+                     // Try to get cluster status (this might not be available in all Weaviate versions)
+                     const meta = await client.misc.metaGetter().do();
+                     
+                     // Show basic connectivity status
+                     healthItems.push(new WeaviateTreeItem(
+                         'Status: Connected',
+                         vscode.TreeItemCollapsibleState.None,
+                         'object',
+                         element.connectionId,
+                         undefined,
+                         'status',
+                         new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed')),
+                         'weaviateClusterDetail'
+                     ));
+
+                     // If we can get schema, show collection count
+                     const schema = await client.schema.getter().do();
+                     const collectionCount = schema?.classes?.length || 0;
+                     healthItems.push(new WeaviateTreeItem(
+                         `Collections: ${collectionCount}`,
+                         vscode.TreeItemCollapsibleState.None,
+                         'object',
+                         element.connectionId,
+                         undefined,
+                         'collectionCount',
+                         new vscode.ThemeIcon('database'),
+                         'weaviateClusterDetail'
+                     ));
+
+                 } catch (error) {
+                     console.warn('Could not fetch cluster health:', error);
+                     healthItems.push(new WeaviateTreeItem(
+                         'Status: Connected (limited info)',
+                         vscode.TreeItemCollapsibleState.None,
+                         'object',
+                         element.connectionId,
+                         undefined,
+                         'status',
+                         new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground')),
+                         'weaviateClusterDetail'
+                     ));
+                 }
+
+                 return healthItems;
+             } catch (error) {
+                 console.error('Error fetching cluster health:', error);
+                 return [
+                     new WeaviateTreeItem('Error fetching cluster health', vscode.TreeItemCollapsibleState.None, 'message')
+                 ];
+             }
+         }
+         else if (element.itemType === 'modules' && element.connectionId) {
+             // Available modules section
+             try {
+                 const client = this.connectionManager.getClient(element.connectionId);
+                 if (!client) {
+                     return [
+                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
+                     ];
+                 }
+
+                 const moduleItems: WeaviateTreeItem[] = [];
+
+                 try {
+                     const meta = await client.misc.metaGetter().do();
+                     
+                     if (meta.modules) {
+                         const modules = Object.keys(meta.modules);
+                         
+                         if (modules.length > 0) {
+                             modules.forEach(moduleName => {
+                                 const moduleInfo = meta.modules[moduleName];
+                                 const version = moduleInfo?.version || 'unknown';
+                                 
+                                 moduleItems.push(new WeaviateTreeItem(
+                                     `${moduleName} (v${version})`,
+                                     vscode.TreeItemCollapsibleState.None,
+                                     'object',
+                                     element.connectionId,
+                                     undefined,
+                                     moduleName,
+                                     new vscode.ThemeIcon('extensions'),
+                                     'weaviateModule'
+                                 ));
+                             });
+                         } else {
+                             moduleItems.push(new WeaviateTreeItem(
+                                 'No modules available',
+                                 vscode.TreeItemCollapsibleState.None,
+                                 'message'
+                             ));
+                         }
+                     } else {
+                         moduleItems.push(new WeaviateTreeItem(
+                             'Module information not available',
+                             vscode.TreeItemCollapsibleState.None,
+                             'message'
+                         ));
+                     }
+
+                 } catch (error) {
+                     console.warn('Could not fetch modules:', error);
+                     moduleItems.push(new WeaviateTreeItem(
+                         'Unable to fetch module information',
+                         vscode.TreeItemCollapsibleState.None,
+                         'message'
+                     ));
+                 }
+
+                 return moduleItems;
+             } catch (error) {
+                 console.error('Error fetching modules:', error);
+                 return [
+                     new WeaviateTreeItem('Error fetching modules', vscode.TreeItemCollapsibleState.None, 'message')
+                 ];
+             }
+         }
+         
+         return [];
     }
 
     // --- Connection Management Methods ---

@@ -44,8 +44,15 @@
 - Visual representation of your data model
 
 ### Enhanced Tree View
-The Weaviate Explorer now provides comprehensive information about your collections:
+The Weaviate Explorer now provides comprehensive information at both connection and collection levels:
 
+#### **Connection-Level Information**
+- **Server Information**: Weaviate version, git hash, hostname
+- **Cluster Health**: Connection status, collection count, health indicators  
+- **Available Modules**: Installed modules with versions (text2vec-openai, generative-openai, etc.)
+- **Collections Overview**: Organized collection grouping with counts
+
+#### **Collection-Level Information**
 - **Properties**: View all collection properties with their data types and descriptions
 - **Vector Configuration**: 
   - Vectorizer settings (text2vec-openai, text2vec-transformers, etc.)
