@@ -81,6 +81,11 @@
         "command": "weaviate.viewDetailedSchema",
         "title": "View Detailed Schema",
         "category": "Weaviate"
+      },
+      {
+        "command": "weaviate.viewRawConfig",
+        "title": "View Raw Collection Config",
+        "category": "Weaviate"
       }
     ],
     "viewsContainers": {
@@ -156,9 +161,14 @@
           "group": "1_actions@2"
         },
         {
-          "command": "weaviate.queryCollection",
+          "command": "weaviate.viewRawConfig",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "1_actions@3"
+        },
+        {
+          "command": "weaviate.queryCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@4"
         },
         {
           "command": "weaviate.deleteCollection",

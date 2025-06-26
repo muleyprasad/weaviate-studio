@@ -146,12 +146,63 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
+
+
+    /**
+     * Shows a raw collection configuration view in a webview
+     * @param item - The tree item representing the collection
+     */
+    public async handleViewRawConfig(item: WeaviateTreeItem): Promise<void> {
+        if (!item.connectionId || !item.label) {
+            vscode.window.showErrorMessage('Cannot view raw config: Missing connection or collection name');
+            return;
+        }
+
+        try {
+            const collectionName = item.label.toString();
+            const collection = this.collections[item.connectionId]?.find(
+                col => col.label === collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema) {
+                vscode.window.showErrorMessage('Could not find schema for collection');
+                return;
+            }
+
+            // Create and show a webview with the raw configuration
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateRawConfig',
+                `Raw Config: ${collectionName}`,
+                vscode.ViewColumn.One,
+                { enableScripts: true }
+            );
+
+            // Format the raw config as HTML
+            panel.webview.html = this.getRawConfigHtml(collection.schema, item.connectionId);
+
+        } catch (error) {
+            console.error('Error viewing raw config:', error);
+            vscode.window.showErrorMessage(
+                `Failed to view raw config: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+
     /**
      * Generates HTML for displaying detailed schema in a webview
      * @param schema The schema to display
      */
     private getDetailedSchemaHtml(schema: SchemaClass): string {
         return this.viewRenderer.renderDetailedSchema(schema);
+    }
+
+    /**
+     * Generates HTML for displaying raw collection configuration in a webview
+     * @param schema The schema to display
+     * @param connectionId The connection ID for context
+     */
+    private getRawConfigHtml(schema: SchemaClass, connectionId: string): string {
+        return this.viewRenderer.renderRawConfig(schema, connectionId);
     }
     
     // #endregion Command Handlers

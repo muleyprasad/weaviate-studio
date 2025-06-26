@@ -122,6 +122,10 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('weaviate.viewDetailedSchema', (item: any) => {
             weaviateTreeDataProvider.handleViewDetailedSchema(item);
         }),
+
+        vscode.commands.registerCommand('weaviate.viewRawConfig', (item: any) => {
+            weaviateTreeDataProvider.handleViewRawConfig(item);
+        }),
         
         // Query a collection
         vscode.commands.registerCommand('weaviate.queryCollection', (arg1: any, arg2?: string) => {
