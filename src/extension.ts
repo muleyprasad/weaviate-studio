@@ -183,6 +183,88 @@ export function activate(context: vscode.ExtensionContext) {
                     `Failed to delete collection: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
+        }),
+
+        // Refresh connection info command
+        vscode.commands.registerCommand('weaviate.refreshConnection', async (item) => {
+            if (!item?.connectionId) {
+                vscode.window.showErrorMessage('Missing connection ID');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.refreshConnectionInfo(item.connectionId);
+                vscode.window.showInformationMessage('Connection info refreshed');
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to refresh connection: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Refresh statistics command
+        vscode.commands.registerCommand('weaviate.refreshStatistics', async (item) => {
+            if (!item?.connectionId || !item?.collectionName) {
+                vscode.window.showErrorMessage('Missing connection or collection information');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.refreshStatistics(item.connectionId, item.collectionName);
+                vscode.window.showInformationMessage('Statistics refreshed');
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to refresh statistics: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Export schema command
+        vscode.commands.registerCommand('weaviate.exportSchema', async (item) => {
+            if (!item?.connectionId || !item?.label) {
+                vscode.window.showErrorMessage('Missing connection or collection information');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.exportSchema(item.connectionId, item.label);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to export schema: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Duplicate collection command
+        vscode.commands.registerCommand('weaviate.duplicateCollection', async (item) => {
+            if (!item?.connectionId || !item?.label) {
+                vscode.window.showErrorMessage('Missing connection or collection information');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.duplicateCollection(item.connectionId, item.label);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to duplicate collection: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // View collection metrics command
+        vscode.commands.registerCommand('weaviate.viewCollectionMetrics', async (item) => {
+            if (!item?.connectionId || !item?.label) {
+                vscode.window.showErrorMessage('Missing connection or collection information');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.viewCollectionMetrics(item.connectionId, item.label);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to view metrics: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
         })
     );
 

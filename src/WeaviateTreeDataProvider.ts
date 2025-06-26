@@ -1294,6 +1294,171 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
+     * Refreshes connection info for a specific connection
+     * @param connectionId - The ID of the connection to refresh
+     */
+    async refreshConnectionInfo(connectionId: string): Promise<void> {
+        try {
+            // Reconnect to refresh the connection info
+            await this.connect(connectionId, true);
+            await this.fetchCollections(connectionId);
+            this.refresh();
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error refreshing connection info:', error);
+            throw new Error(`Failed to refresh connection info: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Refreshes statistics for a specific collection
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection
+     */
+    async refreshStatistics(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            // Simply refresh the tree view to trigger statistics reload
+            this.refresh();
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error refreshing statistics:', error);
+            throw new Error(`Failed to refresh statistics: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Exports a collection schema to a file
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection to export
+     */
+    async exportSchema(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            const collection = this.collections[connectionId]?.find(
+                col => col.label === collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema) {
+                throw new Error('Collection schema not found');
+            }
+
+            // Show save dialog
+            const saveUri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file(`${collectionName}_schema.json`),
+                filters: {
+                    'JSON Files': ['json'],
+                    'All Files': ['*']
+                }
+            });
+
+            if (!saveUri) {
+                return; // User cancelled
+            }
+
+            // Export schema as formatted JSON
+            const schemaJson = JSON.stringify(collection.schema, null, 2);
+            await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
+            
+            vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error exporting schema:', error);
+            throw new Error(`Failed to export schema: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Duplicates a collection by creating a new collection with the same schema
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection to duplicate
+     */
+    async duplicateCollection(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            const collection = this.collections[connectionId]?.find(
+                col => col.label === collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema) {
+                throw new Error('Collection schema not found');
+            }
+
+            // Ask for new collection name
+            const newName = await vscode.window.showInputBox({
+                prompt: `Enter name for duplicated collection (original: ${collectionName})`,
+                value: `${collectionName}_copy`,
+                validateInput: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Collection name cannot be empty';
+                    }
+                    if (value === collectionName) {
+                        return 'New name must be different from original';
+                    }
+                    return null;
+                }
+            });
+
+            if (!newName) {
+                return; // User cancelled
+            }
+
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Client not initialized');
+            }
+
+            // Create duplicate schema with new name
+            const duplicateSchema = { ...collection.schema };
+            duplicateSchema.class = newName.trim();
+
+            // Create the new collection
+            await client.schema.classCreator()
+                .withClass(duplicateSchema)
+                .do();
+
+            // Refresh collections
+            await this.fetchCollections(connectionId);
+            
+            vscode.window.showInformationMessage(`Collection duplicated as "${newName}"`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error duplicating collection:', error);
+            throw new Error(`Failed to duplicate collection: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Shows performance metrics for a collection
+     * @param connectionId - The ID of the connection
+     * @param collectionName - The name of the collection
+     */
+    async viewCollectionMetrics(connectionId: string, collectionName: string): Promise<void> {
+        try {
+            const collection = this.collections[connectionId]?.find(
+                col => col.label === collectionName
+            ) as CollectionWithSchema | undefined;
+
+            if (!collection?.schema) {
+                throw new Error('Collection schema not found');
+            }
+
+            // Create and show a webview with collection metrics
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateCollectionMetrics',
+                `Metrics: ${collectionName}`,
+                vscode.ViewColumn.One,
+                { enableScripts: true }
+            );
+
+            // Generate metrics HTML
+            panel.webview.html = this.viewRenderer.renderCollectionMetrics(collection.schema, connectionId);
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error viewing collection metrics:', error);
+            throw new Error(`Failed to view collection metrics: ${errorMessage}`);
+        }
+    }
+
+    /**
      * Deletes a connection without showing any confirmation dialogs.
      * Callers are responsible for showing confirmation dialogs if needed.
      * @param connectionId The ID of the connection to delete

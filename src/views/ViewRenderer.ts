@@ -777,4 +777,301 @@ await client.schema.classCreator().withClass(schema).do();</code></pre>
         const jsonString = JSON.stringify(json, null, 2);
         return this.escapeHtml(jsonString);
     }
+
+    /**
+     * Renders raw collection configuration view
+     */
+    public renderRawConfig(schema: SchemaClass, connectionId: string): string {
+        // Get connection info for context
+        const timestamp = new Date().toLocaleString();
+        
+        // Generate creation script
+        const creationScript = `# Weaviate Collection Configuration
+# Generated: ${timestamp}
+# Collection: ${schema.class}
+
+import weaviate
+
+client = weaviate.Client("http://localhost:8080")
+
+# Collection definition
+collection_config = ${JSON.stringify(schema, null, 4)}
+
+# Create the collection
+client.schema.create_class(collection_config)
+
+print(f"Collection '{schema.class}' created successfully!")`;
+
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Raw Config: ${this.escapeHtml(schema.class)}</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        padding: 0;
+                        margin: 0;
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                    }
+                    .tab-container {
+                        display: flex;
+                        flex-direction: column;
+                        height: 100vh;
+                    }
+                    .tab-header {
+                        display: flex;
+                        background-color: var(--vscode-tab-border);
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        overflow-x: auto;
+                    }
+                    .tab-button {
+                        padding: 10px 20px;
+                        background: var(--vscode-tab-inactiveBackground);
+                        color: var(--vscode-tab-inactiveForeground);
+                        border: none;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        border-right: 1px solid var(--vscode-panel-border);
+                    }
+                    .tab-button.active {
+                        background: var(--vscode-tab-activeBackground);
+                        color: var(--vscode-tab-activeForeground);
+                    }
+                    .tab-content {
+                        flex: 1;
+                        padding: 20px;
+                        overflow-y: auto;
+                        display: none;
+                    }
+                    .tab-content.active {
+                        display: block;
+                    }
+                    pre {
+                        background-color: var(--vscode-textCodeBlock-background);
+                        padding: 15px;
+                        border-radius: 4px;
+                        overflow-x: auto;
+                        font-family: var(--vscode-editor-font-family);
+                        font-size: var(--vscode-editor-font-size);
+                    }
+                    .copy-btn {
+                        background: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-bottom: 10px;
+                    }
+                    .copy-btn:hover {
+                        background: var(--vscode-button-hoverBackground);
+                    }
+                    .context-info {
+                        background: var(--vscode-textCodeBlock-background);
+                        padding: 10px;
+                        border-radius: 4px;
+                        margin-bottom: 20px;
+                        font-size: 0.9em;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="tab-container">
+                    <div class="tab-header">
+                        <button class="tab-button active" onclick="showTab('creation')">Creation Script</button>
+                        <button class="tab-button" onclick="showTab('details')">Property Details</button>
+                        <button class="tab-button" onclick="showTab('json')">Complete JSON</button>
+                    </div>
+                    
+                    <div id="creation" class="tab-content active">
+                        <div class="context-info">
+                            <strong>Collection:</strong> ${this.escapeHtml(schema.class)}<br>
+                            <strong>Generated:</strong> ${timestamp}<br>
+                            <strong>Properties:</strong> ${schema.properties?.length || 0}
+                        </div>
+                        
+                        <button class="copy-btn" onclick="copyToClipboard('creationScript')">
+                            📋 Copy Creation Script
+                        </button>
+                        <pre id="creationScript">${this.escapeHtml(creationScript)}</pre>
+                    </div>
+                    
+                    <div id="details" class="tab-content">
+                        <h3>Property Details</h3>
+                        ${schema.properties?.map(prop => `
+                            <div style="background: var(--vscode-editor-lineHighlightBackground); padding: 10px; margin: 10px 0; border-radius: 4px;">
+                                <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType?.join(' | ') || 'Unknown'})<br>
+                                ${prop.description ? `<em>${this.escapeHtml(prop.description)}</em><br>` : ''}
+                                <small>Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</small>
+                            </div>
+                        `).join('') || '<p>No properties defined</p>'}
+                    </div>
+                    
+                    <div id="json" class="tab-content">
+                        <button class="copy-btn" onclick="copyToClipboard('fullJson')">
+                            📋 Copy JSON
+                        </button>
+                        <pre id="fullJson">${this.syntaxHighlight(schema)}</pre>
+                    </div>
+                </div>
+
+                <script>
+                    function showTab(tabName) {
+                        // Hide all tab contents
+                        const contents = document.querySelectorAll('.tab-content');
+                        contents.forEach(content => content.classList.remove('active'));
+                        
+                        // Remove active from all buttons
+                        const buttons = document.querySelectorAll('.tab-button');
+                        buttons.forEach(button => button.classList.remove('active'));
+                        
+                        // Show selected tab
+                        document.getElementById(tabName).classList.add('active');
+                        
+                        // Activate corresponding button
+                        event.target.classList.add('active');
+                    }
+                    
+                    function copyToClipboard(elementId) {
+                        const element = document.getElementById(elementId);
+                        const text = element.textContent;
+                        navigator.clipboard.writeText(text).then(() => {
+                            // Show brief success indication
+                            const btn = event.target;
+                            const originalText = btn.textContent;
+                            btn.textContent = '✅ Copied!';
+                            setTimeout(() => {
+                                btn.textContent = originalText;
+                            }, 2000);
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Renders collection performance metrics view
+     */
+    public renderCollectionMetrics(schema: SchemaClass, connectionId: string): string {
+        const timestamp = new Date().toLocaleString();
+        
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Metrics: ${this.escapeHtml(schema.class)}</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        padding: 20px;
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                    }
+                    .metric-card {
+                        background: var(--vscode-editor-lineHighlightBackground);
+                        padding: 15px;
+                        margin: 10px 0;
+                        border-radius: 4px;
+                        border-left: 4px solid var(--vscode-textLink-foreground);
+                    }
+                    .metric-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                        gap: 15px;
+                        margin: 20px 0;
+                    }
+                    .metric-value {
+                        font-size: 1.5em;
+                        font-weight: bold;
+                        color: var(--vscode-textLink-foreground);
+                    }
+                    .metric-label {
+                        font-size: 0.9em;
+                        color: var(--vscode-descriptionForeground);
+                    }
+                    h1, h2 {
+                        color: var(--vscode-textLink-foreground);
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        padding-bottom: 5px;
+                    }
+                    .refresh-btn {
+                        background: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-bottom: 20px;
+                    }
+                    .refresh-btn:hover {
+                        background: var(--vscode-button-hoverBackground);
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Performance Metrics: ${this.escapeHtml(schema.class)}</h1>
+                
+                <button class="refresh-btn" onclick="window.location.reload()">
+                    🔄 Refresh Metrics
+                </button>
+                
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${schema.properties?.length || 0}</div>
+                        <div class="metric-label">Properties Defined</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">${schema.vectorizer || 'None'}</div>
+                        <div class="metric-label">Vectorizer</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">${(schema as any).vectorIndexType || 'HNSW'}</div>
+                        <div class="metric-label">Vector Index Type</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">${Object.keys(schema.moduleConfig || {}).length}</div>
+                        <div class="metric-label">Active Modules</div>
+                    </div>
+                </div>
+
+                <h2>Index Configuration</h2>
+                <div class="metric-card">
+                    <strong>Vector Index:</strong> ${(schema as any).vectorIndexType || 'HNSW'}<br>
+                    <strong>Inverted Index:</strong> ${(schema as any).invertedIndexConfig ? 'Custom' : 'Default'}<br>
+                    <strong>Indexed Properties:</strong> ${schema.properties?.filter(p => p.indexInverted !== false).length || 0}
+                </div>
+
+                <h2>Schema Configuration</h2>
+                <div class="metric-card">
+                    <strong>Multi-tenancy:</strong> ${(schema as any).multiTenancyConfig?.enabled ? 'Enabled' : 'Disabled'}<br>
+                    <strong>Replication Factor:</strong> ${(schema as any).replicationConfig?.factor || 1}<br>
+                    <strong>Sharding:</strong> ${(schema as any).shardingConfig ? 'Custom' : 'Default'}
+                </div>
+
+                <h2>Modules & Vectorization</h2>
+                <div class="metric-card">
+                    ${schema.moduleConfig ? Object.entries(schema.moduleConfig).map(([module, config]) => 
+                        `<strong>${module}:</strong> Configured<br>`
+                    ).join('') : 'No modules configured'}
+                </div>
+
+                <div style="margin-top: 30px; padding: 10px; background: var(--vscode-textCodeBlock-background); border-radius: 4px; font-size: 0.8em;">
+                    <strong>Last Updated:</strong> ${timestamp}<br>
+                    <strong>Connection:</strong> ${connectionId}
+                </div>
+            </body>
+            </html>
+        `;
+    }
 }
