@@ -224,7 +224,7 @@ const App = () => {
     }
   };
 
-  // Generate sample query button handler - requests from backend
+  // Legacy sample query handler - kept for compatibility but no longer used
   const handleGenerateQuery = () => {
     if (collection && vscode) {
       // Request sample query from backend instead of generating it

@@ -146,6 +146,88 @@ Added comprehensive type definitions:
 - Module and cluster information
 - Error handling with user-friendly messages
 
+## Phase 4: Advanced Collection Management
+
+### Enhanced Context Menus
+Added professional management actions available via right-click:
+
+1. **Schema Export**
+   - Export collection schema to JSON file
+   - File save dialog with proper filtering
+   - Clean, formatted JSON output
+   - Success notifications with file path
+
+2. **Collection Duplication**
+   - Duplicate existing collections with new names
+   - Input validation for collection names
+   - Schema cloning with proper renaming
+   - Automatic collection refresh after creation
+
+3. **Performance Metrics Viewer**
+   - Comprehensive metrics dashboard
+   - Property count and configuration analysis
+   - Index performance indicators
+   - Module and vectorization summary
+   - Real-time refresh capability
+
+### Refresh Actions
+Added granular refresh capabilities:
+
+1. **Connection Refresh**
+   - Available on connection, server info, and cluster health items
+   - Refreshes server metadata and statistics
+   - Updates connection status and information
+   - Silent operation with user feedback
+
+2. **Statistics Refresh**
+   - Available on individual statistic items
+   - Triggers real-time data reload
+   - Updates object counts and metrics
+   - Quick refresh without full reconnection
+
+### Advanced Schema Viewers
+
+#### Enhanced Raw Config Viewer
+New professional tabbed interface:
+
+1. **Creation Script Tab**
+   - Complete Python recreation script with imports
+   - Ready-to-execute code
+   - Context information (timestamp, properties count)
+   - Copy-to-clipboard functionality
+
+2. **Property Details Tab**
+   - Human-readable property breakdown
+   - Type information and descriptions
+   - Index status for each property
+   - Visual card layout for easy scanning
+
+3. **Complete JSON Tab**
+   - Full schema with all metadata
+   - Syntax highlighting for readability
+   - Copy functionality with visual feedback
+   - Clean VS Code theming
+
+#### Professional Metrics Dashboard
+Comprehensive performance analysis:
+
+1. **Key Metrics Grid**
+   - Properties count, vectorizer info
+   - Vector index type and configuration
+   - Active modules count
+   - Visual metric cards with values
+
+2. **Configuration Analysis**
+   - Index configuration details
+   - Multi-tenancy status
+   - Replication factor information
+   - Sharding configuration summary
+
+3. **Module Analysis**
+   - Active modules with configuration status
+   - Vectorization setup details
+   - Performance optimization insights
+
 ## How to Test
 
 ### Prerequisites

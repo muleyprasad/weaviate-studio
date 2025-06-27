@@ -19,7 +19,7 @@ export interface TemplateOption {
 }
 
 /**
- * Monaco-based GraphQL query editor with schema-aware features
+ * Enhanced Monaco editor for GraphQL with Weaviate-specific features
  */
 export class MonacoQueryEditor {
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -27,206 +27,203 @@ export class MonacoQueryEditor {
   private schemaConfig: GraphQLSchema | null = null;
   private disposables: monaco.IDisposable[] = [];
   private monacoGraphQLAPI: any = null;
-  private templateSelectorContainer: HTMLElement | null = null;
-  private templateOptions: TemplateOption[] = [];
   private currentCollectionName: string = 'Article';
-  
-  // Event callbacks
+
+  // Event listener management
   private changeListeners: Array<(value: string) => void> = [];
-  
-  /**
-   * Notify all change listeners with the new value
-   * @param value The new editor value
-   */
-  private notifyChangeListeners(value: string): void {
-    this.changeListeners.forEach(listener => listener(value));
-  }
 
   /**
-   * Create a new Monaco-based GraphQL query editor
-   * @param container DOM element to mount the editor
-   * @param initialValue Initial query text
+   * Notify all change listeners when content changes
    */
+  private notifyChangeListeners(value: string): void {
+    this.changeListeners.forEach(listener => {
+      try {
+        listener(value);
+      } catch (error) {
+        console.error('Error in change listener:', error);
+      }
+    });
+  }
+
   constructor(container: HTMLElement, initialValue: string = '') {
     this.container = container;
     this.initializeEditor();
-    this.createTemplateSelector();
+    
+    if (initialValue) {
+      this.setValue(initialValue);
+    }
   }
 
-  /**
-   * Initialize the Monaco editor with GraphQL language support
-   */
   private initializeEditor() {
-    if (!this.container) {
-      console.error('Cannot initialize editor: container is null');
-      return;
-    }
-
-    // Detect VS Code theme
+    // Determine VS Code theme
     const getVSCodeTheme = (): string => {
-      // Check for VS Code CSS custom properties to determine theme
+      // Check for VS Code theme class on body or html
       const body = document.body;
-      const computedStyle = getComputedStyle(body);
+      const html = document.documentElement;
       
-      // Try to get VS Code theme from CSS variables
-      const backgroundColor = computedStyle.getPropertyValue('--vscode-editor-background').trim();
-      const foregroundColor = computedStyle.getPropertyValue('--vscode-editor-foreground').trim();
+      if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
+        return 'vs-dark';
+      } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
+        return 'vs';
+      } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
+        return 'hc-black';
+      }
       
-      // If we can't get CSS variables, fall back to checking computed styles
-      if (!backgroundColor) {
-        const actualBg = computedStyle.backgroundColor;
-        const rgb = actualBg.match(/\d+/g);
+      // Check CSS variables or fallback to dark theme
+      const styles = getComputedStyle(document.body);
+      const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
+                     styles.backgroundColor;
+      
+      // Simple heuristic: if background is dark, use dark theme
+      if (bgColor.includes('rgb')) {
+        const rgb = bgColor.match(/\d+/g);
         if (rgb && rgb.length >= 3) {
-          const [r, g, b] = rgb.map(Number);
-          // If background is dark (low luminance), use dark theme
-          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          return luminance < 0.5 ? 'vs-dark' : 'vs';
+          const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+          return brightness < 128 ? 'vs-dark' : 'vs';
         }
       }
       
-      // Parse background color to determine if it's dark or light
-      if (backgroundColor) {
-        // Handle hex colors
-        if (backgroundColor.startsWith('#')) {
-          const hex = backgroundColor.slice(1);
-          const r = parseInt(hex.slice(0, 2), 16);
-          const g = parseInt(hex.slice(2, 4), 16);
-          const b = parseInt(hex.slice(4, 6), 16);
-          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          return luminance < 0.5 ? 'vs-dark' : 'vs';
-        }
-        // Handle rgb/rgba colors
-        const rgbMatch = backgroundColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (rgbMatch) {
-          const [, r, g, b] = rgbMatch.map(Number);
-          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          return luminance < 0.5 ? 'vs-dark' : 'vs';
-        }
-      }
-      
-      // Default to dark theme if we can't determine
+      // Default to dark theme for VS Code
       return 'vs-dark';
     };
 
-    const currentTheme = getVSCodeTheme();
-
-    // Create Monaco editor instance
+    // Create Monaco editor with enhanced options
     this.editor = monaco.editor.create(this.container, {
       value: '',
       language: 'graphql',
-      theme: currentTheme,
+      theme: getVSCodeTheme(),
       automaticLayout: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
+      wordWrap: 'on',
       lineNumbers: 'on',
       glyphMargin: true,
       folding: true,
-      // Additional editor options
-      renderLineHighlight: 'all',
-      scrollbar: {
-        verticalScrollbarSize: 10,
-        horizontalScrollbarSize: 10
-      },
+      lineDecorationsWidth: 10,
+      lineNumbersMinChars: 3,
+      renderLineHighlight: 'line',
+      selectOnLineNumbers: true,
+      roundedSelection: false,
+      readOnly: false,
+      cursorStyle: 'line',
       fontSize: 14,
-      fontFamily: 'var(--vscode-editor-font-family, "Menlo", "Monaco", "Courier New", monospace)',
+      fontFamily: 'var(--vscode-editor-font-family, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace)',
+      tabSize: 2,
+      insertSpaces: true,
+      detectIndentation: true,
+      trimAutoWhitespace: true,
+      acceptSuggestionOnCommitCharacter: true,
+      acceptSuggestionOnEnter: 'on',
+      accessibilitySupport: 'auto',
+      autoIndent: 'full',
+      contextmenu: true,
+      dragAndDrop: true,
+      links: true,
+      mouseWheelZoom: false,
+      multiCursorMergeOverlapping: true,
+      multiCursorModifier: 'alt',
+      overviewRulerBorder: true,
+      overviewRulerLanes: 2,
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true
+      },
+      quickSuggestionsDelay: 100,
+      parameterHints: {
+        enabled: true,
+        cycle: true
+      },
+      suggestOnTriggerCharacters: true,
+      tabCompletion: 'on',
+      wordBasedSuggestions: 'matchingDocuments',
+      formatOnPaste: true,
+      formatOnType: true,
+      autoClosingBrackets: 'always',
+      autoClosingQuotes: 'always',
+      autoSurround: 'languageDefined',
+      colorDecorators: true,
+      comments: {
+        insertSpace: true,
+        ignoreEmptyLines: true
+      },
+      copyWithSyntaxHighlighting: true,
+      emptySelectionClipboard: true,
+      find: {
+        autoFindInSelection: 'never',
+        seedSearchStringFromSelection: 'always'
+      },
+      gotoLocation: {
+        alternativeDefinitionCommand: 'editor.action.goToReferences',
+        alternativeTypeDefinitionCommand: 'editor.action.goToReferences',
+        alternativeDeclarationCommand: 'editor.action.goToReferences',
+        alternativeImplementationCommand: 'editor.action.goToReferences',
+        alternativeReferenceCommand: 'editor.action.goToReferences'
+      },
+      hover: {
+        enabled: true,
+        delay: 300,
+        sticky: true
+      },
+      matchBrackets: 'always',
+      occurrencesHighlight: 'singleFile',
+      renderControlCharacters: false,
+      renderFinalNewline: 'on',
+      renderWhitespace: 'none',
+      rulers: [],
+      scrollbar: {
+        vertical: 'auto',
+        horizontal: 'auto',
+        arrowSize: 11,
+        useShadows: true,
+        verticalHasArrows: false,
+        horizontalHasArrows: false,
+        horizontalScrollbarSize: 12,
+        verticalScrollbarSize: 12,
+        verticalSliderSize: 12,
+        horizontalSliderSize: 12
+      },
+      smoothScrolling: true,
+      snippetSuggestions: 'top',
+      suggest: {
+        filterGraceful: true,
+        insertMode: 'insert',
+        localityBonus: true,
+        selectionMode: 'always',
+        shareSuggestSelections: true,
+        showIcons: true,
+        showStatusBar: true,
+        snippetsPreventQuickSuggestions: true
+      },
+      unfoldOnClickAfterEndOfLine: false,
+      useShadowDOM: true
     });
-    
-    // Listen for theme changes and update editor theme accordingly
-    const observer = new MutationObserver(() => {
-      const newTheme = getVSCodeTheme();
-      if (this.editor && newTheme !== currentTheme) {
-        monaco.editor.setTheme(newTheme);
-      }
-    });
-    
-    // Observe changes to body class and style attributes that might indicate theme changes
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class', 'style']
-    });
-    
-    // Store observer for cleanup
-    this.disposables.push({
-      dispose: () => observer.disconnect()
-    });
-    
-    // Set up change event listener
+
+    // Register change event listener
     if (this.editor) {
-      this.disposables.push(
-        this.editor.onDidChangeModelContent(() => {
-          const value = this.editor?.getValue() || '';
+      const changeDisposable = this.editor.onDidChangeModelContent(() => {
+        if (this.editor) {
+          const value = this.editor.getValue();
           this.notifyChangeListeners(value);
-        })
-      );
+        }
+      });
+      this.disposables.push(changeDisposable);
     }
 
-    // Add keyboard shortcuts for common operations
-    this.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
-      if (this.editor) {
-        this.editor.trigger('keyboard', 'editor.action.triggerSuggest', {});
-      }
-    });
-
-    // Format document shortcut
-    this.editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
-      if (this.editor) {
-        this.editor.getAction('editor.action.formatDocument')?.run();
-      }
-    });
+    console.log('Monaco GraphQL editor initialized');
   }
 
   /**
    * Configure GraphQL language support with schema
-   * @param schemaConfig GraphQL schema configuration
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
-    if (!this.editor) {
-      console.error('Editor not initialized');
-      return;
-    }
-
+    this.schemaConfig = schemaConfig;
+    
     try {
-      this.schemaConfig = schemaConfig;
-
-      // Clean up previous disposables
-      this.disposables.forEach(d => d.dispose());
-      this.disposables = [];
-
-      // Register the schema with Monaco
-      const modelUri = monaco.Uri.parse('inmemory://weaviate-graphql.graphql');
-      const model = monaco.editor.getModel(modelUri) || 
-                    monaco.editor.createModel('', 'graphql', modelUri);
-      
-      // Set the model before configuring GraphQL language support
-      this.editor.setModel(model);
-      
-      // Initialize Monaco GraphQL mode with schema
+      // Store the monaco-graphql API if available
       if (monacoGraphQLAPI) {
-        console.log('Initializing Monaco GraphQL API with schema', schemaConfig.uri);
-        
-        // Ensure schema is valid before initializing
-        if (!schemaConfig.introspectionJSON) {
-          console.error('Schema introspection JSON is missing');
-          return;
-        }
-        
-        this.monacoGraphQLAPI = monacoGraphQLAPI({
-          schemas: [
-            {
-              uri: schemaConfig.uri,
-              fileMatch: ['*.graphql', '*.gql', modelUri.toString()],
-              schema: schemaConfig.introspectionJSON
-            }
-          ],
-          // run language service on UI thread
-          worker: false
-        });
-        
-        // Force language features to initialize
-        monaco.editor.setModelLanguage(model, 'graphql');
-        
-        // Log success for debugging
-        console.log('Monaco GraphQL language features initialized');
+        this.monacoGraphQLAPI = monacoGraphQLAPI;
+        console.log('Monaco GraphQL API configured');
       } else {
         console.warn('Monaco GraphQL API not available, language features will be limited');
       }
@@ -238,99 +235,11 @@ export class MonacoQueryEditor {
   }
 
   /**
-   * Create template selector UI
-   */
-  private createTemplateSelector(): void {
-    // Create container for template selector
-    this.templateSelectorContainer = document.createElement('div');
-    this.templateSelectorContainer.className = 'template-selector';
-    this.templateSelectorContainer.style.cssText = 
-      'margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px;';
-    
-    // Insert before the Monaco editor container
-    if (this.container.parentNode) {
-      this.container.parentNode.insertBefore(this.templateSelectorContainer, this.container);
-    }
-    
-    // Add template options
-    this.populateTemplateOptions();
-  }
-
-  /**
-   * Populate template options from queryTemplates
-   */
-  private populateTemplateOptions(): void {
-    if (!this.templateSelectorContainer) { return; }
-    
-    // Clear existing options
-    this.templateSelectorContainer.innerHTML = '';
-    this.templateOptions = [];
-
-    // Add label
-    const label = document.createElement('span');
-    label.textContent = 'Templates: ';
-    label.style.cssText = 'font-weight: bold; margin-right: 8px; align-self: center;';
-    
-    if (this.templateSelectorContainer) {
-      this.templateSelectorContainer.appendChild(label);
-    }
-    
-    // Add each template as a button
-    queryTemplates.forEach(template => {
-      const button = document.createElement('button');
-      button.textContent = template.name;
-      button.title = template.description;
-      button.className = 'template-button';
-      
-      // Use CSS variables for theme-aware styling
-      const buttonStyles = [
-        'background-color: var(--vscode-button-secondaryBackground, #2d2d30)',
-        'color: var(--vscode-button-secondaryForeground, #cccccc)',
-        'border: 1px solid var(--vscode-widget-border, #3c3c3c)',
-        'border-radius: 3px',
-        'padding: 4px 8px',
-        'cursor: pointer',
-        'font-size: 12px'
-      ];
-      button.style.cssText = buttonStyles.join('; ') + ';';
-      
-      // Add hover effect with theme variables
-      button.addEventListener('mouseover', () => {
-        button.style.backgroundColor = 'var(--vscode-button-hoverBackground, #3e3e42)';
-      });
-      button.addEventListener('mouseout', () => {
-        button.style.backgroundColor = 'var(--vscode-button-secondaryBackground, #2d2d30)';
-      });
-      
-      // Add click handler to insert template
-      button.addEventListener('click', () => {
-        this.insertTemplate(template.name);
-      });
-      
-      if (this.templateSelectorContainer) {
-        this.templateSelectorContainer.appendChild(button);
-      }
-      
-      // Store reference to option
-      this.templateOptions.push({
-        element: button,
-        template: template.template,
-        name: template.name,
-        description: template.description
-      });
-    });
-  }
-
-  /**
    * Insert template into editor
    * @param templateName Name of the template to insert
    */
   public insertTemplate(templateName: string): void {
     if (!this.editor) { return; }
-    
-    // Find the template
-    const templateOption = this.templateOptions.find(option => option.name === templateName);
-    if (!templateOption) { return; }
     
     // Process the template with current collection name and schema information
     // Pass the schema config to enable proper relationship field handling
@@ -427,15 +336,16 @@ export class MonacoQueryEditor {
 
   /**
    * Get the current query text from the editor
-   * @returns The current query text as a string
    */
   public getValue(): string {
-    return this.editor?.getValue() || '';
+    if (!this.editor) {
+      return '';
+    }
+    return this.editor.getValue();
   }
 
   /**
    * Set the query text in the editor
-   * @param value Query text to set
    */
   public setValue(value: string): void {
     if (this.editor) {
@@ -444,59 +354,56 @@ export class MonacoQueryEditor {
   }
 
   /**
-   * Format the current query using Prettier
+   * Format the current GraphQL query
    */
   public async formatQuery(): Promise<void> {
-    if (this.editor) {
-      try {
-        const currentValue = this.editor.getValue();
-        const formattedValue = await formatGraphQLQuery(currentValue);
+    if (!this.editor) { return; }
+    
+    try {
+      const currentValue = this.editor.getValue();
+      const formatted = await formatGraphQLQuery(currentValue);
+      
+      if (formatted && formatted !== currentValue) {
+        // Get current selection and cursor position
+        const selection = this.editor.getSelection();
+        const position = this.editor.getPosition();
         
-        // Only update if formatting actually changed something
-        if (formattedValue !== currentValue) {
-          // Replace the entire content with the formatted query
-          this.editor.executeEdits('format', [{
-            range: this.editor.getModel()!.getFullModelRange(),
-            text: formattedValue,
-            forceMoveMarkers: true
-          }]);
-          
-          // Check if formatting introduced any issues
-          this.validateQueryParameters();
-        }
-      } catch (error) {
-        console.error('Error formatting GraphQL query:', error);
+        // Update the value
+        this.editor.setValue(formatted);
         
-        // Fall back to Monaco's built-in formatter if our custom formatter fails
-        const formatAction = this.editor.getAction('editor.action.formatDocument');
-        if (formatAction) {
-          formatAction.run();
+        // Try to restore cursor position
+        if (position) {
+          this.editor.setPosition(position);
+        } else if (selection) {
+          this.editor.setSelection(selection);
         }
+        
+        console.log('Query formatted successfully');
       }
+    } catch (error) {
+      console.error('Error formatting query:', error);
+      // Don't throw - just log the error so the editor continues to work
     }
   }
 
   /**
    * Insert text at the current cursor position
-   * @param template Text to insert at cursor
+   * @param text Text to insert
    */
   public insertTextAtCursor(template: string): void {
-    if (this.editor) {
-      const position = this.editor.getPosition();
-      if (position) {
-        this.editor.executeEdits('quick-insert', [{
-          range: new monaco.Range(
-            position.lineNumber,
-            position.column,
-            position.lineNumber,
-            position.column
-          ),
-          text: template,
-          forceMoveMarkers: true
-        }]);
-        this.editor.focus();
-      }
-    }
+    if (!this.editor) { return; }
+    
+    const selection = this.editor.getSelection();
+    const range = selection || new monaco.Range(1, 1, 1, 1);
+    
+    this.editor.executeEdits('insert-template', [{
+      range: range,
+      text: template,
+      forceMoveMarkers: true
+    }]);
+    
+    // Focus the editor
+    this.editor.focus();
   }
 
   /**
@@ -534,36 +441,39 @@ export class MonacoQueryEditor {
   }
 
   /**
-   * Register a listener for editor content changes
-   * @param listener Function to call when content changes
-   * @returns A function to remove the listener
+   * Register a listener for content changes
    */
   public onDidChangeModelContent(listener: (value: string) => void): () => void {
     this.changeListeners.push(listener);
+    
+    // Return unsubscribe function
     return () => {
-      this.changeListeners = this.changeListeners.filter(l => l !== listener);
+      const index = this.changeListeners.indexOf(listener);
+      if (index > -1) {
+        this.changeListeners.splice(index, 1);
+      }
     };
   }
 
   /**
-   * Get the Monaco editor instance
-   * @returns The Monaco editor instance or null if not initialized
+   * Get the underlying Monaco editor instance
    */
   public getEditor(): monaco.editor.IStandaloneCodeEditor | null {
     return this.editor;
   }
 
   /**
-   * Dispose the editor and clean up resources
+   * Clean up resources
    */
   public dispose(): void {
-    this.disposables.forEach(d => d.dispose());
+    this.disposables.forEach(disposable => disposable.dispose());
     this.disposables = [];
-    this.changeListeners = [];
     
     if (this.editor) {
       this.editor.dispose();
       this.editor = null;
     }
+    
+    this.changeListeners = [];
   }
 }
