@@ -9,6 +9,7 @@ interface TableColumn {
 interface ResultsTableProps {
   data: any;
   collectionName?: string;
+  queryText?: string; // Keep for potential future use
 }
 
 /**
@@ -186,7 +187,7 @@ function formatCellValue(value: any, type: TableColumn['type']): string {
   return String(value);
 }
 
-export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName }) => {
+export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName, queryText }) => {
   const { rows, columns } = useMemo(() => {
     const extractedRows = extractDataRows(data);
     const generatedColumns = generateColumns(extractedRows);
@@ -195,7 +196,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
       rows: extractedRows,
       columns: generatedColumns
     };
-  }, [data]);
+  }, [data, collectionName, queryText]);
   
   if (rows.length === 0) {
     return (
@@ -226,26 +227,57 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
     color: 'var(--vscode-editor-foreground, #D4D4D4)'
   };
   
+  // Improved header styling with better theme colors
   const headerStyle: React.CSSProperties = {
-    backgroundColor: 'var(--vscode-list-headerBackground, #1E1E1E)',
-    color: 'var(--vscode-list-headerForeground, #E0E0E0)',
-    padding: '8px 12px',
+    backgroundColor: 'var(--vscode-list-hoverBackground, #2A2D2E)',
+    color: 'var(--vscode-list-activeSelectionForeground, #FFFFFF)',
+    padding: '10px 12px',
     textAlign: 'left',
-    borderBottom: '2px solid var(--vscode-panel-border, #333)',
+    borderBottom: '1px solid var(--vscode-panel-border, #333)',
     fontWeight: 600,
     position: 'sticky',
     top: 0,
-    zIndex: 1
+    zIndex: 1,
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
   };
   
   const cellStyle: React.CSSProperties = {
-    padding: '6px 12px',
+    padding: '8px 12px',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
     verticalAlign: 'top',
     maxWidth: '300px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap'
+  };
+  
+  const rowNumberStyle: React.CSSProperties = {
+    ...cellStyle,
+    backgroundColor: 'var(--vscode-list-hoverBackground, #2A2D2E)',
+    color: 'var(--vscode-list-activeSelectionForeground, #FFFFFF)',
+    fontWeight: 600,
+    textAlign: 'center',
+    width: '60px',
+    minWidth: '60px',
+    maxWidth: '60px',
+    position: 'sticky',
+    left: 0,
+    zIndex: 2,
+    borderRight: '1px solid var(--vscode-panel-border, #333)'
+  };
+  
+  const rowNumberHeaderStyle: React.CSSProperties = {
+    ...headerStyle,
+    textAlign: 'center',
+    width: '60px',
+    minWidth: '60px',
+    maxWidth: '60px',
+    position: 'sticky',
+    left: 0,
+    zIndex: 3,
+    borderRight: '1px solid var(--vscode-panel-border, #333)'
   };
   
   const containerStyle: React.CSSProperties = {
@@ -260,6 +292,9 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
       <table style={tableStyle}>
         <thead>
           <tr>
+            <th style={rowNumberHeaderStyle} title="Row Number">
+              #
+            </th>
             {columns.map(column => (
               <th key={column.key} style={headerStyle} title={column.key}>
                 {column.label}
@@ -272,6 +307,9 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
             const flattenedRow = flattenObject(row);
             return (
               <tr key={rowIndex}>
+                <td style={rowNumberStyle}>
+                  {rowIndex + 1}
+                </td>
                 {columns.map(column => (
                   <td 
                     key={column.key} 
