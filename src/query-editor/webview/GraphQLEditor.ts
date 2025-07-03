@@ -1,12 +1,7 @@
 import * as monaco from 'monaco-editor';
-import { SchemaProvider, GraphQLSchema } from './schemaProvider';
-import { queryTemplates, processTemplate } from './queryTemplates';
+import { SchemaProvider, GraphQLSchema } from './GraphQLSchemaProvider';
+import { queryTemplates, processTemplate } from './graphqlTemplates';
 import { formatGraphQLQuery } from '../../webview/formatGraphQL';
-
-// Import monaco-graphql inline mode (runs without web-workers)
-import { initializeMode as initGraphQLMode } from 'monaco-graphql/esm/initializeMode';
-
-let monacoGraphQLAPI: any = initGraphQLMode;
 
 /**
  * Interface for template selector options
@@ -21,12 +16,11 @@ export interface TemplateOption {
 /**
  * Enhanced Monaco editor for GraphQL with Weaviate-specific features
  */
-export class MonacoQueryEditor {
+export class GraphQLEditor {
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
   private container: HTMLElement;
   private schemaConfig: GraphQLSchema | null = null;
   private disposables: monaco.IDisposable[] = [];
-  private monacoGraphQLAPI: any = null;
   private currentCollectionName: string = 'Article';
 
   // Event listener management
@@ -55,36 +49,75 @@ export class MonacoQueryEditor {
   }
 
   private initializeEditor() {
-    // Determine VS Code theme
+    // Determine VS Code theme with better detection
     const getVSCodeTheme = (): string => {
-      // Check for VS Code theme class on body or html
-      const body = document.body;
-      const html = document.documentElement;
-      
-      if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
-        return 'vs-dark';
-      } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
-        return 'vs';
-      } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
-        return 'hc-black';
-      }
-      
-      // Check CSS variables or fallback to dark theme
-      const styles = getComputedStyle(document.body);
-      const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
-                     styles.backgroundColor;
-      
-      // Simple heuristic: if background is dark, use dark theme
-      if (bgColor.includes('rgb')) {
-        const rgb = bgColor.match(/\d+/g);
-        if (rgb && rgb.length >= 3) {
-          const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
-          return brightness < 128 ? 'vs-dark' : 'vs';
+      try {
+        // Check for VS Code theme classes on body or html
+        const body = document.body;
+        const html = document.documentElement;
+        
+        if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
+          return 'vs-dark';
+        } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
+          return 'vs';
+        } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
+          return 'hc-black';
         }
+        
+        // Check CSS variables with more comprehensive detection
+        const styles = getComputedStyle(document.body);
+        const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
+                       styles.getPropertyValue('--vscode-panel-background') ||
+                       styles.backgroundColor;
+        
+        console.log('Monaco theme detection - background color:', bgColor);
+        
+        // Enhanced background color analysis
+        if (bgColor) {
+          // Handle hex colors
+          if (bgColor.startsWith('#')) {
+            const hex = bgColor.slice(1);
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            const brightness = (r + g + b) / 3;
+            return brightness < 128 ? 'vs-dark' : 'vs';
+          }
+          
+          // Handle RGB colors
+          if (bgColor.includes('rgb')) {
+            const rgb = bgColor.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+              const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+              console.log('Monaco theme detection - brightness:', brightness);
+              return brightness < 128 ? 'vs-dark' : 'vs';
+            }
+          }
+          
+          // Handle color keywords
+          const darkColors = ['black', 'darkgray', 'darkgrey', 'dimgray', 'dimgrey'];
+          const lightColors = ['white', 'lightgray', 'lightgrey', 'silver', 'gainsboro'];
+          
+          if (darkColors.some(color => bgColor.toLowerCase().includes(color))) {
+            return 'vs-dark';
+          }
+          if (lightColors.some(color => bgColor.toLowerCase().includes(color))) {
+            return 'vs';
+          }
+        }
+        
+        // Check media query for dark theme preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          return 'vs-dark';
+        }
+        
+        console.log('Monaco theme detection - defaulting to vs-dark');
+        // Default to dark theme for VS Code
+        return 'vs-dark';
+      } catch (error) {
+        console.error('Error detecting VS Code theme:', error);
+        return 'vs-dark';
       }
-      
-      // Default to dark theme for VS Code
-      return 'vs-dark';
     };
 
     // Create Monaco editor with enhanced options
@@ -210,7 +243,73 @@ export class MonacoQueryEditor {
       this.disposables.push(changeDisposable);
     }
 
+    // Listen for theme changes
+    this.setupThemeListener(getVSCodeTheme);
+
     console.log('Monaco GraphQL editor initialized');
+  }
+
+  /**
+   * Setup theme change listener to automatically update Monaco theme
+   */
+  private setupThemeListener(getVSCodeTheme: () => string): void {
+    try {
+      // Watch for changes to VS Code theme classes
+      const observer = new MutationObserver((mutations) => {
+        let themeChanged = false;
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && 
+              (mutation.attributeName === 'class' || mutation.attributeName === 'data-vscode-theme-kind')) {
+            themeChanged = true;
+          }
+        });
+        
+        if (themeChanged && this.editor) {
+          const newTheme = getVSCodeTheme();
+          console.log('VS Code theme changed, updating Monaco theme to:', newTheme);
+          monaco.editor.setTheme(newTheme);
+        }
+      });
+
+      // Observe changes to body and html classes
+      observer.observe(document.body, { 
+        attributes: true, 
+        attributeFilter: ['class', 'data-vscode-theme-kind'] 
+      });
+      observer.observe(document.documentElement, { 
+        attributes: true, 
+        attributeFilter: ['class', 'data-vscode-theme-kind'] 
+      });
+
+      // Also listen for media query changes
+      if (window.matchMedia) {
+        const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const themeChangeHandler = () => {
+          if (this.editor) {
+            const newTheme = getVSCodeTheme();
+            console.log('System theme changed, updating Monaco theme to:', newTheme);
+            monaco.editor.setTheme(newTheme);
+          }
+        };
+        
+        // Modern browsers
+        if (darkModeQuery.addEventListener) {
+          darkModeQuery.addEventListener('change', themeChangeHandler);
+        } else {
+          // Fallback for older browsers
+          darkModeQuery.addListener(themeChangeHandler);
+        }
+      }
+
+      // Store observer for cleanup
+      this.disposables.push({
+        dispose: () => {
+          observer.disconnect();
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up theme listener:', error);
+    }
   }
 
   /**
@@ -218,20 +317,7 @@ export class MonacoQueryEditor {
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
     this.schemaConfig = schemaConfig;
-    
-    try {
-      // Store the monaco-graphql API if available
-      if (monacoGraphQLAPI) {
-        this.monacoGraphQLAPI = monacoGraphQLAPI;
-        console.log('Monaco GraphQL API configured');
-      } else {
-        console.warn('Monaco GraphQL API not available, language features will be limited');
-      }
-
-      console.log('GraphQL language features configured with schema');
-    } catch (error) {
-      console.error('Error configuring GraphQL language support:', error);
-    }
+    console.log('GraphQL language features configured with schema');
   }
 
   /**
@@ -453,6 +539,51 @@ export class MonacoQueryEditor {
         this.changeListeners.splice(index, 1);
       }
     };
+  }
+
+  /**
+   * Manually update the Monaco editor theme to match VS Code
+   */
+  public updateTheme(): void {
+    if (!this.editor) return;
+    
+    try {
+      // Determine current VS Code theme
+      const getVSCodeTheme = (): string => {
+        const body = document.body;
+        const html = document.documentElement;
+        
+        if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
+          return 'vs-dark';
+        } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
+          return 'vs';
+        } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
+          return 'hc-black';
+        }
+        
+        // Check CSS variables
+        const styles = getComputedStyle(document.body);
+        const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
+                       styles.getPropertyValue('--vscode-panel-background') ||
+                       styles.backgroundColor;
+        
+        if (bgColor && bgColor.includes('rgb')) {
+          const rgb = bgColor.match(/\d+/g);
+          if (rgb && rgb.length >= 3) {
+            const brightness = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+            return brightness < 128 ? 'vs-dark' : 'vs';
+          }
+        }
+        
+        return 'vs-dark'; // Default to dark
+      };
+      
+      const newTheme = getVSCodeTheme();
+      console.log('Updating Monaco theme to:', newTheme);
+      monaco.editor.setTheme(newTheme);
+    } catch (error) {
+      console.error('Error updating Monaco theme:', error);
+    }
   }
 
   /**

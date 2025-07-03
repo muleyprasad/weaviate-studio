@@ -8,27 +8,7 @@ export interface QueryTemplate {
   template: string;
 }
 
-/**
- * Generate a basic Get query for a collection
- * @param collectionName The name of the collection to query
- * @param limit Optional limit for the query (default: 10)
- * @returns GraphQL query string
- */
-export function generateBasicGetQuery(collectionName: string, limit: number = 10): string {
-  return `{
-  Get {
-    ${collectionName} (limit: ${limit}) {
-      # Replace with actual properties from your schema
-      # Example: title, description, createdAt
-      _additional {
-        id
-        creationTimeUnix
-        lastUpdateTimeUnix
-      }
-    }
-  }
-}`;
-}
+
 
 /**
  * Generate a similarity search query using nearVector
@@ -66,6 +46,9 @@ export function generateNearVectorQuery(collectionName: string, limit: number = 
  */
 export function generateNearTextQuery(collectionName: string, limit: number = 10): string {
   return `{
+  # NOTE: nearText requires a text vectorizer module (text2vec-openai, text2vec-cohere, etc.)
+  # If you get an "Unknown argument nearText" error, use nearVector instead or configure a text vectorizer
+  
   Get {
     ${collectionName} (
       nearText: {
@@ -253,36 +236,7 @@ export function generateRelationshipQuery(collectionName: string, limit: number 
 }`;
 }
 
-/**
- * Generate a query with sorting
- * @param collectionName The name of the collection to query
- * @param limit Optional limit for the query (default: 10)
- * @returns GraphQL query string
- */
-export function generateSortQuery(collectionName: string, limit: number = 10): string {
-  return `{
-  Get {
-    ${collectionName} (
-      sort: [
-        {
-          path: ["propertyName"] # Replace with actual property name
-          order: desc # Options: asc, desc
-        }
-        {
-          path: ["secondarySort"]
-          order: asc
-        }
-      ]
-      limit: ${limit}
-    ) {
-      # Replace with actual properties from your schema
-      _additional {
-        id
-      }
-    }
-  }
-}`;
-}
+
 
 /**
  * Generate a query to check object existence and get metadata
@@ -317,11 +271,6 @@ export function generateExploreQuery(collectionName: string): string {
  */
 export const queryTemplates: QueryTemplate[] = [
   {
-    name: 'Basic Get Query',
-    description: 'Simple query to retrieve data from a collection with metadata',
-    template: '{collectionName}' // Will be replaced with actual collection name
-  },
-  {
     name: 'Vector Search (nearVector)',
     description: 'Search for similar objects using a vector with similarity scoring',
     template: '{nearVectorQuery}'
@@ -347,34 +296,9 @@ export const queryTemplates: QueryTemplate[] = [
     template: '{aggregationQuery}'
   },
   {
-    name: 'Collection Statistics',
-    description: 'Get detailed statistics and insights about collection data',
-    template: '{collectionStatsQuery}'
-  },
-  {
-    name: 'Data Quality Check',
-    description: 'Inspect data quality and completeness across properties',
-    template: '{dataQualityQuery}'
-  },
-  {
-    name: 'Vector Analysis',
-    description: 'Analyze vector data completeness and quality',
-    template: '{vectorAnalysisQuery}'
-  },
-  {
-    name: 'Performance Test',
-    description: 'Test query performance with various search patterns',
-    template: '{performanceTestQuery}'
-  },
-  {
     name: 'Relationship Query',
     description: 'Explore object relationships and cross-references',
     template: '{relationshipQuery}'
-  },
-  {
-    name: 'Sort Query',
-    description: 'Sort objects by property values with multiple sort criteria',
-    template: '{sortQuery}'
   },
   {
     name: 'Explore Query',
@@ -656,10 +580,6 @@ export function processTemplate(
 
   // Replace placeholders with actual values using dynamic generation when possible
   let query = template
-    // Use dynamic generation for better schema-aware queries
-    .replace('{collectionName}', classSchema ? 
-      generateDynamicSampleQuery(collectionName, classSchema, limit) :
-      generateSampleQuery(collectionName, [], limit, schema))
     .replace('{nearVectorQuery}', classSchema ?
       generateDynamicNearVectorQuery(collectionName, classSchema, limit) :
       generateNearVectorQuery(collectionName, limit))
@@ -673,12 +593,7 @@ export function processTemplate(
     .replace('{aggregationQuery}', classSchema ?
       generateDynamicAggregationQuery(collectionName, classSchema) :
       generateAggregationQuery(collectionName))
-    .replace('{collectionStatsQuery}', generateCollectionStatsQuery(collectionName, classSchema))
-    .replace('{dataQualityQuery}', generateDataQualityQuery(collectionName, classSchema))
-    .replace('{vectorAnalysisQuery}', generateVectorAnalysisQuery(collectionName, classSchema))
-    .replace('{performanceTestQuery}', generatePerformanceTestQuery(collectionName, classSchema))
     .replace('{relationshipQuery}', generateRelationshipQuery(collectionName, limit))
-    .replace('{sortQuery}', generateSortQuery(collectionName, limit))
     .replace('{exploreQuery}', generateExploreQuery(collectionName));
 
   return query;
@@ -697,7 +612,18 @@ export function generateDynamicSampleQuery(
   limit: number = 10
 ): string {
   if (!classSchema || !classSchema.properties) {
-    return generateBasicGetQuery(collectionName, limit);
+    return `{
+  Get {
+    ${collectionName} (limit: ${limit}) {
+      # Add your properties here - replace with actual properties from your schema
+      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+      }
+    }
+  }
+}`;
   }
 
   const properties = classSchema.properties;
@@ -815,6 +741,39 @@ export function generateDynamicNearTextQuery(
 ): string {
   const properties = getTopPropertiesForDisplay(classSchema, 3);
   const textProperties = getTextProperties(classSchema);
+  
+  // Check if the collection likely supports nearText based on vectorizer configuration
+  const hasTextVectorizer = hasTextVectorizerModule(classSchema);
+  
+  if (!hasTextVectorizer) {
+    // If no text vectorizer is detected, provide a nearVector alternative with instructions
+    return `{
+  # NOTE: This collection doesn't appear to have a text vectorizer configured.
+  # nearText searches require a text vectorizer module (like text2vec-openai, text2vec-cohere, etc.)
+  # Using nearVector instead - replace the vector with actual embeddings:
+  
+  Get {
+    ${collectionName}(
+      nearVector: {
+        vector: [0.1, 0.2, 0.3] # Replace with actual vector embeddings (${getVectorDimensions(classSchema)} dimensions)
+        certainty: 0.7 # Minimum similarity threshold (0-1)
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        distance
+        certainty
+        vector # Include to see the object's vector
+      }
+    }
+  }
+}
+
+# Alternative: If you want text-based search, configure a text vectorizer module for this collection
+# Examples: text2vec-openai, text2vec-cohere, text2vec-transformers, etc.`;
+  }
   
   return `{
   Get {
@@ -975,6 +934,50 @@ function getTextProperties(classSchema?: ClassSchema): string[] {
 }
 
 /**
+ * Helper function to check if a collection has a text vectorizer module configured
+ */
+function hasTextVectorizerModule(classSchema?: ClassSchema): boolean {
+  if (!classSchema) return false;
+  
+  // Check for explicit vectorizer configuration
+  if (classSchema.vectorizer) {
+    const vectorizer = classSchema.vectorizer.toLowerCase();
+    // Common text vectorizer modules
+    const textVectorizers = [
+      'text2vec-openai',
+      'text2vec-cohere', 
+      'text2vec-huggingface',
+      'text2vec-transformers',
+      'text2vec-contextionary',
+      'text2vec-gpt4all',
+      'text2vec-palm'
+    ];
+    
+    return textVectorizers.some(tv => vectorizer.includes(tv));
+  }
+  
+  // Check module configuration for text vectorizer modules
+  if (classSchema.moduleConfig) {
+    const moduleKeys = Object.keys(classSchema.moduleConfig);
+    const textVectorizerKeys = [
+      'text2vec-openai',
+      'text2vec-cohere',
+      'text2vec-huggingface', 
+      'text2vec-transformers',
+      'text2vec-contextionary',
+      'text2vec-gpt4all',
+      'text2vec-palm'
+    ];
+    
+    return moduleKeys.some(key => 
+      textVectorizerKeys.some(tv => key.toLowerCase().includes(tv))
+    );
+  }
+  
+  return false; // Conservative default - assume no text vectorizer
+}
+
+/**
  * Helper function to estimate vector dimensions from schema
  */
 function getVectorDimensions(classSchema?: ClassSchema): string {
@@ -1118,184 +1121,10 @@ function generateAggregationFields(classSchema: ClassSchema): string[] {
   return fields;
 }
 
-/**
- * Generate a collection statistics query
- * @param collectionName The name of the collection
- * @param classSchema The class schema definition
- * @returns GraphQL query string for collection statistics
- */
-export function generateCollectionStatsQuery(
-  collectionName: string,
-  classSchema?: ClassSchema
-): string {
-  if (!classSchema?.properties) {
-    return `{
-  Aggregate {
-    ${collectionName} {
-      meta {
-        count
-      }
-    }
-  }
-}`;
-  }
 
-  const propertyStats = classSchema.properties.slice(0, 3).map(prop => {
-    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
-    
-    switch (dataType) {
-      case 'text':
-      case 'string':
-        return `      ${prop.name} {
-        count
-        topOccurrences(limit: 10) {
-          value
-          occurs
-        }
-      }`;
-      case 'int':
-      case 'number':
-        return `      ${prop.name} {
-        count
-        minimum
-        maximum
-        mean
-        median
-        sum
-      }`;
-      case 'boolean':
-        return `      ${prop.name} {
-        count
-        totalTrue
-        totalFalse
-        percentageTrue
-      }`;
-      default:
-        return `      ${prop.name} {
-        count
-      }`;
-    }
-  });
 
-  return `{
-  Aggregate {
-    ${collectionName} {
-      meta {
-        count
-      }
-${propertyStats.join('\n')}
-    }
-  }
-}`;
-}
 
-/**
- * Generate a data quality inspection query
- * @param collectionName The name of the collection
- * @param classSchema The class schema definition
- * @returns GraphQL query string for data quality inspection
- */
-export function generateDataQualityQuery(
-  collectionName: string,
-  classSchema?: ClassSchema
-): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 5);
-  
-  return `{
-  Get {
-    ${collectionName}(limit: 50) {
-${properties.join('\n')}
-      _additional {
-        id
-        creationTimeUnix
-        lastUpdateTimeUnix
-        vector # Check if vectors are populated
-        certainty # Available if this was from a search
-      }
-    }
-  }
-}`;
-}
 
-/**
- * Generate a vector analysis query
- * @param collectionName The name of the collection
- * @param classSchema The class schema definition
- * @returns GraphQL query string for vector analysis
- */
-export function generateVectorAnalysisQuery(
-  collectionName: string,
-  classSchema?: ClassSchema
-): string {
-  return `{
-  Get {
-    ${collectionName}(limit: 10) {
-      _additional {
-        id
-        vector
-        # Check vector completeness and dimensions
-      }
-    }
-  }
-}
 
-# To analyze vector quality, also run:
-# {
-#   Aggregate {
-#     ${collectionName} {
-#       meta {
-#         count
-#       }
-#     }
-#   }
-# }`;
-}
 
-/**
- * Generate a performance test query
- * @param collectionName The name of the collection
- * @param classSchema The class schema definition
- * @returns GraphQL query string for performance testing
- */
-export function generatePerformanceTestQuery(
-  collectionName: string,
-  classSchema?: ClassSchema
-): string {
-  const textProperties = getTextProperties(classSchema);
-  const firstTextProp = textProperties[0] || 'content';
-  
-  return `{
-  Get {
-    ${collectionName}(
-      where: {
-        path: ["${firstTextProp}"]
-        operator: Like
-        valueText: "*"
-      }
-      limit: 1000
-    ) {
-      _additional {
-        id
-      }
-    }
-  }
-}
 
-# Performance comparison - Vector search:
-# {
-#   Get {
-#     ${collectionName}(
-#       nearText: {
-#         concepts: ["sample query"]
-#         certainty: 0.5
-#       }
-#       limit: 100
-#     ) {
-#       _additional {
-#         id
-#         distance
-#       }
-#     }
-#   }
-# }`;
-}

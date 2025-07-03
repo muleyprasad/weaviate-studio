@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider';
-import { WeaviateQueryEditor } from './query-editor/WeaviateQueryEditor';
+import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
@@ -150,7 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 
             // Open the query editor with the selected collection
-            WeaviateQueryEditor.createOrShow(context, { connectionId, collectionName });
+            QueryEditorPanel.createOrShow(context, { connectionId, collectionName });
         }),
 
         // Refresh the tree view

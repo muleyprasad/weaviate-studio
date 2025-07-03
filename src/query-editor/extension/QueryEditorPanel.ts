@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { URL } from 'url';
-import { ConnectionManager } from '../services/ConnectionManager';
+import { ConnectionManager } from '../../services/ConnectionManager';
 import { WeaviateClient } from 'weaviate-ts-client';
 
 // Helper function to generate a nonce
@@ -37,10 +37,10 @@ function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
     };
 }
 
-export class WeaviateQueryEditor {
+export class QueryEditorPanel {
     public static readonly viewType = 'weaviate.queryEditor';
     // Map to store all open panels by collection name
-    private static readonly panels = new Map<string, WeaviateQueryEditor>();
+    private static readonly panels = new Map<string, QueryEditorPanel>();
     private _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _options: QueryEditorOptions;
@@ -61,9 +61,9 @@ export class WeaviateQueryEditor {
         const panelKey = `${connectionId}:${collectionName}`;
         
         // Check if we already have a panel for this collection
-        if (WeaviateQueryEditor.panels.has(panelKey)) {
+        if (QueryEditorPanel.panels.has(panelKey)) {
             // If yes, reveal the existing panel
-            const existingPanel = WeaviateQueryEditor.panels.get(panelKey);
+            const existingPanel = QueryEditorPanel.panels.get(panelKey);
             existingPanel?._panel.reveal(column);
             return;
         }
@@ -71,15 +71,15 @@ export class WeaviateQueryEditor {
         // Otherwise create a new panel for this collection
         const title = `Weaviate: ${collectionName}`;
         const panel = vscode.window.createWebviewPanel(
-            WeaviateQueryEditor.viewType,
+            QueryEditorPanel.viewType,
             title,
             column,
             getWebviewOptions(context.extensionUri)
         );
 
         // Create new editor instance and store in our map
-        const newEditor = new WeaviateQueryEditor(panel, context, options);
-        WeaviateQueryEditor.panels.set(panelKey, newEditor);
+        const newEditor = new QueryEditorPanel(panel, context, options);
+        QueryEditorPanel.panels.set(panelKey, newEditor);
     }
 
     private constructor(panel: vscode.WebviewPanel, private readonly context: vscode.ExtensionContext, options: QueryEditorOptions) {
@@ -335,7 +335,7 @@ export class WeaviateQueryEditor {
             const schema = await this._weaviateClient.schema.getter().do();
             
             // Use the enhanced generateSampleQuery function that properly handles reference types
-            const { generateSampleQuery } = require('./enhanced/queryTemplates');
+            const { generateSampleQuery } = require('../webview/graphqlTemplates');
             sampleQuery = generateSampleQuery(collectionName, [], 10, schema);
             
         } catch (err) {
@@ -471,7 +471,7 @@ export class WeaviateQueryEditor {
         // Find and remove this panel from the panels map
         const panelKey = this._getPanelKey();
         if (panelKey) {
-            WeaviateQueryEditor.panels.delete(panelKey);
+            QueryEditorPanel.panels.delete(panelKey);
         }
         
         this._panel.dispose();
