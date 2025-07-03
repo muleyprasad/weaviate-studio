@@ -248,6 +248,9 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"src/**/*.tsx\""
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/jest": "^30.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/react": "^19.1.6",
@@ -261,10 +264,13 @@
     "css-loader": "^7.1.2",
     "eslint": "^9.25.1",
     "html-webpack-plugin": "^5.6.3",
+    "jest": "^30.0.4",
+    "jest-environment-jsdom": "^30.0.4",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "path-browserify": "^1.0.1",
     "prettier": "^3.5.3",
     "style-loader": "^4.0.0",
+    "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "webpack": "^5.99.7",
