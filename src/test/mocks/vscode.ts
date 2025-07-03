@@ -25,8 +25,33 @@ const vscode = {
       this.listeners.push(listener);
     };
   },
-  ThemeIcon: class {},
-  ThemeColor: class {}
+  ThemeIcon: class {
+    id: string;
+    color: any;
+    constructor(id: string, color?: any) {
+      this.id = id;
+      this.color = color;
+    }
+  },
+  ThemeColor: class {
+    id: string;
+    constructor(id: string) {
+      this.id = id;
+    }
+  },
+  TreeItemCollapsibleState: {
+    None: 0,
+    Collapsed: 1,
+    Expanded: 2
+  },
+  TreeItem: class {
+    label: string;
+    collapsibleState: number;
+    constructor(label: string, collapsibleState = 0) {
+      this.label = label;
+      this.collapsibleState = collapsibleState;
+    }
+  },
 };
 
 module.exports = vscode; 

@@ -5,13 +5,14 @@
 ---
 
 ## 0. Initial Setup  
-*(Before writing the first test)*
+*(Before writing the first test)* ✅ **Done**
 
+- [x] **Install dev dependencies**  
 - [ ] **Install dev dependencies**  
   `npm install --save-dev jest @types/jest ts-jest jest-environment-jsdom @vscode/test-electron @testing-library/react @testing-library/jest-dom`
-- [ ] **Add Jest config** (`jest.config.js`) with TypeScript + jsdom preset
-- [ ] **Create test bootstrap** (`src/test/setup.ts`) – register `@testing-library/jest-dom` & mock VS Code API / Monaco / Weaviate client
-- [ ] **Update `package.json` scripts**  
+- [x] **Add Jest config** (`jest.config.js`) with TypeScript + jsdom preset
+- [x] **Create test bootstrap** (`src/test/setup.ts`) – register `@testing-library/jest-dom` & mock VS Code API / Monaco / Weaviate client
+- [x] **Update `package.json` scripts**  
   - `test` → `jest`  
   - `test:watch` → `jest --watch`  
   - `test:coverage` → `jest --coverage`
@@ -24,12 +25,30 @@
 | ------ | ---------------------- | ---- | ------ |
 | **ConnectionManager** | URL validation, duplicate checks, connect / disconnect, persistence, error handling | `src/services/ConnectionManager.ts` | [ ] |
 | **GraphQL Templates** | Template substitution, dynamic schema-aware generation, formatting | `src/query-editor/webview/graphqlTemplates.ts` | [ ] |
-| **WeaviateTreeDataProvider** | Tree structure, children resolution, context keys, command routing | `src/WeaviateTreeDataProvider.ts` | [ ] |
+| **WeaviateTreeDataProvider** | Tree structure, children resolution, context keys, status icons | `src/WeaviateTreeDataProvider.ts` | [ ] |
 | **Utility Functions** | `formatGraphQLQuery`, helper methods | `src/webview/formatGraphQL.ts` | [ ] |
 
 Checklist:
-- [ ] Write mocks for `weaviate-ts-client`
+- [x] Write mocks for `weaviate-ts-client`
 - [ ] Achieve ≥ 80 % line coverage for each core module
+
+### Upcoming Unit-Test Add-ons
+
+*WeaviateTreeDataProvider*
+  - [ ] getStatusIcon returns correct green / gray theme icon
+  - [ ] Root children include `serverInfo`, `clusterHealth`, `modules`, `collectionsGroup`
+  - [ ] Collection group label reflects collection count
+  - [ ] Item `contextValue`s match package-menu expectations (`weaviateConnectionActive`, `weaviateCollection`, …)
+
+*Utility `formatGraphQLQuery`*
+  - [ ] Properly formats/minifies prettified GraphQL strings
+
+### Upcoming Integration Tests
+
+*extension activation & commands*
+  - [ ] All command IDs from `package.json` are registered
+  - [ ] execute `weaviate.connect` delegates to ConnectionManager.connect
+  - [ ] Tree-view context keys drive menu visibility (spot-check one item)
 
 ---
 
