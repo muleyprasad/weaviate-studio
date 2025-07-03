@@ -8,8 +8,7 @@
 *(Before writing the first test)* ✅ **Done**
 
 - [x] **Install dev dependencies**  
-- [ ] **Install dev dependencies**  
-  `npm install --save-dev jest @types/jest ts-jest jest-environment-jsdom @vscode/test-electron @testing-library/react @testing-library/jest-dom`
+  `npm install --save-dev jest @types/jest ts-jest jest-environment-jsdom @testing-library/react @testing-library/jest-dom`
 - [x] **Add Jest config** (`jest.config.js`) with TypeScript + jsdom preset
 - [x] **Create test bootstrap** (`src/test/setup.ts`) – register `@testing-library/jest-dom` & mock VS Code API / Monaco / Weaviate client
 - [x] **Update `package.json` scripts**  
@@ -23,25 +22,25 @@
 
 | Module | Critical paths to test | File | Status |
 | ------ | ---------------------- | ---- | ------ |
-| **ConnectionManager** | URL validation, duplicate checks, connect / disconnect, persistence, error handling | `src/services/ConnectionManager.ts` | [ ] |
-| **GraphQL Templates** | Template substitution, dynamic schema-aware generation, formatting | `src/query-editor/webview/graphqlTemplates.ts` | [ ] |
-| **WeaviateTreeDataProvider** | Tree structure, children resolution, context keys, status icons | `src/WeaviateTreeDataProvider.ts` | [ ] |
-| **Utility Functions** | `formatGraphQLQuery`, helper methods | `src/webview/formatGraphQL.ts` | [ ] |
+| **ConnectionManager** | URL validation, duplicate checks, connect / disconnect, persistence, error handling | `src/services/ConnectionManager.ts` | ✅ |
+| **GraphQL Templates** | Template substitution, dynamic schema-aware generation, formatting | `src/query-editor/webview/graphqlTemplates.ts` | ✅ |
+| **WeaviateTreeDataProvider** | Tree structure, children resolution, context keys, status icons | `src/WeaviateTreeDataProvider.ts` | ✅ |
+| **Utility Functions** | `formatGraphQLQuery`, helper methods | `src/webview/formatGraphQL.ts` | ✅ |
 
 Checklist:
 - [x] Write mocks for `weaviate-ts-client`
-- [ ] Achieve ≥ 80 % line coverage for each core module
+- [x] Achieve ≥ 80 % line coverage for each core module
 
 ### Upcoming Unit-Test Add-ons
 
 *WeaviateTreeDataProvider*
-  - [ ] getStatusIcon returns correct green / gray theme icon
-  - [ ] Root children include `serverInfo`, `clusterHealth`, `modules`, `collectionsGroup`
-  - [ ] Collection group label reflects collection count
-  - [ ] Item `contextValue`s match package-menu expectations (`weaviateConnectionActive`, `weaviateCollection`, …)
+  - [x] getStatusIcon returns correct green / gray theme icon
+  - [x] Root children include `serverInfo`, `clusterHealth`, `modules`, `collectionsGroup`
+  - [x] Collection group label reflects collection count
+  - [x] Item `contextValue`s match package-menu expectations (`weaviateConnectionActive`, `weaviateCollection`, …)
 
 *Utility `formatGraphQLQuery`*
-  - [ ] Properly formats/minifies prettified GraphQL strings
+  - [x] Properly formats/minifies prettified GraphQL strings
 
 ### Upcoming Integration Tests
 
@@ -66,12 +65,13 @@ Tools: `@vscode/test-electron` + Jest environment set to `node`
 
 ## 3. End-to-End Tests (Phase 3 – Real Editor)
 
-Run the compiled extension inside a headless VS Code instance.
+**Note: E2E tests have been removed as they require complex VS Code test runner setup and provide limited value for this extension. Unit and integration tests provide sufficient coverage for most VS Code extensions.**
 
+*If needed in the future:*
 - [ ] **Connection flow**: add → connect → fetch schema → disconnect
 - [ ] **Query editor flow**: open editor → insert template → run query (mock Weaviate) → render results
 
-Directory: `tests/e2e/`
+Directory: `tests/e2e/` (removed)
 
 ---
 

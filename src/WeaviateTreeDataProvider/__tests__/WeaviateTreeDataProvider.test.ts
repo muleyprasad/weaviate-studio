@@ -33,7 +33,7 @@ class MockConnectionManager {
 }
 
 // Jest module mocks
-jest.mock('../services/ConnectionManager', () => {
+jest.mock('../../services/ConnectionManager', () => {
   return {
     ConnectionManager: {
       getInstance: (...args: any[]) => MockConnectionManager.getInstance(args[0], mockConnections)
@@ -41,7 +41,7 @@ jest.mock('../services/ConnectionManager', () => {
   };
 });
 
-jest.mock('../views/ViewRenderer', () => {
+jest.mock('../../views/ViewRenderer', () => {
   return {
     ViewRenderer: {
       getInstance: () => ({

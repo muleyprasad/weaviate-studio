@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { ConnectionManager, WeaviateConnection } from './services/ConnectionManager';
-import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from './types';
-import { ViewRenderer } from './views/ViewRenderer';
+import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
+import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from '../types';
+import { ViewRenderer } from '../views/ViewRenderer';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,

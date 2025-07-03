@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider';
+import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTreeDataProvider';
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 
 // This method is called when your extension is activated
