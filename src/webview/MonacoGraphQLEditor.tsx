@@ -163,7 +163,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
           display: 'flex',
           justifyContent: 'flex-end',
           padding: '6px 10px',
-          backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
+          backgroundColor: 'var(--vscode-tab-activeBackground, var(--vscode-editor-background, #2D2D2D))',
           borderBottom: '1px solid var(--vscode-panel-border, #333)'
         }}>
           <div className="right-tools" style={{ display: 'flex', alignItems: 'center' }}>
@@ -174,9 +174,9 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
                 disabled={!collectionName}
                 title={collectionName ? "Choose a query template" : "Select a collection first"}
                 style={{
-                  backgroundColor: 'var(--vscode-button-secondaryBackground, #2D2D2D)',
-                  color: collectionName ? 'var(--vscode-button-secondaryForeground, #E0E0E0)' : 'var(--vscode-descriptionForeground, #888)',
-                  border: '1px solid var(--vscode-widget-border, #444)',
+                  backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                  color: collectionName ? 'var(--vscode-input-foreground, #E0E0E0)' : 'var(--vscode-descriptionForeground, #888)',
+                  border: '1px solid var(--vscode-input-border, #444)',
                   borderRadius: '3px',
                   padding: '3px 8px',
                   fontSize: '12px',
@@ -184,7 +184,18 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
                   cursor: collectionName ? 'pointer' : 'not-allowed',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '4px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (collectionName) {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (collectionName) {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                  }
                 }}
               >
                 📋 Templates
@@ -211,8 +222,8 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
                   <div style={{
                     padding: '8px 12px',
                     borderBottom: '1px solid var(--vscode-panel-border, #333)',
-                    backgroundColor: 'var(--vscode-list-hoverBackground, #2A2D2E)',
-                    color: 'var(--vscode-list-activeSelectionForeground, #FFFFFF)',
+                    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
+                    color: 'var(--vscode-list-activeSelectionForeground, white)',
                     fontWeight: 600,
                     fontSize: '11px',
                     textTransform: 'uppercase',
@@ -236,7 +247,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
                         transition: 'background-color 0.1s ease'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #2A2D2E)';
+                        e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04))';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent';
@@ -282,7 +293,18 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
                 cursor: collectionName ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '4px',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (collectionName) {
+                  e.currentTarget.style.backgroundColor = 'var(--vscode-button-hoverBackground, #1177bb)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (collectionName) {
+                  e.currentTarget.style.backgroundColor = 'var(--vscode-button-background, #0E639C)';
+                }
               }}
             >
               ▶ Run

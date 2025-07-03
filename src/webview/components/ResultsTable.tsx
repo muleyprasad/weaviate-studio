@@ -229,8 +229,8 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   
   // Improved header styling with better theme colors
   const headerStyle: React.CSSProperties = {
-    backgroundColor: 'var(--vscode-list-hoverBackground, #2A2D2E)',
-    color: 'var(--vscode-list-activeSelectionForeground, #FFFFFF)',
+    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
+    color: 'var(--vscode-list-activeSelectionForeground, white)',
     padding: '10px 12px',
     textAlign: 'left',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
@@ -255,8 +255,8 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   
   const rowNumberStyle: React.CSSProperties = {
     ...cellStyle,
-    backgroundColor: 'var(--vscode-list-hoverBackground, #2A2D2E)',
-    color: 'var(--vscode-list-activeSelectionForeground, #FFFFFF)',
+    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
+    color: 'var(--vscode-list-activeSelectionForeground, white)',
     fontWeight: 600,
     textAlign: 'center',
     width: '60px',
@@ -277,7 +277,9 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
     position: 'sticky',
     left: 0,
     zIndex: 3,
-    borderRight: '1px solid var(--vscode-panel-border, #333)'
+    borderRight: '1px solid var(--vscode-panel-border, #333)',
+    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
+    color: 'var(--vscode-list-activeSelectionForeground, white)'
   };
   
   const containerStyle: React.CSSProperties = {

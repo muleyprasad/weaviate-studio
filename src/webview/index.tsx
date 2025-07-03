@@ -77,7 +77,8 @@ const styles = {
     paddingBottom: '10px',
     marginBottom: '5px',
     fontSize: '18px',
-    fontWeight: 500 as 500
+    fontWeight: 500 as 500,
+    color: 'var(--vscode-titleBar-activeForeground, var(--vscode-sideBar-foreground, #CCCCCC))'
   },
   splitContainer: {
     display: 'flex',
@@ -97,9 +98,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
-    padding: '8px 0 5px 0',
-    backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
-    color: 'var(--vscode-editor-foreground, #D4D4D4)'
+    borderLeft: '3px solid var(--vscode-button-background, #0E639C)',
+    padding: '8px 0 5px 12px',
+    backgroundColor: 'var(--vscode-tab-activeBackground, var(--vscode-editor-background, #2D2D2D))',
+    color: 'var(--vscode-tab-activeForeground, var(--vscode-editor-foreground, #CCCCCC))'
   },
   resultContainer: {
     display: 'flex',
@@ -113,9 +115,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
-    padding: '8px 0 5px 0',
-    backgroundColor: 'var(--vscode-editor-background, #1E1E1E)',
-    color: 'var(--vscode-editor-foreground, #D4D4D4)'
+    borderLeft: '3px solid var(--vscode-button-background, #0E639C)',
+    padding: '8px 0 5px 12px',
+    backgroundColor: 'var(--vscode-tab-activeBackground, var(--vscode-editor-background, #2D2D2D))',
+    color: 'var(--vscode-tab-activeForeground, var(--vscode-editor-foreground, #CCCCCC))'
   },
   textarea: {
     backgroundColor: 'var(--vscode-input-background, #252526)',
@@ -540,22 +543,44 @@ const App = () => {
               <button 
                 style={{
                   ...styles.button,
-                  backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-button-secondaryBackground, #2D2D2D)',
-                  border: viewType === 'json' ? 'none' : '1px solid var(--vscode-widget-border, #444)',
-                  color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-button-secondaryForeground, #E0E0E0)'
+                  backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
+                  border: viewType === 'json' ? 'none' : '1px solid var(--vscode-input-border, #444)',
+                  color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
+                  transition: 'background-color 0.2s ease'
                 }} 
                 onClick={() => setViewType('json')}
+                onMouseEnter={(e) => {
+                  if (viewType !== 'json') {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (viewType !== 'json') {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                  }
+                }}
               >
                 📄 JSON
               </button>
               <button 
                 style={{
                   ...styles.button,
-                  backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-button-secondaryBackground, #2D2D2D)',
-                  border: viewType === 'table' ? 'none' : '1px solid var(--vscode-widget-border, #444)',
-                  color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-button-secondaryForeground, #E0E0E0)'
+                  backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
+                  border: viewType === 'table' ? 'none' : '1px solid var(--vscode-input-border, #444)',
+                  color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
+                  transition: 'background-color 0.2s ease'
                 }} 
                 onClick={() => setViewType('table')}
+                onMouseEnter={(e) => {
+                  if (viewType !== 'table') {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (viewType !== 'table') {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                  }
+                }}
               >
                 📋 Table
               </button>
