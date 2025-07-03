@@ -696,7 +696,12 @@ const App = () => {
                     backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
                     border: viewType === 'json' ? 'none' : '1px solid var(--vscode-input-border, #444)',
                     color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
-                    transition: 'background-color 0.2s ease'
+                    transition: 'background-color 0.2s ease',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    padding: '6px 12px',
+                    height: '32px',
+                    minWidth: '48px',
                   }} 
                   onClick={() => setViewType('json')}
                   onMouseEnter={(e) => {
@@ -718,7 +723,12 @@ const App = () => {
                     backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
                     border: viewType === 'table' ? 'none' : '1px solid var(--vscode-input-border, #444)',
                     color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
-                    transition: 'background-color 0.2s ease'
+                    transition: 'background-color 0.2s ease',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    padding: '6px 12px',
+                    height: '32px',
+                    minWidth: '48px',
                   }} 
                   onClick={() => setViewType('table')}
                   onMouseEnter={(e) => {
