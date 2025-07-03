@@ -1,5 +1,5 @@
-import prettier from 'prettier/standalone';
-import graphqlParser from 'prettier/parser-graphql';
+import * as prettier from 'prettier/standalone';
+import * as graphqlParser from 'prettier/parser-graphql';
 
 /**
  * Format a GraphQL query string using Prettier
