@@ -1,4 +1,5 @@
 /* VS Code Theme Integration for Webview */
+/* Features: Theme-aware styling, Resizable panels, Accessibility support */
 
 /* Ensure webview inherits VS Code theme variables */
 :root {
@@ -201,4 +202,6 @@ a:hover {
 .theme-dropdown-item-active {
   background-color: var(--vscode-list-activeSelectionBackground, #0E639C);
   color: var(--vscode-list-activeSelectionForeground, #FFFFFF);
-} 
+}
+
+/* Native VS Code-style resizable splitters - invisible by default */ 

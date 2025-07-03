@@ -59,6 +59,144 @@ try {
   console.error('Failed to configure Monaco environment:', error);
 }
 
+// Resizable Splitter Component
+const ResizableSplitter: React.FC<{
+  children: [React.ReactNode, React.ReactNode];
+  direction?: 'horizontal' | 'vertical';
+  initialSplit?: number;
+  minSize?: number;
+  onSplitChange?: (split: number) => void;
+}> = ({ 
+  children, 
+  direction = 'vertical', 
+  initialSplit = 50, 
+  minSize = 20,
+  onSplitChange 
+}) => {
+  const [split, setSplit] = useState(initialSplit);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !containerRef.current) return;
+
+      const container = containerRef.current;
+      const rect = container.getBoundingClientRect();
+      
+      let newSplit: number;
+      if (direction === 'vertical') {
+        const y = e.clientY - rect.top;
+        newSplit = (y / rect.height) * 100;
+      } else {
+        const x = e.clientX - rect.left;
+        newSplit = (x / rect.width) * 100;
+      }
+
+      // Apply constraints
+      newSplit = Math.max(minSize, Math.min(100 - minSize, newSplit));
+      setSplit(newSplit);
+      onSplitChange?.(newSplit);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, direction, minSize, onSplitChange]);
+
+  const splitterStyle: React.CSSProperties = {
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    zIndex: 10,
+    cursor: direction === 'vertical' ? 'row-resize' : 'col-resize',
+    transition: isDragging ? 'none' : 'background-color 0.1s ease',
+  };
+
+  if (direction === 'vertical') {
+    Object.assign(splitterStyle, {
+      top: `${split}%`,
+      left: 0,
+      right: 0,
+      height: '6px',
+      marginTop: '-3px',
+    });
+  } else {
+    Object.assign(splitterStyle, {
+      left: `${split}%`,
+      top: 0,
+      bottom: 0,
+      width: '6px',
+      marginLeft: '-3px',
+    });
+  }
+
+  const firstPaneStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: direction === 'horizontal' ? `${100 - split}%` : 0,
+    bottom: direction === 'vertical' ? `${100 - split}%` : 0,
+    overflow: 'hidden',
+  };
+
+  const secondPaneStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: direction === 'vertical' ? `${split}%` : 0,
+    left: direction === 'horizontal' ? `${split}%` : 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  };
+
+  return (
+    <div 
+      ref={containerRef}
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '100%',
+        userSelect: isDragging ? 'none' : 'auto'
+      }}
+    >
+      <div style={firstPaneStyle}>
+        {children[0]}
+      </div>
+      <div 
+        style={splitterStyle}
+        onMouseDown={handleMouseDown}
+        onMouseEnter={(e) => {
+          if (!isDragging) {
+            e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04))';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isDragging) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
+        }}
+      />
+      <div style={secondPaneStyle}>
+        {children[1]}
+      </div>
+    </div>
+  );
+};
+
 // Styles using VS Code theme variables for proper theme integration
 const styles = {
   container: {
@@ -90,8 +228,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as 'column',
     gap: '10px',
-    minHeight: '200px',
-    flex: '0 0 40%'
+    height: '100%'
   },
   queryHeader: {
     display: 'flex',
@@ -107,8 +244,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as 'column',
     gap: '10px',
-    flex: '1',
-    overflow: 'auto'
+    height: '100%',
+    overflow: 'hidden'
   },
   resultHeader: {
     display: 'flex',
@@ -196,44 +333,51 @@ const App = () => {
   const [schema, setSchema] = useState<any>(null);
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
+  const [splitRatio, setSplitRatio] = useState<number>(50);
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
     if (collection && !queryText && !initialQuerySent && vscode) {
       // Request sample query from backend instead of generating it here
-      vscode.postMessage({ type: 'requestSampleQuery', collection });
-      // We'll receive the sample query via the message handler
+      vscode.postMessage({ 
+        type: 'requestSampleQuery', 
+        collection: collection 
+      });
+      setInitialQuerySent(true);  // Mark that we've requested an initial query
     }
   }, [collection, queryText, initialQuerySent]);
 
-  // Handle running the query
+  // Handle query execution
   const handleRunQuery = () => {
     if (!queryText.trim()) {
-      setError('Query cannot be empty');
+      setError('Please enter a GraphQL query');
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    setInitialQuerySent(true);
 
-    // Send the query to the extension host
     if (vscode) {
-      vscode.postMessage({
-        type: 'runQuery',
+      vscode.postMessage({ 
+        type: 'runQuery', 
         query: queryText,
-        options: {}
+        collection: collection 
       });
     }
   };
 
-  // Legacy sample query handler - kept for compatibility but no longer used
+  // Handle sample query generation
   const handleGenerateQuery = () => {
-    if (collection && vscode) {
-      // Request sample query from backend instead of generating it
-      vscode.postMessage({ type: 'requestSampleQuery', collection });
-    } else {
+    if (!collection) {
       setError('No collection selected');
+      return;
+    }
+
+    if (vscode) {
+      vscode.postMessage({ 
+        type: 'generateSampleQuery', 
+        collection: collection 
+      });
     }
   };
 
@@ -499,139 +643,148 @@ const App = () => {
         </div>
       )}
       
-      {/* Split layout with GraphQL editor and query results */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
-        {/* GraphQL Query Editor Section */}
-        <div style={{ ...styles.queryContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
-          <div style={styles.queryHeader}>
-            <span style={{ fontSize: '16px', fontWeight: 600 }}>
-              📝 GraphQL Query Editor
-              {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
-                for {collection}
-              </span>}
-            </span>
-          </div>
+      {/* Resizable split layout with GraphQL editor and query results */}
+      <div style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+        <ResizableSplitter
+          direction="vertical"
+          initialSplit={splitRatio}
+          minSize={20}
+          onSplitChange={(newSplit) => setSplitRatio(newSplit)}
+        >
+          {/* GraphQL Query Editor Section */}
+          <div style={styles.queryContainer}>
+            <div style={styles.queryHeader}>
+              <span style={{ fontSize: '16px', fontWeight: 600 }}>
+                📝 GraphQL Query Editor
+                {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
+                  for {collection}
+                </span>}
+              </span>
+            </div>
 
-          <div style={{ flex: 1, minHeight: '200px' }}>
-            <MonacoGraphQLEditor
-              initialValue={queryText}
-              onChange={(value) => setQueryText(value)}
-              onRunQuery={handleRunQuery}
-              onGenerateSample={handleGenerateQuery}
-              schemaConfig={schemaConfig}
-              collectionName={collection || undefined}
-            />
-          </div>
-        </div>
-
-        {/* Query Results Section */}
-        <div style={{ ...styles.resultContainer, flex: '0 0 50%', minHeight: '200px', maxHeight: '50%' }}>
-          <div style={styles.resultHeader}>
-            <span style={{ fontSize: '16px', fontWeight: 600 }}>
-              📊 Query Results
-              {jsonData && (
-                <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
-                  {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
-                    ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
-                    : 'Data loaded'
-                  }
-                </span>
-              )}
-            </span>
-            {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button 
-                style={{
-                  ...styles.button,
-                  backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
-                  border: viewType === 'json' ? 'none' : '1px solid var(--vscode-input-border, #444)',
-                  color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
-                  transition: 'background-color 0.2s ease'
-                }} 
-                onClick={() => setViewType('json')}
-                onMouseEnter={(e) => {
-                  if (viewType !== 'json') {
-                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (viewType !== 'json') {
-                    e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
-                  }
-                }}
-              >
-                📄 JSON
-              </button>
-              <button 
-                style={{
-                  ...styles.button,
-                  backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
-                  border: viewType === 'table' ? 'none' : '1px solid var(--vscode-input-border, #444)',
-                  color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
-                  transition: 'background-color 0.2s ease'
-                }} 
-                onClick={() => setViewType('table')}
-                onMouseEnter={(e) => {
-                  if (viewType !== 'table') {
-                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (viewType !== 'table') {
-                    e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
-                  }
-                }}
-              >
-                📋 Table
-              </button>
+            <div style={{ flex: 1, minHeight: '150px', height: 'calc(100% - 40px)' }}>
+              <MonacoGraphQLEditor
+                initialValue={queryText}
+                onChange={(value) => setQueryText(value)}
+                onRunQuery={handleRunQuery}
+                onGenerateSample={handleGenerateQuery}
+                schemaConfig={schemaConfig}
+                collectionName={collection || undefined}
+              />
             </div>
           </div>
 
-          {/* Display data in selected format when available */}
-          {jsonData ? (
-            viewType === 'json' ? (
-              <div style={styles.jsonContainer}>
-                {/* Check if we have an empty result with just _errors array */}
-                {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
-                  <div style={styles.emptyState}>
-                    <p>📭 No data found in collection: {collection}</p>
-                    <p>This collection exists but appears to be empty.</p>
-                    <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)' }}>
-                      💡 Try adding some data to this collection or select a different collection.
-                    </p>
+          {/* Query Results Section */}
+          <div style={styles.resultContainer}>
+            <div style={styles.resultHeader}>
+              <span style={{ fontSize: '16px', fontWeight: 600 }}>
+                📊 Query Results
+                {jsonData && (
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
+                    {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
+                      ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
+                      : 'Data loaded'
+                    }
+                  </span>
+                )}
+              </span>
+              {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button 
+                  style={{
+                    ...styles.button,
+                    backgroundColor: viewType === 'json' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
+                    border: viewType === 'json' ? 'none' : '1px solid var(--vscode-input-border, #444)',
+                    color: viewType === 'json' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
+                    transition: 'background-color 0.2s ease'
+                  }} 
+                  onClick={() => setViewType('json')}
+                  onMouseEnter={(e) => {
+                    if (viewType !== 'json') {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (viewType !== 'json') {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                    }
+                  }}
+                >
+                  📄 JSON
+                </button>
+                <button 
+                  style={{
+                    ...styles.button,
+                    backgroundColor: viewType === 'table' ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
+                    border: viewType === 'table' ? 'none' : '1px solid var(--vscode-input-border, #444)',
+                    color: viewType === 'table' ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-input-foreground, #E0E0E0)',
+                    transition: 'background-color 0.2s ease'
+                  }} 
+                  onClick={() => setViewType('table')}
+                  onMouseEnter={(e) => {
+                    if (viewType !== 'table') {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (viewType !== 'table') {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                    }
+                  }}
+                >
+                  📋 Table
+                </button>
+              </div>
+            </div>
+
+            {/* Display data in selected format when available */}
+            <div style={{ flex: 1, overflow: 'auto', height: 'calc(100% - 40px)' }}>
+              {jsonData ? (
+                viewType === 'json' ? (
+                  <div style={styles.jsonContainer}>
+                    {/* Check if we have an empty result with just _errors array */}
+                    {jsonData._errors !== undefined && Object.keys(jsonData).length === 1 && jsonData._errors.length === 0 ? (
+                      <div style={styles.emptyState}>
+                        <p>📭 No data found in collection: {collection}</p>
+                        <p>This collection exists but appears to be empty.</p>
+                        <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)' }}>
+                          💡 Try adding some data to this collection or select a different collection.
+                        </p>
+                      </div>
+                    ) : (
+                      /* Use a simple pre-formatted JSON display as a reliable fallback */
+                      <pre style={{
+                        backgroundColor: 'var(--vscode-editor-background, #252526)',
+                        color: 'var(--vscode-editor-foreground, #D4D4D4)',
+                        padding: '12px',
+                        borderRadius: '4px',
+                        fontFamily: 'var(--vscode-editor-font-family, monospace)',
+                        overflow: 'auto',
+                        height: '100%'
+                      }}>
+                        {JSON.stringify(jsonData, null, 2)}
+                      </pre>
+                    )}
                   </div>
                 ) : (
-                  /* Use a simple pre-formatted JSON display as a reliable fallback */
-                  <pre style={{
-                    backgroundColor: 'var(--vscode-editor-background, #252526)',
-                    color: 'var(--vscode-editor-foreground, #D4D4D4)',
-                    padding: '12px',
-                    borderRadius: '4px',
-                    fontFamily: 'var(--vscode-editor-font-family, monospace)',
-                    overflow: 'auto',
-                    height: '100%'
-                  }}>
-                    {JSON.stringify(jsonData, null, 2)}
-                  </pre>
-                )}
-              </div>
-            ) : (
-              collection && <ResultsTable data={jsonData} collectionName={collection} />
-            )
-          ) : (
-            <div style={styles.emptyState}>
-              <p>🚀 Ready to execute your first query</p>
-              {collection ? (
-                <p>Try running a query for collection: <strong>{collection}</strong></p>
+                  collection && <ResultsTable data={jsonData} collectionName={collection} />
+                )
               ) : (
-                <p>Select a collection from the sidebar to get started</p>
+                <div style={styles.emptyState}>
+                  <p>🚀 Ready to execute your first query</p>
+                  {collection ? (
+                    <p>Try running a query for collection: <strong>{collection}</strong></p>
+                  ) : (
+                    <p>Select a collection from the sidebar to get started</p>
+                  )}
+                  <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)', marginTop: '10px' }}>
+                    💡 Use the "Sample" button to generate example queries
+                  </p>
+                </div>
               )}
-              <p style={{ fontSize: '14px', color: 'var(--vscode-descriptionForeground, #888)', marginTop: '10px' }}>
-                💡 Use the "Sample" button to generate example queries
-              </p>
             </div>
-          )}
-        </div>
+          </div>
+        </ResizableSplitter>
       </div>
     </div>
   );
