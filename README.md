@@ -228,3 +228,98 @@ npm install
 # Start development mode
 npm run dev
 ```
+
+### Testing
+
+The project includes comprehensive test coverage using Jest:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+#### Test Structure
+
+The project follows Jest best practices with colocated test files:
+
+```
+src/
+├── WeaviateTreeDataProvider/
+│   ├── WeaviateTreeDataProvider.ts
+│   └── __tests__/
+│       └── WeaviateTreeDataProvider.test.ts
+├── services/
+│   ├── ConnectionManager.ts
+│   └── __tests__/
+│       └── ConnectionManager.test.ts
+├── query-editor/webview/
+│   ├── graphqlTemplates.ts
+│   └── __tests__/
+│       └── graphqlTemplates.test.ts
+├── webview/
+│   ├── formatGraphQL.ts
+│   └── __tests__/
+│       └── formatGraphQLQuery.test.ts
+└── test/
+    ├── setup.ts
+    └── mocks/
+        ├── vscode.ts
+        ├── monaco-editor.ts
+        └── weaviate-client.ts
+```
+
+#### Test Coverage
+
+- **ConnectionManager**: Connection validation, management, and error handling
+- **GraphQL Templates**: Template generation, schema-aware queries, and type safety
+- **WeaviateTreeDataProvider**: Tree view structure, data providers, and UI interactions
+- **Utility Functions**: GraphQL formatting and helper methods
+
+All tests use proper mocking for VS Code APIs, Monaco Editor, and Weaviate client dependencies.
+
+#### Quality Assurance
+
+The project maintains high code quality through:
+
+- **Comprehensive Unit Tests**: 22 tests covering all core functionality
+- **Integration Tests**: Service interactions and component behavior
+- **Type Safety**: Full TypeScript coverage with strict type checking
+- **Code Coverage**: Continuous monitoring of test coverage
+- **Linting**: ESLint configuration for code consistency
+- **Formatting**: Prettier integration for consistent code style
+
+See `TESTING_PLAN.md` for detailed testing strategy and coverage goals.
+
+### Contributing
+
+We welcome contributions! Please see `CONTRIBUTING.md` for guidelines.
+
+#### For Contributors
+
+1. **Fork and clone** the repository
+2. **Install dependencies**: `npm install`
+3. **Run tests**: `npm test` to ensure everything works
+4. **Make changes** with tests for new functionality
+5. **Submit a pull request** with a clear description
+
+#### Testing Your Changes
+
+```bash
+# Run tests before committing
+npm test
+
+# Check code coverage
+npm run test:coverage
+
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+```
