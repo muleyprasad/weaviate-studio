@@ -363,8 +363,8 @@ export function generateSampleQuery(
       !p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates')
     );
     
-    // Add primitive properties first (up to 5)
-    primitiveProps.slice(0, 5).forEach(prop => {
+    // Add all primitive and geoCoordinate properties
+    primitiveProps.forEach(prop => {
       // Special handling for geoCoordinates - they need latitude and longitude sub-fields
       if (prop.dataType.some(dt => dt.toLowerCase() === 'geocoordinates')) {
         propertyStrings.push(`${prop.name} {
@@ -376,16 +376,15 @@ export function generateSampleQuery(
       }
     });
     
-    // Add reference properties with proper nested structure (up to 3)
-    referenceProps.slice(0, 3).forEach(prop => {
+    // Add all reference properties with proper nested structure
+    referenceProps.forEach(prop => {
       const referencedClassName = prop.dataType[0];
       const referencedClass = schema?.classes?.find(c => c.class === referencedClassName);
       
       if (referencedClass && referencedClass.properties) {
-        // Get up to 3 primitive properties from the referenced class
+        // Get all primitive properties from the referenced class
         const refPrimitiveProps = referencedClass.properties
-          .filter(p => p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase())))
-          .slice(0, 3);
+          .filter(p => p.dataType.some(dt => primitiveTypes.includes(dt.toLowerCase())));
           
         if (refPrimitiveProps.length > 0) {
           const nestedProps = refPrimitiveProps.map(p => `          ${p.name}`).join('\n');
@@ -441,10 +440,9 @@ ${nestedProps}
             
             // If we found the referenced class, include a few of its properties
             if (referencedClass && referencedClass.properties) {
-              // Get up to 3 non-reference properties from the referenced class
+              // Get all non-reference primitive properties from the referenced class
               const refProperties = referencedClass.properties
                 .filter(p => primitiveTypes.includes(p.dataType[0].toLowerCase()))
-                .slice(0, 3)
                 .map(p => p.name);
                 
               // If we have properties to include
