@@ -5,6 +5,7 @@ import 'react-json-view-lite/dist/index.css';
 import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
 import ResultsTable from './components/ResultsTable';
 import * as monaco from 'monaco-editor';
+import { queryTemplates, processTemplate } from '../query-editor/webview/graphqlTemplates';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
 // due to webview bundle isolation
@@ -378,7 +379,7 @@ const App = () => {
 
     if (vscode) {
       vscode.postMessage({ 
-        type: 'generateSampleQuery', 
+        type: 'requestSampleQuery', 
         collection: collection 
       });
     }
@@ -390,19 +391,20 @@ const App = () => {
   };
 
   // Handle template selection
-  const handleTemplateSelect = (templateName: string) => {
+  const handleTemplateSelect = async (templateName: string) => {
     setShowTemplateDropdown(false);
     if (templateName === 'Schema-based Sample') {
+      // Show loading placeholder in the editor
+      setQueryText('Loading sample query...');
       // Request auto-generated sample from backend
       handleGenerateQuery();
     } else {
-      // Handle regular template - we'll need to insert it into the editor
-      // For now, we'll send a message to extension to handle template processing
-      vscode.postMessage({ 
-        type: 'insertTemplate', 
-        templateName: templateName,
-        collection: collection
-      });
+      // Find the template and process it
+      const template = queryTemplates.find(t => t.name === templateName);
+      if (template) {
+        const processed = await processTemplate(template.template, collection || '');
+        setQueryText(processed);
+      }
     }
   };
 
@@ -529,12 +531,12 @@ const App = () => {
 
         case 'sampleQuery':
           // Handle sample query message from backend
-          console.log('Received sample query from backend:', message.data?.sampleQuery);
+          console.log('Received sampleQuery message:', message);
           if (message.data && message.data.sampleQuery) {
             setQueryText(message.data.sampleQuery);
             console.log('Query text state updated with sample query');
           } else {
-            console.warn('Received sampleQuery message but no query was included');
+            console.warn('Received sampleQuery message but no query was included. Full message:', message);
           }
           setIsLoading(false);
           break;
@@ -699,9 +701,7 @@ const App = () => {
                 borderRadius: '4px',
                 marginRight: '8px',
                 display: 'inline-block',
-                minWidth: '140px',
-                borderBottom: '2px solid var(--vscode-panel-border, #333)',
-                boxShadow: '0 2px 6px 0 rgba(0,0,0,0.06)'
+                minWidth: '140px'
               }}>
                 GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
@@ -893,9 +893,7 @@ const App = () => {
                 borderRadius: '4px',
                 marginRight: '8px',
                 display: 'inline-block',
-                minWidth: '140px',
-                borderBottom: '2px solid var(--vscode-panel-border, #333)',
-                boxShadow: '0 2px 6px 0 rgba(0,0,0,0.06)'
+                minWidth: '140px'
               }}>
                 {jsonData ? 'Results Data loaded' : 'Results'}
               </span>
