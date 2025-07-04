@@ -693,8 +693,8 @@ const App = () => {
               <span style={{
                 fontSize: '14px',
                 fontWeight: 600,
-                color: 'var(--vscode-foreground, #333)',
-                background: 'var(--vscode-sideBar-background, #f3f3f3)',
+                color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                background: 'var(--vscode-editorWidget-background, #23272e)',
                 padding: '4px 12px',
                 borderRadius: '4px',
                 marginRight: '8px',
@@ -885,8 +885,8 @@ const App = () => {
               <span style={{
                 fontSize: '14px',
                 fontWeight: 600,
-                color: 'var(--vscode-foreground, #333)',
-                background: 'var(--vscode-sideBar-background, #f3f3f3)',
+                color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                background: 'var(--vscode-editorWidget-background, #23272e)',
                 padding: '4px 12px',
                 borderRadius: '4px',
                 marginRight: '8px',
