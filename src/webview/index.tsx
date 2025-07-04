@@ -339,6 +339,38 @@ const App = () => {
   const [splitRatio, setSplitRatio] = useState<number>(50);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
 
+  // Save current state to backend for persistence across tab switches
+  const saveCurrentState = () => {
+    if (vscode) {
+      const currentState = {
+        queryText,
+        jsonData,
+        collection,
+        viewType,
+        splitRatio,
+        error,
+        schema,
+        schemaConfig
+      };
+      vscode.postMessage({
+        type: 'saveState',
+        state: currentState
+      });
+    }
+  };
+
+  // Auto-save state when important data changes
+  useEffect(() => {
+    // Debounce state saving to avoid too frequent saves
+    const timeoutId = setTimeout(() => {
+      if (queryText || jsonData) {
+        saveCurrentState();
+      }
+    }, 1000); // Save after 1 second of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [queryText, jsonData, viewType, splitRatio]);
+
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
     if (collection && !queryText && !initialQuerySent && vscode) {
@@ -479,6 +511,30 @@ const App = () => {
           console.log('Received schema for collection:', message.collection);
           setCollection(message.collection);
           setTitle(`Weaviate Collection: ${message.collection}`);
+          
+          // Restore saved state if available
+          if (message.savedState) {
+            console.log('Restoring saved state:', message.savedState);
+            const state = message.savedState;
+            
+            if (state.queryText) setQueryText(state.queryText);
+            if (state.jsonData) setJsonData(state.jsonData);
+            if (state.viewType) setViewType(state.viewType);
+            if (state.splitRatio) setSplitRatio(state.splitRatio);
+            if (state.error) setError(state.error);
+            if (state.schema) setSchema(state.schema);
+            if (state.schemaConfig) setSchemaConfig(state.schemaConfig);
+            
+            // Mark as initialized if we have restored state
+            if (state.queryText) {
+              setInitialQuerySent(true);
+            }
+            
+            // Don't request sample query if we have restored query text
+            if (state.queryText) {
+              break;
+            }
+          }
           
           // Store schema for backend query generation (via requestSampleQuery)
           if (message.schema) {
@@ -639,6 +695,17 @@ const App = () => {
           setTitle(`Schema: ${message.collection}`);
           setError(null);
           setIsLoading(false);
+          break;
+
+        case 'ping':
+          // Respond to backend ping to indicate webview is alive
+          if (vscode) {
+            vscode.postMessage({ type: 'pong' });
+          }
+          break;
+
+        default:
+          console.log('Unknown message type:', message.type);
           break;
       }
     };

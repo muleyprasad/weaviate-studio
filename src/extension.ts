@@ -153,6 +153,27 @@ export function activate(context: vscode.ExtensionContext) {
             QueryEditorPanel.createOrShow(context, { connectionId, collectionName });
         }),
 
+        // Open a new query tab (always creates a new tab)
+        vscode.commands.registerCommand('weaviate.openNewQueryTab', (arg1: any, arg2?: string) => {
+            // Handle both call signatures similar to queryCollection
+            let connectionId: string;
+            let collectionName: string;
+
+            if (typeof arg1 === 'string' && arg2) {
+                connectionId = arg1;
+                collectionName = arg2;
+            } else if (arg1?.connectionId && (arg1.label || arg1.collectionName)) {
+                connectionId = arg1.connectionId;
+                collectionName = arg1.label || arg1.collectionName || '';
+            } else {
+                console.error('Invalid arguments for weaviate.openNewQueryTab:', arg1, arg2);
+                return;
+            }
+
+            // Always create a new tab by not providing a tabId (will auto-generate)
+            QueryEditorPanel.createOrShow(context, { connectionId, collectionName });
+        }),
+
         // Refresh the tree view
         vscode.commands.registerCommand('weaviate.refresh', () => {
             weaviateTreeDataProvider.refresh();

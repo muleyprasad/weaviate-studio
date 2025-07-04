@@ -18,6 +18,7 @@ interface QueryEditorOptions {
     connectionId?: string;
     collectionName?: string;
     client?: WeaviateClient;
+    tabId?: string; // Optional unique identifier for this tab instance
 }
 
 interface QueryRunOptions {
@@ -27,9 +28,11 @@ interface QueryRunOptions {
 }
 
 // Helper function to get webview options
-function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewPanelOptions & vscode.WebviewOptions {
     return {
         enableScripts: true,
+        // Preserve the webview when it is hidden so switching tabs is instant and state persists
+        retainContextWhenHidden: true,
         localResourceRoots: [
             vscode.Uri.joinPath(extensionUri, 'media'),
             vscode.Uri.joinPath(extensionUri, 'dist')
@@ -51,14 +54,18 @@ export class QueryEditorPanel {
     
     /**
      * Opens a new query editor instance for the specified collection
-     * Creates a new tab for each unique collection
+     * Creates a new tab for each request, allowing multiple tabs for the same collection
      */
     public static createOrShow(context: vscode.ExtensionContext, options: QueryEditorOptions = {}) {
         const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
         const collectionName = options.collectionName || 'Default';
         const connectionId = options.connectionId || '';
-        // Use both connection ID and collection name as the key to handle same collection name across different connections
-        const panelKey = `${connectionId}:${collectionName}`;
+        
+        // Generate a unique tab ID if not provided to ensure separate instances
+        const tabId = options.tabId || `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Use connection ID, collection name, and tab ID as the key for true isolation
+        const panelKey = `${connectionId}:${collectionName}:${tabId}`;
         
         // Check if we already have a panel for this collection
         if (QueryEditorPanel.panels.has(panelKey)) {
@@ -68,8 +75,8 @@ export class QueryEditorPanel {
             return;
         }
 
-        // Otherwise create a new panel for this collection
-        const title = `Weaviate: ${collectionName}`;
+        // Create a new panel with a unique title
+        const title = `Query: ${collectionName}`;
         const panel = vscode.window.createWebviewPanel(
             QueryEditorPanel.viewType,
             title,
@@ -78,15 +85,28 @@ export class QueryEditorPanel {
         );
 
         // Create new editor instance and store in our map
-        const newEditor = new QueryEditorPanel(panel, context, options);
+        const newEditor = new QueryEditorPanel(panel, context, { ...options, tabId });
         QueryEditorPanel.panels.set(panelKey, newEditor);
     }
 
     private constructor(panel: vscode.WebviewPanel, private readonly context: vscode.ExtensionContext, options: QueryEditorOptions) {
         this._options = options;
         this._panel = panel;
+        this._context = context;
         this._connectionManager = ConnectionManager.getInstance(context);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+        
+        // Handle webview state changes to preserve content when switching tabs
+        this._panel.onDidChangeViewState(
+            e => {
+                if (this._panel.visible) {
+                    // Webview became visible, restore state if needed
+                    this._restoreWebviewState();
+                }
+            },
+            null,
+            this._disposables
+        );
         
         this._initializeWebview();
     }
@@ -113,22 +133,34 @@ export class QueryEditorPanel {
                     break;
                 
                 case 'runQuery':
-                    try {
-                        await this._executeQuery(message.query, message.options || {});
-                    } catch (error: any) {
-                        this._panel.webview.postMessage({
-                            type: 'queryError',
-                            error: `Error executing query: ${error.message}`
-                        });
-                    }
+                    const query = message.query;
+                    const queryOptions: QueryRunOptions = {
+                        distanceMetric: message.distanceMetric || 'cosine',
+                        limit: message.limit || 10,
+                        certainty: message.certainty || 0.7
+                    };
+                    this._executeQuery(query, queryOptions);
                     break;
                 
                 case 'explainPlan':
                     await this._explainQueryPlan(message.query);
                     break;
                 
+                case 'saveState':
+                    // Save webview state for restoration
+                    this._saveWebviewState(message.state);
+                    break;
+                
                 case 'requestSampleQuery':
-                    await this._sendSampleQuery(message.collection || this._options.collectionName);
+                    const collectionName = message.collection || this._options.collectionName;
+                    if (collectionName) {
+                        this._sendSampleQuery(collectionName);
+                    } else {
+                        this._panel.webview.postMessage({
+                            type: 'queryError',
+                            error: 'No collection specified for sample query'
+                        });
+                    }
                     break;
                     
                 case 'getSchema':
@@ -302,15 +334,67 @@ export class QueryEditorPanel {
                 throw new Error('Not connected to Weaviate');
             }
             const schema = await this._weaviateClient.schema.getter().do();
+            
+            // Get any saved state for this panel
+            const savedState = this._getSavedWebviewState();
+            
             this._panel.webview.postMessage({
                 type: 'initialData',
                 schema,
-                collection: this._options.collectionName
+                collection: this._options.collectionName,
+                savedState: savedState
             });
             
         } catch (error: any) {
             vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
         }
+    }
+    
+    /**
+     * Restore webview state when the panel becomes visible again
+     */
+    private async _restoreWebviewState() {
+        // Check if webview needs reinitialization (content was disposed)
+        try {
+            // Try to ping the webview to see if it's responsive
+            this._panel.webview.postMessage({ type: 'ping' });
+            
+            // If we get here without error, webview is still alive
+            // No need to restore state
+        } catch (error) {
+            // Webview content was disposed, reinitialize
+            console.log('Webview content was disposed, reinitializing...');
+            await this._initializeWebview();
+        }
+    }
+    
+    /**
+     * Save current webview state for restoration
+     */
+    private _saveWebviewState(state: any) {
+        const panelKey = this._getPanelKey();
+        if (panelKey) {
+            this.context.workspaceState.update(`webview_state_${panelKey}`, {
+                ...state,
+                timestamp: Date.now()
+            });
+        }
+    }
+    
+    /**
+     * Get saved webview state
+     */
+    private _getSavedWebviewState(): any {
+        const panelKey = this._getPanelKey();
+        if (panelKey) {
+            const savedState = this.context.workspaceState.get(`webview_state_${panelKey}`);
+            // Only return state if it's recent (within last hour)
+            if (savedState && (savedState as any).timestamp && 
+                Date.now() - (savedState as any).timestamp < 3600000) {
+                return savedState;
+            }
+        }
+        return null;
     }
     
     /**
@@ -490,10 +574,11 @@ export class QueryEditorPanel {
     private _getPanelKey(): string | undefined {
         const connectionId = this._options.connectionId || '';
         const collectionName = this._options.collectionName;
+        const tabId = this._options.tabId;
         if (!collectionName) {
             return undefined;
         }
         
-        return `${connectionId}:${collectionName}`;
+        return `${connectionId}:${collectionName}:${tabId}`;
     }
 }

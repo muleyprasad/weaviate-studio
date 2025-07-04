@@ -111,6 +111,10 @@
         "command": "weaviate.viewCollectionMetrics",
         "title": "View Performance Metrics",
         "category": "Weaviate"
+      },
+      {
+        "command": "weaviate.openNewQueryTab",
+        "title": "Open New Query Tab"
       }
     ],
     "viewsContainers": {
@@ -219,6 +223,11 @@
           "command": "weaviate.queryCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "1_actions@4"
+        },
+        {
+          "command": "weaviate.openNewQueryTab",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@5"
         },
         {
           "command": "weaviate.deleteCollection",
