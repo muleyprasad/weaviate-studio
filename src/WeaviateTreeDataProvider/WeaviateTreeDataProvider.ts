@@ -132,7 +132,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 'weaviateDetailedSchema',
                 `Schema: ${collectionName}`,
                 vscode.ViewColumn.One,
-                { enableScripts: true }
+                { 
+                    enableScripts: true,
+                    retainContextWhenHidden: true 
+                }
             );
 
             // Format the schema as HTML
@@ -174,7 +177,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 'weaviateRawConfig',
                 `Raw Config: ${collectionName}`,
                 vscode.ViewColumn.One,
-                { enableScripts: true }
+                { 
+                    enableScripts: true,
+                    retainContextWhenHidden: true
+                }
             );
 
             // Format the raw config as HTML
