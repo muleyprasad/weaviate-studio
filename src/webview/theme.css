@@ -151,8 +151,8 @@ a:hover {
 }
 
 .theme-table-header {
-  background-color: var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C));
   color: var(--vscode-list-activeSelectionForeground, white);
+  background-color: var(--vscode-list-activeSelectionBackground, #0E639C);  
   border-bottom: 1px solid var(--vscode-panel-border, #333);
   font-weight: 600;
   text-transform: uppercase;

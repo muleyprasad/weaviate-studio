@@ -672,8 +672,6 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.header}>{title || 'Weaviate Studio - GraphQL Query Interface'}</h1>
-
       {/* Display error messages if present */}
       {error && (
         <div style={styles.error}>
@@ -682,7 +680,7 @@ const App = () => {
       )}
       
       {/* Resizable split layout with GraphQL editor and query results */}
-      <div style={{ height: 'calc(100vh - 54px)', overflow: 'hidden' }}>
+      <div style={{ height: 'calc(100vh - 20px)', overflow: 'hidden' }}>
         <ResizableSplitter
           direction="vertical"
           initialSplit={splitRatio}
@@ -692,11 +690,18 @@ const App = () => {
           {/* GraphQL Query Editor Section */}
           <div style={styles.queryContainer}>
             <div style={styles.queryHeader}>
-              <span style={{ fontSize: '14px', fontWeight: 600 }}>
-                📝 GraphQL Query Editor
-                {collection && <span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '8px' }}>
-                  for {collection}
-                </span>}
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--vscode-foreground, #333)',
+                background: 'var(--vscode-sideBar-background, #f3f3f3)',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                marginRight: '8px',
+                display: 'inline-block',
+                minWidth: '140px'
+              }}>
+                GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
               
               {/* Template and Run buttons */}
@@ -877,16 +882,18 @@ const App = () => {
           {/* Query Results Section */}
           <div style={styles.resultContainer}>
             <div style={styles.resultHeader}>
-              <span style={{ fontSize: '14px', fontWeight: 600 }}>
-                📊 Query Results
-                {jsonData && (
-                  <span style={{ fontSize: '13px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '8px' }}>
-                    {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
-                      ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
-                      : 'Data loaded'
-                    }
-                  </span>
-                )}
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--vscode-foreground, #333)',
+                background: 'var(--vscode-sideBar-background, #f3f3f3)',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                marginRight: '8px',
+                display: 'inline-block',
+                minWidth: '140px'
+              }}>
+                {jsonData ? 'Results Data loaded' : 'Results'}
               </span>
               {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
