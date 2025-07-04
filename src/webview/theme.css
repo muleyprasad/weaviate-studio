@@ -217,8 +217,8 @@ a:hover {
   }
   
   .template-dropdown-menu .template-dropdown-header {
-    background-color: var(--vscode-list-activeSelectionBackground, var(--fallback-light-button-bg)) !important;
-    color: var(--vscode-list-activeSelectionForeground, var(--fallback-light-button-fg)) !important;
+    background-color: var(--vscode-editorWidget-background, var(--fallback-light-header-bg)) !important;
+    color: var(--vscode-editorWidget-foreground, var(--fallback-light-header-fg)) !important;
     border-bottom: 1px solid var(--vscode-panel-border, var(--fallback-light-border)) !important;
   }
   
@@ -232,7 +232,7 @@ a:hover {
   }
   
   .template-dropdown-menu .template-dropdown-item .template-title {
-    color: var(--vscode-list-activeSelectionForeground, var(--fallback-light-foreground)) !important;
+    color: var(--vscode-foreground, var(--fallback-light-foreground)) !important;
   }
   
   .template-dropdown-menu .template-dropdown-item .template-description {
@@ -241,8 +241,8 @@ a:hover {
 }
 
 .theme-dropdown-header {
-  background-color: var(--vscode-titleBar-activeBackground, var(--vscode-sideBar-background, #2D2D2D));
-  color: var(--vscode-titleBar-activeForeground, var(--vscode-sideBar-foreground, #CCCCCC));
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D));
+  color: var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC));
   border-bottom: 1px solid var(--vscode-panel-border, #333);
   font-weight: 600;
   text-transform: uppercase;
@@ -255,6 +255,7 @@ a:hover {
   padding: 8px 10px; /* Reduced from 10px 12px */
   cursor: pointer;
   transition: background-color 0.1s ease;
+  color: var(--vscode-foreground, var(--vscode-editor-foreground, #CCCCCC));
 }
 
 .theme-dropdown-item:hover {

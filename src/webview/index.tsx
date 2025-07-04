@@ -515,7 +515,6 @@ const App = () => {
           
           try {
             const extractedData = extractWeaviateData(message.data, message.collection);
-            console.log('Extracted data:', extractedData);
             setJsonData(extractedData);
           } catch (err) {
             console.error('Error extracting data from response:', err);
@@ -769,8 +768,8 @@ const App = () => {
                       <div className="template-dropdown-header theme-dropdown-header" style={{
                         padding: '8px 12px',
                         borderBottom: '1px solid var(--vscode-panel-border, #333)',
-                        backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
-                        color: 'var(--vscode-list-activeSelectionForeground, white)',
+                        backgroundColor: 'var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D))',
+                        color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
                         fontWeight: 600,
                         fontSize: '11px',
                         textTransform: 'uppercase',
@@ -810,7 +809,7 @@ const App = () => {
                           <div className="template-title" style={{ 
                             fontWeight: 500,
                             marginBottom: '3px',
-                            color: 'var(--vscode-foreground, #222)',
+                            color: 'var(--vscode-foreground, var(--vscode-editor-foreground, #CCCCCC))',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px'
@@ -820,7 +819,7 @@ const App = () => {
                           </div>
                           <div className="template-description" style={{ 
                             fontSize: '11px',
-                            color: 'var(--vscode-descriptionForeground, #888)',
+                            color: 'var(--vscode-descriptionForeground, #999)',
                             lineHeight: '1.4'
                           }}>
                             {template.description}
