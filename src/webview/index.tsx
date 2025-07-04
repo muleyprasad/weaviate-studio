@@ -694,12 +694,14 @@ const App = () => {
                 fontSize: '14px',
                 fontWeight: 600,
                 color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
-                background: 'var(--vscode-editorWidget-background, #23272e)',
+                background: 'var(--vscode-editorWidget-background, #1a1d21)',
                 padding: '4px 12px',
                 borderRadius: '4px',
                 marginRight: '8px',
                 display: 'inline-block',
-                minWidth: '140px'
+                minWidth: '140px',
+                borderBottom: '2px solid var(--vscode-panel-border, #333)',
+                boxShadow: '0 2px 6px 0 rgba(0,0,0,0.06)'
               }}>
                 GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
@@ -886,12 +888,14 @@ const App = () => {
                 fontSize: '14px',
                 fontWeight: 600,
                 color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
-                background: 'var(--vscode-editorWidget-background, #23272e)',
+                background: 'var(--vscode-editorWidget-background, #1a1d21)',
                 padding: '4px 12px',
                 borderRadius: '4px',
                 marginRight: '8px',
                 display: 'inline-block',
-                minWidth: '140px'
+                minWidth: '140px',
+                borderBottom: '2px solid var(--vscode-panel-border, #333)',
+                boxShadow: '0 2px 6px 0 rgba(0,0,0,0.06)'
               }}>
                 {jsonData ? 'Results Data loaded' : 'Results'}
               </span>
