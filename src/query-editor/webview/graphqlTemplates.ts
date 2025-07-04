@@ -212,6 +212,10 @@ export function generateRelationshipQuery(collectionName: string, limit: number 
       # Replace with actual properties from your schema
       
       # Example reference properties (replace with actual ones):
+      # NOTE: Reference properties cannot be limited individually in Weaviate GraphQL.
+      # To control results: 1) Use a smaller main query limit, 2) Use separate queries, 
+      # or 3) Filter the main query to reduce linked objects.
+      
       # hasAuthor {
       #   ... on Author {
       #     name
@@ -389,6 +393,8 @@ export function generateSampleQuery(
         if (refPrimitiveProps.length > 0) {
           const nestedProps = refPrimitiveProps.map(p => `          ${p.name}`).join('\n');
           propertyStrings.push(`${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query 
+        # or adjust the main query limit to control total results.
         ... on ${referencedClassName} {
 ${nestedProps}
           _additional {
@@ -399,6 +405,7 @@ ${nestedProps}
         } else {
           // No suitable properties found, use a basic structure
           propertyStrings.push(`${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
         ... on ${referencedClassName} {
           _additional {
             id
@@ -410,6 +417,7 @@ ${nestedProps}
         // We couldn't find schema info for the referenced class
         // Use a generic structure with _additional.id
         propertyStrings.push(`${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
         ... on ${referencedClassName} {
           _additional {
             id
@@ -666,6 +674,7 @@ export function generateDynamicSampleQuery(
   selectedReferenceProps.forEach(prop => {
     const referencedClassName = prop.dataType?.[0] || 'Unknown';
     propertyLines.push(`      ${prop.name} {
+        # WARNING: May return many linked objects. Consider separate queries if needed.
         ... on ${referencedClassName} {
           _additional {
             id
@@ -908,6 +917,7 @@ function getTopPropertiesForDisplay(classSchema?: ClassSchema, maxCount: number 
   references.forEach(prop => {
     const refClassName = prop.dataType?.[0] || 'Unknown';
     result.push(`      ${prop.name} {
+        # WARNING: May return many objects. Consider separate queries if needed.
         ... on ${refClassName} {
           _additional { id }
         }
