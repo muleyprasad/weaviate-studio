@@ -222,17 +222,25 @@ Property: ${prop.name}
                     }
                     
                     .header {
-                        background-color: var(--vscode-sideBar-background);
-                        padding: 20px;
-                        border-bottom: 1px solid var(--vscode-panel-border);
+                        font-family: "Inter", Arial, sans-serif;
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: #222b45;
+                        background-color: #f5f6fa;
+                        padding: 12px 20px;
+                        margin: 0;
+                        border: none;
                     }
                     
                     .header h1 {
                         margin: 0;
-                        color: var(--vscode-textLink-foreground);
                         display: flex;
                         align-items: center;
                         gap: 10px;
+                        font-family: "Inter", Arial, sans-serif;
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: #222b45;
                     }
                     
                     .collection-badge {
@@ -244,17 +252,80 @@ Property: ${prop.name}
                         font-weight: normal;
                     }
 
+                    .section-header {
+                        font-family: var(--vscode-font-family);
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+                        margin: 0;
+                        padding: 8px 12px;
+                        background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+                        border-bottom: 1px solid var(--vscode-panel-border);
+                        border-left: 3px solid var(--vscode-button-background);
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        text-transform: none;
+                    }
+                    
+                    .section-header .buttons {
+                        display: flex;
+                        gap: 8px;
+                    }
+
+                    .button {
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                        border: none;
+                        padding: 4px 8px;
+                        font-size: 12px;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        border-radius: 2px;
+                    }
+
+                    .button:hover {
+                        background-color: var(--vscode-button-hoverBackground);
+                    }
+
+                    .section-content {
+                        padding: 8px 20px;
+                        margin: 0;
+                        background: none;
+                    }
+                    
+                    .section-content pre {
+                        margin: 0;
+                    }
+
+                    .section-content p {
+                        margin: 0 0 8px 0;
+                    }
+                    
+                    .sidebar {
+                        padding: 16px;
+                        background: none;
+                    }
+                    
+                    .results {
+                        padding: 12px;
+                        margin: 0;
+                        background: none;
+                    }
+
                     .tabs {
                         display: flex;
-                        background-color: var(--vscode-tab-inactiveBackground);
+                        background: none;
                         border-bottom: 1px solid var(--vscode-panel-border);
                         overflow-x: auto;
+                        margin: 0;
                     }
                     
                     .tab {
                         padding: 12px 16px;
                         cursor: pointer;
-                        background-color: var(--vscode-tab-inactiveBackground);
+                        background: none;
                         color: var(--vscode-tab-inactiveForeground);
                         border: none;
                         border-right: 1px solid var(--vscode-panel-border);
@@ -276,7 +347,7 @@ Property: ${prop.name}
                     
                     .tab-content {
                         display: none;
-                        padding: 20px;
+                        padding: 0;
                         max-height: calc(100vh - 200px);
                         overflow-y: auto;
                     }
@@ -286,17 +357,17 @@ Property: ${prop.name}
                     }
                     
                     .property-item {
-                        background-color: var(--vscode-editor-lineHighlightBackground);
-                        border-radius: 4px;
                         padding: 12px;
                         margin-bottom: 12px;
-                        border-left: 3px solid var(--vscode-textLink-foreground);
+                        background: none;
+                        border: none;
                     }
                     
                     .property-header {
                         display: flex;
                         justify-content: space-between;
                         margin-bottom: 8px;
+                        background: none;
                     }
                     
                     .property-name {
@@ -308,7 +379,6 @@ Property: ${prop.name}
                         color: var(--vscode-typeHint-foreground);
                         font-family: var(--vscode-editor-font-family);
                         font-size: 0.9em;
-                        background-color: var(--vscode-badge-background);
                         padding: 2px 6px;
                         border-radius: 4px;
                     }
@@ -327,17 +397,16 @@ Property: ${prop.name}
                     }
                     
                     .property-detail {
-                        background-color: var(--vscode-textCodeBlock-background);
                         padding: 2px 6px;
                         border-radius: 3px;
+                        background: none;
                     }
                     
-                    /* FIXED: Clean JSON styling without gray highlighting */
                     pre {
-                        background-color: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-panel-border);
+                        background: none;
+                        border: none;
                         padding: 15px;
-                        border-radius: 6px;
+                        border-radius: 0;
                         overflow-x: auto;
                         font-size: 0.9em;
                         line-height: 1.4;
@@ -350,38 +419,19 @@ Property: ${prop.name}
                         color: var(--vscode-editor-foreground);
                     }
                     
-                    /* JSON syntax highlighting - clean and minimal */
-                    .json-key {
-                        color: var(--vscode-symbolIcon-stringForeground, #ce9178);
-                    }
-                    
-                    .json-string {
-                        color: var(--vscode-symbolIcon-stringForeground, #ce9178);
-                    }
-                    
-                    .json-number {
-                        color: var(--vscode-symbolIcon-numberForeground, #b5cea8);
-                    }
-                    
-                    .json-boolean {
-                        color: var(--vscode-symbolIcon-booleanForeground, #569cd6);
-                    }
-                    
-                    .json-null {
-                        color: var(--vscode-symbolIcon-nullForeground, #569cd6);
-                    }
-                    
                     .config-section {
-                        background-color: var(--vscode-editor-lineHighlightBackground);
-                        padding: 15px;
-                        border-radius: 6px;
-                        margin-bottom: 20px;
-                        border-left: 4px solid var(--vscode-textLink-foreground);
+                        padding: 20px;
+                        margin: 0;
+                        background: none;
+                        border: none;
                     }
                     
                     .config-section h3 {
-                        margin: 0 0 10px 0;
-                        color: var(--vscode-textLink-foreground);
+                        font-family: "Inter", Arial, sans-serif;
+                        font-size: 16px;
+                        font-weight: bold;
+                        color: #222b45;
+                        margin: 0 0 16px 0;
                         display: flex;
                         align-items: center;
                         gap: 8px;
@@ -395,10 +445,10 @@ Property: ${prop.name}
                     }
                     
                     .config-item {
-                        background-color: var(--vscode-textCodeBlock-background);
                         padding: 8px 12px;
                         border-radius: 4px;
                         font-size: 0.9em;
+                        background: none;
                     }
                     
                     .config-label {
@@ -431,109 +481,91 @@ Property: ${prop.name}
                         display: grid;
                         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
                         gap: 15px;
-                        margin-bottom: 20px;
+                        margin: 20px 0;
                     }
                     
                     .stat-card {
-                        background-color: var(--vscode-editor-lineHighlightBackground);
                         padding: 15px;
-                        border-radius: 6px;
                         text-align: center;
-                        border: 1px solid var(--vscode-panel-border);
+                        margin: 0;
+                        background: none;
+                        border: none;
                     }
                     
                     .stat-number {
                         font-size: 1.5em;
                         font-weight: bold;
-                        color: var(--vscode-textLink-foreground);
+                        color: #222b45;
                         display: block;
+                        font-family: "Inter", Arial, sans-serif;
                     }
                     
                     .stat-label {
                         font-size: 0.9em;
                         color: var(--vscode-descriptionForeground);
                         margin-top: 5px;
+                        font-family: "Inter", Arial, sans-serif;
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>
-                        🗄️ Schema: ${this.escapeHtml(schema.class)}
-                        <span class="collection-badge">Collection</span>
+                        Schema: ${this.escapeHtml(schema.class)}
                     </h1>
                 </div>
-
                 <div class="tabs">
-                    <button class="tab active" onclick="switchTab('overview')">📋 Overview</button>
-                    <button class="tab" onclick="switchTab('properties')">🔧 Properties</button>
-                    <button class="tab" onclick="switchTab('raw')">📄 Raw JSON</button>
-                    <button class="tab" onclick="switchTab('api')">🚀 API Equivalent</button>
-                    <button class="tab" onclick="switchTab('scripts')">🐍 Creation Scripts</button>
+                    <div class="tab active" onclick="switchTab('overview')">Overview</div>
+                    <div class="tab" onclick="switchTab('properties')">Properties</div>
+                    <div class="tab" onclick="switchTab('raw-json')">Raw JSON</div>
+                    <div class="tab" onclick="switchTab('api-equivalent')">API Equivalent</div>
+                    <div class="tab" onclick="switchTab('creation-scripts')">Creation Scripts</div>
                 </div>
-
-                <!-- Overview Tab -->
                 <div id="overview" class="tab-content active">
+                    <div class="section-header">Description</div>
+                    <div class="section-content">${this.escapeHtml(schema.description || 'No description available')}</div>
+                    
+                    <div class="section-header">Vector Configuration</div>
+                    <div class="section-content">
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <span class="config-label">Vectorizer:</span>
+                                <span class="config-value">${this.escapeHtml(schema.vectorizer || 'None')}</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">Index Type:</span>
+                                <span class="config-value">${this.escapeHtml((schema as any).vectorIndexType || 'HNSW')}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-header">Module Configuration</div>
+                    <div class="section-content">
+                        <pre><code>${this.formatJsonClean(schema.moduleConfig)}</code></pre>
+                    </div>
+                    
+                    <div class="section-header">Scaling Configuration</div>
+                    <div class="section-content">
+                        <div class="config-section">
+                            <h3>Sharding</h3>
+                            <pre><code>${this.formatJsonClean((schema as any).shardingConfig)}</code></pre>
+                        </div>
+                    </div>
+                    
                     <div class="stats-grid">
                         <div class="stat-card">
                             <span class="stat-number">${schema.properties?.length || 0}</span>
-                            <div class="stat-label">Properties</div>
+                            <span class="stat-label">Properties</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-number">${schema.vectorizer ? '✅' : '❌'}</span>
-                            <div class="stat-label">Vectorizer</div>
+                            <span class="stat-number">${schema.vectorizer ? '1' : '0'}</span>
+                            <span class="stat-label">Vectorizer</span>
                         </div>
                         <div class="stat-card">
                             <span class="stat-number">${schema.moduleConfig ? Object.keys(schema.moduleConfig).length : 0}</span>
-                            <div class="stat-label">Modules</div>
+                            <span class="stat-label">Modules</span>
                         </div>
                     </div>
-
-                    ${schema.description ? `
-                        <div class="config-section">
-                            <h3>📝 Description</h3>
-                            <p>${this.escapeHtml(schema.description)}</p>
-                        </div>
-                    ` : ''}
-
-                    ${schema.vectorizer ? `
-                        <div class="config-section">
-                            <h3>🎯 Vector Configuration</h3>
-                            <div class="config-grid">
-                                <div class="config-item">
-                                    <span class="config-label">Vectorizer:</span>
-                                    <span class="config-value">${this.escapeHtml(schema.vectorizer)}</span>
-                                </div>
-                                ${(schema as any).vectorIndexType ? `
-                                    <div class="config-item">
-                                        <span class="config-label">Index Type:</span>
-                                        <span class="config-value">${this.escapeHtml((schema as any).vectorIndexType)}</span>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    ${schema.moduleConfig ? `
-                        <div class="config-section">
-                            <h3>🧩 Module Configuration</h3>
-                            <pre><code>${this.formatJsonClean(schema.moduleConfig)}</code></pre>
-                        </div>
-                    ` : ''}
-
-                    ${(schema as any).shardingConfig || (schema as any).replicationConfig ? `
-                        <div class="config-section">
-                            <h3>🏗️ Scaling Configuration</h3>
-                            ${(schema as any).shardingConfig ? `
-                                <h4>Sharding:</h4>
-                                <pre><code>${this.formatJsonClean((schema as any).shardingConfig)}</code></pre>
-                            ` : ''}
-                            ${(schema as any).replicationConfig ? `
-                                <h4>Replication:</h4>
-                                <pre><code>${this.formatJsonClean((schema as any).replicationConfig)}</code></pre>
-                            ` : ''}
-                        </div>
-                    ` : ''}
                 </div>
 
                 <!-- Properties Tab -->
@@ -543,52 +575,43 @@ Property: ${prop.name}
                 </div>
 
                 <!-- Raw JSON Tab -->
-                <div id="raw" class="tab-content">
-                    <h3>Complete Schema Definition</h3>
-                    <button class="copy-button" onclick="copyToClipboard('rawSchema')">📋 Copy JSON</button>
-                    <pre><code id="rawSchema">${this.formatJsonClean(schema)}</code></pre>
+                <div id="raw-json" class="tab-content">
+                    <div class="section-header">
+                        <span>Complete Schema Definition</span>
+                        <div class="buttons">
+                            <button class="button" onclick="copyToClipboard('rawSchema')">Copy JSON</button>
+                        </div>
+                    </div>
+                    <div class="section-content">
+                        <pre id="rawSchema"><code>${this.formatJsonClean(schema)}</code></pre>
+                    </div>
                 </div>
 
                 <!-- API Equivalent Tab -->
-                <div id="api" class="tab-content">
-                    <h3>🚀 REST API Equivalent</h3>
-                    <p>Use this cURL command to recreate this collection:</p>
-                    <button class="copy-button" onclick="copyToClipboard('curlCommand')">📋 Copy cURL</button>
-                    <pre><code id="curlCommand">${this.escapeHtml(curlCommand)}</code></pre>
-                    
-                    <h4>📡 Python Client Example</h4>
-                    <button class="copy-button" onclick="copyToClipboard('pythonCode')">📋 Copy Python</button>
-                    <pre><code id="pythonCode">import weaviate
-
-client = weaviate.Client("http://localhost:8080")
-
-schema = ${JSON.stringify(apiEquivalent, null, 2)}
-
-client.schema.create_class(schema)</code></pre>
-
-                    <h4>📱 JavaScript Client Example</h4>
-                    <button class="copy-button" onclick="copyToClipboard('jsCode')">📋 Copy JavaScript</button>
-                    <pre><code id="jsCode">import weaviate from 'weaviate-ts-client';
-
-const client = weaviate.client({
-  scheme: 'http',
-  host: 'localhost:8080',
-});
-
-const schema = ${JSON.stringify(apiEquivalent, null, 2)};
-
-await client.schema.classCreator().withClass(schema).do();</code></pre>
+                <div id="api-equivalent" class="tab-content">
+                    <div class="section-header">
+                        <span>REST API Equivalent</span>
+                        <div class="buttons">
+                            <button class="button" onclick="copyToClipboard('apiCommand')">Copy Command</button>
+                        </div>
+                    </div>
+                    <div class="section-content">
+                        <p>Use this cURL command to recreate this collection:</p>
+                        <pre id="apiCommand"><code>${this.generateCurlCommand(schema)}</code></pre>
+                    </div>
                 </div>
 
                 <!-- Creation Scripts Tab -->
-                <div id="scripts" class="tab-content">
-                    <h3>🐍 Complete Creation Script</h3>
-                    <button class="copy-button" onclick="copyToClipboard('creationScript')">📋 Copy Script</button>
-                    <pre><code id="creationScript">${this.escapeHtml(creationScript)}</code></pre>
-                    
-                    <h4>🔧 Property Details</h4>
-                    <button class="copy-button" onclick="copyToClipboard('propertyDetails')">📋 Copy Properties</button>
-                    <pre><code id="propertyDetails">${this.escapeHtml(propertyDetails)}</code></pre>
+                <div id="creation-scripts" class="tab-content">
+                    <div class="section-header">
+                        <span>Complete Creation Script</span>
+                        <div class="buttons">
+                            <button class="button" onclick="copyToClipboard('creationScript')">Copy Script</button>
+                        </div>
+                    </div>
+                    <div class="section-content">
+                        <pre id="creationScript"><code>${this.generatePythonScript(schema)}</code></pre>
+                    </div>
                 </div>
 
                 <script>
@@ -1073,5 +1096,33 @@ print(f"Collection '{schema.class}' created successfully!")`;
             </body>
             </html>
         `;
+    }
+
+    private generateCurlCommand(schema: any): string {
+        const apiEquivalent = this.convertToApiFormat(schema);
+        return `curl \\
+    -X POST \\
+    -H "Content-Type: application/json" \\
+    -d '${JSON.stringify(apiEquivalent, null, 2)}' \\
+    http://localhost:8080/v1/schema`;
+    }
+
+    private generatePythonScript(schema: any): string {
+        const apiEquivalent = this.convertToApiFormat(schema);
+        return `import weaviate
+
+client = weaviate.Client("http://localhost:8080")
+
+schema = ${JSON.stringify(apiEquivalent, null, 2)}
+
+client.schema.create_class(schema)`;
+    }
+
+    private convertToApiFormat(schema: any): any {
+        // Remove internal fields and format for API
+        const apiSchema = { ...schema };
+        delete apiSchema.id;
+        delete apiSchema._additional;
+        return apiSchema;
     }
 }

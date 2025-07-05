@@ -215,11 +215,6 @@
           "group": "1_actions@4"
         },
         {
-          "command": "weaviate.openNewQueryTab",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "1_actions@5"
-        },
-        {
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "2_management@1"
