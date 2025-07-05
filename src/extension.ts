@@ -18,13 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
         if (e.selection && e.selection.length > 0) {
             const item = e.selection[0];
             
-            // Handle collection selection
-            if (item.itemType === 'collection' && item.connectionId) {
-                // Open query editor with the selected collection
-                vscode.commands.executeCommand('weaviate.queryCollection', item.connectionId, item.label);
-            }
-            // Handle connection selection - auto connect if not connected
-            else if (item.itemType === 'connection' && item.connectionId) {
+            // Handle connection selection – auto connect if not connected
+            if (item.itemType === 'connection' && item.connectionId) {
                 // Get connection status
                 const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
                 
@@ -264,22 +259,6 @@ export function activate(context: vscode.ExtensionContext) {
             } catch (error) {
                 vscode.window.showErrorMessage(
                     `Failed to duplicate collection: ${error instanceof Error ? error.message : String(error)}`
-                );
-            }
-        }),
-
-        // View collection metrics command
-        vscode.commands.registerCommand('weaviate.viewCollectionMetrics', async (item) => {
-            if (!item?.connectionId || !item?.label) {
-                vscode.window.showErrorMessage('Missing connection or collection information');
-                return;
-            }
-            
-            try {
-                await weaviateTreeDataProvider.viewCollectionMetrics(item.connectionId, item.label);
-            } catch (error) {
-                vscode.window.showErrorMessage(
-                    `Failed to view metrics: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
         })

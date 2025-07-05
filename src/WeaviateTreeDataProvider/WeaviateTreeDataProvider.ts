@@ -688,7 +688,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 );
                 const schema = (collection as any)?.schema;
                 
-                if (schema?.multiTenancyConfig?.enabled) {
+                if ((schema as any)?.multiTenancyConfig?.enabled) {
                     try {
                         const tenants = await client.schema.tenantsGetter(element.collectionName).do();
                         statsItems.push(new WeaviateTreeItem(
@@ -1374,39 +1374,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error duplicating collection:', error);
             throw new Error(`Failed to duplicate collection: ${errorMessage}`);
-        }
-    }
-
-    /**
-     * Shows performance metrics for a collection
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection
-     */
-    async viewCollectionMetrics(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const collection = this.collections[connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
-
-            if (!collection?.schema) {
-                throw new Error('Collection schema not found');
-            }
-
-            // Create and show a webview with collection metrics
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateCollectionMetrics',
-                `Metrics: ${collectionName}`,
-                vscode.ViewColumn.One,
-                { enableScripts: true }
-            );
-
-            // Generate metrics HTML
-            panel.webview.html = this.viewRenderer.renderCollectionMetrics(collection.schema, connectionId);
-
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error viewing collection metrics:', error);
-            throw new Error(`Failed to view collection metrics: ${errorMessage}`);
         }
     }
 

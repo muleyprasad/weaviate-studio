@@ -66,7 +66,7 @@
       },
       {
         "command": "weaviate.queryCollection",
-        "title": "Query Collection"
+        "title": "Open Query Editor"
       },
       {
         "command": "weaviate.deleteCollection",
@@ -100,11 +100,6 @@
       {
         "command": "weaviate.duplicateCollection",
         "title": "Duplicate Collection Schema",
-        "category": "Weaviate"
-      },
-      {
-        "command": "weaviate.viewCollectionMetrics",
-        "title": "View Performance Metrics",
         "category": "Weaviate"
       },
       {
@@ -193,11 +188,6 @@
           "command": "weaviate.duplicateCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "2_management@2"
-        },
-        {
-          "command": "weaviate.viewCollectionMetrics",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "3_analysis@1"
         },
         {
           "command": "weaviate.refreshConnection",
