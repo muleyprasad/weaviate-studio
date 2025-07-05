@@ -55,13 +55,5 @@ describe('Tree panel webview options', () => {
     expect(opts.retainContextWhenHidden).toBe(true);
   });
 
-  it('raw config panel includes retainContextWhenHidden', async () => {
-    const capture = jest.fn(() => ({ webview: { }, reveal: jest.fn(), dispose: jest.fn() }));
-    vsMock.window.createWebviewPanel.mockImplementation(capture);
-
-    await provider.handleViewRawConfig(makeItem('ColA'));
-
-    const opts: any = (capture.mock.calls as any)[0][3];
-    expect(opts.retainContextWhenHidden).toBe(true);
-  });
+  // REMOVED raw config panel test as feature is deprecated
 }); 
