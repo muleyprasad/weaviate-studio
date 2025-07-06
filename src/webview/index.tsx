@@ -421,7 +421,7 @@ const App = () => {
   };
 
   // Handle template selection
-  const handleTemplateSelect = async (templateName: string) => {
+  const handleTemplateSelect = (templateName: string) => {
     setShowTemplateDropdown(false);
     if (templateName === 'Schema-based Sample') {
       // Show loading placeholder in the editor
@@ -432,7 +432,7 @@ const App = () => {
       // Find the template and process it
       const template = queryTemplates.find(t => t.name === templateName);
       if (template) {
-        const processed = await processTemplate(template.template, collection || '');
+        const processed = processTemplate(template.template, collection || '', 10, schema || undefined);
         setQueryText(processed);
       }
     }
