@@ -1465,9 +1465,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             throw new Error('Client not initialized');
         }
 
+        // Build schema object
+        const schemaObject = {
+            class: schema.class,
+            description: schema.description || undefined,
+            vectorizer: schema.vectorizer === 'none' ? undefined : schema.vectorizer
+        };
+        
         // Create the collection using the schema API
         await client.schema.classCreator()
-            .withClass(schema)
+            .withClass(schemaObject)
             .do();
     }
 
@@ -1628,6 +1635,92 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         font-size: 12px;
                         color: var(--vscode-editor-foreground);
                     }
+                    .properties-container {
+                        border: 1px solid var(--vscode-input-border);
+                        border-radius: 3px;
+                        padding: 10px;
+                        margin-bottom: 10px;
+                        min-height: 60px;
+                        background-color: var(--vscode-input-background);
+                    }
+                    .no-properties {
+                        color: var(--vscode-descriptionForeground);
+                        font-style: italic;
+                        text-align: center;
+                        padding: 20px;
+                    }
+                    .property-card {
+                        background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-input-border);
+                        border-radius: 3px;
+                        padding: 12px;
+                        margin-bottom: 8px;
+                        position: relative;
+                    }
+                    .property-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 8px;
+                    }
+                    .property-name {
+                        font-weight: 600;
+                        color: var(--vscode-foreground);
+                    }
+                    .property-actions {
+                        display: flex;
+                        gap: 5px;
+                    }
+                    .property-actions button {
+                        padding: 2px 6px;
+                        font-size: 11px;
+                        border: none;
+                        border-radius: 2px;
+                        cursor: pointer;
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                    }
+                    .property-actions button:hover {
+                        background-color: var(--vscode-button-secondaryHoverBackground);
+                    }
+                    .property-actions button.danger {
+                        background-color: var(--vscode-errorForeground);
+                        color: white;
+                    }
+                    .property-actions button.danger:hover {
+                        background-color: var(--vscode-inputValidation-errorBackground);
+                    }
+                    .property-fields {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 8px;
+                    }
+                    .property-field {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .property-field label {
+                        font-size: 11px;
+                        margin-bottom: 2px;
+                        color: var(--vscode-descriptionForeground);
+                    }
+                    .property-field input,
+                    .property-field select,
+                    .property-field textarea {
+                        padding: 4px 6px;
+                        font-size: 12px;
+                        border: 1px solid var(--vscode-input-border);
+                        border-radius: 2px;
+                        background-color: var(--vscode-input-background);
+                        color: var(--vscode-input-foreground);
+                    }
+                    .property-field textarea {
+                        resize: vertical;
+                        min-height: 40px;
+                    }
+                    .property-field.full-width {
+                        grid-column: 1 / -1;
+                    }
                 </style>
             </head>
             <body>
@@ -1655,6 +1748,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 <option value="text2vec-cohere">Cohere</option>
                                 <option value="text2vec-huggingface">Hugging Face</option>
                             </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Properties (Coming Soon)</label>
+                            <div class="properties-container" id="propertiesContainer">
+                                <div class="no-properties">Property management will be available in the next update.</div>
+                            </div>
                         </div>
                         
                         <div class="error" id="formError"></div>
