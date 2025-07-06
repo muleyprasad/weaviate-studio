@@ -1465,11 +1465,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             throw new Error('Client not initialized');
         }
 
+        // Basic validation
+        if (!schema.class) {
+            throw new Error('Collection name is required');
+        }
+        
         // Build schema object
         const schemaObject = {
             class: schema.class,
             description: schema.description || undefined,
-            vectorizer: schema.vectorizer === 'none' ? undefined : schema.vectorizer
+            vectorizer: schema.vectorizer === 'none' ? undefined : schema.vectorizer,
+            properties: schema.properties || []  // Include properties from the form
         };
         
         // Create the collection using the schema API
@@ -1721,6 +1727,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .property-field.full-width {
                         grid-column: 1 / -1;
                     }
+                    .property-field input[type="checkbox"] {
+                        width: auto;
+                        margin-right: 8px;
+                    }
+                    .property-field .help-text {
+                        margin-top: 2px;
+                        font-size: 10px;
+                    }
+                    .data-type-hint {
+                        font-size: 10px;
+                        color: var(--vscode-descriptionForeground);
+                        margin-top: 2px;
+                        font-style: italic;
+                    }
                 </style>
             </head>
             <body>
@@ -1731,7 +1751,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <div class="form-group">
                             <label for="collectionName">Collection Name*</label>
                             <input type="text" id="collectionName" name="collectionName" required>
-                            <div class="help-text">Must be PascalCase (start with capital letter, letters and numbers only). Examples: PodcastHosts, UserProfile, ArticleContent</div>
+                            <div class="help-text">Enter the name for your collection. The name will be used exactly as entered.</div>
                             <div class="preview" id="namePreview" style="display: none;"></div>
                         </div>
                         
@@ -1751,10 +1771,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         </div>
                         
                         <div class="form-group">
-                            <label>Properties (Coming Soon)</label>
+                            <label>Properties</label>
                             <div class="properties-container" id="propertiesContainer">
-                                <div class="no-properties">Property management will be available in the next update.</div>
+                                <div class="no-properties" id="noProperties">No properties added yet. Click "Add Property" to create your first property.</div>
                             </div>
+                            <button type="button" class="secondary-button" id="addPropertyButton">Add Property</button>
+                            <div class="help-text">Properties define the structure of your data. Each property has a name, data type, and optional description.</div>
                         </div>
                         
                         <div class="error" id="formError"></div>
@@ -1768,30 +1790,255 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                 <script>
                     const vscode = acquireVsCodeApi();
+                    let propertyCounter = 0;
+                    let properties = [];
+                    
+                    // Comprehensive data type definitions
+                    const dataTypes = [
+                        { value: 'text', label: 'Text', description: 'Long text content, vectorizable', supportsArray: true },
+                        { value: 'string', label: 'String', description: 'Short text, not vectorizable', supportsArray: true },
+                        { value: 'int', label: 'Integer', description: 'Whole numbers', supportsArray: true },
+                        { value: 'number', label: 'Number', description: 'Decimal numbers', supportsArray: true },
+                        { value: 'boolean', label: 'Boolean', description: 'True/false values', supportsArray: true },
+                        { value: 'date', label: 'Date', description: 'ISO 8601 date format', supportsArray: true },
+                        { value: 'geoCoordinates', label: 'Geo Coordinates', description: 'Latitude/longitude pairs', supportsArray: false },
+                        { value: 'phoneNumber', label: 'Phone Number', description: 'International phone numbers', supportsArray: false },
+                        { value: 'blob', label: 'Blob', description: 'Binary data (images, files)', supportsArray: false },
+                        { value: 'object', label: 'Object', description: 'Nested JSON objects', supportsArray: true },
+                        { value: 'uuid', label: 'UUID', description: 'Universally unique identifiers', supportsArray: true }
+                    ];
                     
                     // Request available vectorizers when the form loads
                     vscode.postMessage({ command: 'getVectorizers' });
                     
-                    // Add real-time validation for collection name
+                    // Add help text for collection name
                     document.getElementById('collectionName').addEventListener('input', (e) => {
                         const input = e.target.value.trim();
                         const preview = document.getElementById('namePreview');
                         
                         if (input) {
-                            // Show validation status instead of transformation
-                            const isValid = /^[A-Z][a-zA-Z0-9]*$/.test(input);
-                            if (isValid) {
-                                preview.textContent = '✓ Valid collection name';
-                                preview.style.color = 'var(--vscode-testing-iconPassed)';
-                            } else {
-                                preview.textContent = '✗ Must be PascalCase (start with capital letter, letters and numbers only)';
-                                preview.style.color = 'var(--vscode-errorForeground)';
-                            }
+                            preview.textContent = 'Collection name will be used exactly as entered';
+                            preview.style.color = 'var(--vscode-descriptionForeground)';
                             preview.style.display = 'block';
                         } else {
                             preview.style.display = 'none';
                         }
                     });
+                    
+                    // Property management
+                    document.getElementById('addPropertyButton').addEventListener('click', () => {
+                        addProperty();
+                    });
+                    
+                    function addProperty() {
+                        const propertyId = 'prop_' + (++propertyCounter);
+                        const property = {
+                            id: propertyId,
+                            name: '',
+                            dataType: 'text',
+                            isArray: false,
+                            description: ''
+                        };
+                        
+                        properties.push(property);
+                        renderProperties();
+                        
+                        // Focus the name input
+                        setTimeout(() => {
+                            const nameInput = document.getElementById(propertyId + '_name');
+                            if (nameInput) nameInput.focus();
+                        }, 100);
+                    }
+                    
+                    function removeProperty(propertyId) {
+                        properties = properties.filter(p => p.id !== propertyId);
+                        renderProperties();
+                    }
+                    
+                    function updateProperty(propertyId, field, value) {
+                        const prop = properties.find(p => p.id === propertyId);
+                        if (prop) {
+                            prop[field] = value;
+                            if (field === 'name') renderProperties();
+                        }
+                    }
+                    
+                    function renderProperties() {
+                        const container = document.getElementById('propertiesContainer');
+                        
+                        if (properties.length === 0) {
+                            container.innerHTML = '<div class="no-properties" id="noProperties">No properties added yet. Click "Add Property" to create your first property.</div>';
+                            return;
+                        }
+                        
+                        container.innerHTML = '';
+                        properties.forEach(prop => {
+                            const card = createPropertyCard(prop);
+                            container.appendChild(card);
+                        });
+                    }
+                    
+                    function createPropertyCard(prop) {
+                        const card = document.createElement('div');
+                        card.className = 'property-card';
+                        
+                        // Header
+                        const header = document.createElement('div');
+                        header.className = 'property-header';
+                        
+                        const nameSpan = document.createElement('div');
+                        nameSpan.className = 'property-name';
+                        nameSpan.textContent = prop.name || 'New Property';
+                        header.appendChild(nameSpan);
+                        
+                        const actions = document.createElement('div');
+                        actions.className = 'property-actions';
+                        
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = 'Remove';
+                        removeBtn.className = 'danger';
+                        removeBtn.addEventListener('click', () => removeProperty(prop.id));
+                        actions.appendChild(removeBtn);
+                        
+                        header.appendChild(actions);
+                        card.appendChild(header);
+                        
+                        // Fields container
+                        const fields = document.createElement('div');
+                        fields.className = 'property-fields';
+                        
+                        // Name field
+                        const nameField = createField('Name', 'input', prop.id + '_name', {
+                            value: prop.name,
+                            placeholder: 'propertyName',
+                            onchange: (e) => updateProperty(prop.id, 'name', e.target.value)
+                        });
+                        fields.appendChild(nameField);
+                        
+                        // Data type field
+                        const typeField = createSelectField('Data Type', prop.id + '_type', dataTypes.map(dt => ({
+                            value: dt.value,
+                            label: dt.label,
+                            selected: prop.dataType === dt.value
+                        })), (e) => {
+                            updateProperty(prop.id, 'dataType', e.target.value);
+                            updateArrayCheckbox(prop);
+                            updateDataTypeHint(prop);
+                        });
+                        
+                        // Add data type hint
+                        const dataTypeHint = document.createElement('div');
+                        dataTypeHint.className = 'data-type-hint';
+                        dataTypeHint.id = prop.id + '_hint';
+                        const selectedType = dataTypes.find(dt => dt.value === prop.dataType);
+                        dataTypeHint.textContent = selectedType ? selectedType.description : '';
+                        typeField.appendChild(dataTypeHint);
+                        
+                        fields.appendChild(typeField);
+                        
+                        // Array checkbox
+                        const arrayField = createArrayField(prop);
+                        fields.appendChild(arrayField);
+                        
+                        // Description field
+                        const descField = createField('Description', 'textarea', prop.id + '_desc', {
+                            value: prop.description,
+                            placeholder: 'Optional description for this property',
+                            onchange: (e) => updateProperty(prop.id, 'description', e.target.value)
+                        });
+                        descField.className += ' full-width';
+                        fields.appendChild(descField);
+                        
+                        card.appendChild(fields);
+                        return card;
+                    }
+                    
+                    function createField(label, type, id, options = {}) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = label;
+                        field.appendChild(labelEl);
+                        
+                        const input = document.createElement(type);
+                        input.id = id;
+                        Object.assign(input, options);
+                        field.appendChild(input);
+                        
+                        return field;
+                    }
+                    
+                    function createSelectField(label, id, options, onchange) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = label;
+                        field.appendChild(labelEl);
+                        
+                        const select = document.createElement('select');
+                        select.id = id;
+                        select.onchange = onchange;
+                        
+                        options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            option.selected = opt.selected;
+                            select.appendChild(option);
+                        });
+                        
+                        field.appendChild(select);
+                        return field;
+                    }
+                    
+                    function createArrayField(prop) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = 'Array';
+                        field.appendChild(labelEl);
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = prop.id + '_array';
+                        checkbox.checked = prop.isArray;
+                        checkbox.onchange = (e) => updateProperty(prop.id, 'isArray', e.target.checked);
+                        
+                        const dataType = dataTypes.find(dt => dt.value === prop.dataType);
+                        checkbox.disabled = !dataType?.supportsArray;
+                        
+                        field.appendChild(checkbox);
+                        
+                        const helpText = document.createElement('div');
+                        helpText.className = 'help-text';
+                        helpText.textContent = dataType?.supportsArray ? 'Allow multiple values' : 'Arrays not supported for this type';
+                        field.appendChild(helpText);
+                        
+                        return field;
+                    }
+                    
+                    function updateArrayCheckbox(prop) {
+                        const checkbox = document.getElementById(prop.id + '_array');
+                        if (checkbox) {
+                            const dataType = dataTypes.find(dt => dt.value === prop.dataType);
+                            checkbox.disabled = !dataType?.supportsArray;
+                            if (!dataType?.supportsArray) {
+                                checkbox.checked = false;
+                                prop.isArray = false;
+                            }
+                        }
+                    }
+                    
+                    function updateDataTypeHint(prop) {
+                        const hint = document.getElementById(prop.id + '_hint');
+                        if (hint) {
+                            const dataType = dataTypes.find(dt => dt.value === prop.dataType);
+                            hint.textContent = dataType ? dataType.description : '';
+                        }
+                    }
                     
                     document.getElementById('collectionForm').addEventListener('submit', (e) => {
                         e.preventDefault();
@@ -1810,25 +2057,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             return;
                         }
                         
-                        // Validate collection name format (no transformation)
-                        // Weaviate requires: PascalCase, letters and numbers only, no spaces or special chars
-                        
-                        // Validate collection name format
-                        if (collectionName.length < 2) {
-                            showError('Collection name must be at least 2 characters long');
-                            return;
-                        }
-                        
-                        if (!/^[A-Z][a-zA-Z0-9]*$/.test(collectionName)) {
-                            showError('Collection name must be PascalCase (start with capital letter, letters and numbers only, no spaces or special characters)');
-                            return;
-                        }
+                        const preview = document.getElementById('namePreview');
+                        preview.style.display = 'none';
                         
                         // Build schema object
                         const schema = {
                             class: collectionName,
                             description: description || undefined,
-                            vectorizer: vectorizer === 'none' ? undefined : vectorizer
+                            vectorizer: vectorizer === 'none' ? undefined : vectorizer,
+                            properties: properties.map(function(prop) {
+                                return {
+                                    name: prop.name.trim(),
+                                    dataType: prop.isArray ? [prop.dataType + '[]'] : [prop.dataType],
+                                    description: prop.description ? prop.description.trim() : undefined
+                                };
+                            })
                         };
                         
                         // Send schema to extension
