@@ -132,7 +132,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 'weaviateDetailedSchema',
                 `Schema: ${collectionName}`,
                 vscode.ViewColumn.One,
-                { enableScripts: true }
+                { 
+                    enableScripts: true,
+                    retainContextWhenHidden: true 
+                }
             );
 
             // Format the schema as HTML
@@ -146,48 +149,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-
-
-    /**
-     * Shows a raw collection configuration view in a webview
-     * @param item - The tree item representing the collection
-     */
-    public async handleViewRawConfig(item: WeaviateTreeItem): Promise<void> {
-        if (!item.connectionId || !item.label) {
-            vscode.window.showErrorMessage('Cannot view raw config: Missing connection or collection name');
-            return;
-        }
-
-        try {
-            const collectionName = item.label.toString();
-            const collection = this.collections[item.connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
-
-            if (!collection?.schema) {
-                vscode.window.showErrorMessage('Could not find schema for collection');
-                return;
-            }
-
-            // Create and show a webview with the raw configuration
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateRawConfig',
-                `Raw Config: ${collectionName}`,
-                vscode.ViewColumn.One,
-                { enableScripts: true }
-            );
-
-            // Format the raw config as HTML
-            panel.webview.html = this.getRawConfigHtml(collection.schema, item.connectionId);
-
-        } catch (error) {
-            console.error('Error viewing raw config:', error);
-            vscode.window.showErrorMessage(
-                `Failed to view raw config: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
-    }
-
     /**
      * Generates HTML for displaying detailed schema in a webview
      * @param schema The schema to display
@@ -196,15 +157,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return this.viewRenderer.renderDetailedSchema(schema);
     }
 
-    /**
-     * Generates HTML for displaying raw collection configuration in a webview
-     * @param schema The schema to display
-     * @param connectionId The connection ID for context
-     */
-    private getRawConfigHtml(schema: SchemaClass, connectionId: string): string {
-        return this.viewRenderer.renderRawConfig(schema, connectionId);
-    }
-    
     // #endregion Command Handlers
 
     // Helper to get connected status theme icon
@@ -736,7 +688,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 );
                 const schema = (collection as any)?.schema;
                 
-                if (schema?.multiTenancyConfig?.enabled) {
+                if ((schema as any)?.multiTenancyConfig?.enabled) {
                     try {
                         const tenants = await client.schema.tenantsGetter(element.collectionName).do();
                         statsItems.push(new WeaviateTreeItem(
@@ -1422,39 +1374,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error duplicating collection:', error);
             throw new Error(`Failed to duplicate collection: ${errorMessage}`);
-        }
-    }
-
-    /**
-     * Shows performance metrics for a collection
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection
-     */
-    async viewCollectionMetrics(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const collection = this.collections[connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
-
-            if (!collection?.schema) {
-                throw new Error('Collection schema not found');
-            }
-
-            // Create and show a webview with collection metrics
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateCollectionMetrics',
-                `Metrics: ${collectionName}`,
-                vscode.ViewColumn.One,
-                { enableScripts: true }
-            );
-
-            // Generate metrics HTML
-            panel.webview.html = this.viewRenderer.renderCollectionMetrics(collection.schema, connectionId);
-
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error viewing collection metrics:', error);
-            throw new Error(`Failed to view collection metrics: ${errorMessage}`);
         }
     }
 

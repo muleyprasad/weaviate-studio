@@ -945,7 +945,9 @@ function getTextProperties(classSchema?: ClassSchema): string[] {
  * Helper function to check if a collection has a text vectorizer module configured
  */
 function hasTextVectorizerModule(classSchema?: ClassSchema): boolean {
-  if (!classSchema) return false;
+  if (!classSchema) {
+    return false;
+  }
   
   // Check for explicit vectorizer configuration
   if (classSchema.vectorizer) {
@@ -996,9 +998,15 @@ function getVectorDimensions(classSchema?: ClassSchema): string {
       if (typeof config === 'object' && config && 'model' in config) {
         // Common dimension sizes for popular models
         const model = String(config.model).toLowerCase();
-        if (model.includes('openai') || model.includes('ada-002')) return '1536';
-        if (model.includes('sentence-transformers') || model.includes('all-mpnet')) return '768';
-        if (model.includes('cohere')) return '4096';
+        if (model.includes('openai') || model.includes('ada-002')) {
+          return '1536';
+        }
+        if (model.includes('sentence-transformers') || model.includes('all-mpnet')) {
+          return '768';
+        }
+        if (model.includes('cohere')) {
+          return '4096';
+        }
       }
     }
   }

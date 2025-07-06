@@ -224,16 +224,18 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
     borderCollapse: 'collapse',
     fontSize: '13px',
     backgroundColor: 'var(--vscode-editor-background, #252526)',
-    color: 'var(--vscode-editor-foreground, #D4D4D4)'
+    color: 'var(--vscode-editor-foreground, #D4D4D4)',
+    border: '1px solid var(--vscode-panel-border, #333)'
   };
   
   // Improved header styling with better theme colors
   const headerStyle: React.CSSProperties = {
-    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
-    color: 'var(--vscode-list-activeSelectionForeground, white)',
+    backgroundColor: 'var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D))',
+    color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
     padding: '10px 12px',
     textAlign: 'left',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
+    borderRight: '1px solid var(--vscode-panel-border, #333)',
     fontWeight: 600,
     position: 'sticky',
     top: 0,
@@ -246,6 +248,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   const cellStyle: React.CSSProperties = {
     padding: '8px 12px',
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
+    borderRight: '1px solid var(--vscode-panel-border, #333)',
     verticalAlign: 'top',
     maxWidth: '300px',
     overflow: 'hidden',
@@ -255,13 +258,13 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   
   const rowNumberStyle: React.CSSProperties = {
     ...cellStyle,
-    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
-    color: 'var(--vscode-list-activeSelectionForeground, white)',
+    backgroundColor: 'var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D))',
+    color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
     fontWeight: 600,
     textAlign: 'center',
-    width: '60px',
-    minWidth: '60px',
-    maxWidth: '60px',
+    width: '36px',
+    minWidth: '36px',
+    maxWidth: '36px',
     position: 'sticky',
     left: 0,
     zIndex: 2,
@@ -271,15 +274,15 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({ data, collectionName
   const rowNumberHeaderStyle: React.CSSProperties = {
     ...headerStyle,
     textAlign: 'center',
-    width: '60px',
-    minWidth: '60px',
-    maxWidth: '60px',
+    width: '36px',
+    minWidth: '36px',
+    maxWidth: '36px',
     position: 'sticky',
     left: 0,
     zIndex: 3,
     borderRight: '1px solid var(--vscode-panel-border, #333)',
-    backgroundColor: 'var(--vscode-list-activeSelectionBackground, var(--vscode-button-background, #0E639C))',
-    color: 'var(--vscode-list-activeSelectionForeground, white)'
+    backgroundColor: 'var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D))',
+    color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))'
   };
   
   const containerStyle: React.CSSProperties = {

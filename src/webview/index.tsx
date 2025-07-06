@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { JsonView } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
 import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
 import ResultsTable from './components/ResultsTable';
 import * as monaco from 'monaco-editor';
+import { queryTemplates, processTemplate } from '../query-editor/webview/graphqlTemplates';
 
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
 // due to webview bundle isolation
@@ -200,7 +199,7 @@ const ResizableSplitter: React.FC<{
 // Styles using VS Code theme variables for proper theme integration
 const styles = {
   container: {
-    padding: '10px',
+    padding: '0',
     fontFamily: 'var(--vscode-font-family, "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", monospace)',
     height: '100vh',
     overflow: 'auto',
@@ -208,42 +207,46 @@ const styles = {
     color: 'var(--vscode-editor-foreground, #D4D4D4)',
     display: 'flex',
     flexDirection: 'column' as 'column',
-    gap: '15px'
+    gap: '0'
   },
   header: {
     borderBottom: '1px solid var(--vscode-panel-border, #333)',
-    paddingBottom: '10px',
-    marginBottom: '5px',
-    fontSize: '18px',
+    paddingBottom: '8px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    paddingTop: '8px',
+    marginBottom: '0',
+    fontSize: '16px',
     fontWeight: 500 as 500,
-    color: 'var(--vscode-titleBar-activeForeground, var(--vscode-sideBar-foreground, #CCCCCC))'
+    color: 'var(--vscode-titleBar-activeForeground, var(--vscode-sideBar-foreground, #CCCCCC))',
+    backgroundColor: 'var(--vscode-titleBar-activeBackground, var(--vscode-sideBar-background, #252526))'
   },
   splitContainer: {
     display: 'flex',
     flexDirection: 'column' as 'column',
-    gap: '10px',
-    height: 'calc(100vh - 80px)'
+    gap: '0',
+    height: 'calc(100vh - 50px)'
   },
   queryContainer: {
     display: 'flex',
     flexDirection: 'column' as 'column',
-    gap: '10px',
+    gap: '0',
     height: '100%'
   },
   queryHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid var(--vscode-panel-border, #333)',
     borderLeft: '3px solid var(--vscode-button-background, #0E639C)',
-    padding: '8px 0 5px 12px',
-    backgroundColor: 'var(--vscode-tab-activeBackground, var(--vscode-editor-background, #2D2D2D))',
-    color: 'var(--vscode-tab-activeForeground, var(--vscode-editor-foreground, #CCCCCC))'
+    padding: '6px 8px',
+    marginBottom: '0',
+    backgroundColor: 'var(--vscode-sideBar-background, var(--vscode-editor-background, #252526))',
+    color: 'var(--vscode-sideBar-foreground, var(--vscode-editor-foreground, #CCCCCC))'
   },
   resultContainer: {
     display: 'flex',
     flexDirection: 'column' as 'column',
-    gap: '10px',
+    gap: '0',
     height: '100%',
     overflow: 'hidden'
   },
@@ -251,11 +254,10 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid var(--vscode-panel-border, #333)',
     borderLeft: '3px solid var(--vscode-button-background, #0E639C)',
-    padding: '8px 0 5px 12px',
-    backgroundColor: 'var(--vscode-tab-activeBackground, var(--vscode-editor-background, #2D2D2D))',
-    color: 'var(--vscode-tab-activeForeground, var(--vscode-editor-foreground, #CCCCCC))'
+    padding: '6px 8px',
+    backgroundColor: 'var(--vscode-sideBar-background, var(--vscode-editor-background, #252526))',
+    color: 'var(--vscode-sideBar-foreground, var(--vscode-editor-foreground, #CCCCCC))'
   },
   textarea: {
     backgroundColor: 'var(--vscode-input-background, #252526)',
@@ -272,9 +274,8 @@ const styles = {
     overflowY: 'auto' as 'auto'
   },
   jsonContainer: {
-    border: '1px solid var(--vscode-panel-border, #333)',
-    borderRadius: '4px',
-    padding: '10px',
+    borderRadius: '0',
+    padding: '12px',
     overflow: 'auto',
     backgroundColor: 'var(--vscode-editor-background, #252526)',
     flex: '1',
@@ -308,17 +309,17 @@ const styles = {
   error: {
     color: 'var(--vscode-errorForeground, #e74c3c)',
     backgroundColor: 'var(--vscode-inputValidation-errorBackground, rgba(231, 76, 60, 0.1))',
-    padding: '10px 15px',
+    padding: '6px 10px',
     borderRadius: '4px',
-    marginBottom: '10px',
+    marginBottom: '6px',
     border: '1px solid var(--vscode-inputValidation-errorBorder, rgba(231, 76, 60, 0.3))'
   },
   loading: {
     color: 'var(--vscode-progressBar-background, #3498db)',
-    marginBottom: '10px',
+    marginBottom: '6px',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '6px'
   }
 };
 
@@ -334,6 +335,39 @@ const App = () => {
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
   const [splitRatio, setSplitRatio] = useState<number>(50);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
+
+  // Save current state to backend for persistence across tab switches
+  const saveCurrentState = () => {
+    if (vscode) {
+      const currentState = {
+        queryText,
+        jsonData,
+        collection,
+        viewType,
+        splitRatio,
+        error,
+        schema,
+        schemaConfig
+      };
+      vscode.postMessage({
+        type: 'saveState',
+        state: currentState
+      });
+    }
+  };
+
+  // Auto-save state when important data changes
+  useEffect(() => {
+    // Debounce state saving to avoid too frequent saves
+    const timeoutId = setTimeout(() => {
+      if (queryText || jsonData) {
+        saveCurrentState();
+      }
+    }, 1000); // Save after 1 second of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [queryText, jsonData, viewType, splitRatio]);
 
   // Request a default query from the backend when collection is set and query is empty
   useEffect(() => {
@@ -375,11 +409,47 @@ const App = () => {
 
     if (vscode) {
       vscode.postMessage({ 
-        type: 'generateSampleQuery', 
+        type: 'requestSampleQuery', 
         collection: collection 
       });
     }
   };
+
+  // Handle template dropdown toggle
+  const handleToggleTemplateDropdown = () => {
+    setShowTemplateDropdown(!showTemplateDropdown);
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (templateName: string) => {
+    setShowTemplateDropdown(false);
+    if (templateName === 'Schema-based Sample') {
+      // Show loading placeholder in the editor
+      setQueryText('Loading sample query...');
+      // Request auto-generated sample from backend
+      handleGenerateQuery();
+    } else {
+      // Find the template and process it
+      const template = queryTemplates.find(t => t.name === templateName);
+      if (template) {
+        const processed = processTemplate(template.template, collection || '', 10, schema || undefined);
+        setQueryText(processed);
+      }
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showTemplateDropdown && !target.closest('.template-dropdown-container')) {
+        setShowTemplateDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTemplateDropdown]);
 
   // Setup message listener to receive data from extension
   // Helper function to extract data from Weaviate response formats
@@ -440,6 +510,30 @@ const App = () => {
           setCollection(message.collection);
           setTitle(`Weaviate Collection: ${message.collection}`);
           
+          // Restore saved state if available
+          if (message.savedState) {
+            console.log('Restoring saved state:', message.savedState);
+            const state = message.savedState;
+            
+            if (state.queryText) setQueryText(state.queryText);
+            if (state.jsonData) setJsonData(state.jsonData);
+            if (state.viewType) setViewType(state.viewType);
+            if (state.splitRatio) setSplitRatio(state.splitRatio);
+            if (state.error) setError(state.error);
+            if (state.schema) setSchema(state.schema);
+            if (state.schemaConfig) setSchemaConfig(state.schemaConfig);
+            
+            // Mark as initialized if we have restored state
+            if (state.queryText) {
+              setInitialQuerySent(true);
+            }
+            
+            // Don't request sample query if we have restored query text
+            if (state.queryText) {
+              break;
+            }
+          }
+          
           // Store schema for backend query generation (via requestSampleQuery)
           if (message.schema) {
             console.log('Received schema data for initialData');
@@ -475,7 +569,6 @@ const App = () => {
           
           try {
             const extractedData = extractWeaviateData(message.data, message.collection);
-            console.log('Extracted data:', extractedData);
             setJsonData(extractedData);
           } catch (err) {
             console.error('Error extracting data from response:', err);
@@ -491,12 +584,12 @@ const App = () => {
 
         case 'sampleQuery':
           // Handle sample query message from backend
-          console.log('Received sample query from backend:', message.data?.sampleQuery);
+          console.log('Received sampleQuery message:', message);
           if (message.data && message.data.sampleQuery) {
             setQueryText(message.data.sampleQuery);
             console.log('Query text state updated with sample query');
           } else {
-            console.warn('Received sampleQuery message but no query was included');
+            console.warn('Received sampleQuery message but no query was included. Full message:', message);
           }
           setIsLoading(false);
           break;
@@ -601,6 +694,17 @@ const App = () => {
           setError(null);
           setIsLoading(false);
           break;
+
+        case 'ping':
+          // Respond to backend ping to indicate webview is alive
+          if (vscode) {
+            vscode.postMessage({ type: 'pong' });
+          }
+          break;
+
+        default:
+          console.log('Unknown message type:', message.type);
+          break;
       }
     };
 
@@ -634,8 +738,6 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.header}>{title || 'Weaviate Studio - GraphQL Query Interface'}</h1>
-
       {/* Display error messages if present */}
       {error && (
         <div style={styles.error}>
@@ -644,7 +746,7 @@ const App = () => {
       )}
       
       {/* Resizable split layout with GraphQL editor and query results */}
-      <div style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+      <div style={{ height: 'calc(100vh - 20px)', overflow: 'hidden' }}>
         <ResizableSplitter
           direction="vertical"
           initialSplit={splitRatio}
@@ -654,22 +756,191 @@ const App = () => {
           {/* GraphQL Query Editor Section */}
           <div style={styles.queryContainer}>
             <div style={styles.queryHeader}>
-              <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                📝 GraphQL Query Editor
-                {collection && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
-                  for {collection}
-                </span>}
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                background: 'var(--vscode-editorWidget-background, #1a1d21)',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                marginRight: '8px',
+                display: 'inline-block',
+                minWidth: '140px'
+              }}>
+                GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
+              
+              {/* Template and Run buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Template Dropdown */}
+                <div className="template-dropdown-container" style={{ position: 'relative' }}>
+                  <button
+                    onClick={handleToggleTemplateDropdown}
+                    disabled={!collection}
+                    title={collection ? "Choose a query template" : "Select a collection first"}
+                    style={{
+                      backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                      color: collection ? 'var(--vscode-input-foreground, #E0E0E0)' : 'var(--vscode-descriptionForeground, #888)',
+                      border: '1px solid var(--vscode-input-border, #444)',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      height: '28px',
+                      minWidth: '42px',
+                      cursor: collection ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, #3A3A3A)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor = 'var(--vscode-input-background, #2D2D2D)';
+                      }
+                    }}
+                  >
+                    📋 Templates
+                    <span style={{ fontSize: '9px' }}>▼</span>
+                  </button>
+                  
+                  {/* Template Dropdown Menu - positioned relative to button */}
+                  {showTemplateDropdown && collection && (
+                    <div className="template-dropdown-menu theme-dropdown" style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: '0',
+                      marginTop: '2px',
+                      backgroundColor: 'var(--vscode-dropdown-background, var(--vscode-editor-background, #2D2D2D))',
+                      border: '1px solid var(--vscode-widget-border, var(--vscode-input-border, #444))',
+                      borderRadius: '4px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                      zIndex: 1000,
+                      minWidth: '320px',
+                      maxWidth: '400px',
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      fontSize: '12px',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)'
+                    }}>
+                      {/* Dropdown Header */}
+                      <div className="template-dropdown-header theme-dropdown-header" style={{
+                        padding: '8px 12px',
+                        borderBottom: '1px solid var(--vscode-panel-border, #333)',
+                        backgroundColor: 'var(--vscode-editorWidget-background, var(--vscode-editor-background, #2D2D2D))',
+                        color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Query Templates for {collection}
+                      </div>
+                      
+                      {/* Template Options */}
+                      {[
+                        {
+                          name: 'Schema-based Sample',
+                          description: 'Auto-generated query using actual collection properties and schema'
+                        },
+                        ...require('../query-editor/webview/graphqlTemplates').queryTemplates
+                      ].map((template, index) => (
+                        <div
+                          key={index}
+                          className="template-dropdown-item theme-dropdown-item"
+                          onClick={() => handleTemplateSelect(template.name)}
+                          title={template.description}
+                          style={{
+                            padding: '10px 12px',
+                            cursor: 'pointer',
+                            borderBottom: index < 7 ? '1px solid var(--vscode-panel-border, #333)' : 'none',
+                            backgroundColor: 'transparent',
+                            color: 'var(--vscode-foreground, #CCCCCC)',
+                            transition: 'background-color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06))';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <div className="template-title" style={{ 
+                            fontWeight: 500,
+                            marginBottom: '3px',
+                            color: 'var(--vscode-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            {template.name === 'Schema-based Sample' && <span>⭐</span>}
+                            {template.name}
+                          </div>
+                          <div className="template-description" style={{ 
+                            fontSize: '11px',
+                            color: 'var(--vscode-descriptionForeground, #999)',
+                            lineHeight: '1.4'
+                          }}>
+                            {template.description}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <button
+                  onClick={handleRunQuery}
+                  disabled={!collection}
+                  title={collection ? "Execute the GraphQL query" : "Select a collection first"}
+                  style={{
+                    backgroundColor: collection ? 'var(--vscode-button-background, #0E639C)' : 'var(--vscode-input-background, #2D2D2D)',
+                    color: collection ? 'var(--vscode-button-foreground, white)' : 'var(--vscode-descriptionForeground, #888)',
+                    border: 'none',
+                    borderRadius: '3px',
+                    padding: '4px 10px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    height: '28px',
+                    minWidth: '42px',
+                    cursor: collection ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (collection) {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-button-hoverBackground, #1177bb)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (collection) {
+                      e.currentTarget.style.backgroundColor = 'var(--vscode-button-background, #0E639C)';
+                    }
+                  }}
+                >
+                  ▶ Run
+                </button>
+              </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: '150px', height: 'calc(100% - 40px)' }}>
+            <div style={{ flex: 1, minHeight: '150px', height: 'calc(100% - 30px)' }}>
               <MonacoGraphQLEditor
                 initialValue={queryText}
                 onChange={(value) => setQueryText(value)}
-                onRunQuery={handleRunQuery}
                 onGenerateSample={handleGenerateQuery}
                 schemaConfig={schemaConfig}
                 collectionName={collection || undefined}
+                showTemplateDropdown={showTemplateDropdown}
+                onToggleTemplateDropdown={handleToggleTemplateDropdown}
+                onTemplateSelect={handleTemplateSelect}
               />
             </div>
           </div>
@@ -677,16 +948,18 @@ const App = () => {
           {/* Query Results Section */}
           <div style={styles.resultContainer}>
             <div style={styles.resultHeader}>
-              <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                📊 Query Results
-                {jsonData && (
-                  <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--vscode-descriptionForeground, #888)', marginLeft: '10px' }}>
-                    {Array.isArray(jsonData.Get?.[Object.keys(jsonData.Get || {})[0]]) 
-                      ? `${jsonData.Get[Object.keys(jsonData.Get)[0]].length} records`
-                      : 'Data loaded'
-                    }
-                  </span>
-                )}
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground, #CCCCCC))',
+                background: 'var(--vscode-editorWidget-background, #1a1d21)',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                marginRight: '8px',
+                display: 'inline-block',
+                minWidth: '140px'
+              }}>
+                {jsonData ? 'Results Data loaded' : 'Results'}
               </span>
               {isLoading && <span style={styles.loading}>⏳ Executing query...</span>}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -748,7 +1021,7 @@ const App = () => {
             </div>
 
             {/* Display data in selected format when available */}
-            <div style={{ flex: 1, overflow: 'auto', height: 'calc(100% - 40px)' }}>
+            <div style={{ flex: 1, overflow: 'auto', height: 'calc(100% - 30px)' }}>
               {jsonData ? (
                 viewType === 'json' ? (
                   <div style={styles.jsonContainer}>
