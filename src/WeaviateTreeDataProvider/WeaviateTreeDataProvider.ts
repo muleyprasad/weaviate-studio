@@ -1806,6 +1806,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     const vscode = acquireVsCodeApi();
                     let propertyCounter = 0;
                     let properties = [];
+                    let existingCollections = [];
                     
                     // Comprehensive data type definitions
                     const dataTypes = [
@@ -1834,12 +1835,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const input = e.target.value.trim();
                         const preview = document.getElementById('namePreview');
                         
-                        if (input) {
+                        if (!input) {
+                            preview.style.display = 'none';
+                        } else if (existingCollections.includes(input)) {
+                            preview.textContent = 'A collection with this name already exists';
+                            preview.style.color = 'var(--vscode-errorForeground)';
+                            preview.style.display = 'block';
+                        } else {
                             preview.textContent = 'Collection name will be used exactly as entered';
                             preview.style.color = 'var(--vscode-descriptionForeground)';
                             preview.style.display = 'block';
-                        } else {
-                            preview.style.display = 'none';
                         }
                     });
                     
@@ -2112,6 +2117,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             showError('Collection name is required');
                             return;
                         }
+                        if (existingCollections.includes(collectionName)) {
+                            showError('A collection with this name already exists');
+                            return;
+                        }
                         
                         const preview = document.getElementById('namePreview');
                         preview.style.display = 'none';
@@ -2156,6 +2165,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 break;
                             case 'collections':
                                 updateCollectionOptions(message.collections);
+                                existingCollections = message.collections || [];
                                 break;
                         }
                     });
