@@ -1604,121 +1604,151 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         font-size: var(--vscode-font-size);
                         color: var(--vscode-foreground);
                         background-color: var(--vscode-editor-background);
-                        padding: 20px;
+                        padding: 16px;
+                        margin: 0;
                     }
                     .container {
-                        max-width: 800px;
+                        max-width: 700px;
                         margin: 0 auto;
                     }
-                    .form-group label {
-                        font-weight: 600;
-                        margin-bottom: 4px;
+                    .header {
+                        margin-bottom: 24px;
+                        padding-bottom: 16px;
+                        border-bottom: 1px solid var(--vscode-input-border);
                     }
+                    .header h2 {
+                        margin: 0 0 8px 0;
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+                    .header .subtitle {
+                        color: var(--vscode-descriptionForeground);
+                        font-size: 13px;
+                    }
+                    
+                    /* Form Layout */
+                    .form-section {
+                        margin-bottom: 24px;
+                        background: var(--vscode-input-background);
+                        border: 1px solid var(--vscode-input-border);
+                        border-radius: 6px;
+                        overflow: hidden;
+                    }
+                    .section-header {
+                        padding: 12px 16px;
+                        background: var(--vscode-editor-background);
+                        border-bottom: 1px solid var(--vscode-input-border);
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        font-weight: 600;
+                        font-size: 14px;
+                    }
+                    .section-header:hover {
+                        background: var(--vscode-list-hoverBackground);
+                    }
+                    .section-header .icon {
+                        transition: transform 0.2s;
+                    }
+                    .section-header.collapsed .icon {
+                        transform: rotate(-90deg);
+                    }
+                    .section-content {
+                        padding: 16px;
+                        display: block;
+                    }
+                    .section-content.collapsed {
+                        display: none;
+                    }
+                    
+                    /* Form Fields */
                     .form-row {
                         display: grid;
-                        grid-template-columns: 160px 1fr;
-                        gap: 12px;
-                        align-items: start;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 16px;
+                        margin-bottom: 16px;
                     }
-                    .form-row > label {
-                        margin-top: 6px;
+                    .form-row:last-child {
+                        margin-bottom: 0;
                     }
-                    .form-row > *:first-child {
-                        grid-column: 1;
+                    .form-row.full-width {
+                        grid-template-columns: 1fr;
                     }
-                    .form-row > *:nth-child(2) {
-                        grid-column: 2;
+                    .form-field {
+                        display: flex;
+                        flex-direction: column;
                     }
-                    .form-group {
-                        margin-bottom: 15px;
+                    .form-field label {
+                        font-weight: 500;
+                        margin-bottom: 6px;
+                        font-size: 13px;
+                        color: var(--vscode-foreground);
                     }
-                    input[type="text"], textarea, select {
-                        width: 100%;
-                        padding: 8px;
+                    .form-field label.required::after {
+                        content: " *";
+                        color: var(--vscode-errorForeground);
+                    }
+                    .form-field input,
+                    .form-field select,
+                    .form-field textarea {
+                        padding: 8px 12px;
                         border: 1px solid var(--vscode-input-border);
-                        background-color: var(--vscode-input-background);
+                        background: var(--vscode-input-background);
                         color: var(--vscode-input-foreground);
-                        border-radius: 3px;
+                        border-radius: 4px;
                         font-family: inherit;
-                        font-size: inherit;
+                        font-size: 13px;
+                        transition: border-color 0.2s;
                     }
-                    textarea {
+                    .form-field input:focus,
+                    .form-field select:focus,
+                    .form-field textarea:focus {
+                        outline: none;
+                        border-color: var(--vscode-focusBorder);
+                    }
+                    .form-field textarea {
                         resize: vertical;
                         min-height: 60px;
                     }
-                    .button-group {
-                        display: flex;
-                        gap: 10px;
-                        margin-top: 20px;
-                    }
-                    button {
-                        padding: 8px 16px;
-                        border: none;
-                        border-radius: 3px;
-                        cursor: pointer;
-                        font-family: inherit;
-                        font-size: inherit;
-                    }
-                    .primary-button {
-                        background-color: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
-                    }
-                    .primary-button:hover {
-                        background-color: var(--vscode-button-hoverBackground);
-                    }
-                    .secondary-button {
-                        background-color: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
-                    }
-                    .secondary-button:hover {
-                        background-color: var(--vscode-button-secondaryHoverBackground);
-                    }
-                    .error {
-                        color: var(--vscode-errorForeground);
-                        background-color: var(--vscode-inputValidation-errorBackground);
-                        border: 1px solid var(--vscode-inputValidation-errorBorder);
-                        padding: 8px;
-                        border-radius: 3px;
-                        margin-top: 10px;
-                        display: none;
-                    }
-                    .help-text {
-                        font-size: 12px;
+                    .form-field .hint {
+                        font-size: 11px;
                         color: var(--vscode-descriptionForeground);
                         margin-top: 4px;
-                        font-style: italic;
                     }
-                    .preview {
-                        background-color: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-input-border);
-                        padding: 8px;
-                        border-radius: 3px;
-                        margin-top: 4px;
-                        font-family: var(--vscode-editor-font-family);
-                        font-size: 12px;
-                        color: var(--vscode-editor-foreground);
-                    }
+                    
+                    /* Properties Section */
                     .properties-container {
+                        min-height: 80px;
+                        border: 2px dashed var(--vscode-input-border);
+                        border-radius: 6px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: var(--vscode-editor-background);
+                        margin-bottom: 12px;
+                    }
+                    .properties-container.has-properties {
                         border: 1px solid var(--vscode-input-border);
-                        border-radius: 3px;
-                        padding: 10px;
-                        margin-bottom: 10px;
-                        min-height: 60px;
-                        background-color: var(--vscode-input-background);
+                        border-style: solid;
+                        padding: 12px;
+                        min-height: auto;
                     }
                     .no-properties {
+                        text-align: center;
                         color: var(--vscode-descriptionForeground);
                         font-style: italic;
-                        text-align: center;
-                        padding: 20px;
                     }
                     .property-card {
-                        background-color: var(--vscode-editor-background);
+                        background: var(--vscode-input-background);
                         border: 1px solid var(--vscode-input-border);
-                        border-radius: 3px;
+                        border-radius: 4px;
                         padding: 12px;
                         margin-bottom: 8px;
                         position: relative;
+                    }
+                    .property-card:last-child {
+                        margin-bottom: 0;
                     }
                     .property-header {
                         display: flex;
@@ -1728,30 +1758,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     .property-name {
                         font-weight: 600;
-                        color: var(--vscode-foreground);
-                    }
-                    .property-actions {
-                        display: flex;
-                        gap: 5px;
+                        font-size: 13px;
                     }
                     .property-actions button {
-                        padding: 2px 6px;
+                        padding: 4px 8px;
                         font-size: 11px;
                         border: none;
-                        border-radius: 2px;
+                        border-radius: 3px;
                         cursor: pointer;
-                        background-color: var(--vscode-button-secondaryBackground);
+                        background: var(--vscode-button-secondaryBackground);
                         color: var(--vscode-button-secondaryForeground);
+                        margin-left: 4px;
                     }
                     .property-actions button:hover {
-                        background-color: var(--vscode-button-secondaryHoverBackground);
+                        background: var(--vscode-button-secondaryHoverBackground);
                     }
                     .property-actions button.danger {
-                        background-color: var(--vscode-errorForeground);
+                        background: var(--vscode-errorForeground);
                         color: white;
-                    }
-                    .property-actions button.danger:hover {
-                        background-color: var(--vscode-inputValidation-errorBackground);
                     }
                     .property-fields {
                         display: grid;
@@ -1764,131 +1788,227 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     .property-field label {
                         font-size: 11px;
-                        margin-bottom: 2px;
+                        margin-bottom: 4px;
                         color: var(--vscode-descriptionForeground);
                     }
                     .property-field input,
                     .property-field select,
                     .property-field textarea {
-                        padding: 4px 6px;
+                        padding: 6px 8px;
                         font-size: 12px;
-                        border: 1px solid var(--vscode-input-border);
-                        border-radius: 2px;
-                        background-color: var(--vscode-input-background);
-                        color: var(--vscode-input-foreground);
-                    }
-                    .property-field textarea {
-                        resize: vertical;
-                        min-height: 40px;
                     }
                     .property-field.full-width {
                         grid-column: 1 / -1;
                     }
                     .property-field input[type="checkbox"] {
                         width: auto;
-                        margin-right: 8px;
+                        margin-right: 6px;
                     }
-                    .property-field .help-text {
-                        margin-top: 2px;
-                        font-size: 10px;
-                    }
-                    .data-type-hint {
-                        font-size: 10px;
-                        color: var(--vscode-descriptionForeground);
-                        margin-top: 2px;
-                        font-style: italic;
-                    }
-                    /* --- NEW: JSON preview styling --- */
-                    .json-preview {
-                        background-color: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-input-border);
-                        padding: 10px;
-                        border-radius: 3px;
-                        margin-top: 4px;
-                        max-height: 300px;
-                        overflow: auto;
-                        white-space: pre;
-                        font-family: var(--vscode-editor-font-family);
-                        font-size: 12px;
-                        color: var(--vscode-editor-foreground);
-                    }
-                    /* --- NEW: config field grid --- */
-                    .config-grid {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 8px;
-                    }
-                    /* --- NEW: inline checkbox label styling --- */
                     .inline-checkbox {
                         display: flex;
                         align-items: center;
                         gap: 6px;
                     }
-                    /* --- NEW: config small styling --- */
-                    .config-small {
-                        max-width: 120px;
+                    
+                    /* Buttons */
+                    .button-group {
+                        display: flex;
+                        gap: 12px;
+                        margin-top: 24px;
+                        padding-top: 16px;
+                        border-top: 1px solid var(--vscode-input-border);
+                    }
+                    button {
+                        padding: 8px 16px;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                        font-weight: 500;
+                        transition: background-color 0.2s;
+                    }
+                    .primary-button {
+                        background: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                    }
+                    .primary-button:hover {
+                        background: var(--vscode-button-hoverBackground);
+                    }
+                    .secondary-button {
+                        background: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                    }
+                    .secondary-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground);
+                    }
+                    .add-property-btn {
+                        background: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                        border: 1px solid var(--vscode-input-border);
+                        padding: 6px 12px;
+                        font-size: 12px;
+                    }
+                    .add-property-btn:hover {
+                        background: var(--vscode-button-secondaryHoverBackground);
+                    }
+                    
+                    /* Error Handling */
+                    .error {
+                        color: var(--vscode-errorForeground);
+                        background: var(--vscode-inputValidation-errorBackground);
+                        border: 1px solid var(--vscode-inputValidation-errorBorder);
+                        padding: 8px 12px;
+                        border-radius: 4px;
+                        margin-top: 12px;
+                        display: none;
+                        font-size: 12px;
+                    }
+                    
+                    /* Preview Section */
+                    .preview-toggle {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        cursor: pointer;
+                        padding: 8px 0;
+                        color: var(--vscode-descriptionForeground);
+                        font-size: 12px;
+                    }
+                    .preview-toggle:hover {
+                        color: var(--vscode-foreground);
+                    }
+                    .json-preview {
+                        background: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-input-border);
+                        padding: 12px;
+                        border-radius: 4px;
+                        max-height: 200px;
+                        overflow: auto;
+                        font-family: var(--vscode-editor-font-family);
+                        font-size: 11px;
+                        color: var(--vscode-editor-foreground);
+                        white-space: pre;
+                        display: none;
+                    }
+                    
+                    /* Responsive */
+                    @media (max-width: 600px) {
+                        .form-row {
+                            grid-template-columns: 1fr;
+                        }
+                        .property-fields {
+                            grid-template-columns: 1fr;
+                        }
                     }
                 </style>
             </head>
             <body>
                 <div class="container">
-                    <h2>Add Collection</h2>
+                    <div class="header">
+                        <h2>Create New Collection</h2>
+                        <div class="subtitle">Define your collection's structure and configuration</div>
+                    </div>
                     
                     <form id="collectionForm">
-                        <div class="form-group">
-                            <label for="collectionName">Collection Name*</label>
-                            <input type="text" id="collectionName" name="collectionName" required>
-                            <div class="help-text">Enter the name for your collection. The name will be used exactly as entered.</div>
-                            <div class="preview" id="namePreview" style="display: none;"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="description">Description</label>
-                            <textarea id="description" name="description" placeholder="Optional description for your collection"></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="vectorizer">Vectorizer</label>
-                            <select id="vectorizer" name="vectorizer">
-                                <option value="none">None</option>
-                                <option value="text2vec-openai">OpenAI</option>
-                                <option value="text2vec-cohere">Cohere</option>
-                                <option value="text2vec-huggingface">Hugging Face</option>
-                            </select>
-                        </div>
-                        
-                        <!-- NEW: Vector index type & config -->
-                        <div class="form-group">
-                            <label for="vectorIndexType">Vector Index Type</label>
-                            <select id="vectorIndexType" name="vectorIndexType">
-                                <option value="hnsw" selected>HNSW</option>
-                                <option value="flat">Flat</option>
-                            </select>
-                        </div>
-                        <div class="form-group" id="vectorIndexConfigContainer"></div>
-                        
-                        <!-- NEW: Module configuration -->
-                        <div class="form-group" id="moduleConfigContainer"></div>
-                        <!-- NEW: Multi-tenancy toggle -->
-                        <div class="form-group">
-                            <label class="inline-checkbox"><input type="checkbox" id="multiTenancyToggle"> Enable Multi-Tenancy</label>
-                            <div class="help-text">Allows this collection to be partitioned by tenant.</div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Properties</label>
-                            <div class="properties-container" id="propertiesContainer">
-                                <div class="no-properties" id="noProperties">No properties added yet. Click "Add Property" to create your first property.</div>
+                        <!-- Basic Settings Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="basic">
+                                <span>Basic Settings</span>
+                                <span class="icon">▼</span>
                             </div>
-                            <button type="button" class="secondary-button" id="addPropertyButton">Add Property</button>
-                            <div class="help-text">Properties define the structure of your data. Each property has a name, data type, and optional description.</div>
+                            <div class="section-content" id="basicContent">
+                                <div class="form-row full-width">
+                                    <div class="form-field">
+                                        <label for="collectionName" class="required">Collection Name</label>
+                                        <input type="text" id="collectionName" name="collectionName" required placeholder="e.g., Articles, Products, Documents">
+                                        <div class="hint">Choose a descriptive name for your collection</div>
+                                    </div>
+                                </div>
+                                <div class="form-row full-width">
+                                    <div class="form-field">
+                                        <label for="description">Description</label>
+                                        <textarea id="description" name="description" placeholder="Optional description of what this collection contains"></textarea>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="vectorizer">Vectorizer</label>
+                                        <select id="vectorizer" name="vectorizer">
+                                            <option value="none">None (Manual vectors)</option>
+                                            <option value="text2vec-openai">OpenAI</option>
+                                            <option value="text2vec-cohere">Cohere</option>
+                                            <option value="text2vec-huggingface">Hugging Face</option>
+                                        </select>
+                                        <div class="hint">How text will be converted to vectors</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="vectorIndexType">Index Type</label>
+                                        <select id="vectorIndexType" name="vectorIndexType">
+                                            <option value="hnsw">HNSW (Recommended)</option>
+                                            <option value="flat">Flat</option>
+                                        </select>
+                                        <div class="hint">Vector search algorithm</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
-                        <!-- NEW: Live JSON schema preview -->
-                        <div class="form-group">
-                            <label>Schema Preview</label>
-                            <pre id="jsonPreview" class="json-preview">{\n  \n}</pre>
-                            <div class="help-text">This JSON will be sent to Weaviate when you create the collection.</div>
+                        <!-- Properties Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="properties">
+                                <span>Properties</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content" id="propertiesContent">
+                                <div class="properties-container" id="propertiesContainer">
+                                    <div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>
+                                </div>
+                                <button type="button" class="add-property-btn" id="addPropertyButton">+ Add Property</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Settings Section -->
+                        <div class="form-section">
+                            <div class="section-header collapsed" data-section="advanced">
+                                <span>Advanced Settings</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="advancedContent">
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="efConstruction">EF Construction</label>
+                                        <input type="number" id="efConstruction" min="4" value="128">
+                                        <div class="hint">HNSW build quality (higher = better, slower)</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="maxConnections">Max Connections</label>
+                                        <input type="number" id="maxConnections" min="4" value="16">
+                                        <div class="hint">HNSW graph connections</div>
+                                    </div>
+                                </div>
+                                <div class="form-row full-width">
+                                    <div class="form-field">
+                                        <label class="inline-checkbox">
+                                            <input type="checkbox" id="multiTenancyToggle">
+                                            Enable Multi-Tenancy
+                                        </label>
+                                        <div class="hint">Allow collection to be partitioned by tenant</div>
+                                    </div>
+                                </div>
+                                <div class="form-row full-width" id="moduleConfigContainer"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Preview Section -->
+                        <div class="form-section">
+                            <div class="section-header collapsed" data-section="preview">
+                                <span>Schema Preview</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="previewContent">
+                                <pre id="jsonPreview" class="json-preview">{\n  \n}</pre>
+                            </div>
                         </div>
                         
                         <div class="error" id="formError"></div>
@@ -1905,27 +2025,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     let propertyCounter = 0;
                     let properties = [];
                     let existingCollections = [];
-                    
-                    // NEW: state for vector index & module config
                     let vectorIndexConfigState = { efConstruction: 128, maxConnections: 16 };
                     let moduleConfigState = {};
                     let multiTenancyEnabled = false;
-                    
-                    // Store server version to filter unsupported features
                     let serverVersion = 'unknown';
                     
-                    function versionAtLeast(target) {
-                        if (serverVersion === 'unknown') return false;
-                        const sv = serverVersion.split('.').map(n=>parseInt(n));
-                        const tv = target.split('.').map(n=>parseInt(n));
-                        for (let i=0;i<tv.length;i++) {
-                            if ((sv[i]||0) > (tv[i]||0)) return true;
-                            if ((sv[i]||0) < (tv[i]||0)) return false;
-                        }
-                        return true;
-                    }
-                    
-                    // Comprehensive data type definitions (restored)
+                    // Data type definitions
                     const dataTypes = [
                         { value: 'text', label: 'Text', description: 'Long text content, vectorizable', supportsArray: true },
                         { value: 'string', label: 'String', description: 'Short text, not vectorizable', supportsArray: true },
@@ -1941,21 +2046,82 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         { value: 'reference', label: 'Reference', description: 'Reference to another collection', supportsArray: true }
                     ];
                     
-                    // --- NEW: renderers ---
-                    function renderVectorIndexConfig() {
-                        const container = document.getElementById('vectorIndexConfigContainer');
-                        const type = document.getElementById('vectorIndexType').value;
-                        container.innerHTML = '';
-                        if (type === 'hnsw') {
-                            container.innerHTML = \`
-                                <div class="config-grid">
-                                    <div class="property-field"><label>efConstruction</label><input type="number" id="efConstruction" min="4" value="\${vectorIndexConfigState.efConstruction}"></div>
-                                    <div class="property-field"><label>maxConnections</label><input type="number" id="maxConnections" min="4" value="\${vectorIndexConfigState.maxConnections}"></div>
-                                </div>\`;
-                            document.getElementById('efConstruction').addEventListener('input', (e)=>{vectorIndexConfigState.efConstruction=parseInt(e.target.value||0);updateJsonPreview();});
-                            document.getElementById('maxConnections').addEventListener('input', (e)=>{vectorIndexConfigState.maxConnections=parseInt(e.target.value||0);updateJsonPreview();});
-                        }
+                    // Section toggle functionality
+                    document.querySelectorAll('.section-header').forEach(header => {
+                        header.addEventListener('click', () => {
+                            const section = header.dataset.section;
+                            const content = document.getElementById(section + 'Content');
+                            const isCollapsed = header.classList.contains('collapsed');
+                            
+                            if (isCollapsed) {
+                                header.classList.remove('collapsed');
+                                content.classList.remove('collapsed');
+                            } else {
+                                header.classList.add('collapsed');
+                                content.classList.add('collapsed');
+                            }
+                        });
+                    });
+                    
+                    // Initialize form
+                    function initForm() {
+                        // Request data from extension
+                        vscode.postMessage({ command: 'getVectorizers' });
+                        vscode.postMessage({ command: 'getCollections' });
+                        
+                        // Set up event listeners
+                        setupEventListeners();
+                        
+                        // Initial renders
+                        renderModuleConfig();
                         updateJsonPreview();
+                        
+                        // Focus collection name
+                        document.getElementById('collectionName').focus();
+                    }
+                    
+                    function setupEventListeners() {
+                        // Collection name validation
+                        document.getElementById('collectionName').addEventListener('input', (e) => {
+                            const input = e.target.value.trim();
+                            if (input && existingCollections.includes(input)) {
+                                showError('A collection with this name already exists');
+                            } else {
+                                hideError();
+                            }
+                            updateJsonPreview();
+                        });
+                        
+                        // Other form fields
+                        document.getElementById('description').addEventListener('input', updateJsonPreview);
+                        document.getElementById('vectorizer').addEventListener('change', (e) => {
+                            updateJsonPreview();
+                            renderModuleConfig();
+                        });
+                        document.getElementById('vectorIndexType').addEventListener('change', updateJsonPreview);
+                        document.getElementById('multiTenancyToggle').addEventListener('change', (e) => {
+                            multiTenancyEnabled = e.target.checked;
+                            updateJsonPreview();
+                        });
+                        
+                        // Advanced settings
+                        document.getElementById('efConstruction').addEventListener('input', (e) => {
+                            vectorIndexConfigState.efConstruction = parseInt(e.target.value || 0);
+                            updateJsonPreview();
+                        });
+                        document.getElementById('maxConnections').addEventListener('input', (e) => {
+                            vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
+                            updateJsonPreview();
+                        });
+                        
+                        // Property management
+                        document.getElementById('addPropertyButton').addEventListener('click', addProperty);
+                        
+                        // Form submission
+                        document.getElementById('collectionForm').addEventListener('submit', handleSubmit);
+                        document.getElementById('cancelButton').addEventListener('click', () => {
+                            vscode.postMessage({ command: 'cancel' });
+                        });
                     }
                     
                     function renderModuleConfig() {
@@ -1963,60 +2129,34 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const vectorizer = document.getElementById('vectorizer').value;
                         container.innerHTML = '';
                         moduleConfigState = {};
+                        
                         if (vectorizer === 'text2vec-openai') {
                             container.innerHTML = \`
-                                <label>OpenAI Module Configuration</label>
-                                <div class="config-grid">
-                                    <div class="property-field"><label>Model</label><input type="text" id="openaiModel" placeholder="e.g. text-embedding-ada-002"></div>
-                                    <div class="property-field"><label>Base URL</label><input type="text" id="openaiBaseUrl" placeholder="Optional"></div>
+                                <div class="form-field">
+                                    <label>OpenAI Configuration</label>
+                                    <div class="form-row">
+                                        <div class="form-field">
+                                            <label for="openaiModel">Model</label>
+                                            <input type="text" id="openaiModel" placeholder="text-embedding-ada-002">
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="openaiBaseUrl">Base URL (Optional)</label>
+                                            <input type="text" id="openaiBaseUrl" placeholder="https://api.openai.com/v1">
+                                        </div>
+                                    </div>
                                 </div>\`;
-                            document.getElementById('openaiModel').addEventListener('input', (e)=>{moduleConfigState.model=e.target.value.trim();updateJsonPreview();});
-                            document.getElementById('openaiBaseUrl').addEventListener('input', (e)=>{moduleConfigState.baseURL=e.target.value.trim();updateJsonPreview();});
+                            
+                            document.getElementById('openaiModel').addEventListener('input', (e) => {
+                                moduleConfigState.model = e.target.value.trim();
+                                updateJsonPreview();
+                            });
+                            document.getElementById('openaiBaseUrl').addEventListener('input', (e) => {
+                                moduleConfigState.baseURL = e.target.value.trim();
+                                updateJsonPreview();
+                            });
                         }
                         updateJsonPreview();
                     }
-                    
-                    // Request available vectorizers when the form loads
-                    vscode.postMessage({ command: 'getVectorizers' });
-                    
-                    // Also request available collections for reference properties
-                    vscode.postMessage({ command: 'getCollections' });
-                    
-                    // Add help text for collection name
-                    document.getElementById('collectionName').addEventListener('input', (e) => {
-                        const input = e.target.value.trim();
-                        const preview = document.getElementById('namePreview');
-                        
-                        if (!input) {
-                            preview.style.display = 'none';
-                        } else if (existingCollections.includes(input)) {
-                            preview.textContent = 'A collection with this name already exists';
-                            preview.style.color = 'var(--vscode-errorForeground)';
-                            preview.style.display = 'block';
-                        } else {
-                            preview.textContent = 'Collection name will be used exactly as entered';
-                            preview.style.color = 'var(--vscode-descriptionForeground)';
-                            preview.style.display = 'block';
-                        }
-                        
-                        // NEW: refresh JSON preview
-                        updateJsonPreview();
-                    });
-                    
-                    // NEW: hook description & vectorizer changes
-                    document.getElementById('description').addEventListener('input', updateJsonPreview);
-                    document.getElementById('vectorizer').addEventListener('change', (e)=>{updateJsonPreview();renderModuleConfig();});
-                    document.getElementById('vectorIndexType').addEventListener('change', (e)=>{renderVectorIndexConfig();});
-                    document.getElementById('multiTenancyToggle').addEventListener('change', (e)=>{multiTenancyEnabled=e.target.checked;updateJsonPreview();});
-                    
-                    // Initial renders
-                    renderVectorIndexConfig();
-                    renderModuleConfig();
-                    
-                    // Property management
-                    document.getElementById('addPropertyButton').addEventListener('click', () => {
-                        addProperty();
-                    });
                     
                     function addProperty() {
                         const propertyId = 'prop_' + (++propertyCounter);
@@ -2037,14 +2177,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             if (nameInput) nameInput.focus();
                         }, 100);
                         
-                        // NEW: refresh JSON preview
                         updateJsonPreview();
                     }
                     
                     function removeProperty(propertyId) {
                         properties = properties.filter(p => p.id !== propertyId);
                         renderProperties();
-                        // NEW: refresh JSON preview
                         updateJsonPreview();
                     }
                     
@@ -2054,7 +2192,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             prop[field] = value;
                             if (field === 'name') renderProperties();
                         }
-                        // NEW: refresh JSON preview
                         updateJsonPreview();
                     }
                     
@@ -2062,11 +2199,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const container = document.getElementById('propertiesContainer');
                         
                         if (properties.length === 0) {
-                            container.innerHTML = '<div class="no-properties" id="noProperties">No properties added yet. Click "Add Property" to create your first property.</div>';
+                            container.innerHTML = '<div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>';
+                            container.classList.remove('has-properties');
                             return;
                         }
                         
                         container.innerHTML = '';
+                        container.classList.add('has-properties');
+                        
                         properties.forEach(prop => {
                             const card = createPropertyCard(prop);
                             container.appendChild(card);
@@ -2098,7 +2238,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         header.appendChild(actions);
                         card.appendChild(header);
                         
-                        // Fields container
+                        // Fields
                         const fields = document.createElement('div');
                         fields.className = 'property-fields';
                         
@@ -2111,7 +2251,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         fields.appendChild(nameField);
                         
                         // Data type field
-                        const typeField = createSelectField('Data Type', prop.id + '_type', dataTypes.map(dt => ({
+                        const typeField = createSelectField('Type', prop.id + '_type', dataTypes.map(dt => ({
                             value: dt.value,
                             label: dt.label,
                             selected: prop.dataType === dt.value
@@ -2119,23 +2259,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             const newDataType = e.target.value;
                             updateProperty(prop.id, 'dataType', newDataType);
                             updateArrayCheckbox(prop);
-                            updateDataTypeHint(prop);
                             updateTargetCollectionField(prop);
                             
-                            // Request collections list when switching to reference type
                             if (newDataType === 'reference') {
                                 vscode.postMessage({ command: 'getCollections' });
                             }
                         });
-                        
-                        // Add data type hint
-                        const dataTypeHint = document.createElement('div');
-                        dataTypeHint.className = 'data-type-hint';
-                        dataTypeHint.id = prop.id + '_hint';
-                        const selectedType = dataTypes.find(dt => dt.value === prop.dataType);
-                        dataTypeHint.textContent = selectedType ? selectedType.description : '';
-                        typeField.appendChild(dataTypeHint);
-                        
                         fields.appendChild(typeField);
                         
                         // Target collection field (for reference type)
@@ -2152,7 +2281,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         targetCollectionSelect.id = prop.id + '_target_collection';
                         targetCollectionSelect.onchange = (e) => updateProperty(prop.id, 'targetCollection', e.target.value);
                         
-                        // Add loading option
                         const loadingOption = document.createElement('option');
                         loadingOption.value = '';
                         loadingOption.textContent = 'Loading collections...';
@@ -2169,7 +2297,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         // Description field
                         const descField = createField('Description', 'textarea', prop.id + '_desc', {
                             value: prop.description,
-                            placeholder: 'Optional description for this property',
+                            placeholder: 'Optional description',
                             onchange: (e) => updateProperty(prop.id, 'description', e.target.value)
                         });
                         descField.className += ' full-width';
@@ -2238,11 +2366,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         
                         field.appendChild(checkbox);
                         
-                        const helpText = document.createElement('div');
-                        helpText.className = 'help-text';
-                        helpText.textContent = dataType?.supportsArray ? 'Allow multiple values' : 'Arrays not supported for this type';
-                        field.appendChild(helpText);
-                        
                         return field;
                     }
                     
@@ -2258,14 +2381,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                     }
                     
-                    function updateDataTypeHint(prop) {
-                        const hint = document.getElementById(prop.id + '_hint');
-                        if (hint) {
-                            const dataType = dataTypes.find(dt => dt.value === prop.dataType);
-                            hint.textContent = dataType ? dataType.description : '';
-                        }
-                    }
-                    
                     function updateTargetCollectionField(prop) {
                         const field = document.getElementById(prop.id + '_target_collection_field');
                         if (field) {
@@ -2273,7 +2388,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                     }
                     
-                    document.getElementById('collectionForm').addEventListener('submit', (e) => {
+                    function handleSubmit(e) {
                         e.preventDefault();
                         
                         const formData = new FormData(e.target);
@@ -2283,27 +2398,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const vectorIndexType = document.getElementById('vectorIndexType').value;
                         const mtEnabled = document.getElementById('multiTenancyToggle').checked;
                         
-                        // gather vector index config
-                        let vectorIndexConfig = null;
-                        if (vectorIndexType === 'hnsw') {
-                            vectorIndexConfig = {
-                                efConstruction: vectorIndexConfigState.efConstruction,
-                                maxConnections: vectorIndexConfigState.maxConnections
-                            };
-                        }
-                        
-                        // gather module config
-                        let moduleConfig = null;
-                        if (Object.keys(moduleConfigState).length > 0) {
-                            if (vectorizer === 'text2vec-openai') {
-                                moduleConfig = { 'text2vec-openai': { ...moduleConfigState } };
-                            }
-                        }
-                        
-                        // Clear previous errors
-                        document.getElementById('formError').style.display = 'none';
-                        
-                        // Basic validation
+                        // Validation
                         if (!collectionName) {
                             showError('Collection name is required');
                             return;
@@ -2313,10 +2408,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             return;
                         }
                         
-                        const preview = document.getElementById('namePreview');
-                        preview.style.display = 'none';
-                        
-                        // Build schema object
+                        // Build schema
                         const schema = {
                             class: collectionName,
                             description: description || undefined,
@@ -2332,107 +2424,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 return propSchema;
                             }),
                             vectorIndexType: vectorIndexType,
-                            vectorIndexConfig: vectorIndexConfig,
-                            moduleConfig: moduleConfig,
+                            vectorIndexConfig: vectorIndexType === 'hnsw' ? {
+                                efConstruction: vectorIndexConfigState.efConstruction,
+                                maxConnections: vectorIndexConfigState.maxConnections
+                            } : undefined,
+                            moduleConfig: Object.keys(moduleConfigState).length > 0 ? { 'text2vec-openai': { ...moduleConfigState } } : undefined,
                             multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
                         };
                         
-                        // Send schema to extension
                         vscode.postMessage({
                             command: 'create',
                             schema: schema
                         });
-                    });
-                    
-                    document.getElementById('cancelButton').addEventListener('click', () => {
-                        vscode.postMessage({ command: 'cancel' });
-                    });
-                    
-                    // Listen for messages from the extension
-                    window.addEventListener('message', event => {
-                        const message = event.data;
-                        switch (message.command) {
-                            case 'error':
-                                showError(message.message);
-                                break;
-                            case 'vectorizers':
-                                updateVectorizerOptions(message.vectorizers);
-                                break;
-                            case 'collections':
-                                updateCollectionOptions(message.collections);
-                                existingCollections = message.collections || [];
-                                break;
-                            case 'serverVersion':
-                                serverVersion = message.version || 'unknown';
-                                adjustVectorIndexTypeOptions();
-                                break;
-                        }
-                    });
-                    
-                    function showError(message) {
-                        const errorElement = document.getElementById('formError');
-                        errorElement.textContent = message;
-                        errorElement.style.display = 'block';
                     }
                     
-                    function updateVectorizerOptions(vectorizers) {
-                        const select = document.getElementById('vectorizer');
-                        select.innerHTML = '';
-                        
-                        vectorizers.forEach(vectorizer => {
-                            const option = document.createElement('option');
-                            option.value = vectorizer;
-                            option.textContent = vectorizer === 'none' ? 'None' : 
-                                vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
-                            select.appendChild(option);
-                        });
-                    }
-                    
-                    function updateCollectionOptions(collections) {
-                        // Update all target collection selects
-                        properties.forEach(prop => {
-                            const select = document.getElementById(prop.id + '_target_collection');
-                            if (select) {
-                                select.innerHTML = '';
-                                
-                                // Add placeholder option
-                                const placeholderOption = document.createElement('option');
-                                placeholderOption.value = '';
-                                placeholderOption.textContent = 'Select target collection';
-                                select.appendChild(placeholderOption);
-                                
-                                // Add collection options
-                                collections.forEach(collection => {
-                                    const option = document.createElement('option');
-                                    option.value = collection;
-                                    option.textContent = collection;
-                                    option.selected = prop.targetCollection === collection;
-                                    select.appendChild(option);
-                                });
-                            }
-                        });
-                        
-                        // NEW: refresh preview after collections loaded/updated
-                        updateJsonPreview();
-                    }
-                    
-                    // Focus the collection name input
-                    document.getElementById('collectionName').focus();
-                    
-                    // Initial preview
-                    updateJsonPreview();
-                    
-                    // --- NEW: builds & updates JSON preview ---
                     function updateJsonPreview() {
                         const collectionName = document.getElementById('collectionName').value.trim();
                         const descriptionVal = document.getElementById('description').value.trim();
                         const vectorizerVal = document.getElementById('vectorizer').value;
                         const vectorIndexTypeVal = document.getElementById('vectorIndexType').value;
                         const vectorIndexConfigVal = vectorIndexTypeVal === 'hnsw' ? { ...vectorIndexConfigState } : null;
-                        const moduleConfigVal = Object.keys(moduleConfigState).length>0 ? { 'text2vec-openai': { ...moduleConfigState } } : null;
+                        const moduleConfigVal = Object.keys(moduleConfigState).length > 0 ? { 'text2vec-openai': { ...moduleConfigState } } : null;
                         const mtVal = document.getElementById('multiTenancyToggle').checked ? { enabled: true } : undefined;
                         
-                        // Build schema object mirroring the submit logic
                         const schemaObj = {
                             class: collectionName || '<collectionName>',
                             description: descriptionVal || undefined,
@@ -2454,20 +2468,75 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         };
                         document.getElementById('jsonPreview').textContent = JSON.stringify(schemaObj, null, 2);
                     }
-
-                    function adjustVectorIndexTypeOptions() {
-                        const select = document.getElementById('vectorIndexType');
-                        if (!select) return;
-                        // Remove flat option if not supported
-                        if (!versionAtLeast('1.25')) {
-                            const flatOpt = select.querySelector('option[value="flat"]');
-                            if (flatOpt) flatOpt.remove();
-                            if (select.value === 'flat') {
-                                select.value = 'hnsw';
-                                renderVectorIndexConfig();
-                            }
-                        }
+                    
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
                     }
+                    
+                    function hideError() {
+                        document.getElementById('formError').style.display = 'none';
+                    }
+                    
+                    // Message handling
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        switch (message.command) {
+                            case 'error':
+                                showError(message.message);
+                                break;
+                            case 'vectorizers':
+                                updateVectorizerOptions(message.vectorizers);
+                                break;
+                            case 'collections':
+                                updateCollectionOptions(message.collections);
+                                existingCollections = message.collections || [];
+                                break;
+                            case 'serverVersion':
+                                serverVersion = message.version || 'unknown';
+                                break;
+                        }
+                    });
+                    
+                    function updateVectorizerOptions(vectorizers) {
+                        const select = document.getElementById('vectorizer');
+                        select.innerHTML = '';
+                        
+                        vectorizers.forEach(vectorizer => {
+                            const option = document.createElement('option');
+                            option.value = vectorizer;
+                            option.textContent = vectorizer === 'none' ? 'None (Manual vectors)' : 
+                                vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
+                            select.appendChild(option);
+                        });
+                    }
+                    
+                    function updateCollectionOptions(collections) {
+                        properties.forEach(prop => {
+                            const select = document.getElementById(prop.id + '_target_collection');
+                            if (select) {
+                                select.innerHTML = '';
+                                
+                                const placeholderOption = document.createElement('option');
+                                placeholderOption.value = '';
+                                placeholderOption.textContent = 'Select target collection';
+                                select.appendChild(placeholderOption);
+                                
+                                collections.forEach(collection => {
+                                    const option = document.createElement('option');
+                                    option.value = collection;
+                                    option.textContent = collection;
+                                    option.selected = prop.targetCollection === collection;
+                                    select.appendChild(option);
+                                });
+                            }
+                        });
+                        updateJsonPreview();
+                    }
+                    
+                    // Initialize when DOM is ready
+                    document.addEventListener('DOMContentLoaded', initForm);
                 </script>
             </body>
             </html>
