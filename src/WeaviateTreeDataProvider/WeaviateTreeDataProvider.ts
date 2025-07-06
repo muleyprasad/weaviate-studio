@@ -1441,6 +1441,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 });
                             }
                             break;
+                        case 'getCollections':
+                            try {
+                                const collections = this.collections[connectionId] || [];
+                                panel.webview.postMessage({
+                                    command: 'collections',
+                                    collections: collections.map(col => col.label)
+                                });
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`
+                                });
+                            }
+                            break;
                     }
                 },
                 undefined,
@@ -1805,11 +1819,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         { value: 'phoneNumber', label: 'Phone Number', description: 'International phone numbers', supportsArray: false },
                         { value: 'blob', label: 'Blob', description: 'Binary data (images, files)', supportsArray: false },
                         { value: 'object', label: 'Object', description: 'Nested JSON objects', supportsArray: true },
-                        { value: 'uuid', label: 'UUID', description: 'Universally unique identifiers', supportsArray: true }
+                        { value: 'uuid', label: 'UUID', description: 'Universally unique identifiers', supportsArray: true },
+                        { value: 'reference', label: 'Reference', description: 'Reference to another collection', supportsArray: true }
                     ];
                     
                     // Request available vectorizers when the form loads
                     vscode.postMessage({ command: 'getVectorizers' });
+                    
+                    // Also request available collections for reference properties
+                    vscode.postMessage({ command: 'getCollections' });
                     
                     // Add help text for collection name
                     document.getElementById('collectionName').addEventListener('input', (e) => {
@@ -1921,9 +1939,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             label: dt.label,
                             selected: prop.dataType === dt.value
                         })), (e) => {
-                            updateProperty(prop.id, 'dataType', e.target.value);
+                            const newDataType = e.target.value;
+                            updateProperty(prop.id, 'dataType', newDataType);
                             updateArrayCheckbox(prop);
                             updateDataTypeHint(prop);
+                            updateTargetCollectionField(prop);
+                            
+                            // Request collections list when switching to reference type
+                            if (newDataType === 'reference') {
+                                vscode.postMessage({ command: 'getCollections' });
+                            }
                         });
                         
                         // Add data type hint
@@ -1935,6 +1960,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         typeField.appendChild(dataTypeHint);
                         
                         fields.appendChild(typeField);
+                        
+                        // Target collection field (for reference type)
+                        const targetCollectionField = document.createElement('div');
+                        targetCollectionField.className = 'property-field';
+                        targetCollectionField.id = prop.id + '_target_collection_field';
+                        targetCollectionField.style.display = prop.dataType === 'reference' ? 'block' : 'none';
+                        
+                        const targetCollectionLabel = document.createElement('label');
+                        targetCollectionLabel.textContent = 'Target Collection';
+                        targetCollectionField.appendChild(targetCollectionLabel);
+                        
+                        const targetCollectionSelect = document.createElement('select');
+                        targetCollectionSelect.id = prop.id + '_target_collection';
+                        targetCollectionSelect.onchange = (e) => updateProperty(prop.id, 'targetCollection', e.target.value);
+                        
+                        // Add loading option
+                        const loadingOption = document.createElement('option');
+                        loadingOption.value = '';
+                        loadingOption.textContent = 'Loading collections...';
+                        loadingOption.disabled = true;
+                        targetCollectionSelect.appendChild(loadingOption);
+                        
+                        targetCollectionField.appendChild(targetCollectionSelect);
+                        fields.appendChild(targetCollectionField);
                         
                         // Array checkbox
                         const arrayField = createArrayField(prop);
@@ -2040,6 +2089,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                     }
                     
+                    function updateTargetCollectionField(prop) {
+                        const field = document.getElementById(prop.id + '_target_collection_field');
+                        if (field) {
+                            field.style.display = prop.dataType === 'reference' ? 'block' : 'none';
+                        }
+                    }
+                    
                     document.getElementById('collectionForm').addEventListener('submit', (e) => {
                         e.preventDefault();
                         
@@ -2066,11 +2122,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             description: description || undefined,
                             vectorizer: vectorizer === 'none' ? undefined : vectorizer,
                             properties: properties.map(function(prop) {
-                                return {
+                                const propSchema = {
                                     name: prop.name.trim(),
-                                    dataType: prop.isArray ? [prop.dataType + '[]'] : [prop.dataType],
+                                    dataType: prop.dataType === 'reference' && prop.targetCollection
+                                        ? (prop.isArray ? [prop.targetCollection + '[]'] : [prop.targetCollection])
+                                        : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]),
                                     description: prop.description ? prop.description.trim() : undefined
                                 };
+                                return propSchema;
                             })
                         };
                         
@@ -2095,6 +2154,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             case 'vectorizers':
                                 updateVectorizerOptions(message.vectorizers);
                                 break;
+                            case 'collections':
+                                updateCollectionOptions(message.collections);
+                                break;
                         }
                     });
                     
@@ -2114,6 +2176,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             option.textContent = vectorizer === 'none' ? 'None' : 
                                 vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
                             select.appendChild(option);
+                        });
+                    }
+                    
+                    function updateCollectionOptions(collections) {
+                        // Update all target collection selects
+                        properties.forEach(prop => {
+                            const select = document.getElementById(prop.id + '_target_collection');
+                            if (select) {
+                                select.innerHTML = '';
+                                
+                                // Add placeholder option
+                                const placeholderOption = document.createElement('option');
+                                placeholderOption.value = '';
+                                placeholderOption.textContent = 'Select target collection';
+                                select.appendChild(placeholderOption);
+                                
+                                // Add collection options
+                                collections.forEach(collection => {
+                                    const option = document.createElement('option');
+                                    option.value = collection;
+                                    option.textContent = collection;
+                                    option.selected = prop.targetCollection === collection;
+                                    select.appendChild(option);
+                                });
+                            }
                         });
                     }
                     
