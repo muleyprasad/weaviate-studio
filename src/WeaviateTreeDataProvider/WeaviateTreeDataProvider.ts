@@ -1599,307 +1599,423 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Add Collection</title>
                 <style>
+                    /* Reset and base styles */
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
                     body {
-                        font-family: var(--vscode-font-family);
-                        font-size: var(--vscode-font-size);
-                        color: var(--vscode-foreground);
-                        background-color: var(--vscode-editor-background);
-                        padding: 16px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                        font-size: 14px;
+                        line-height: 1.4;
+                        color: #2D2D2D;
+                        background-color: #FFFFFF;
                         margin: 0;
+                        padding: 0;
                     }
+                    
                     .container {
-                        max-width: 700px;
+                        max-width: 800px;
                         margin: 0 auto;
+                        padding: 24px;
                     }
+                    
+                    /* Header */
                     .header {
-                        margin-bottom: 24px;
-                        padding-bottom: 16px;
-                        border-bottom: 1px solid var(--vscode-input-border);
+                        margin-bottom: 32px;
                     }
+                    
                     .header h2 {
                         margin: 0 0 8px 0;
-                        font-size: 18px;
-                        font-weight: 600;
+                        font-size: 16px;
+                        font-weight: bold;
+                        color: #2D2D2D;
                     }
+                    
                     .header .subtitle {
-                        color: var(--vscode-descriptionForeground);
-                        font-size: 13px;
+                        color: #6A6A6A;
+                        font-size: 14px;
+                        font-weight: normal;
                     }
                     
                     /* Form Layout */
                     .form-section {
                         margin-bottom: 24px;
-                        background: var(--vscode-input-background);
-                        border: 1px solid var(--vscode-input-border);
-                        border-radius: 6px;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 4px;
+                        background: #FFFFFF;
                         overflow: hidden;
                     }
+                    
                     .section-header {
-                        padding: 12px 16px;
-                        background: var(--vscode-editor-background);
-                        border-bottom: 1px solid var(--vscode-input-border);
+                        padding: 16px 20px;
+                        background: #F3F3F3;
+                        border-bottom: 1px solid #CCCCCC;
                         cursor: pointer;
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        font-weight: 600;
-                        font-size: 14px;
+                        font-weight: bold;
+                        font-size: 16px;
+                        color: #2D2D2D;
+                        transition: background-color 0.2s ease;
                     }
+                    
                     .section-header:hover {
-                        background: var(--vscode-list-hoverBackground);
+                        background: #E8E8E8;
                     }
+                    
                     .section-header .icon {
-                        transition: transform 0.2s;
+                        transition: transform 0.2s ease;
+                        font-size: 12px;
+                        color: #6A6A6A;
                     }
+                    
                     .section-header.collapsed .icon {
                         transform: rotate(-90deg);
                     }
+                    
                     .section-content {
-                        padding: 16px;
+                        padding: 20px;
                         display: block;
+                        transition: all 0.2s ease;
                     }
+                    
                     .section-content.collapsed {
                         display: none;
                     }
                     
                     /* Form Fields */
-                    .form-row {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 16px;
-                        margin-bottom: 16px;
-                    }
-                    .form-row:last-child {
-                        margin-bottom: 0;
-                    }
-                    .form-row.full-width {
-                        grid-template-columns: 1fr;
-                    }
                     .form-field {
                         display: flex;
                         flex-direction: column;
+                        margin-bottom: 20px;
                     }
+                    
+                    .form-field:last-child {
+                        margin-bottom: 0;
+                    }
+                    
                     .form-field label {
-                        font-weight: 500;
-                        margin-bottom: 6px;
-                        font-size: 13px;
-                        color: var(--vscode-foreground);
+                        font-weight: normal;
+                        margin-bottom: 8px;
+                        font-size: 14px;
+                        color: #6A6A6A;
+                        display: block;
                     }
+                    
                     .form-field label.required::after {
                         content: " *";
-                        color: var(--vscode-errorForeground);
+                        color: #D32F2F;
                     }
+                    
                     .form-field input,
                     .form-field select,
                     .form-field textarea {
-                        padding: 8px 12px;
-                        border: 1px solid var(--vscode-input-border);
-                        background: var(--vscode-input-background);
-                        color: var(--vscode-input-foreground);
+                        height: 32px;
+                        padding: 0 12px;
+                        border: 1px solid #CCCCCC;
+                        background: #F3F3F3;
+                        color: #2D2D2D;
                         border-radius: 4px;
                         font-family: inherit;
-                        font-size: 13px;
-                        transition: border-color 0.2s;
+                        font-size: 14px;
+                        transition: border-color 0.2s ease;
+                        width: 100%;
                     }
+                    
+                    .form-field textarea {
+                        height: auto;
+                        min-height: 80px;
+                        padding: 8px 12px;
+                        resize: vertical;
+                    }
+                    
                     .form-field input:focus,
                     .form-field select:focus,
                     .form-field textarea:focus {
                         outline: none;
-                        border-color: var(--vscode-focusBorder);
+                        border-color: #007ACC;
+                        box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
                     }
-                    .form-field textarea {
-                        resize: vertical;
-                        min-height: 60px;
-                    }
+                    
                     .form-field .hint {
-                        font-size: 11px;
-                        color: var(--vscode-descriptionForeground);
+                        font-size: 12px;
+                        color: #6A6A6A;
                         margin-top: 4px;
+                        font-style: italic;
+                    }
+                    
+                    .form-field .error-text {
+                        font-size: 12px;
+                        color: #D32F2F;
+                        margin-top: 4px;
+                        display: none;
+                    }
+                    
+                    /* Side-by-side fields */
+                    .form-row {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 16px;
                     }
                     
                     /* Properties Section */
                     .properties-container {
                         min-height: 80px;
-                        border: 2px dashed var(--vscode-input-border);
-                        border-radius: 6px;
+                        border: 2px dashed #CCCCCC;
+                        border-radius: 4px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        background: var(--vscode-editor-background);
-                        margin-bottom: 12px;
+                        background: #F3F3F3;
+                        margin-bottom: 16px;
+                        transition: border-color 0.2s ease;
                     }
+                    
                     .properties-container.has-properties {
-                        border: 1px solid var(--vscode-input-border);
+                        border: 1px solid #CCCCCC;
                         border-style: solid;
-                        padding: 12px;
+                        padding: 16px;
                         min-height: auto;
+                        background: #FFFFFF;
                     }
+                    
                     .no-properties {
                         text-align: center;
-                        color: var(--vscode-descriptionForeground);
+                        color: #6A6A6A;
                         font-style: italic;
+                        font-size: 14px;
                     }
+                    
                     .property-card {
-                        background: var(--vscode-input-background);
-                        border: 1px solid var(--vscode-input-border);
+                        background: #F3F3F3;
+                        border: 1px solid #CCCCCC;
                         border-radius: 4px;
-                        padding: 12px;
-                        margin-bottom: 8px;
+                        padding: 16px;
+                        margin-bottom: 12px;
                         position: relative;
                     }
+                    
                     .property-card:last-child {
                         margin-bottom: 0;
                     }
+                    
                     .property-header {
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-                        margin-bottom: 8px;
+                        margin-bottom: 12px;
                     }
+                    
                     .property-name {
-                        font-weight: 600;
-                        font-size: 13px;
+                        font-weight: bold;
+                        font-size: 14px;
+                        color: #2D2D2D;
                     }
+                    
                     .property-actions button {
-                        padding: 4px 8px;
-                        font-size: 11px;
-                        border: none;
-                        border-radius: 3px;
+                        padding: 6px 12px;
+                        font-size: 12px;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 4px;
                         cursor: pointer;
-                        background: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
-                        margin-left: 4px;
+                        background: #FFFFFF;
+                        color: #6A6A6A;
+                        transition: all 0.2s ease;
                     }
+                    
                     .property-actions button:hover {
-                        background: var(--vscode-button-secondaryHoverBackground);
+                        background: #F3F3F3;
                     }
+                    
                     .property-actions button.danger {
-                        background: var(--vscode-errorForeground);
-                        color: white;
+                        background: #D32F2F;
+                        color: #FFFFFF;
+                        border-color: #D32F2F;
                     }
+                    
+                    .property-actions button.danger:hover {
+                        background: #B71C1C;
+                    }
+                    
                     .property-fields {
                         display: grid;
                         grid-template-columns: 1fr 1fr;
-                        gap: 8px;
+                        gap: 12px;
                     }
+                    
                     .property-field {
                         display: flex;
                         flex-direction: column;
                     }
+                    
                     .property-field label {
-                        font-size: 11px;
-                        margin-bottom: 4px;
-                        color: var(--vscode-descriptionForeground);
+                        font-size: 12px;
+                        margin-bottom: 6px;
+                        color: #6A6A6A;
                     }
+                    
                     .property-field input,
                     .property-field select,
                     .property-field textarea {
-                        padding: 6px 8px;
+                        height: 28px;
+                        padding: 0 8px;
                         font-size: 12px;
                     }
+                    
+                    .property-field textarea {
+                        height: auto;
+                        min-height: 60px;
+                        padding: 6px 8px;
+                    }
+                    
                     .property-field.full-width {
                         grid-column: 1 / -1;
                     }
+                    
                     .property-field input[type="checkbox"] {
                         width: auto;
-                        margin-right: 6px;
+                        height: auto;
+                        margin-right: 8px;
                     }
+                    
                     .inline-checkbox {
                         display: flex;
                         align-items: center;
-                        gap: 6px;
+                        gap: 8px;
+                    }
+                    
+                    .inline-checkbox label {
+                        margin-bottom: 0;
+                        cursor: pointer;
                     }
                     
                     /* Buttons */
                     .button-group {
                         display: flex;
-                        gap: 12px;
-                        margin-top: 24px;
-                        padding-top: 16px;
-                        border-top: 1px solid var(--vscode-input-border);
+                        gap: 8px;
+                        margin-top: 32px;
+                        justify-content: flex-end;
                     }
+                    
                     button {
                         padding: 8px 16px;
                         border: none;
                         border-radius: 4px;
                         cursor: pointer;
                         font-family: inherit;
-                        font-size: 13px;
-                        font-weight: 500;
-                        transition: background-color 0.2s;
+                        font-size: 14px;
+                        font-weight: normal;
+                        transition: all 0.2s ease;
+                        min-height: 32px;
                     }
+                    
                     .primary-button {
-                        background: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
+                        background: #007ACC;
+                        color: #FFFFFF;
+                        border: 1px solid #007ACC;
                     }
+                    
                     .primary-button:hover {
-                        background: var(--vscode-button-hoverBackground);
+                        background: #005A9E;
+                        border-color: #005A9E;
                     }
+                    
                     .secondary-button {
-                        background: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
+                        background: transparent;
+                        color: #6A6A6A;
+                        border: 1px solid #CCCCCC;
                     }
+                    
                     .secondary-button:hover {
-                        background: var(--vscode-button-secondaryHoverBackground);
+                        background: #F3F3F3;
                     }
+                    
                     .add-property-btn {
-                        background: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
-                        border: 1px solid var(--vscode-input-border);
-                        padding: 6px 12px;
-                        font-size: 12px;
+                        background: transparent;
+                        color: #007ACC;
+                        border: none;
+                        padding: 0;
+                        font-size: 14px;
+                        text-decoration: underline;
+                        text-align: left;
+                        margin-bottom: 16px;
                     }
+                    
                     .add-property-btn:hover {
-                        background: var(--vscode-button-secondaryHoverBackground);
+                        color: #005A9E;
+                        background: transparent;
                     }
                     
                     /* Error Handling */
                     .error {
-                        color: var(--vscode-errorForeground);
-                        background: var(--vscode-inputValidation-errorBackground);
-                        border: 1px solid var(--vscode-inputValidation-errorBorder);
-                        padding: 8px 12px;
+                        color: #D32F2F;
+                        background: #FFEBEE;
+                        border: 1px solid #FFCDD2;
+                        padding: 12px 16px;
                         border-radius: 4px;
-                        margin-top: 12px;
+                        margin-top: 16px;
                         display: none;
-                        font-size: 12px;
+                        font-size: 14px;
                     }
                     
-                    /* Preview Section */
-                    .preview-toggle {
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        cursor: pointer;
-                        padding: 8px 0;
-                        color: var(--vscode-descriptionForeground);
-                        font-size: 12px;
-                    }
-                    .preview-toggle:hover {
-                        color: var(--vscode-foreground);
-                    }
+                    /* JSON Preview */
                     .json-preview {
-                        background: var(--vscode-editor-background);
-                        border: 1px solid var(--vscode-input-border);
-                        padding: 12px;
+                        background: #F3F3F3;
+                        border: 1px solid #CCCCCC;
+                        padding: 16px;
                         border-radius: 4px;
-                        max-height: 200px;
+                        max-height: 300px;
                         overflow: auto;
-                        font-family: var(--vscode-editor-font-family);
-                        font-size: 11px;
-                        color: var(--vscode-editor-foreground);
+                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                        font-size: 12px;
+                        color: #2D2D2D;
                         white-space: pre;
-                        display: none;
+                        line-height: 1.4;
+                    }
+                    
+                    /* Dropdown styling */
+                    select {
+                        appearance: none;
+                        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236A6A6A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+                        background-repeat: no-repeat;
+                        background-position: right 8px center;
+                        background-size: 16px;
+                        padding-right: 32px;
                     }
                     
                     /* Responsive */
                     @media (max-width: 600px) {
+                        .container {
+                            padding: 16px;
+                        }
+                        
                         .form-row {
                             grid-template-columns: 1fr;
                         }
+                        
                         .property-fields {
                             grid-template-columns: 1fr;
                         }
+                        
+                        .button-group {
+                            flex-direction: column;
+                        }
+                    }
+                    
+                    /* Accessibility */
+                    button:focus,
+                    input:focus,
+                    select:focus,
+                    textarea:focus {
+                        outline: 2px solid #007ACC;
+                        outline-offset: 2px;
+                    }
+                    
+                    /* Animation for collapsible sections */
+                    .section-content {
+                        transition: all 0.2s ease;
                     }
                 </style>
             </head>
@@ -1910,7 +2026,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <div class="subtitle">Define your collection's structure and configuration</div>
                     </div>
                     
-                    <form id="collectionForm">
+                                        <form id="collectionForm">
                         <!-- Basic Settings Section -->
                         <div class="form-section">
                             <div class="section-header" data-section="basic">
@@ -1918,37 +2034,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 <span class="icon">▼</span>
                             </div>
                             <div class="section-content" id="basicContent">
-                                <div class="form-row full-width">
-                                    <div class="form-field">
-                                        <label for="collectionName" class="required">Collection Name</label>
-                                        <input type="text" id="collectionName" name="collectionName" required placeholder="e.g., Articles, Products, Documents">
-                                        <div class="hint">Choose a descriptive name for your collection</div>
-                                    </div>
+                                <div class="form-field">
+                                    <label for="collectionName" class="required">Collection Name</label>
+                                    <input type="text" id="collectionName" name="collectionName" required placeholder="e.g., Articles, Products, Documents" aria-describedby="nameHint nameError">
+                                    <div class="hint" id="nameHint">Choose a descriptive name for your collection</div>
+                                    <div class="error-text" id="nameError" role="alert"></div>
                                 </div>
-                                <div class="form-row full-width">
-                                    <div class="form-field">
-                                        <label for="description">Description</label>
-                                        <textarea id="description" name="description" placeholder="Optional description of what this collection contains"></textarea>
-                                    </div>
+                                <div class="form-field">
+                                    <label for="description">Description</label>
+                                    <textarea id="description" name="description" placeholder="Optional description of what this collection contains"></textarea>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vectorizer & Index Type Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="vectorizer">
+                                <span>Vectorizer & Index Type</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content" id="vectorizerContent">
                                 <div class="form-row">
                                     <div class="form-field">
                                         <label for="vectorizer">Vectorizer</label>
-                                        <select id="vectorizer" name="vectorizer">
+                                        <select id="vectorizer" name="vectorizer" aria-describedby="vectorizerHint">
                                             <option value="none">None (Manual vectors)</option>
                                             <option value="text2vec-openai">OpenAI</option>
                                             <option value="text2vec-cohere">Cohere</option>
                                             <option value="text2vec-huggingface">Hugging Face</option>
                                         </select>
-                                        <div class="hint">How text will be converted to vectors</div>
+                                        <div class="hint" id="vectorizerHint">How text will be converted to vectors</div>
                                     </div>
                                     <div class="form-field">
                                         <label for="vectorIndexType">Index Type</label>
-                                        <select id="vectorIndexType" name="vectorIndexType">
+                                        <select id="vectorIndexType" name="vectorIndexType" aria-describedby="indexHint">
                                             <option value="hnsw">HNSW (Recommended)</option>
                                             <option value="flat">Flat</option>
                                         </select>
-                                        <div class="hint">Vector search algorithm</div>
+                                        <div class="hint" id="indexHint">Vector search algorithm</div>
                                     </div>
                                 </div>
                             </div>
@@ -1961,10 +2084,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 <span class="icon">▼</span>
                             </div>
                             <div class="section-content" id="propertiesContent">
+                                <button type="button" class="add-property-btn" id="addPropertyButton">+ Add Property</button>
                                 <div class="properties-container" id="propertiesContainer">
                                     <div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>
                                 </div>
-                                <button type="button" class="add-property-btn" id="addPropertyButton">+ Add Property</button>
                             </div>
                         </div>
                         
@@ -1978,40 +2101,38 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 <div class="form-row">
                                     <div class="form-field">
                                         <label for="efConstruction">EF Construction</label>
-                                        <input type="number" id="efConstruction" min="4" value="128">
-                                        <div class="hint">HNSW build quality (higher = better, slower)</div>
+                                        <input type="number" id="efConstruction" min="4" value="128" aria-describedby="efHint">
+                                        <div class="hint" id="efHint">HNSW build quality (higher = better, slower)</div>
                                     </div>
                                     <div class="form-field">
                                         <label for="maxConnections">Max Connections</label>
-                                        <input type="number" id="maxConnections" min="4" value="16">
-                                        <div class="hint">HNSW graph connections</div>
+                                        <input type="number" id="maxConnections" min="4" value="16" aria-describedby="maxConnHint">
+                                        <div class="hint" id="maxConnHint">HNSW graph connections</div>
                                     </div>
                                 </div>
-                                <div class="form-row full-width">
-                                    <div class="form-field">
-                                        <label class="inline-checkbox">
-                                            <input type="checkbox" id="multiTenancyToggle">
-                                            Enable Multi-Tenancy
-                                        </label>
-                                        <div class="hint">Allow collection to be partitioned by tenant</div>
-                                    </div>
+                                <div class="form-field">
+                                    <label class="inline-checkbox">
+                                        <input type="checkbox" id="multiTenancyToggle" aria-describedby="mtHint">
+                                        <span>Enable Multi-Tenancy</span>
+                                    </label>
+                                    <div class="hint" id="mtHint">Allow collection to be partitioned by tenant</div>
                                 </div>
-                                <div class="form-row full-width" id="moduleConfigContainer"></div>
+                                <div id="moduleConfigContainer"></div>
                             </div>
                         </div>
                         
-                        <!-- Preview Section -->
+                        <!-- Schema Preview Section -->
                         <div class="form-section">
                             <div class="section-header collapsed" data-section="preview">
                                 <span>Schema Preview</span>
                                 <span class="icon">▼</span>
                             </div>
                             <div class="section-content collapsed" id="previewContent">
-                                <pre id="jsonPreview" class="json-preview">{\n  \n}</pre>
+                                <pre id="jsonPreview" class="json-preview" role="textbox" aria-label="JSON Schema Preview">{\n  \n}</pre>
                             </div>
                         </div>
                         
-                        <div class="error" id="formError"></div>
+                        <div class="error" id="formError" role="alert" aria-live="polite"></div>
                         
                         <div class="button-group">
                             <button type="submit" class="primary-button">Create Collection</button>
@@ -2066,9 +2187,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     // Initialize form
                     function initForm() {
                         // Request data from extension
-                        vscode.postMessage({ command: 'getVectorizers' });
-                        vscode.postMessage({ command: 'getCollections' });
-                        
+                    vscode.postMessage({ command: 'getVectorizers' });
+                    vscode.postMessage({ command: 'getCollections' });
+                    
                         // Set up event listeners
                         setupEventListeners();
                         
@@ -2080,15 +2201,25 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         document.getElementById('collectionName').focus();
                     }
                     
-                    function setupEventListeners() {
-                        // Collection name validation
+                                        function setupEventListeners() {
+                        // Collection name validation with inline error
                         document.getElementById('collectionName').addEventListener('input', (e) => {
                             const input = e.target.value.trim();
+                            const errorElement = document.getElementById('nameError');
+                            
+                            if (input && existingCollections.includes(input)) {
+                                showInlineError('nameError', 'A collection with this name already exists');
+                            } else {
+                                hideInlineError('nameError');
+                            }
+                            
+                            // Also update main error display
                             if (input && existingCollections.includes(input)) {
                                 showError('A collection with this name already exists');
                             } else {
                                 hideError();
                             }
+                            
                             updateJsonPreview();
                         });
                         
@@ -2477,6 +2608,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     function hideError() {
                         document.getElementById('formError').style.display = 'none';
+                    }
+                    
+                    function showInlineError(elementId, message) {
+                        const errorElement = document.getElementById(elementId);
+                        if (errorElement) {
+                            errorElement.textContent = message;
+                            errorElement.style.display = 'block';
+                        }
+                    }
+                    
+                    function hideInlineError(elementId) {
+                        const errorElement = document.getElementById(elementId);
+                        if (errorElement) {
+                            errorElement.style.display = 'none';
+                        }
                     }
                     
                     // Message handling
