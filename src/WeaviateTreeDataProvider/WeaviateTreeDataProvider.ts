@@ -1378,6 +1378,411 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
+     * Shows the Add Collection dialog for creating a new collection
+     * @param connectionId - The ID of the connection to add the collection to
+     */
+    async addCollection(connectionId: string): Promise<void> {
+        try {
+            const connection = this.connectionManager.getConnection(connectionId);
+            if (!connection) {
+                throw new Error('Connection not found');
+            }
+
+            if (connection.status !== 'connected') {
+                throw new Error('Connection must be active to add collections');
+            }
+
+            // Create and show the Add Collection webview panel
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateAddCollection',
+                'Add Collection',
+                vscode.ViewColumn.Active,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: []
+                }
+            );
+
+            // Set the webview content
+            panel.webview.html = this.getAddCollectionHtml();
+
+            // Handle messages from the webview
+            panel.webview.onDidReceiveMessage(
+                async (message) => {
+                    switch (message.command) {
+                        case 'create':
+                            try {
+                                await this.createCollection(connectionId, message.schema);
+                                panel.dispose();
+                                vscode.window.showInformationMessage(`Collection "${message.schema.class}" created successfully`);
+                                await this.fetchCollections(connectionId);
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: error instanceof Error ? error.message : String(error)
+                                });
+                            }
+                            break;
+                        case 'cancel':
+                            panel.dispose();
+                            break;
+                        case 'getVectorizers':
+                            try {
+                                const vectorizers = await this.getAvailableVectorizers(connectionId);
+                                panel.webview.postMessage({
+                                    command: 'vectorizers',
+                                    vectorizers: vectorizers
+                                });
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`
+                                });
+                            }
+                            break;
+                    }
+                },
+                undefined,
+                this.context.subscriptions
+            );
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error showing add collection dialog:', error);
+            throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Creates a new collection using the Weaviate API
+     * @param connectionId - The ID of the connection
+     * @param schema - The collection schema to create
+     */
+    private async createCollection(connectionId: string, schema: any): Promise<void> {
+        const client = this.connectionManager.getClient(connectionId);
+        if (!client) {
+            throw new Error('Client not initialized');
+        }
+
+        // Create the collection using the schema API
+        await client.schema.classCreator()
+            .withClass(schema)
+            .do();
+    }
+
+    /**
+     * Gets available vectorizers from the Weaviate instance
+     * @param connectionId - The ID of the connection
+     * @returns Array of available vectorizers
+     */
+    private async getAvailableVectorizers(connectionId: string): Promise<string[]> {
+        const client = this.connectionManager.getClient(connectionId);
+        if (!client) {
+            throw new Error('Client not initialized');
+        }
+
+        try {
+            const meta = await client.misc.metaGetter().do();
+            
+            // Extract vectorizer names from modules
+            const vectorizers: string[] = ['none']; // Default option
+            
+            if (meta.modules) {
+                const moduleNames = Object.keys(meta.modules);
+                console.log('Available modules:', moduleNames); // Debug log
+                
+                // Add common vectorizers based on available modules
+                if (moduleNames.includes('text2vec-openai')) {
+                    vectorizers.push('text2vec-openai');
+                }
+                if (moduleNames.includes('text2vec-cohere')) {
+                    vectorizers.push('text2vec-cohere');
+                }
+                if (moduleNames.includes('text2vec-huggingface')) {
+                    vectorizers.push('text2vec-huggingface');
+                }
+                if (moduleNames.includes('text2vec-transformers')) {
+                    vectorizers.push('text2vec-transformers');
+                }
+                if (moduleNames.includes('text2vec-contextionary')) {
+                    vectorizers.push('text2vec-contextionary');
+                }
+                if (moduleNames.includes('multi2vec-clip')) {
+                    vectorizers.push('multi2vec-clip');
+                }
+                if (moduleNames.includes('multi2vec-bind')) {
+                    vectorizers.push('multi2vec-bind');
+                }
+                if (moduleNames.includes('img2vec-neural')) {
+                    vectorizers.push('img2vec-neural');
+                }
+                if (moduleNames.includes('ref2vec-centroid')) {
+                    vectorizers.push('ref2vec-centroid');
+                }
+            }
+            
+            console.log('Available vectorizers:', vectorizers); // Debug log
+            return vectorizers;
+        } catch (error) {
+            console.warn('Could not fetch vectorizers, using defaults:', error);
+            return ['none', 'text2vec-openai', 'text2vec-cohere', 'text2vec-huggingface', 'text2vec-contextionary'];
+        }
+    }
+
+    /**
+     * Generates HTML for the Add Collection webview
+     * @returns The HTML content for the webview
+     */
+    private getAddCollectionHtml(): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Add Collection</title>
+                <style>
+                    body {
+                        font-family: var(--vscode-font-family);
+                        font-size: var(--vscode-font-size);
+                        color: var(--vscode-foreground);
+                        background-color: var(--vscode-editor-background);
+                        padding: 20px;
+                    }
+                    .container {
+                        max-width: 600px;
+                        margin: 0 auto;
+                    }
+                    .form-group {
+                        margin-bottom: 15px;
+                    }
+                    label {
+                        display: block;
+                        margin-bottom: 5px;
+                        font-weight: 600;
+                    }
+                    input[type="text"], textarea, select {
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid var(--vscode-input-border);
+                        background-color: var(--vscode-input-background);
+                        color: var(--vscode-input-foreground);
+                        border-radius: 3px;
+                        font-family: inherit;
+                        font-size: inherit;
+                    }
+                    textarea {
+                        resize: vertical;
+                        min-height: 60px;
+                    }
+                    .button-group {
+                        display: flex;
+                        gap: 10px;
+                        margin-top: 20px;
+                    }
+                    button {
+                        padding: 8px 16px;
+                        border: none;
+                        border-radius: 3px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: inherit;
+                    }
+                    .primary-button {
+                        background-color: var(--vscode-button-background);
+                        color: var(--vscode-button-foreground);
+                    }
+                    .primary-button:hover {
+                        background-color: var(--vscode-button-hoverBackground);
+                    }
+                    .secondary-button {
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
+                    }
+                    .secondary-button:hover {
+                        background-color: var(--vscode-button-secondaryHoverBackground);
+                    }
+                    .error {
+                        color: var(--vscode-errorForeground);
+                        background-color: var(--vscode-inputValidation-errorBackground);
+                        border: 1px solid var(--vscode-inputValidation-errorBorder);
+                        padding: 8px;
+                        border-radius: 3px;
+                        margin-top: 10px;
+                        display: none;
+                    }
+                    .help-text {
+                        font-size: 12px;
+                        color: var(--vscode-descriptionForeground);
+                        margin-top: 4px;
+                        font-style: italic;
+                    }
+                    .preview {
+                        background-color: var(--vscode-editor-background);
+                        border: 1px solid var(--vscode-input-border);
+                        padding: 8px;
+                        border-radius: 3px;
+                        margin-top: 4px;
+                        font-family: var(--vscode-editor-font-family);
+                        font-size: 12px;
+                        color: var(--vscode-editor-foreground);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h2>Add Collection</h2>
+                    
+                    <form id="collectionForm">
+                        <div class="form-group">
+                            <label for="collectionName">Collection Name*</label>
+                            <input type="text" id="collectionName" name="collectionName" required>
+                            <div class="help-text">Must be PascalCase (start with capital letter, letters and numbers only). Examples: PodcastHosts, UserProfile, ArticleContent</div>
+                            <div class="preview" id="namePreview" style="display: none;"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description" placeholder="Optional description for your collection"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="vectorizer">Vectorizer</label>
+                            <select id="vectorizer" name="vectorizer">
+                                <option value="none">None</option>
+                                <option value="text2vec-openai">OpenAI</option>
+                                <option value="text2vec-cohere">Cohere</option>
+                                <option value="text2vec-huggingface">Hugging Face</option>
+                            </select>
+                        </div>
+                        
+                        <div class="error" id="formError"></div>
+                        
+                        <div class="button-group">
+                            <button type="submit" class="primary-button">Create Collection</button>
+                            <button type="button" class="secondary-button" id="cancelButton">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    
+                    // Request available vectorizers when the form loads
+                    vscode.postMessage({ command: 'getVectorizers' });
+                    
+                    // Add real-time validation for collection name
+                    document.getElementById('collectionName').addEventListener('input', (e) => {
+                        const input = e.target.value.trim();
+                        const preview = document.getElementById('namePreview');
+                        
+                        if (input) {
+                            // Show validation status instead of transformation
+                            const isValid = /^[A-Z][a-zA-Z0-9]*$/.test(input);
+                            if (isValid) {
+                                preview.textContent = '✓ Valid collection name';
+                                preview.style.color = 'var(--vscode-testing-iconPassed)';
+                            } else {
+                                preview.textContent = '✗ Must be PascalCase (start with capital letter, letters and numbers only)';
+                                preview.style.color = 'var(--vscode-errorForeground)';
+                            }
+                            preview.style.display = 'block';
+                        } else {
+                            preview.style.display = 'none';
+                        }
+                    });
+                    
+                    document.getElementById('collectionForm').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        
+                        const formData = new FormData(e.target);
+                        let collectionName = formData.get('collectionName').trim();
+                        const description = formData.get('description').trim();
+                        const vectorizer = formData.get('vectorizer');
+                        
+                        // Clear previous errors
+                        document.getElementById('formError').style.display = 'none';
+                        
+                        // Basic validation
+                        if (!collectionName) {
+                            showError('Collection name is required');
+                            return;
+                        }
+                        
+                        // Validate collection name format (no transformation)
+                        // Weaviate requires: PascalCase, letters and numbers only, no spaces or special chars
+                        
+                        // Validate collection name format
+                        if (collectionName.length < 2) {
+                            showError('Collection name must be at least 2 characters long');
+                            return;
+                        }
+                        
+                        if (!/^[A-Z][a-zA-Z0-9]*$/.test(collectionName)) {
+                            showError('Collection name must be PascalCase (start with capital letter, letters and numbers only, no spaces or special characters)');
+                            return;
+                        }
+                        
+                        // Build schema object
+                        const schema = {
+                            class: collectionName,
+                            description: description || undefined,
+                            vectorizer: vectorizer === 'none' ? undefined : vectorizer
+                        };
+                        
+                        // Send schema to extension
+                        vscode.postMessage({
+                            command: 'create',
+                            schema: schema
+                        });
+                    });
+                    
+                    document.getElementById('cancelButton').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'cancel' });
+                    });
+                    
+                    // Listen for messages from the extension
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        switch (message.command) {
+                            case 'error':
+                                showError(message.message);
+                                break;
+                            case 'vectorizers':
+                                updateVectorizerOptions(message.vectorizers);
+                                break;
+                        }
+                    });
+                    
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
+                    }
+                    
+                    function updateVectorizerOptions(vectorizers) {
+                        const select = document.getElementById('vectorizer');
+                        select.innerHTML = '';
+                        
+                        vectorizers.forEach(vectorizer => {
+                            const option = document.createElement('option');
+                            option.value = vectorizer;
+                            option.textContent = vectorizer === 'none' ? 'None' : 
+                                vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
+                            select.appendChild(option);
+                        });
+                    }
+                    
+                    // Focus the collection name input
+                    document.getElementById('collectionName').focus();
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
      * Deletes a connection without showing any confirmation dialogs.
      * Callers are responsible for showing confirmation dialogs if needed.
      * @param connectionId The ID of the connection to delete

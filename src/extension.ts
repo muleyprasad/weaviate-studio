@@ -261,6 +261,22 @@ export function activate(context: vscode.ExtensionContext) {
                     `Failed to duplicate collection: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
+        }),
+
+        // Add collection command
+        vscode.commands.registerCommand('weaviate.addCollection', async (item) => {
+            if (!item?.connectionId) {
+                vscode.window.showErrorMessage('Missing connection information');
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.addCollection(item.connectionId);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to add collection: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
         })
     );
 
