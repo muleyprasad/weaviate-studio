@@ -325,7 +325,9 @@ export class GraphQLEditor {
    * @param templateName Name of the template to insert
    */
   public insertTemplate(templateName: string): void {
-    if (!this.editor) { return; }
+    if (!this.editor) {
+      return;
+    }
     
     // Process the template with current collection name and schema information
     // Pass the schema config to enable proper relationship field handling
@@ -359,7 +361,9 @@ export class GraphQLEditor {
    * Provides warnings for large limits and validates certainty values
    */
   public validateQueryParameters(): void {
-    if (!this.editor) { return; }
+    if (!this.editor) {
+      return;
+    }
     
     const model = this.editor.getModel();
     if (!model) { return; }
@@ -443,7 +447,9 @@ export class GraphQLEditor {
    * Format the current GraphQL query
    */
   public async formatQuery(): Promise<void> {
-    if (!this.editor) { return; }
+    if (!this.editor) {
+      return;
+    }
     
     try {
       const currentValue = this.editor.getValue();
@@ -545,7 +551,9 @@ export class GraphQLEditor {
    * Manually update the Monaco editor theme to match VS Code
    */
   public updateTheme(): void {
-    if (!this.editor) return;
+    if (!this.editor) {
+      return;
+    }
     
     try {
       // Determine current VS Code theme

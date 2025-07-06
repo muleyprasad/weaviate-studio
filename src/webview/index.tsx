@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { JsonView } from 'react-json-view-lite';
-import 'react-json-view-lite/dist/index.css';
 import { MonacoGraphQLEditor } from './MonacoGraphQLEditor';
 import ResultsTable from './components/ResultsTable';
 import * as monaco from 'monaco-editor';

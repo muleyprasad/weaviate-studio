@@ -172,6 +172,30 @@ export class ViewRenderer {
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
 
+        // Build scaling configuration sections dynamically
+        const scalingSections: string[] = [];
+        const formatIfExists = (data: any, label: string): void => {
+            if (data) {
+                scalingSections.push(`
+                    <div class="config-section">
+                        <h3>${label}</h3>
+                        <pre><code>${this.formatJsonClean(data)}</code></pre>
+                    </div>
+                `);
+            }
+        };
+
+        formatIfExists((schema as any).shardingConfig, 'Sharding');
+        formatIfExists((schema as any).replicationConfig, 'Replication');
+        formatIfExists((schema as any).multiTenancyConfig, 'Multi-Tenancy');
+
+        const scalingHtml = scalingSections.length > 0 ? `
+            <div class="section-header">Scaling Configuration</div>
+            <div class="section-content">
+                ${scalingSections.join('')}
+            </div>
+        ` : '';
+
         // Generate creation script for the 5th tab
         const creationScript = `# Weaviate Collection Definition
 # Generated on: ${new Date().toLocaleString()}
@@ -233,7 +257,7 @@ Property: ${prop.name}
                     }
                     
                     .header h1 {
-                        margin: 0;
+                        margin: 0 0 6px 0;
                         display: flex;
                         align-items: center;
                         gap: 10px;
@@ -241,6 +265,17 @@ Property: ${prop.name}
                         font-size: 18px;
                         font-weight: bold;
                         color: #222b45;
+                    }
+                    
+                    .header .stats-grid {
+                        display: flex;
+                        gap: 24px;
+                    }
+                    
+                    .header .stat-card {
+                        padding: 0;
+                        margin: 0;
+                        text-align: left;
                     }
                     
                     .collection-badge {
@@ -357,10 +392,9 @@ Property: ${prop.name}
                     }
                     
                     .property-item {
-                        padding: 12px;
-                        margin-bottom: 12px;
-                        background: none;
-                        border: none;
+                        padding: 8px 0 12px 0;
+                        margin: 0 20px;
+                        border-bottom: 1px solid var(--vscode-panel-border);
                     }
                     
                     .property-header {
@@ -381,10 +415,13 @@ Property: ${prop.name}
                         font-size: 0.9em;
                         padding: 2px 6px;
                         border-radius: 4px;
+                        background-color: var(--vscode-editor-inactiveSelectionBackground);
+                        margin-left: auto;
+                        white-space: nowrap;
                     }
                     
                     .property-description {
-                        margin: 8px 0;
+                        margin: 4px 0 6px 0;
                         color: var(--vscode-descriptionForeground);
                         font-style: italic;
                     }
@@ -427,14 +464,14 @@ Property: ${prop.name}
                     }
                     
                     .config-section h3 {
-                        font-family: "Inter", Arial, sans-serif;
-                        font-size: 16px;
-                        font-weight: bold;
-                        color: #222b45;
-                        margin: 0 0 16px 0;
+                        font-family: var(--vscode-font-family);
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+                        margin: 0 0 8px 0;
                         display: flex;
                         align-items: center;
-                        gap: 8px;
+                        gap: 6px;
                     }
                     
                     .config-grid {
@@ -476,47 +513,15 @@ Property: ${prop.name}
                     .copy-button:hover {
                         background-color: var(--vscode-button-hoverBackground);
                     }
-                    
-                    .stats-grid {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                        gap: 15px;
-                        margin: 20px 0;
-                    }
-                    
-                    .stat-card {
-                        padding: 15px;
-                        text-align: center;
-                        margin: 0;
-                        background: none;
-                        border: none;
-                    }
-                    
-                    .stat-number {
-                        font-size: 1.5em;
-                        font-weight: bold;
-                        color: #222b45;
-                        display: block;
-                        font-family: "Inter", Arial, sans-serif;
-                    }
-                    
-                    .stat-label {
-                        font-size: 0.9em;
-                        color: var(--vscode-descriptionForeground);
-                        margin-top: 5px;
-                        font-family: "Inter", Arial, sans-serif;
-                    }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>
-                        Schema: ${this.escapeHtml(schema.class)}
-                    </h1>
+                    <h1>Schema: ${this.escapeHtml(schema.class)}</h1>
                 </div>
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('overview')">Overview</div>
-                    <div class="tab" onclick="switchTab('properties')">Properties</div>
+                    <div class="tab" onclick="switchTab('properties')">Properties (${schema.properties?.length || 0})</div>
                     <div class="tab" onclick="switchTab('raw-json')">Raw JSON</div>
                     <div class="tab" onclick="switchTab('api-equivalent')">API Equivalent</div>
                     <div class="tab" onclick="switchTab('creation-scripts')">Creation Scripts</div>
@@ -544,34 +549,15 @@ Property: ${prop.name}
                         <pre><code>${this.formatJsonClean(schema.moduleConfig)}</code></pre>
                     </div>
                     
-                    <div class="section-header">Scaling Configuration</div>
-                    <div class="section-content">
-                        <div class="config-section">
-                            <h3>Sharding</h3>
-                            <pre><code>${this.formatJsonClean((schema as any).shardingConfig)}</code></pre>
-                        </div>
-                    </div>
-                    
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <span class="stat-number">${schema.properties?.length || 0}</span>
-                            <span class="stat-label">Properties</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-number">${schema.vectorizer ? '1' : '0'}</span>
-                            <span class="stat-label">Vectorizer</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-number">${schema.moduleConfig ? Object.keys(schema.moduleConfig).length : 0}</span>
-                            <span class="stat-label">Modules</span>
-                        </div>
-                    </div>
+                    ${scalingHtml}
                 </div>
 
                 <!-- Properties Tab -->
                 <div id="properties" class="tab-content">
-                    <h3>Properties (${schema.properties?.length || 0})</h3>
-                    ${propertiesHtml}
+                    <div class="section-header">Properties (${schema.properties?.length || 0})</div>
+                    <div class="section-content">
+                        ${propertiesHtml}
+                    </div>
                 </div>
 
                 <!-- Raw JSON Tab -->
@@ -604,7 +590,7 @@ Property: ${prop.name}
                 <!-- Creation Scripts Tab -->
                 <div id="creation-scripts" class="tab-content">
                     <div class="section-header">
-                        <span>Complete Creation Script</span>
+                        <span>Python Creation Script</span>
                         <div class="buttons">
                             <button class="button" onclick="copyToClipboard('creationScript')">Copy Script</button>
                         </div>
