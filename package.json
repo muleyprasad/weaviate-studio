@@ -209,6 +209,12 @@
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "2_management@1"
+        },
+        {
+          "command": "weaviate.addCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "inline@1",
+          "icon": "$(add)"
         }
       ]
     }

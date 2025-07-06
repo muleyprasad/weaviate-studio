@@ -1607,16 +1607,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         padding: 20px;
                     }
                     .container {
-                        max-width: 600px;
+                        max-width: 800px;
                         margin: 0 auto;
+                    }
+                    .form-group label {
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                    }
+                    .form-row {
+                        display: grid;
+                        grid-template-columns: 160px 1fr;
+                        gap: 12px;
+                        align-items: start;
+                    }
+                    .form-row > label {
+                        margin-top: 6px;
+                    }
+                    .form-row > *:first-child {
+                        grid-column: 1;
+                    }
+                    .form-row > *:nth-child(2) {
+                        grid-column: 2;
                     }
                     .form-group {
                         margin-bottom: 15px;
-                    }
-                    label {
-                        display: block;
-                        margin-bottom: 5px;
-                        font-weight: 600;
                     }
                     input[type="text"], textarea, select {
                         width: 100%;
