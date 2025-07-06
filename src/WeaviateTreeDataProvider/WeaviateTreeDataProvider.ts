@@ -1804,6 +1804,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         grid-template-columns: 1fr 1fr;
                         gap: 8px;
                     }
+                    /* --- NEW: inline checkbox label styling --- */
+                    .inline-checkbox {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    /* --- NEW: config small styling --- */
+                    .config-small {
+                        max-width: 120px;
+                    }
                 </style>
             </head>
             <body>
@@ -1845,6 +1855,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         
                         <!-- NEW: Module configuration -->
                         <div class="form-group" id="moduleConfigContainer"></div>
+                        <!-- NEW: Multi-tenancy toggle -->
+                        <div class="form-group">
+                            <label class="inline-checkbox"><input type="checkbox" id="multiTenancyToggle"> Enable Multi-Tenancy</label>
+                            <div class="help-text">Allows this collection to be partitioned by tenant.</div>
+                        </div>
                         
                         <div class="form-group">
                             <label>Properties</label>
@@ -1880,6 +1895,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     // NEW: state for vector index & module config
                     let vectorIndexConfigState = { efConstruction: 128, maxConnections: 16 };
                     let moduleConfigState = {};
+                    let multiTenancyEnabled = false;
                     
                     // Store server version to filter unsupported features
                     let serverVersion = 'unknown';
@@ -1977,6 +1993,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     document.getElementById('description').addEventListener('input', updateJsonPreview);
                     document.getElementById('vectorizer').addEventListener('change', (e)=>{updateJsonPreview();renderModuleConfig();});
                     document.getElementById('vectorIndexType').addEventListener('change', (e)=>{renderVectorIndexConfig();});
+                    document.getElementById('multiTenancyToggle').addEventListener('change', (e)=>{multiTenancyEnabled=e.target.checked;updateJsonPreview();});
                     
                     // Initial renders
                     renderVectorIndexConfig();
@@ -2250,6 +2267,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const description = formData.get('description').trim();
                         const vectorizer = formData.get('vectorizer');
                         const vectorIndexType = document.getElementById('vectorIndexType').value;
+                        const mtEnabled = document.getElementById('multiTenancyToggle').checked;
                         
                         // gather vector index config
                         let vectorIndexConfig = null;
@@ -2301,7 +2319,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             }),
                             vectorIndexType: vectorIndexType,
                             vectorIndexConfig: vectorIndexConfig,
-                            moduleConfig: moduleConfig
+                            moduleConfig: moduleConfig,
+                            multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
                         };
                         
                         // Send schema to extension
@@ -2397,6 +2416,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const vectorIndexTypeVal = document.getElementById('vectorIndexType').value;
                         const vectorIndexConfigVal = vectorIndexTypeVal === 'hnsw' ? { ...vectorIndexConfigState } : null;
                         const moduleConfigVal = Object.keys(moduleConfigState).length>0 ? { 'text2vec-openai': { ...moduleConfigState } } : null;
+                        const mtVal = document.getElementById('multiTenancyToggle').checked ? { enabled: true } : undefined;
                         
                         // Build schema object mirroring the submit logic
                         const schemaObj = {
@@ -2415,7 +2435,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             }),
                             vectorIndexType: vectorIndexTypeVal,
                             vectorIndexConfig: vectorIndexConfigVal,
-                            moduleConfig: moduleConfigVal
+                            moduleConfig: moduleConfigVal,
+                            multiTenancyConfig: mtVal
                         };
                         document.getElementById('jsonPreview').textContent = JSON.stringify(schemaObj, null, 2);
                     }

@@ -61,7 +61,8 @@
       },
       {
         "command": "weaviate.addCollection",
-        "title": "Add Collection",
+        "title": "Weaviate: Add Collection",
+        "category": "Weaviate",
         "icon": "$(add)"
       },
       {
