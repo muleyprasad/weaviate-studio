@@ -61,7 +61,8 @@
       },
       {
         "command": "weaviate.addCollection",
-        "title": "Add Collection",
+        "title": "Weaviate: Add Collection",
+        "category": "Weaviate",
         "icon": "$(add)"
       },
       {
@@ -95,11 +96,6 @@
       {
         "command": "weaviate.exportSchema",
         "title": "Export Collection Schema",
-        "category": "Weaviate"
-      },
-      {
-        "command": "weaviate.duplicateCollection",
-        "title": "Duplicate Collection Schema",
         "category": "Weaviate"
       },
       {
@@ -160,11 +156,6 @@
           "group": "1_connection@2"
         },
         {
-          "command": "weaviate.addCollection",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
-          "group": "1_connection@3"
-        },
-        {
           "command": "weaviate.editConnection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
           "group": "2_management@1"
@@ -185,11 +176,6 @@
           "group": "2_management@1"
         },
         {
-          "command": "weaviate.duplicateCollection",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "2_management@2"
-        },
-        {
           "command": "weaviate.refreshConnection",
           "when": "view == weaviateConnectionsView && (viewItem == weaviateConnectionActive || viewItem == weaviateServerInfo || viewItem == weaviateClusterHealth)",
           "group": "navigation@1"
@@ -202,12 +188,18 @@
         {
           "command": "weaviate.queryCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "1_actions@4"
+          "group": "1_actions@3"
+        },
+        {
+          "command": "weaviate.addCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "inline@1",
+          "icon": "$(add)"
         },
         {
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
-          "group": "2_management@1"
+          "group": "3_modification"
         }
       ]
     }

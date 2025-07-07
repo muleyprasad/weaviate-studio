@@ -247,18 +247,18 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        // Duplicate collection command
-        vscode.commands.registerCommand('weaviate.duplicateCollection', async (item) => {
-            if (!item?.connectionId || !item?.label) {
-                vscode.window.showErrorMessage('Missing connection or collection information');
+        // Add collection command
+        vscode.commands.registerCommand('weaviate.addCollection', async (item) => {
+            if (!item?.connectionId) {
+                vscode.window.showErrorMessage('Missing connection information');
                 return;
             }
             
             try {
-                await weaviateTreeDataProvider.duplicateCollection(item.connectionId, item.label);
+                await weaviateTreeDataProvider.addCollection(item.connectionId);
             } catch (error) {
                 vscode.window.showErrorMessage(
-                    `Failed to duplicate collection: ${error instanceof Error ? error.message : String(error)}`
+                    `Failed to add collection: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
         })

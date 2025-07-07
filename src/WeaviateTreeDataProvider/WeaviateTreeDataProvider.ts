@@ -1318,63 +1318,1357 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
+
+
     /**
-     * Duplicates a collection by creating a new collection with the same schema
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection to duplicate
+     * Shows the Add Collection dialog for creating a new collection
+     * @param connectionId - The ID of the connection to add the collection to
      */
-    async duplicateCollection(connectionId: string, collectionName: string): Promise<void> {
+    async addCollection(connectionId: string): Promise<void> {
         try {
-            const collection = this.collections[connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
-
-            if (!collection?.schema) {
-                throw new Error('Collection schema not found');
+            const connection = this.connectionManager.getConnection(connectionId);
+            if (!connection) {
+                throw new Error('Connection not found');
             }
 
-            // Ask for new collection name
-            const newName = await vscode.window.showInputBox({
-                prompt: `Enter name for duplicated collection (original: ${collectionName})`,
-                value: `${collectionName}_copy`,
-                validateInput: (value) => {
-                    if (!value || value.trim().length === 0) {
-                        return 'Collection name cannot be empty';
-                    }
-                    if (value === collectionName) {
-                        return 'New name must be different from original';
-                    }
-                    return null;
+            if (connection.status !== 'connected') {
+                throw new Error('Connection must be active to add collections');
+            }
+
+            // Create and show the Add Collection webview panel
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateAddCollection',
+                'Add Collection',
+                vscode.ViewColumn.Active,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: []
                 }
-            });
+            );
 
-            if (!newName) {
-                return; // User cancelled
-            }
+            // Set the webview content
+            panel.webview.html = this.getAddCollectionHtml();
 
+            // Handle messages from the webview
+            panel.webview.onDidReceiveMessage(
+                async (message) => {
+                    switch (message.command) {
+                        case 'create':
+                            try {
+                                await this.createCollection(connectionId, message.schema);
+                                panel.dispose();
+                                vscode.window.showInformationMessage(`Collection "${message.schema.class}" created successfully`);
+                                await this.fetchCollections(connectionId);
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: error instanceof Error ? error.message : String(error)
+                                });
+                            }
+                            break;
+                        case 'cancel':
+                            panel.dispose();
+                            break;
+                        case 'getVectorizers':
+                            try {
+                                const client = this.connectionManager.getClient(connectionId);
+                                const vectorizers = await this.getAvailableVectorizers(connectionId);
+
+                                // Send vectorizers
+                                panel.webview.postMessage({
+                                    command: 'vectorizers',
+                                    vectorizers: vectorizers
+                                });
+
+                                // Also send server version information
+                                try {
+                                    if (client) {
+                                        const meta = await client.misc.metaGetter().do();
+                                        panel.webview.postMessage({
+                                            command: 'serverVersion',
+                                            version: meta.version || 'unknown'
+                                        });
+                                    }
+                                } catch (_) {
+                                    // ignore version errors
+                                }
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`
+                                });
+                            }
+                            break;
+                        case 'getCollections':
+                            try {
+                                const collections = this.collections[connectionId] || [];
+                                panel.webview.postMessage({
+                                    command: 'collections',
+                                    collections: collections.map(col => col.label)
+                                });
+                            } catch (error) {
+                                panel.webview.postMessage({
+                                    command: 'error',
+                                    message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`
+                                });
+                            }
+                            break;
+                        case 'serverVersion':
+                            // serverVersion handled in webview only
+                            break;
+                    }
+                },
+                undefined,
+                this.context.subscriptions
+            );
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error showing add collection dialog:', error);
+            throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Creates a new collection using the Weaviate API
+     * @param connectionId - The ID of the connection
+     * @param schema - The collection schema to create
+     */
+    private async createCollection(connectionId: string, schema: any): Promise<void> {
+        const client = this.connectionManager.getClient(connectionId);
+        if (!client) {
+            throw new Error('Client not initialized');
+        }
+
+        // Basic validation
+        if (!schema.class) {
+            throw new Error('Collection name is required');
+        }
+        
+        // Build schema object
+        const schemaObject = {
+            class: schema.class,
+            description: schema.description || undefined,
+            vectorizer: schema.vectorizer === 'none' ? undefined : schema.vectorizer,
+            properties: schema.properties || []  // Include properties from the form
+        } as any;
+        
+        if (schema.vectorIndexType) {
+            schemaObject.vectorIndexType = schema.vectorIndexType;
+        }
+        if (schema.vectorIndexConfig) {
+            schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
+        }
+        if (schema.moduleConfig) {
+            schemaObject.moduleConfig = schema.moduleConfig;
+        }
+        
+        // Create the collection using the schema API
+        await client.schema.classCreator()
+            .withClass(schemaObject)
+            .do();
+    }
+
+    /**
+     * Gets available vectorizers from the Weaviate instance
+     * @param connectionId - The ID of the connection
+     * @returns Array of available vectorizers
+     */
+    private async getAvailableVectorizers(connectionId: string): Promise<string[]> {
+        // Define all possible vectorizers
+        const allVectorizers = [
+            'none',                     // Manual vectors
+            'text2vec-openai',          // OpenAI
+            'text2vec-cohere',          // Cohere
+            'text2vec-huggingface',     // Hugging Face
+            'text2vec-transformers',    // Local transformers
+            'text2vec-contextionary',   // Contextionary
+            'multi2vec-clip',           // CLIP
+            'multi2vec-bind',           // BIND
+            'img2vec-neural',           // Neural image vectorizer
+            'ref2vec-centroid'          // Reference centroid
+        ];
+
+        try {
             const client = this.connectionManager.getClient(connectionId);
             if (!client) {
                 throw new Error('Client not initialized');
             }
 
-            // Create duplicate schema with new name
-            const duplicateSchema = { ...collection.schema };
-            duplicateSchema.class = newName.trim();
-
-            // Create the new collection
-            await client.schema.classCreator()
-                .withClass(duplicateSchema)
-                .do();
-
-            // Refresh collections
-            await this.fetchCollections(connectionId);
+            const meta = await client.misc.metaGetter().do();
             
-            vscode.window.showInformationMessage(`Collection duplicated as "${newName}"`);
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error duplicating collection:', error);
-            throw new Error(`Failed to duplicate collection: ${errorMessage}`);
+            // If no modules info available, return all vectorizers
+            if (!meta?.modules) {
+                return allVectorizers;
+            }
+
+            // Filter vectorizers based on available modules
+            const availableVectorizers = ['none']; // Always include manual vectors
+            const moduleNames = Object.keys(meta.modules);
+            
+            // Only include vectorizers whose names exactly match a module name
+            allVectorizers.slice(1).forEach(vectorizer => {
+                if (moduleNames.includes(vectorizer)) {
+                    availableVectorizers.push(vectorizer);
+                }
+            });
+
+            return availableVectorizers;
+        } catch (error) {
+            // Log error for debugging but don't expose to user
+            console.error('Error fetching vectorizers:', error);
+            // Return all possible vectorizers as fallback
+            return allVectorizers;
         }
+    }
+
+    /**
+     * Generates HTML for the Add Collection webview
+     * @returns The HTML content for the webview
+     */
+    private getAddCollectionHtml(): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Add Collection</title>
+                <style>
+                    /* Reset and base styles */
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                        font-size: 14px;
+                        line-height: 1.4;
+                        color: #2D2D2D;
+                        background-color: #FFFFFF;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    .container {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 24px;
+                    }
+                    
+                    /* Header */
+                    .header {
+                        margin-bottom: 32px;
+                    }
+                    
+                    .header h2 {
+                        margin: 0 0 8px 0;
+                        font-size: 16px;
+                        font-weight: bold;
+                        color: #2D2D2D;
+                    }
+                    
+                    .header .subtitle {
+                        color: #6A6A6A;
+                        font-size: 14px;
+                        font-weight: normal;
+                    }
+                    
+                    /* Form Layout */
+                    .form-section {
+                        margin-bottom: 24px;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 4px;
+                        background: #FFFFFF;
+                        overflow: hidden;
+                    }
+                    
+                    .section-header {
+                        height: 48px;
+                        padding: 0 16px;
+                        background: #F3F3F3;
+                        border-bottom: 1px solid #CCCCCC;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        font-weight: bold;
+                        font-size: 16px;
+                        color: #2D2D2D;
+                        transition: background-color 0.2s ease;
+                    }
+                    
+                    .section-header:hover {
+                        background: #E8E8E8;
+                    }
+                    
+                    .section-header .icon {
+                        transition: transform 0.2s ease;
+                        font-size: 16px;
+                        color: #6A6A6A;
+                    }
+                    
+                    .section-header.collapsed .icon {
+                        transform: rotate(-90deg);
+                    }
+                    
+                    .section-content {
+                        padding: 20px;
+                        display: block;
+                        transition: all 180ms ease-in-out;
+                    }
+                    
+                    .section-content.collapsed {
+                        display: none;
+                    }
+                    
+                    /* Form Fields */
+                    .form-field {
+                        display: flex;
+                        flex-direction: column;
+                        margin-bottom: 20px;
+                    }
+                    
+                    .form-field:last-child {
+                        margin-bottom: 0;
+                    }
+                    
+                    .form-field label {
+                        font-weight: normal;
+                        margin-bottom: 8px;
+                        font-size: 14px;
+                        color: #6A6A6A;
+                        display: block;
+                    }
+                    
+                    .form-field label.required::after {
+                        content: " *";
+                        color: #D32F2F;
+                    }
+                    
+                    .form-field input,
+                    .form-field select,
+                    .form-field textarea {
+                        height: 32px;
+                        padding: 0 12px;
+                        border: 1px solid #CCCCCC;
+                        background: #F3F3F3;
+                        color: #2D2D2D;
+                        border-radius: 4px;
+                        font-family: inherit;
+                        font-size: 14px;
+                        transition: border-color 0.2s ease;
+                        width: 100%;
+                    }
+                    
+                    .form-field textarea {
+                        height: auto;
+                        min-height: 80px;
+                        padding: 8px 12px;
+                        resize: vertical;
+                    }
+                    
+                    .form-field input:focus,
+                    .form-field select:focus,
+                    .form-field textarea:focus {
+                        outline: none;
+                        border-color: #007ACC;
+                        box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+                    }
+                    
+                    .form-field .hint {
+                        font-size: 12px;
+                        color: #9E9E9E;
+                        margin-top: 4px;
+                        font-style: italic;
+                    }
+                    
+                    .form-field .error-text {
+                        font-size: 12px;
+                        color: #D32F2F;
+                        margin-top: 4px;
+                        display: none;
+                    }
+                    
+                    /* Side-by-side fields */
+                    .form-row {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 16px;
+                    }
+                    
+                    /* Properties Section */
+                    .properties-container {
+                        background: #F7F7F7;
+                        border: 1px solid #E0E0E0;
+                        border-radius: 4px;
+                        padding: 16px;
+                        min-height: 120px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                    }
+                    
+                    .properties-container.has-properties {
+                        background: #F7F7F7;
+                        border: 1px solid #E0E0E0;
+                        padding: 16px;
+                        min-height: auto;
+                    }
+                    
+                    .no-properties {
+                        text-align: center;
+                        color: #6A6A6A;
+                        font-style: italic;
+                        font-size: 14px;
+                        padding: 32px 16px;
+                    }
+                    
+                    .property-card {
+                        background: #FFFFFF;
+                        border: 1px solid #DADADA;
+                        border-radius: 4px;
+                        padding: 12px;
+                        margin-bottom: 12px;
+                        position: relative;
+                    }
+                    
+                    .property-card:last-child {
+                        margin-bottom: 0;
+                    }
+                    
+                    .property-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 12px;
+                    }
+                    
+                    .property-name {
+                        font-weight: bold;
+                        font-size: 14px;
+                        color: #2D2D2D;
+                    }
+                    
+                    .property-actions button {
+                        background: none;
+                        border: none;
+                        color: #D32F2F;
+                        cursor: pointer;
+                        font-size: 12px;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .property-actions button:hover {
+                        background: #FFEBEE;
+                    }
+                    
+                    .property-fields {
+                        display: flex;
+                        flex-direction: row;
+                        gap: 12px;
+                    }
+                    
+                    .property-field {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .property-field.name-field {
+                        flex: 2;
+                    }
+                    
+                    .property-field.type-field {
+                        flex: 1;
+                    }
+                    
+                    .property-field label {
+                        font-size: 12px;
+                        margin-bottom: 8px;
+                        color: #6A6A6A;
+                        padding-right: 12px;
+                    }
+                    
+                    .property-field input,
+                    .property-field select,
+                    .property-field textarea {
+                        height: 32px;
+                        padding: 0 12px;
+                        font-size: 12px;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 4px;
+                        background: #FFFFFF;
+                        color: #2D2D2D;
+                        transition: border-color 0.2s ease;
+                    }
+                    
+                    .property-field input:focus,
+                    .property-field select:focus,
+                    .property-field textarea:focus {
+                        outline: none;
+                        border-color: #007ACC;
+                        box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+                    }
+                    
+                    .property-field textarea {
+                        height: auto;
+                        min-height: 60px;
+                        padding: 8px 12px;
+                    }
+                    
+                    .property-field.full-width {
+                        flex: 1 1 100%;
+                        width: 100%;
+                    }
+                    
+                    .property-field input[type="checkbox"] {
+                        width: 16px;
+                        height: 16px;
+                        margin: 0;
+                        appearance: none;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 2px;
+                        background: #FFFFFF;
+                        cursor: pointer;
+                        position: relative;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .property-field input[type="checkbox"]:checked {
+                        background: #007ACC;
+                        border-color: #007ACC;
+                    }
+                    
+                    .property-field input[type="checkbox"]:checked::after {
+                        content: '✓';
+                        position: absolute;
+                        top: -2px;
+                        left: 2px;
+                        color: #FFFFFF;
+                        font-size: 10px;
+                        font-weight: bold;
+                    }
+                    
+                    .inline-checkbox {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    
+                    .inline-checkbox label {
+                        margin-bottom: 0;
+                        cursor: pointer;
+                    }
+                    
+                    /* Mobile responsive for properties */
+                    @media (max-width: 600px) {
+                        .property-fields {
+                            flex-direction: column;
+                        }
+                        
+                        .property-field.name-field,
+                        .property-field.type-field {
+                            flex: 1;
+                        }
+                    }
+                    
+                    /* Buttons */
+                    .button-group {
+                        display: flex;
+                        gap: 8px;
+                        margin-top: 32px;
+                        justify-content: flex-end;
+                    }
+                    
+                    button {
+                        padding: 8px 16px;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 14px;
+                        font-weight: normal;
+                        transition: all 0.2s ease;
+                        min-height: 32px;
+                    }
+                    
+                    .primary-button {
+                        background: #007ACC;
+                        color: #FFFFFF;
+                        border: 1px solid #007ACC;
+                    }
+                    
+                    .primary-button:hover {
+                        background: #005A9E;
+                        border-color: #005A9E;
+                    }
+                    
+                    .secondary-button {
+                        background: transparent;
+                        color: #6A6A6A;
+                        border: 1px solid #CCCCCC;
+                    }
+                    
+                    .secondary-button:hover {
+                        background: #F3F3F3;
+                    }
+                    
+                    .add-property-btn {
+                        background: transparent;
+                        color: #007ACC;
+                        border: none;
+                        padding: 0;
+                        font-size: 14px;
+                        text-decoration: underline;
+                        text-align: left;
+                        margin-bottom: 16px;
+                    }
+                    
+                    .add-property-btn:hover {
+                        color: #005A9E;
+                        background: transparent;
+                    }
+                    
+                    /* Error Handling */
+                    .error {
+                        color: #D32F2F;
+                        background: #FFEBEE;
+                        border: 1px solid #FFCDD2;
+                        padding: 12px 16px;
+                        border-radius: 4px;
+                        margin-top: 16px;
+                        display: none;
+                        font-size: 14px;
+                    }
+                    
+                    /* JSON Preview */
+                    .json-preview {
+                        background: #F3F3F3;
+                        border: 1px solid #CCCCCC;
+                        padding: 16px;
+                        border-radius: 4px;
+                        max-height: 300px;
+                        overflow: auto;
+                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                        font-size: 12px;
+                        color: #2D2D2D;
+                        white-space: pre;
+                        line-height: 1.4;
+                    }
+                    
+                    /* Dropdown styling */
+                    select {
+                        appearance: none;
+                        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236A6A6A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+                        background-repeat: no-repeat;
+                        background-position: right 8px center;
+                        background-size: 16px;
+                        padding-right: 32px;
+                    }
+                    
+                    /* Responsive */
+                    @media (max-width: 600px) {
+                        .container {
+                            padding: 16px;
+                        }
+                        
+                        .form-row {
+                            grid-template-columns: 1fr;
+                        }
+                        
+                        .property-fields {
+                            grid-template-columns: 1fr;
+                        }
+                        
+                        .button-group {
+                            flex-direction: column;
+                        }
+                    }
+                    
+                    /* Accessibility */
+                    button:focus,
+                    input:focus,
+                    select:focus,
+                    textarea:focus {
+                        outline: 2px solid #007ACC;
+                        outline-offset: 2px;
+                    }
+                    
+                    /* Animation for collapsible sections */
+                    .section-content {
+                        transition: all 180ms ease-in-out;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>Create New Collection</h2>
+                        <div class="subtitle">Define your collection's structure and configuration</div>
+                    </div>
+                    
+                    <form id="collectionForm">
+                        <!-- Basic Settings Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="basic">
+                                <span>Basic Settings</span>
+                                <span class="icon">▼</span>
+                        </div>
+                            <div class="section-content" id="basicContent">
+                                <div class="form-field">
+                                    <label for="collectionName" class="required">Collection Name</label>
+                                    <input type="text" id="collectionName" name="collectionName" required placeholder="e.g., Articles, Products, Documents" aria-describedby="nameHint nameError">
+                                    <div class="hint" id="nameHint">Choose a descriptive name for your collection</div>
+                                    <div class="error-text" id="nameError" role="alert"></div>
+                                </div>
+                                <div class="form-field">
+                            <label for="description">Description</label>
+                                    <textarea id="description" name="description" placeholder="Optional description of what this collection contains"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vectorizer & Index Type Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="vectorizer">
+                                <span>Vectorizer & Index Type</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content" id="vectorizerContent">
+                                <div class="form-row">
+                                    <div class="form-field">
+                            <label for="vectorizer">Vectorizer</label>
+                                        <select id="vectorizer" name="vectorizer" aria-describedby="vectorizerHint">
+                                            <option value="none">None (Manual vectors)</option>
+                                <option value="text2vec-openai">OpenAI</option>
+                                <option value="text2vec-cohere">Cohere</option>
+                                <option value="text2vec-huggingface">Hugging Face</option>
+                            </select>
+                                        <div class="hint" id="vectorizerHint">How text will be converted to vectors</div>
+                        </div>
+                                    <div class="form-field">
+                                        <label for="vectorIndexType">Index Type</label>
+                                        <select id="vectorIndexType" name="vectorIndexType" aria-describedby="indexHint">
+                                            <option value="hnsw">HNSW (Recommended)</option>
+                                <option value="flat">Flat</option>
+                            </select>
+                                        <div class="hint" id="indexHint">Vector search algorithm</div>
+                        </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Properties Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="properties">
+                                <span>Properties</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content" id="propertiesContent">
+                                <button type="button" class="add-property-btn" id="addPropertyButton">+ Add Property</button>
+                            <div class="properties-container" id="propertiesContainer">
+                                    <div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>
+                            </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Settings Section -->
+                        <div class="form-section">
+                            <div class="section-header collapsed" data-section="advanced">
+                                <span>Advanced Settings</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="advancedContent">
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="efConstruction">EF Construction</label>
+                                        <input type="number" id="efConstruction" min="4" value="128" aria-describedby="efHint">
+                                        <div class="hint" id="efHint">HNSW build quality (higher = better, slower)</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="maxConnections">Max Connections</label>
+                                        <input type="number" id="maxConnections" min="4" value="16" aria-describedby="maxConnHint">
+                                        <div class="hint" id="maxConnHint">HNSW graph connections</div>
+                                    </div>
+                                </div>
+                                <div class="form-field">
+                                    <label class="inline-checkbox">
+                                        <input type="checkbox" id="multiTenancyToggle" aria-describedby="mtHint">
+                                        <span>Enable Multi-Tenancy</span>
+                                    </label>
+                                    <div class="hint" id="mtHint">Allow collection to be partitioned by tenant</div>
+                                </div>
+                                <div id="moduleConfigContainer"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Schema Preview Section -->
+                        <div class="form-section">
+                            <div class="section-header collapsed" data-section="preview">
+                                <span>Schema Preview</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content collapsed" id="previewContent">
+                                <pre id="jsonPreview" class="json-preview" role="textbox" aria-label="JSON Schema Preview">{\n  \n}</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="error" id="formError" role="alert" aria-live="polite"></div>
+                        
+                        <div class="button-group">
+                            <button type="submit" class="primary-button">Create Collection</button>
+                            <button type="button" class="secondary-button" id="cancelButton">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    let propertyCounter = 0;
+                    let properties = [];
+                    let existingCollections = [];
+                    let vectorIndexConfigState = { efConstruction: 128, maxConnections: 16 };
+                    let moduleConfigState = {};
+                    let multiTenancyEnabled = false;
+                    let serverVersion = 'unknown';
+                    
+                    // Data type definitions
+                    const dataTypes = [
+                        { value: 'text', label: 'Text', description: 'Long text content, vectorizable', supportsArray: true },
+                        { value: 'string', label: 'String', description: 'Short text, not vectorizable', supportsArray: true },
+                        { value: 'int', label: 'Integer', description: 'Whole numbers', supportsArray: true },
+                        { value: 'number', label: 'Number', description: 'Decimal numbers', supportsArray: true },
+                        { value: 'boolean', label: 'Boolean', description: 'True/false values', supportsArray: true },
+                        { value: 'date', label: 'Date', description: 'ISO 8601 date format', supportsArray: true },
+                        { value: 'geoCoordinates', label: 'Geo Coordinates', description: 'Latitude/longitude pairs', supportsArray: false },
+                        { value: 'phoneNumber', label: 'Phone Number', description: 'International phone numbers', supportsArray: false },
+                        { value: 'blob', label: 'Blob', description: 'Binary data (images, files)', supportsArray: false },
+                        { value: 'object', label: 'Object', description: 'Nested JSON objects', supportsArray: true },
+                        { value: 'uuid', label: 'UUID', description: 'Universally unique identifiers', supportsArray: true },
+                        { value: 'reference', label: 'Reference', description: 'Reference to another collection', supportsArray: true }
+                    ];
+                    
+                    // Section toggle functionality
+                    document.querySelectorAll('.section-header').forEach(header => {
+                        header.addEventListener('click', () => {
+                            const section = header.dataset.section;
+                            const content = document.getElementById(section + 'Content');
+                            const isCollapsed = header.classList.contains('collapsed');
+                            
+                            if (isCollapsed) {
+                                header.classList.remove('collapsed');
+                                content.classList.remove('collapsed');
+                            } else {
+                                header.classList.add('collapsed');
+                                content.classList.add('collapsed');
+                            }
+                        });
+                    });
+                    
+                    // Initialize form
+                    function initForm() {
+                        // Request data from extension
+                    vscode.postMessage({ command: 'getVectorizers' });
+                    vscode.postMessage({ command: 'getCollections' });
+                    
+                        // Set up event listeners
+                        setupEventListeners();
+                        
+                        // Initial renders
+                        renderModuleConfig();
+                        updateJsonPreview();
+                        
+                        // Focus collection name
+                        document.getElementById('collectionName').focus();
+                    }
+                    
+                                        function setupEventListeners() {
+                        // Collection name validation with inline error
+                    document.getElementById('collectionName').addEventListener('input', (e) => {
+                        const input = e.target.value.trim();
+                            const errorElement = document.getElementById('nameError');
+                            
+                            if (input && existingCollections.includes(input)) {
+                                showInlineError('nameError', 'A collection with this name already exists');
+                        } else {
+                                hideInlineError('nameError');
+                            }
+                            
+                            // Also update main error display
+                            if (input && existingCollections.includes(input)) {
+                                showError('A collection with this name already exists');
+                            } else {
+                                hideError();
+                            }
+                            
+                        updateJsonPreview();
+                    });
+                    
+                        // Other form fields
+                    document.getElementById('description').addEventListener('input', updateJsonPreview);
+                        document.getElementById('vectorizer').addEventListener('change', (e) => {
+                            updateJsonPreview();
+                    renderModuleConfig();
+                        });
+                        document.getElementById('vectorIndexType').addEventListener('change', updateJsonPreview);
+                        document.getElementById('multiTenancyToggle').addEventListener('change', (e) => {
+                            multiTenancyEnabled = e.target.checked;
+                            updateJsonPreview();
+                        });
+                        
+                        // Advanced settings
+                        document.getElementById('efConstruction').addEventListener('input', (e) => {
+                            vectorIndexConfigState.efConstruction = parseInt(e.target.value || 0);
+                            updateJsonPreview();
+                        });
+                        document.getElementById('maxConnections').addEventListener('input', (e) => {
+                            vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
+                            updateJsonPreview();
+                        });
+                    
+                    // Property management
+                        document.getElementById('addPropertyButton').addEventListener('click', addProperty);
+                        
+                        // Form submission
+                        document.getElementById('collectionForm').addEventListener('submit', handleSubmit);
+                        document.getElementById('cancelButton').addEventListener('click', () => {
+                            vscode.postMessage({ command: 'cancel' });
+                        });
+                    }
+                    
+                    function renderModuleConfig() {
+                        const container = document.getElementById('moduleConfigContainer');
+                        const vectorizer = document.getElementById('vectorizer').value;
+                        container.innerHTML = '';
+                        moduleConfigState = {};
+                        
+                        if (vectorizer === 'text2vec-openai') {
+                            container.innerHTML = \`
+                                <div class="form-field">
+                                    <label>OpenAI Configuration</label>
+                                    <div class="form-row">
+                                        <div class="form-field">
+                                            <label for="openaiModel">Model</label>
+                                            <input type="text" id="openaiModel" placeholder="text-embedding-ada-002">
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="openaiBaseUrl">Base URL (Optional)</label>
+                                            <input type="text" id="openaiBaseUrl" placeholder="https://api.openai.com/v1">
+                                        </div>
+                                    </div>
+                                </div>\`;
+                            
+                            document.getElementById('openaiModel').addEventListener('input', (e) => {
+                                moduleConfigState.model = e.target.value.trim();
+                                updateJsonPreview();
+                            });
+                            document.getElementById('openaiBaseUrl').addEventListener('input', (e) => {
+                                moduleConfigState.baseURL = e.target.value.trim();
+                                updateJsonPreview();
+                            });
+                        }
+                        updateJsonPreview();
+                    }
+                    
+                    function addProperty() {
+                        const propertyId = 'prop_' + (++propertyCounter);
+                        const property = {
+                            id: propertyId,
+                            name: '',
+                            dataType: 'text',
+                            isArray: false,
+                            description: ''
+                        };
+                        
+                        properties.push(property);
+                        renderProperties();
+                        
+                        // Focus the name input
+                        setTimeout(() => {
+                            const nameInput = document.getElementById(propertyId + '_name');
+                            if (nameInput) nameInput.focus();
+                        }, 100);
+                        
+                        updateJsonPreview();
+                    }
+                    
+                    function removeProperty(propertyId) {
+                        properties = properties.filter(p => p.id !== propertyId);
+                        renderProperties();
+                        updateJsonPreview();
+                    }
+                    
+                    function updateProperty(propertyId, field, value) {
+                        const prop = properties.find(p => p.id === propertyId);
+                        if (prop) {
+                            prop[field] = value;
+                            if (field === 'name') renderProperties();
+                        }
+                        updateJsonPreview();
+                    }
+                    
+                    function renderProperties() {
+                        const container = document.getElementById('propertiesContainer');
+                        
+                        if (properties.length === 0) {
+                            container.innerHTML = '<div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>';
+                            container.classList.remove('has-properties');
+                            return;
+                        }
+                        
+                        container.innerHTML = '';
+                        container.classList.add('has-properties');
+                        
+                        properties.forEach(prop => {
+                            const card = createPropertyCard(prop);
+                            container.appendChild(card);
+                        });
+                        // Ensure target collection dropdowns are always updated after rendering
+                        updateCollectionOptions(existingCollections);
+                    }
+                    
+                    function createPropertyCard(prop) {
+                        const card = document.createElement('div');
+                        card.className = 'property-card';
+                        
+                        // Header
+                        const header = document.createElement('div');
+                        header.className = 'property-header';
+                        
+                        const nameSpan = document.createElement('div');
+                        nameSpan.className = 'property-name';
+                        nameSpan.textContent = prop.name || 'New Property';
+                        header.appendChild(nameSpan);
+                        
+                        const actions = document.createElement('div');
+                        actions.className = 'property-actions';
+                        
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = 'Remove';
+                        removeBtn.addEventListener('click', () => removeProperty(prop.id));
+                        actions.appendChild(removeBtn);
+                        
+                        header.appendChild(actions);
+                        card.appendChild(header);
+                        
+                        // Fields
+                        const fields = document.createElement('div');
+                        fields.className = 'property-fields';
+                        
+                        // Name field
+                        const nameField = createField('Name', 'input', prop.id + '_name', {
+                            value: prop.name,
+                            placeholder: 'propertyName',
+                            onchange: (e) => updateProperty(prop.id, 'name', e.target.value)
+                        });
+                        nameField.classList.add('name-field');
+                        fields.appendChild(nameField);
+                        
+                        // Data type field
+                        const typeField = createSelectField('Type', prop.id + '_type', dataTypes.map(dt => ({
+                            value: dt.value,
+                            label: dt.label,
+                            selected: prop.dataType === dt.value
+                        })), (e) => {
+                            const newDataType = e.target.value;
+                            updateProperty(prop.id, 'dataType', newDataType);
+                            updateArrayCheckbox(prop);
+                            updateTargetCollectionField(prop);
+                            
+                            if (newDataType === 'reference') {
+                                vscode.postMessage({ command: 'getCollections' });
+                            }
+                        });
+                        typeField.classList.add('type-field');
+                        fields.appendChild(typeField);
+                        
+                        // Array checkbox
+                        const arrayField = createArrayField(prop);
+                        fields.appendChild(arrayField);
+                        
+                        // Description field
+                        const descField = createField('Description', 'textarea', prop.id + '_desc', {
+                            value: prop.description,
+                            placeholder: 'Optional description',
+                            onchange: (e) => updateProperty(prop.id, 'description', e.target.value)
+                        });
+                        descField.className += ' full-width';
+                        fields.appendChild(descField);
+                        
+                        card.appendChild(fields);
+                        // Target collection field (for reference type) - full width below type
+                        const targetCollectionField = document.createElement('div');
+                        targetCollectionField.className = 'property-field full-width';
+                        targetCollectionField.id = prop.id + '_target_collection_field';
+                        targetCollectionField.style.display = prop.dataType === 'reference' ? 'block' : 'none';
+                        const targetCollectionLabel = document.createElement('label');
+                        targetCollectionLabel.textContent = 'Target Collection';
+                        targetCollectionField.appendChild(targetCollectionLabel);
+                        const targetCollectionSelect = document.createElement('select');
+                        targetCollectionSelect.id = prop.id + '_target_collection';
+                        targetCollectionSelect.onchange = (e) => updateProperty(prop.id, 'targetCollection', e.target.value);
+                        const loadingOption = document.createElement('option');
+                        loadingOption.value = '';
+                        loadingOption.textContent = 'Loading collections...';
+                        loadingOption.disabled = true;
+                        targetCollectionSelect.appendChild(loadingOption);
+                        targetCollectionField.appendChild(targetCollectionSelect);
+                        card.appendChild(targetCollectionField);
+                        return card;
+                    }
+                    
+                    function createField(label, type, id, options = {}) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = label;
+                        field.appendChild(labelEl);
+                        
+                        const input = document.createElement(type);
+                        input.id = id;
+                        Object.assign(input, options);
+                        field.appendChild(input);
+                        
+                        return field;
+                    }
+                    
+                    function createSelectField(label, id, options, onchange) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = label;
+                        field.appendChild(labelEl);
+                        
+                        const select = document.createElement('select');
+                        select.id = id;
+                        select.onchange = onchange;
+                        
+                        options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt.value;
+                            option.textContent = opt.label;
+                            option.selected = opt.selected;
+                            select.appendChild(option);
+                        });
+                        
+                        field.appendChild(select);
+                        return field;
+                    }
+                    
+                    function createArrayField(prop) {
+                        const field = document.createElement('div');
+                        field.className = 'property-field';
+                        
+                        const labelEl = document.createElement('label');
+                        labelEl.textContent = 'Array';
+                        field.appendChild(labelEl);
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.id = prop.id + '_array';
+                        checkbox.checked = prop.isArray;
+                        checkbox.onchange = (e) => updateProperty(prop.id, 'isArray', e.target.checked);
+                        
+                        const dataType = dataTypes.find(dt => dt.value === prop.dataType);
+                        checkbox.disabled = !dataType?.supportsArray;
+                        
+                        field.appendChild(checkbox);
+                        
+                        return field;
+                    }
+                    
+                    function updateArrayCheckbox(prop) {
+                        const checkbox = document.getElementById(prop.id + '_array');
+                        if (checkbox) {
+                            const dataType = dataTypes.find(dt => dt.value === prop.dataType);
+                            checkbox.disabled = !dataType?.supportsArray;
+                            if (!dataType?.supportsArray) {
+                                checkbox.checked = false;
+                                prop.isArray = false;
+                            }
+                        }
+                    }
+                    
+                    function updateTargetCollectionField(prop) {
+                        const field = document.getElementById(prop.id + '_target_collection_field');
+                        if (field) {
+                            field.style.display = prop.dataType === 'reference' ? 'block' : 'none';
+                        }
+                    }
+                    
+                    function handleSubmit(e) {
+                        e.preventDefault();
+                        
+                        const formData = new FormData(e.target);
+                        let collectionName = formData.get('collectionName').trim();
+                        const description = formData.get('description').trim();
+                        const vectorizer = formData.get('vectorizer');
+                        const vectorIndexType = document.getElementById('vectorIndexType').value;
+                        const mtEnabled = document.getElementById('multiTenancyToggle').checked;
+                        
+                        // Validation
+                        if (!collectionName) {
+                            showError('Collection name is required');
+                            return;
+                        }
+                        if (existingCollections.includes(collectionName)) {
+                            showError('A collection with this name already exists');
+                            return;
+                        }
+                        
+                        // Build schema
+                        const schema = {
+                            class: collectionName,
+                            description: description || undefined,
+                            vectorizer: vectorizer === 'none' ? undefined : vectorizer,
+                            properties: properties.map(function(prop) {
+                                const propSchema = {
+                                    name: prop.name.trim(),
+                                    dataType: prop.dataType === 'reference' && prop.targetCollection
+                                        ? [prop.targetCollection]
+                                        : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]),
+                                    description: prop.description ? prop.description.trim() : undefined
+                                };
+                                return propSchema;
+                            }),
+                            vectorIndexType: vectorIndexType,
+                            vectorIndexConfig: vectorIndexType === 'hnsw' ? {
+                                efConstruction: vectorIndexConfigState.efConstruction,
+                                maxConnections: vectorIndexConfigState.maxConnections
+                            } : undefined,
+                            moduleConfig: Object.keys(moduleConfigState).length > 0 && vectorizer !== 'none' ? { [vectorizer]: { ...moduleConfigState } } : undefined,
+                            multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
+                        };
+                        
+                        vscode.postMessage({
+                            command: 'create',
+                            schema: schema
+                        });
+                    }
+                    
+                    function updateJsonPreview() {
+                        const collectionName = document.getElementById('collectionName').value.trim();
+                        const descriptionVal = document.getElementById('description').value.trim();
+                        const vectorizerVal = document.getElementById('vectorizer').value;
+                        const vectorIndexTypeVal = document.getElementById('vectorIndexType').value;
+                        const vectorIndexConfigVal = vectorIndexTypeVal === 'hnsw' ? { ...vectorIndexConfigState } : null;
+                        const moduleConfigVal = Object.keys(moduleConfigState).length > 0 && vectorizerVal !== 'none' ? { [vectorizerVal]: { ...moduleConfigState } } : null;
+                        const mtVal = document.getElementById('multiTenancyToggle').checked ? { enabled: true } : undefined;
+                        
+                        const schemaObj = {
+                            class: collectionName || '<collectionName>',
+                            description: descriptionVal || undefined,
+                            vectorizer: vectorizerVal === 'none' ? undefined : vectorizerVal,
+                            properties: properties.map(function(prop) {
+                                const dataType = prop.dataType === 'reference' && prop.targetCollection
+                                    ? [prop.targetCollection]
+                                    : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]);
+                                return {
+                                    name: prop.name.trim() || '<propertyName>',
+                                    dataType: dataType,
+                                    description: prop.description ? prop.description.trim() : undefined
+                                };
+                            }),
+                            vectorIndexType: vectorIndexTypeVal,
+                            vectorIndexConfig: vectorIndexConfigVal,
+                            moduleConfig: moduleConfigVal,
+                            multiTenancyConfig: mtVal
+                        };
+                        document.getElementById('jsonPreview').textContent = JSON.stringify(schemaObj, null, 2);
+                    }
+                    
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
+                    }
+                    
+                    function hideError() {
+                        document.getElementById('formError').style.display = 'none';
+                    }
+                    
+                    function showInlineError(elementId, message) {
+                        const errorElement = document.getElementById(elementId);
+                        if (errorElement) {
+                            errorElement.textContent = message;
+                            errorElement.style.display = 'block';
+                        }
+                    }
+                    
+                    function hideInlineError(elementId) {
+                        const errorElement = document.getElementById(elementId);
+                        if (errorElement) {
+                            errorElement.style.display = 'none';
+                        }
+                    }
+                    
+                    // Message handling
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        switch (message.command) {
+                            case 'error':
+                                showError(message.message);
+                                break;
+                            case 'vectorizers':
+                                updateVectorizerOptions(message.vectorizers);
+                                break;
+                            case 'collections':
+                                updateCollectionOptions(message.collections);
+                                existingCollections = message.collections || [];
+                                break;
+                            case 'serverVersion':
+                                serverVersion = message.version || 'unknown';
+                                break;
+                        }
+                    });
+                    
+                    function updateVectorizerOptions(vectorizers) {
+                        const select = document.getElementById('vectorizer');
+                        select.innerHTML = '';
+                        
+                        vectorizers.forEach(vectorizer => {
+                            const option = document.createElement('option');
+                            option.value = vectorizer;
+                            option.textContent = vectorizer === 'none' ? 'None (Manual vectors)' : 
+                                vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
+                            select.appendChild(option);
+                        });
+                    }
+                    
+                    function updateCollectionOptions(collections) {
+                        properties.forEach(prop => {
+                            const select = document.getElementById(prop.id + '_target_collection');
+                            if (select) {
+                                select.innerHTML = '';
+                                
+                                const placeholderOption = document.createElement('option');
+                                placeholderOption.value = '';
+                                placeholderOption.textContent = 'Select target collection';
+                                select.appendChild(placeholderOption);
+                                
+                                collections.forEach(collection => {
+                                    const option = document.createElement('option');
+                                    option.value = collection;
+                                    option.textContent = collection;
+                                    option.selected = prop.targetCollection === collection;
+                                    select.appendChild(option);
+                                });
+                            }
+                        });
+                        updateJsonPreview();
+                    }
+                    
+                    // Initialize when DOM is ready
+                    document.addEventListener('DOMContentLoaded', initForm);
+                </script>
+            </body>
+            </html>
+        `;
     }
 
     /**
