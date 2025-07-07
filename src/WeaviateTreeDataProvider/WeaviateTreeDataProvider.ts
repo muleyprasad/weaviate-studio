@@ -1648,7 +1648,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .section-header {
-                        padding: 16px 20px;
+                        height: 48px;
+                        padding: 0 16px;
                         background: #F3F3F3;
                         border-bottom: 1px solid #CCCCCC;
                         cursor: pointer;
@@ -1667,7 +1668,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     .section-header .icon {
                         transition: transform 0.2s ease;
-                        font-size: 12px;
+                        font-size: 16px;
                         color: #6A6A6A;
                     }
                     
@@ -1678,7 +1679,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .section-content {
                         padding: 20px;
                         display: block;
-                        transition: all 0.2s ease;
+                        transition: all 180ms ease-in-out;
                     }
                     
                     .section-content.collapsed {
@@ -1741,7 +1742,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     .form-field .hint {
                         font-size: 12px;
-                        color: #6A6A6A;
+                        color: #9E9E9E;
                         margin-top: 4px;
                         font-style: italic;
                     }
@@ -1762,23 +1763,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     /* Properties Section */
                     .properties-container {
-                        min-height: 80px;
-                        border: 2px dashed #CCCCCC;
+                        background: #F7F7F7;
+                        border: 1px solid #E0E0E0;
                         border-radius: 4px;
+                        padding: 16px;
+                        min-height: 120px;
                         display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        background: #F3F3F3;
-                        margin-bottom: 16px;
-                        transition: border-color 0.2s ease;
+                        flex-direction: column;
+                        gap: 12px;
                     }
                     
                     .properties-container.has-properties {
-                        border: 1px solid #CCCCCC;
-                        border-style: solid;
+                        background: #F7F7F7;
+                        border: 1px solid #E0E0E0;
                         padding: 16px;
                         min-height: auto;
-                        background: #FFFFFF;
                     }
                     
                     .no-properties {
@@ -1786,13 +1785,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         color: #6A6A6A;
                         font-style: italic;
                         font-size: 14px;
+                        padding: 32px 16px;
                     }
                     
                     .property-card {
-                        background: #F3F3F3;
-                        border: 1px solid #CCCCCC;
+                        background: #FFFFFF;
+                        border: 1px solid #DADADA;
                         border-radius: 4px;
-                        padding: 16px;
+                        padding: 12px;
                         margin-bottom: 12px;
                         position: relative;
                     }
@@ -1815,33 +1815,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .property-actions button {
-                        padding: 6px 12px;
-                        font-size: 12px;
-                        border: 1px solid #CCCCCC;
-                        border-radius: 4px;
+                        background: none;
+                        border: none;
+                        color: #D32F2F;
                         cursor: pointer;
-                        background: #FFFFFF;
-                        color: #6A6A6A;
+                        font-size: 12px;
+                        padding: 4px 8px;
+                        border-radius: 4px;
                         transition: all 0.2s ease;
                     }
                     
                     .property-actions button:hover {
-                        background: #F3F3F3;
-                    }
-                    
-                    .property-actions button.danger {
-                        background: #D32F2F;
-                        color: #FFFFFF;
-                        border-color: #D32F2F;
-                    }
-                    
-                    .property-actions button.danger:hover {
-                        background: #B71C1C;
+                        background: #FFEBEE;
                     }
                     
                     .property-fields {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
+                        display: flex;
+                        flex-direction: row;
                         gap: 12px;
                     }
                     
@@ -1850,34 +1840,79 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         flex-direction: column;
                     }
                     
+                    .property-field.name-field {
+                        flex: 2;
+                    }
+                    
+                    .property-field.type-field {
+                        flex: 1;
+                    }
+                    
                     .property-field label {
                         font-size: 12px;
-                        margin-bottom: 6px;
+                        margin-bottom: 8px;
                         color: #6A6A6A;
+                        padding-right: 12px;
                     }
                     
                     .property-field input,
                     .property-field select,
                     .property-field textarea {
-                        height: 28px;
-                        padding: 0 8px;
+                        height: 32px;
+                        padding: 0 12px;
                         font-size: 12px;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 4px;
+                        background: #FFFFFF;
+                        color: #2D2D2D;
+                        transition: border-color 0.2s ease;
+                    }
+                    
+                    .property-field input:focus,
+                    .property-field select:focus,
+                    .property-field textarea:focus {
+                        outline: none;
+                        border-color: #007ACC;
+                        box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
                     }
                     
                     .property-field textarea {
                         height: auto;
                         min-height: 60px;
-                        padding: 6px 8px;
+                        padding: 8px 12px;
                     }
                     
                     .property-field.full-width {
-                        grid-column: 1 / -1;
+                        flex: 1 1 100%;
+                        width: 100%;
                     }
                     
                     .property-field input[type="checkbox"] {
-                        width: auto;
-                        height: auto;
-                        margin-right: 8px;
+                        width: 16px;
+                        height: 16px;
+                        margin: 0;
+                        appearance: none;
+                        border: 1px solid #CCCCCC;
+                        border-radius: 2px;
+                        background: #FFFFFF;
+                        cursor: pointer;
+                        position: relative;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .property-field input[type="checkbox"]:checked {
+                        background: #007ACC;
+                        border-color: #007ACC;
+                    }
+                    
+                    .property-field input[type="checkbox"]:checked::after {
+                        content: '✓';
+                        position: absolute;
+                        top: -2px;
+                        left: 2px;
+                        color: #FFFFFF;
+                        font-size: 10px;
+                        font-weight: bold;
                     }
                     
                     .inline-checkbox {
@@ -1889,6 +1924,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .inline-checkbox label {
                         margin-bottom: 0;
                         cursor: pointer;
+                    }
+                    
+                    /* Mobile responsive for properties */
+                    @media (max-width: 600px) {
+                        .property-fields {
+                            flex-direction: column;
+                        }
+                        
+                        .property-field.name-field,
+                        .property-field.type-field {
+                            flex: 1;
+                        }
                     }
                     
                     /* Buttons */
@@ -2015,7 +2062,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     /* Animation for collapsible sections */
                     .section-content {
-                        transition: all 0.2s ease;
+                        transition: all 180ms ease-in-out;
                     }
                 </style>
             </head>
@@ -2342,6 +2389,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             const card = createPropertyCard(prop);
                             container.appendChild(card);
                         });
+                        // Ensure target collection dropdowns are always updated after rendering
+                        updateCollectionOptions(existingCollections);
                     }
                     
                     function createPropertyCard(prop) {
@@ -2362,7 +2411,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         
                         const removeBtn = document.createElement('button');
                         removeBtn.textContent = 'Remove';
-                        removeBtn.className = 'danger';
                         removeBtn.addEventListener('click', () => removeProperty(prop.id));
                         actions.appendChild(removeBtn);
                         
@@ -2379,6 +2427,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             placeholder: 'propertyName',
                             onchange: (e) => updateProperty(prop.id, 'name', e.target.value)
                         });
+                        nameField.classList.add('name-field');
                         fields.appendChild(nameField);
                         
                         // Data type field
@@ -2396,30 +2445,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 vscode.postMessage({ command: 'getCollections' });
                             }
                         });
+                        typeField.classList.add('type-field');
                         fields.appendChild(typeField);
-                        
-                        // Target collection field (for reference type)
-                        const targetCollectionField = document.createElement('div');
-                        targetCollectionField.className = 'property-field';
-                        targetCollectionField.id = prop.id + '_target_collection_field';
-                        targetCollectionField.style.display = prop.dataType === 'reference' ? 'block' : 'none';
-                        
-                        const targetCollectionLabel = document.createElement('label');
-                        targetCollectionLabel.textContent = 'Target Collection';
-                        targetCollectionField.appendChild(targetCollectionLabel);
-                        
-                        const targetCollectionSelect = document.createElement('select');
-                        targetCollectionSelect.id = prop.id + '_target_collection';
-                        targetCollectionSelect.onchange = (e) => updateProperty(prop.id, 'targetCollection', e.target.value);
-                        
-                        const loadingOption = document.createElement('option');
-                        loadingOption.value = '';
-                        loadingOption.textContent = 'Loading collections...';
-                        loadingOption.disabled = true;
-                        targetCollectionSelect.appendChild(loadingOption);
-                        
-                        targetCollectionField.appendChild(targetCollectionSelect);
-                        fields.appendChild(targetCollectionField);
                         
                         // Array checkbox
                         const arrayField = createArrayField(prop);
@@ -2435,6 +2462,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         fields.appendChild(descField);
                         
                         card.appendChild(fields);
+                        // Target collection field (for reference type) - full width below type
+                        const targetCollectionField = document.createElement('div');
+                        targetCollectionField.className = 'property-field full-width';
+                        targetCollectionField.id = prop.id + '_target_collection_field';
+                        targetCollectionField.style.display = prop.dataType === 'reference' ? 'block' : 'none';
+                        const targetCollectionLabel = document.createElement('label');
+                        targetCollectionLabel.textContent = 'Target Collection';
+                        targetCollectionField.appendChild(targetCollectionLabel);
+                        const targetCollectionSelect = document.createElement('select');
+                        targetCollectionSelect.id = prop.id + '_target_collection';
+                        targetCollectionSelect.onchange = (e) => updateProperty(prop.id, 'targetCollection', e.target.value);
+                        const loadingOption = document.createElement('option');
+                        loadingOption.value = '';
+                        loadingOption.textContent = 'Loading collections...';
+                        loadingOption.disabled = true;
+                        targetCollectionSelect.appendChild(loadingOption);
+                        targetCollectionField.appendChild(targetCollectionSelect);
+                        card.appendChild(targetCollectionField);
                         return card;
                     }
                     
