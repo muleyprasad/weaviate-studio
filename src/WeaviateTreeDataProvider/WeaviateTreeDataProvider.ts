@@ -1476,56 +1476,50 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * @returns Array of available vectorizers
      */
     private async getAvailableVectorizers(connectionId: string): Promise<string[]> {
-        const client = this.connectionManager.getClient(connectionId);
-        if (!client) {
-            throw new Error('Client not initialized');
-        }
+        // Define all possible vectorizers
+        const allVectorizers = [
+            'none',                     // Manual vectors
+            'text2vec-openai',          // OpenAI
+            'text2vec-cohere',          // Cohere
+            'text2vec-huggingface',     // Hugging Face
+            'text2vec-transformers',    // Local transformers
+            'text2vec-contextionary',   // Contextionary
+            'multi2vec-clip',           // CLIP
+            'multi2vec-bind',           // BIND
+            'img2vec-neural',           // Neural image vectorizer
+            'ref2vec-centroid'          // Reference centroid
+        ];
 
         try {
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Client not initialized');
+            }
+
             const meta = await client.misc.metaGetter().do();
             
-            // Extract vectorizer names from modules
-            const vectorizers: string[] = ['none']; // Default option
-            
-            if (meta.modules) {
-                const moduleNames = Object.keys(meta.modules);
-                console.log('Available modules:', moduleNames); // Debug log
-                
-                // Add common vectorizers based on available modules
-                if (moduleNames.includes('text2vec-openai')) {
-                    vectorizers.push('text2vec-openai');
-                }
-                if (moduleNames.includes('text2vec-cohere')) {
-                    vectorizers.push('text2vec-cohere');
-                }
-                if (moduleNames.includes('text2vec-huggingface')) {
-                    vectorizers.push('text2vec-huggingface');
-                }
-                if (moduleNames.includes('text2vec-transformers')) {
-                    vectorizers.push('text2vec-transformers');
-                }
-                if (moduleNames.includes('text2vec-contextionary')) {
-                    vectorizers.push('text2vec-contextionary');
-                }
-                if (moduleNames.includes('multi2vec-clip')) {
-                    vectorizers.push('multi2vec-clip');
-                }
-                if (moduleNames.includes('multi2vec-bind')) {
-                    vectorizers.push('multi2vec-bind');
-                }
-                if (moduleNames.includes('img2vec-neural')) {
-                    vectorizers.push('img2vec-neural');
-                }
-                if (moduleNames.includes('ref2vec-centroid')) {
-                    vectorizers.push('ref2vec-centroid');
-                }
+            // If no modules info available, return all vectorizers
+            if (!meta?.modules) {
+                return allVectorizers;
             }
+
+            // Filter vectorizers based on available modules
+            const availableVectorizers = ['none']; // Always include manual vectors
+            const moduleNames = Object.keys(meta.modules);
             
-            console.log('Available vectorizers:', vectorizers); // Debug log
-            return vectorizers;
+            // Only include vectorizers whose names exactly match a module name
+            allVectorizers.slice(1).forEach(vectorizer => {
+                if (moduleNames.includes(vectorizer)) {
+                    availableVectorizers.push(vectorizer);
+                }
+            });
+
+            return availableVectorizers;
         } catch (error) {
-            console.warn('Could not fetch vectorizers, using defaults:', error);
-            return ['none', 'text2vec-openai', 'text2vec-cohere', 'text2vec-huggingface', 'text2vec-contextionary'];
+            // Log error for debugging but don't expose to user
+            console.error('Error fetching vectorizers:', error);
+            // Return all possible vectorizers as fallback
+            return allVectorizers;
         }
     }
 
