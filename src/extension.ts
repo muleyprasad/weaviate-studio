@@ -247,22 +247,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        // Duplicate collection command
-        vscode.commands.registerCommand('weaviate.duplicateCollection', async (item) => {
-            if (!item?.connectionId || !item?.label) {
-                vscode.window.showErrorMessage('Missing connection or collection information');
-                return;
-            }
-            
-            try {
-                await weaviateTreeDataProvider.duplicateCollection(item.connectionId, item.label);
-            } catch (error) {
-                vscode.window.showErrorMessage(
-                    `Failed to duplicate collection: ${error instanceof Error ? error.message : String(error)}`
-                );
-            }
-        }),
-
         // Add collection command
         vscode.commands.registerCommand('weaviate.addCollection', async (item) => {
             if (!item?.connectionId) {

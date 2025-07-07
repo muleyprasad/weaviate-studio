@@ -1318,64 +1318,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
     }
 
-    /**
-     * Duplicates a collection by creating a new collection with the same schema
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection to duplicate
-     */
-    async duplicateCollection(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const collection = this.collections[connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
 
-            if (!collection?.schema) {
-                throw new Error('Collection schema not found');
-            }
-
-            // Ask for new collection name
-            const newName = await vscode.window.showInputBox({
-                prompt: `Enter name for duplicated collection (original: ${collectionName})`,
-                value: `${collectionName}_copy`,
-                validateInput: (value) => {
-                    if (!value || value.trim().length === 0) {
-                        return 'Collection name cannot be empty';
-                    }
-                    if (value === collectionName) {
-                        return 'New name must be different from original';
-                    }
-                    return null;
-                }
-            });
-
-            if (!newName) {
-                return; // User cancelled
-            }
-
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Client not initialized');
-            }
-
-            // Create duplicate schema with new name
-            const duplicateSchema = { ...collection.schema };
-            duplicateSchema.class = newName.trim();
-
-            // Create the new collection
-            await client.schema.classCreator()
-                .withClass(duplicateSchema)
-                .do();
-
-            // Refresh collections
-            await this.fetchCollections(connectionId);
-            
-            vscode.window.showInformationMessage(`Collection duplicated as "${newName}"`);
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error duplicating collection:', error);
-            throw new Error(`Failed to duplicate collection: ${errorMessage}`);
-        }
-    }
 
     /**
      * Shows the Add Collection dialog for creating a new collection
@@ -2073,13 +2016,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <div class="subtitle">Define your collection's structure and configuration</div>
                     </div>
                     
-                                        <form id="collectionForm">
+                    <form id="collectionForm">
                         <!-- Basic Settings Section -->
                         <div class="form-section">
                             <div class="section-header" data-section="basic">
                                 <span>Basic Settings</span>
                                 <span class="icon">▼</span>
-                            </div>
+                        </div>
                             <div class="section-content" id="basicContent">
                                 <div class="form-field">
                                     <label for="collectionName" class="required">Collection Name</label>
@@ -2088,7 +2031,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                     <div class="error-text" id="nameError" role="alert"></div>
                                 </div>
                                 <div class="form-field">
-                                    <label for="description">Description</label>
+                            <label for="description">Description</label>
                                     <textarea id="description" name="description" placeholder="Optional description of what this collection contains"></textarea>
                                 </div>
                             </div>
@@ -2103,23 +2046,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             <div class="section-content" id="vectorizerContent">
                                 <div class="form-row">
                                     <div class="form-field">
-                                        <label for="vectorizer">Vectorizer</label>
+                            <label for="vectorizer">Vectorizer</label>
                                         <select id="vectorizer" name="vectorizer" aria-describedby="vectorizerHint">
                                             <option value="none">None (Manual vectors)</option>
-                                            <option value="text2vec-openai">OpenAI</option>
-                                            <option value="text2vec-cohere">Cohere</option>
-                                            <option value="text2vec-huggingface">Hugging Face</option>
-                                        </select>
+                                <option value="text2vec-openai">OpenAI</option>
+                                <option value="text2vec-cohere">Cohere</option>
+                                <option value="text2vec-huggingface">Hugging Face</option>
+                            </select>
                                         <div class="hint" id="vectorizerHint">How text will be converted to vectors</div>
-                                    </div>
+                        </div>
                                     <div class="form-field">
                                         <label for="vectorIndexType">Index Type</label>
                                         <select id="vectorIndexType" name="vectorIndexType" aria-describedby="indexHint">
                                             <option value="hnsw">HNSW (Recommended)</option>
-                                            <option value="flat">Flat</option>
-                                        </select>
+                                <option value="flat">Flat</option>
+                            </select>
                                         <div class="hint" id="indexHint">Vector search algorithm</div>
-                                    </div>
+                        </div>
                                 </div>
                             </div>
                         </div>
@@ -2132,9 +2075,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             </div>
                             <div class="section-content" id="propertiesContent">
                                 <button type="button" class="add-property-btn" id="addPropertyButton">+ Add Property</button>
-                                <div class="properties-container" id="propertiesContainer">
+                            <div class="properties-container" id="propertiesContainer">
                                     <div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>
-                                </div>
+                            </div>
                             </div>
                         </div>
                         
@@ -2250,13 +2193,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                                         function setupEventListeners() {
                         // Collection name validation with inline error
-                        document.getElementById('collectionName').addEventListener('input', (e) => {
-                            const input = e.target.value.trim();
+                    document.getElementById('collectionName').addEventListener('input', (e) => {
+                        const input = e.target.value.trim();
                             const errorElement = document.getElementById('nameError');
                             
                             if (input && existingCollections.includes(input)) {
                                 showInlineError('nameError', 'A collection with this name already exists');
-                            } else {
+                        } else {
                                 hideInlineError('nameError');
                             }
                             
@@ -2267,14 +2210,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 hideError();
                             }
                             
-                            updateJsonPreview();
-                        });
-                        
+                        updateJsonPreview();
+                    });
+                    
                         // Other form fields
-                        document.getElementById('description').addEventListener('input', updateJsonPreview);
+                    document.getElementById('description').addEventListener('input', updateJsonPreview);
                         document.getElementById('vectorizer').addEventListener('change', (e) => {
                             updateJsonPreview();
-                            renderModuleConfig();
+                    renderModuleConfig();
                         });
                         document.getElementById('vectorIndexType').addEventListener('change', updateJsonPreview);
                         document.getElementById('multiTenancyToggle').addEventListener('change', (e) => {
@@ -2291,8 +2234,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
                             updateJsonPreview();
                         });
-                        
-                        // Property management
+                    
+                    // Property management
                         document.getElementById('addPropertyButton').addEventListener('click', addProperty);
                         
                         // Form submission
