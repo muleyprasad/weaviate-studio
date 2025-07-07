@@ -197,11 +197,6 @@
           "icon": "$(add)"
         },
         {
-          "command": "weaviate.refreshConnection",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
-          "group": "2_workspace"
-        },
-        {
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "3_modification"
