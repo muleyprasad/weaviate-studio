@@ -2530,7 +2530,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 const propSchema = {
                                     name: prop.name.trim(),
                                     dataType: prop.dataType === 'reference' && prop.targetCollection
-                                        ? (prop.isArray ? [prop.targetCollection + '[]'] : [prop.targetCollection])
+                                        ? [prop.targetCollection]
                                         : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]),
                                     description: prop.description ? prop.description.trim() : undefined
                                 };
@@ -2541,7 +2541,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 efConstruction: vectorIndexConfigState.efConstruction,
                                 maxConnections: vectorIndexConfigState.maxConnections
                             } : undefined,
-                            moduleConfig: Object.keys(moduleConfigState).length > 0 ? { 'text2vec-openai': { ...moduleConfigState } } : undefined,
+                            moduleConfig: Object.keys(moduleConfigState).length > 0 && vectorizer !== 'none' ? { [vectorizer]: { ...moduleConfigState } } : undefined,
                             multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
                         };
                         
@@ -2557,7 +2557,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const vectorizerVal = document.getElementById('vectorizer').value;
                         const vectorIndexTypeVal = document.getElementById('vectorIndexType').value;
                         const vectorIndexConfigVal = vectorIndexTypeVal === 'hnsw' ? { ...vectorIndexConfigState } : null;
-                        const moduleConfigVal = Object.keys(moduleConfigState).length > 0 ? { 'text2vec-openai': { ...moduleConfigState } } : null;
+                        const moduleConfigVal = Object.keys(moduleConfigState).length > 0 && vectorizerVal !== 'none' ? { [vectorizerVal]: { ...moduleConfigState } } : null;
                         const mtVal = document.getElementById('multiTenancyToggle').checked ? { enabled: true } : undefined;
                         
                         const schemaObj = {
@@ -2566,7 +2566,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             vectorizer: vectorizerVal === 'none' ? undefined : vectorizerVal,
                             properties: properties.map(function(prop) {
                                 const dataType = prop.dataType === 'reference' && prop.targetCollection
-                                    ? (prop.isArray ? [prop.targetCollection + '[]'] : [prop.targetCollection])
+                                    ? [prop.targetCollection]
                                     : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]);
                                 return {
                                     name: prop.name.trim() || '<propertyName>',
