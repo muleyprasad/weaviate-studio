@@ -5,6 +5,34 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Ensure that all automatically injected <script> tags include the nonce placeholder expected by
+// VS Code's webview template ({{nonce}}). Without this each bundle is blocked by the CSP that
+// requires a matching nonce value. The runtime extension code later replaces the placeholder with
+// the real nonce.
+class WebviewNoncePlugin {
+  apply (compiler) {
+    compiler.hooks.compilation.tap('WebviewNoncePlugin', (compilation) => {
+      const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+      HtmlWebpackPlugin.getHooks(compilation).alterAssetTagGroups.tap(
+        'WebviewNoncePlugin',
+        (data) => {
+          const addNonce = (tag) => {
+            if (tag.tagName === 'script') {
+              tag.attributes = tag.attributes || {};
+              // VS Code extension will replace this placeholder at runtime.
+              tag.attributes.nonce = '{{nonce}}';
+            }
+          };
+
+          data.headTags.forEach(addNonce);
+          data.bodyTags.forEach(addNonce);
+        }
+      );
+    });
+  }
+}
+
 module.exports = {
   target: 'web',
   mode: isProduction ? 'production' : 'development',
@@ -70,6 +98,8 @@ module.exports = {
       scriptLoading: 'defer',
       minify: isProduction,
     }),
+    // Attach the nonce placeholder to every injected script tag.
+    new WebviewNoncePlugin(),
     ...(isProduction ? [new MiniCssExtractPlugin({
       filename: '[name].[contenthash].css',
     })] : []),
