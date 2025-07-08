@@ -4,7 +4,17 @@ All notable changes to the "weaviate-studio" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [1.0.0] - 2024-12-XX
+## [1.0.1] — 2025-07-08
+### Added
+* WebviewNoncePlugin to fix CSP violation.
+
+### Fixed
+* Webview fails to load under strict CSP policy.
+
+### Internal
+* CI workflow now packages webview with nonce placeholders.
+
+## [1.0.0] - 2025-07-08
 
 ### Added
 - **Initial Release** - Complete Weaviate vector database management extension
@@ -53,6 +63,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Optimized webview rendering for large datasets
 - Efficient GraphQL query execution
 - Lazy loading of collection data
+
 
 ## [Unreleased]
 
