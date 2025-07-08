@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Weaviate Studio Logo](resources/weaviate-logo.png)
+![Weaviate Studio Logo](resources/weaviate-studio-color.png)
 
 **A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL interface**
 

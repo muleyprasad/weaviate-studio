@@ -4,7 +4,7 @@
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
   "version": "1.0.1",
   "license": "MIT",
-  "icon": "resources/database-icon.png",
+  "icon": "resources/weaviate-studio-color.png",
   "publisher": "prasadmuley",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "query-editor"
   ],
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Data Science",
@@ -119,7 +119,7 @@
         {
           "id": "weaviate-manager-activitybar",
           "title": "Weaviate Studio",
-          "icon": "resources/weaviate-logo.png"
+          "icon": "resources/weaviate-studio-color.png"
         }
       ]
     },
