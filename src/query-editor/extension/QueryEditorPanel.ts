@@ -302,13 +302,6 @@ export class QueryEditorPanel {
 
         htmlContent = htmlContent.replace(/{{nonce}}/g, nonce);
         htmlContent = htmlContent.replace(/{{cspSource}}/g, webview.cspSource);
-        const extensionRootFileUri = vscode.Uri.file(this.context.extensionUri.fsPath);
-        const webviewExtensionRootUri = webview.asWebviewUri(extensionRootFileUri);
-
-        // Generate URI for webview.bundle.js
-        const scriptPathOnDisk = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'webview.bundle.js');
-        const scriptUri = webview.asWebviewUri(scriptPathOnDisk);
-        htmlContent = htmlContent.replace(/{{webviewBundleUri}}/g, scriptUri.toString());
 
         // Calculate baseHref for the <base> tag
         const webviewDistPath = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview');

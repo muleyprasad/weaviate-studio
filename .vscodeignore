@@ -1,8 +1,13 @@
+# Source files and development tools
 .vscode/**
 .vscode-test/**
 out/**
 node_modules/**
 src/**
+**/*.ts
+**/*.map
+
+# Development configuration
 .gitignore
 .yarnrc
 webpack.config.js
@@ -10,11 +15,39 @@ webpack.webview.config.js
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
-**/*.map
-**/*.ts
 **/.vscode-test.*
 jest.config.js
+eslint.config.mjs
+jsconfig.json
+
+# Documentation and meta files (keep essential ones only)
 .github/**
 docs/**
 RELEASE_GUIDE.md
 CONTRIBUTING.md
+
+# Test files
+**/__tests__/**
+**/test/**
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+
+# Development dependencies  
+package-lock.json
+
+# Temporary and cache files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+.cache/**
+
+# Large source map files
+**/*.js.map
+**/*.css.map
+
+# Exclude large dev files
+dist/**/*.map
+dist/**/test/**
