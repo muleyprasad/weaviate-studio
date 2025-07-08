@@ -4,7 +4,7 @@ import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
-    console.log('"Weaviate Manager" extension is now active');
+    console.log('"Weaviate Studio" extension is now active');
 
     // Create and register the TreeDataProvider
     const weaviateTreeDataProvider = new WeaviateTreeDataProvider(context);
