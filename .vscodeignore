@@ -6,9 +6,15 @@ src/**
 .gitignore
 .yarnrc
 webpack.config.js
+webpack.webview.config.js
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
 **/*.ts
 **/.vscode-test.*
+jest.config.js
+.github/**
+docs/**
+RELEASE_GUIDE.md
+CONTRIBUTING.md

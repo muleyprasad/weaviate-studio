@@ -2,16 +2,17 @@
   "name": "weaviate-studio",
   "displayName": "Weaviate Manager",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "license": "MIT",
   "icon": "resources/database-icon.png",
-  "publisher": "weaviate",
+  "publisher": "prasadmuley",
   "repository": {
     "type": "git",
-    "url": "https://github.com/weaviate/weaviate-studio.git"
+    "url": "https://github.com/prasadmuley/weaviate-studio.git"
   },
-  "homepage": "https://github.com/weaviate/weaviate-studio#readme",
+  "homepage": "https://github.com/prasadmuley/weaviate-studio#readme",
   "bugs": {
-    "url": "https://github.com/weaviate/weaviate-studio/issues"
+    "url": "https://github.com/prasadmuley/weaviate-studio/issues"
   },
   "keywords": [
     "weaviate",
@@ -20,17 +21,27 @@
     "database",
     "ai",
     "machine-learning",
-    "semantic-search"
+    "semantic-search",
+    "vector-search",
+    "similarity-search",
+    "embeddings",
+    "llm",
+    "generative-ai",
+    "data-visualization",
+    "schema-management",
+    "query-editor"
   ],
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.100.0"
   },
   "categories": [
+    "Data Science",
+    "Visualization",
     "Other"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
-  "browser": "./out/extension.js",
+  "browser": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
