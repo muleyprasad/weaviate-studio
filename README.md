@@ -41,7 +41,6 @@
 - **Enhanced Query Templates**: 9 comprehensive templates covering all major Weaviate operations
 - **Reference Field Support**: Intelligent detection and proper sub-selection generation for cross-references
 - **Type-Safe Generation**: Handles all Weaviate data types including geoCoordinates, vectors, and primitives
-- **Query Templates**: Pre-built templates for common operations
 
 ### Schema Management
 - Browse collections and their properties
@@ -50,7 +49,7 @@
 - Visual representation of your data model
 
 ### Enhanced Tree View
-The Weaviate Explorer now provides comprehensive information at both connection and collection levels:
+The Weaviate Explorer provides comprehensive information at both connection and collection levels:
 
 #### **Connection-Level Information**
 - **Server Information**: Weaviate version, git hash, hostname
@@ -100,13 +99,7 @@ Right-click on any collection → **"View Detailed Schema"**
 ![Connection Management](docs/images/connections.png)
 
 ### GraphQL Query Interface
-![Query Interface](docs/images/query-interface.png)
-
-### Table View Results
-![Table View](docs/images/table-view.png)
-
-### Schema Explorer
-![Schema Explorer](docs/images/schema-explorer.png)
+![Query Interface](docs/images/query-editor.png)
 
 ## Quick Start
 
@@ -118,9 +111,15 @@ Right-click on any collection → **"View Detailed Schema"**
    - Search for "Weaviate Studio"
    - Click Install
 
-2. **From VSIX Package**
+2. **From Open VSX Registry** (For Cursor, Windsurf, etc.)
+   - Open your editor
+   - Go to Extensions
+   - Search for "Weaviate Studio" by prasadmuley
+   - Click Install
+
+3. **From VSIX Package**
    ```bash
-   code --install-extension weaviate-studio-0.0.1.vsix
+   code --install-extension weaviate-studio-1.0.1.vsix
    ```
 
 ### First Steps
@@ -219,13 +218,13 @@ Each template includes:
 
 - **Node.js** (v16 or later)
 - **npm** (v8 or later)
-- **VS Code** (v1.85.0 or later)
+- **VS Code** (v1.80.0 or later)
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/weaviate/weaviate-studio.git
+git clone https://github.com/prasadmuley/weaviate-studio.git
 cd weaviate-studio
 
 # Install dependencies
@@ -235,20 +234,52 @@ npm install
 npm run dev
 ```
 
+### Packaging and Local Testing
+
+To create a VSIX package for local testing:
+
+```bash
+npx vsce package
+```
+
+This will generate a `.vsix` file in your project root.
+
+To install it in VS Code:
+
+```bash
+code --install-extension weaviate-studio-1.0.1.vsix
+```
+
+You can also use the Extensions sidebar's "Install from VSIX..." option.
+
+### Available Scripts
+
+```bash
+# Development
+npm run dev                 # Start development with watchers
+npm run compile             # Compile TypeScript
+npm run watch              # Watch for changes
+npm run build:webview      # Build webview in development mode
+
+# Production
+npm run package            # Package for production
+npm run package:webview    # Package webview for production
+
+# Testing
+npm test                   # Run all tests
+npm run test:watch         # Run tests in watch mode
+npm run test:coverage      # Run tests with coverage report
+
+# Code Quality
+npm run lint               # Run ESLint
+npm run lint:fix           # Run ESLint with auto-fix
+npm run format             # Format code with Prettier
+npm run format:check       # Check code formatting
+```
+
 ### Testing
 
 The project includes comprehensive test coverage using Jest:
-
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage report
-npm run test:coverage
-```
 
 #### Test Structure
 
@@ -293,14 +324,12 @@ All tests use proper mocking for VS Code APIs, Monaco Editor, and Weaviate clien
 
 The project maintains high code quality through:
 
-- **Comprehensive Unit Tests**: 22 tests covering all core functionality
+- **Comprehensive Unit Tests**: Complete test coverage for all core functionality
 - **Integration Tests**: Service interactions and component behavior
 - **Type Safety**: Full TypeScript coverage with strict type checking
 - **Code Coverage**: Continuous monitoring of test coverage
 - **Linting**: ESLint configuration for code consistency
 - **Formatting**: Prettier integration for consistent code style
-
-See `TESTING_PLAN.md` for detailed testing strategy and coverage goals.
 
 ### Contributing
 
@@ -329,3 +358,17 @@ npm run lint
 # Format code
 npm run format
 ```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/prasadmuley/weaviate-studio/issues)
+- **Marketplace**: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio)
+- **Open VSX**: [Open VSX Registry](https://open-vsx.org/extension/prasadmuley/weaviate-studio)
+
+---
+
+**Happy querying with Weaviate Studio!** 🚀
