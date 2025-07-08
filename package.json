@@ -1,17 +1,18 @@
 {
   "name": "weaviate-studio",
-  "displayName": "Weaviate Manager",
+  "displayName": "Weaviate Studio",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "0.0.1",
+  "version": "1.0.1",
+  "license": "MIT",
   "icon": "resources/database-icon.png",
-  "publisher": "weaviate",
+  "publisher": "prasadmuley",
   "repository": {
     "type": "git",
-    "url": "https://github.com/weaviate/weaviate-studio.git"
+    "url": "https://github.com/prasadmuley/weaviate-studio.git"
   },
-  "homepage": "https://github.com/weaviate/weaviate-studio#readme",
+  "homepage": "https://github.com/prasadmuley/weaviate-studio#readme",
   "bugs": {
-    "url": "https://github.com/weaviate/weaviate-studio/issues"
+    "url": "https://github.com/prasadmuley/weaviate-studio/issues"
   },
   "keywords": [
     "weaviate",
@@ -20,17 +21,27 @@
     "database",
     "ai",
     "machine-learning",
-    "semantic-search"
+    "semantic-search",
+    "vector-search",
+    "similarity-search",
+    "embeddings",
+    "llm",
+    "generative-ai",
+    "data-visualization",
+    "schema-management",
+    "query-editor"
   ],
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.100.0"
   },
   "categories": [
+    "Data Science",
+    "Visualization",
     "Other"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
-  "browser": "./out/extension.js",
+  "browser": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -107,7 +118,7 @@
       "activitybar": [
         {
           "id": "weaviate-manager-activitybar",
-          "title": "Weaviate Manager",
+          "title": "Weaviate Studio",
           "icon": "resources/weaviate-logo.png"
         }
       ]
@@ -120,7 +131,7 @@
           "type": "tree",
           "when": "true",
           "icon": "$(database)",
-          "contextualTitle": "Weaviate Manager"
+          "contextualTitle": "Weaviate Studio"
         }
       ]
     },
@@ -213,7 +224,7 @@
     "dev": "concurrently \"npm:watch:extension\" \"npm:watch:webview\"",
     "package": "webpack --mode production --devtool hidden-source-map",
     "build:webview": "webpack --config webpack.webview.config.js --mode development",
-    "package:webview": "webpack --config webpack.webview.config.js --mode production",
+    "package:webview": "NODE_ENV=production webpack --config webpack.webview.config.js --mode production",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "test": "jest",
@@ -237,8 +248,10 @@
     "css-loader": "^7.1.2",
     "eslint": "^9.25.1",
     "html-webpack-plugin": "^5.6.3",
+    "husky": "^9.0.7",
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
+    "mini-css-extract-plugin": "^2.9.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "path-browserify": "^1.0.1",
     "prettier": "^3.5.3",
