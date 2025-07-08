@@ -244,6 +244,67 @@ code --install-extension weaviate-studio-1.0.0.vsix
 - Security-related changes
 ```
 
+## ⚡ Quick Release Checklist (CI/CD Pipeline)
+
+Follow **these six steps** any time you need to publish a new version.  The GitHub
+Actions workflow in `.github/workflows/ci.yml` is wired to run automatically
+when a Git tag that starts with `v` is pushed.
+
+1. **Pick the next version number**  
+   – Use [Semantic Versioning](https://semver.org).  
+   – Patch fix → `1.0.0` → `1.0.1`  
+   – Back-compatible feature → `1.1.0`  
+   – Breaking change → `2.0.0`.
+
+2. **Update metadata**  
+   ```bash
+   # bump package.json manually or via npm
+   npm version <patch|minor|major> --no-git-tag-version
+   ```
+   • Edit `CHANGELOG.md` — add a section like:
+   ```markdown
+   ## [1.0.1] — 2025-07-08
+   ### Added
+   * Something new.
+   ### Fixed
+   * Something fixed.
+   ```
+
+3. **Commit and push to `main`**  
+   ```bash
+   git add package.json CHANGELOG.md
+   git commit -m "chore(release): 1.0.1"
+   git push origin main
+   ```
+
+4. **Tag _and_ publish the release**  
+   ```bash
+   git tag -a v1.0.1 -m "Release 1.0.1"
+   git push origin v1.0.1
+   ```
+   Then open **GitHub → Releases → "Draft new release"** and:
+   * Select the just–pushed tag `v1.0.1`.
+   * Paste the same CHANGELOG section in the description.
+   * Click **Publish release** – this fires the `release` event that the
+     workflow listens for.
+
+5. **Watch GitHub Actions**  
+   The `ci.yml` workflow will:
+   * run tests & build (extension + webview)
+   * package with `vsce`
+   * publish to VS Code Marketplace using the `VSCE_PAT` secret
+   * attach the `.vsix` file as a build artifact
+
+6. **Verify**  
+   * Marketplace listing should show the new version a few minutes after the
+     job succeeds.  
+   * Optionally test the artifact locally:
+     ```bash
+     code --install-extension weaviate-studio-1.0.1.vsix --force
+     ```
+
+That's it—no manual `vsce publish` needed.  Just remember: **version bump → changelog → commit → tag**.
+
 ---
 
 **Questions or Issues?**

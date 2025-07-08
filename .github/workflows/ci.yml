@@ -1,4 +1,6 @@
 name: CI/CD Pipeline
+permissions:
+  contents: write  # allow actions/upload-release-asset to attach artifacts
 
 on:
   push:
