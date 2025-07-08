@@ -1542,11 +1542,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+                        font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif);
                         font-size: 14px;
                         line-height: 1.4;
-                        color: #2D2D2D;
-                        background-color: #FFFFFF;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        background-color: var(--vscode-editor-background, #FFFFFF);
                         margin: 0;
                         padding: 0;
                     }
@@ -1566,11 +1566,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         margin: 0 0 8px 0;
                         font-size: 16px;
                         font-weight: bold;
-                        color: #2D2D2D;
+                        color: var(--vscode-foreground, #2D2D2D);
                     }
                     
                     .header .subtitle {
-                        color: #6A6A6A;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
                         font-size: 14px;
                         font-weight: normal;
                     }
@@ -1578,35 +1578,35 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     /* Form Layout */
                     .form-section {
                         margin-bottom: 24px;
-                        border: 1px solid #CCCCCC;
+                        border: 1px solid var(--vscode-panel-border, #CCCCCC);
                         border-radius: 4px;
-                        background: #FFFFFF;
+                        background: var(--vscode-editor-background, #FFFFFF);
                         overflow: hidden;
                     }
                     
                     .section-header {
                         height: 48px;
                         padding: 0 16px;
-                        background: #F3F3F3;
-                        border-bottom: 1px solid #CCCCCC;
+                        background: var(--vscode-sideBar-background, #F3F3F3);
+                        border-bottom: 1px solid var(--vscode-panel-border, #CCCCCC);
                         cursor: pointer;
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
                         font-weight: bold;
                         font-size: 16px;
-                        color: #2D2D2D;
+                        color: var(--vscode-foreground, #2D2D2D);
                         transition: background-color 0.2s ease;
                     }
                     
                     .section-header:hover {
-                        background: #E8E8E8;
+                        background: var(--vscode-list-hoverBackground, #E8E8E8);
                     }
                     
                     .section-header .icon {
                         transition: transform 0.2s ease;
                         font-size: 16px;
-                        color: #6A6A6A;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
                     }
                     
                     .section-header.collapsed .icon {
@@ -1638,13 +1638,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         font-weight: normal;
                         margin-bottom: 8px;
                         font-size: 14px;
-                        color: #6A6A6A;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
                         display: block;
                     }
                     
                     .form-field label.required::after {
                         content: " *";
-                        color: #D32F2F;
+                        color: var(--vscode-errorForeground, #D32F2F);
                     }
                     
                     .form-field input,
@@ -1652,9 +1652,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .form-field textarea {
                         height: 32px;
                         padding: 0 12px;
-                        border: 1px solid #CCCCCC;
-                        background: #F3F3F3;
-                        color: #2D2D2D;
+                        border: 1px solid var(--vscode-input-border, #CCCCCC);
+                        background: var(--vscode-input-background, #F3F3F3);
+                        color: var(--vscode-input-foreground, #2D2D2D);
                         border-radius: 4px;
                         font-family: inherit;
                         font-size: 14px;
@@ -1673,20 +1673,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .form-field select:focus,
                     .form-field textarea:focus {
                         outline: none;
-                        border-color: #007ACC;
+                        border-color: var(--vscode-focusBorder, #007ACC);
                         box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
                     }
                     
                     .form-field .hint {
                         font-size: 12px;
-                        color: #9E9E9E;
+                        color: var(--vscode-descriptionForeground, #9E9E9E);
                         margin-top: 4px;
                         font-style: italic;
                     }
                     
                     .form-field .error-text {
                         font-size: 12px;
-                        color: #D32F2F;
+                        color: var(--vscode-errorForeground, #D32F2F);
                         margin-top: 4px;
                         display: none;
                     }
@@ -1700,8 +1700,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     /* Properties Section */
                     .properties-container {
-                        background: #F7F7F7;
-                        border: 1px solid #E0E0E0;
+                        background: var(--vscode-sideBar-background, #F7F7F7);
+                        border: 1px solid var(--vscode-panel-border, #E0E0E0);
                         border-radius: 4px;
                         padding: 16px;
                         min-height: 120px;
@@ -1711,23 +1711,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .properties-container.has-properties {
-                        background: #F7F7F7;
-                        border: 1px solid #E0E0E0;
+                        background: var(--vscode-sideBar-background, #F7F7F7);
+                        border: 1px solid var(--vscode-panel-border, #E0E0E0);
                         padding: 16px;
                         min-height: auto;
                     }
                     
                     .no-properties {
                         text-align: center;
-                        color: #6A6A6A;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
                         font-style: italic;
                         font-size: 14px;
                         padding: 32px 16px;
                     }
                     
                     .property-card {
-                        background: #FFFFFF;
-                        border: 1px solid #DADADA;
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        border: 1px solid var(--vscode-panel-border, #DADADA);
                         border-radius: 4px;
                         padding: 12px;
                         margin-bottom: 12px;
@@ -1748,13 +1748,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .property-name {
                         font-weight: bold;
                         font-size: 14px;
-                        color: #2D2D2D;
+                        color: var(--vscode-foreground, #2D2D2D);
                     }
                     
                     .property-actions button {
                         background: none;
                         border: none;
-                        color: #D32F2F;
+                        color: var(--vscode-errorForeground, #D32F2F);
                         cursor: pointer;
                         font-size: 12px;
                         padding: 4px 8px;
@@ -1763,7 +1763,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .property-actions button:hover {
-                        background: #FFEBEE;
+                        background: var(--vscode-list-hoverBackground, #FFEBEE);
                     }
                     
                     .property-fields {
@@ -1788,7 +1788,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .property-field label {
                         font-size: 12px;
                         margin-bottom: 8px;
-                        color: #6A6A6A;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
                         padding-right: 12px;
                     }
                     
@@ -1798,10 +1798,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         height: 32px;
                         padding: 0 12px;
                         font-size: 12px;
-                        border: 1px solid #CCCCCC;
+                        border: 1px solid var(--vscode-input-border, #CCCCCC);
                         border-radius: 4px;
-                        background: #FFFFFF;
-                        color: #2D2D2D;
+                        background: var(--vscode-input-background, #FFFFFF);
+                        color: var(--vscode-input-foreground, #2D2D2D);
                         transition: border-color 0.2s ease;
                     }
                     
@@ -1809,7 +1809,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .property-field select:focus,
                     .property-field textarea:focus {
                         outline: none;
-                        border-color: #007ACC;
+                        border-color: var(--vscode-focusBorder, #007ACC);
                         box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
                     }
                     
@@ -1829,17 +1829,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         height: 16px;
                         margin: 0;
                         appearance: none;
-                        border: 1px solid #CCCCCC;
+                        border: 1px solid var(--vscode-input-border, #CCCCCC);
                         border-radius: 2px;
-                        background: #FFFFFF;
+                        background: var(--vscode-input-background, #FFFFFF);
                         cursor: pointer;
                         position: relative;
                         transition: all 0.2s ease;
                     }
                     
                     .property-field input[type="checkbox"]:checked {
-                        background: #007ACC;
-                        border-color: #007ACC;
+                        background: var(--vscode-button-background, #007ACC);
+                        border-color: var(--vscode-button-background, #007ACC);
                     }
                     
                     .property-field input[type="checkbox"]:checked::after {
@@ -1847,7 +1847,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         position: absolute;
                         top: -2px;
                         left: 2px;
-                        color: #FFFFFF;
+                        color: var(--vscode-button-foreground, #FFFFFF);
                         font-size: 10px;
                         font-weight: bold;
                     }
@@ -1896,29 +1896,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .primary-button {
-                        background: #007ACC;
-                        color: #FFFFFF;
-                        border: 1px solid #007ACC;
+                        background: var(--vscode-button-background, #007ACC);
+                        color: var(--vscode-button-foreground, #FFFFFF);
+                        border: 1px solid var(--vscode-button-background, #007ACC);
                     }
                     
                     .primary-button:hover {
-                        background: #005A9E;
-                        border-color: #005A9E;
+                        background: var(--vscode-button-hoverBackground, #005A9E);
+                        border-color: var(--vscode-button-hoverBackground, #005A9E);
                     }
                     
                     .secondary-button {
                         background: transparent;
-                        color: #6A6A6A;
-                        border: 1px solid #CCCCCC;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        border: 1px solid var(--vscode-input-border, #CCCCCC);
                     }
                     
                     .secondary-button:hover {
-                        background: #F3F3F3;
+                        background: var(--vscode-list-hoverBackground, #F3F3F3);
                     }
                     
                     .add-property-btn {
                         background: transparent;
-                        color: #007ACC;
+                        color: var(--vscode-button-background, #007ACC);
                         border: none;
                         padding: 0;
                         font-size: 14px;

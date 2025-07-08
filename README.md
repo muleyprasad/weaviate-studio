@@ -19,6 +19,27 @@
 
 </div>
 
+Weaviate Studio is a Visual Studio Code extension that brings a graphical interface for managing and querying Weaviate vector databases—directly inside your code editor. It’s designed to fill the UI gap for self-hosted users, while also providing cloud users with a convenient, integrated experience.
+
+## Why Use Weaviate Studio?
+- No Official UI: Self-hosted Weaviate lacks a robust, built-in graphical UI for data exploration and management.
+- All-in-One Tool: Manage, query, and monitor your Weaviate instance from within VSCode—no need to switch between browser tabs or use only APIs.
+- Supports Both Self-Hosted and Cloud: Connect to any Weaviate instance, whether running locally, on-premises, or in the cloud.
+
+## Screenshots
+
+### GraphQL Query Interface
+![Query Interface](docs/images/query-editor.png)
+
+### Connection Management
+![Connection Management](docs/images/connections.png)
+
+### Add Collection
+![Add collection](docs/images/add-collection.png)
+
+### Detailed Schema
+![Detailed Schema](docs/images/detailed-schema.png)
+
 ## Features
 
 ### Connection Management
@@ -75,7 +96,7 @@ The Weaviate Explorer provides comprehensive information at both connection and 
   - Replication factor
   - Multi-tenancy status
 
-### 🔍 Schema Analysis
+## 🔍 Schema Analysis
 
 #### **Enhanced Schema Viewer**
 Right-click on any collection → **"View Detailed Schema"**
@@ -92,95 +113,6 @@ Right-click on any collection → **"View Detailed Schema"**
 - **TypeScript Support**: Full type safety and IntelliSense
 - **Modern UI**: Dark theme optimized for VS Code
 - **Responsive Design**: Works seamlessly across different screen sizes
-
-## Screenshots
-
-### Connection Management
-![Connection Management](docs/images/connections.png)
-
-### GraphQL Query Interface
-![Query Interface](docs/images/query-editor.png)
-
-## Quick Start
-
-### Installation
-
-1. **From VS Code Marketplace** (Recommended)
-   - Open VS Code
-   - Go to Extensions (Ctrl+Shift+X)
-   - Search for "Weaviate Studio"
-   - Click Install
-
-2. **From Open VSX Registry** (For Cursor, Windsurf, etc.)
-   - Open your editor
-   - Go to Extensions
-   - Search for "Weaviate Studio" by prasadmuley
-   - Click Install
-
-3. **From VSIX Package**
-   ```bash
-   code --install-extension weaviate-studio-1.0.1.vsix
-   ```
-
-### First Steps
-
-1. **Open Weaviate Studio**
-   - Click the Weaviate icon in the Activity Bar
-   - Or use Command Palette: `Ctrl+Shift+P` → "Weaviate: Open Query Editor"
-
-2. **Add Your First Connection**
-   - Click "Add New Weaviate Connection"
-   - Enter your Weaviate instance details:
-     - **Name**: A friendly name for your connection
-     - **URL**: Your Weaviate endpoint (e.g., `http://localhost:8080`)
-     - **API Key**: (Optional) Your Weaviate API key
-
-3. **Start Querying**
-   - Connect to your instance
-   - Browse collections in the sidebar
-   - Click "Query Collection" to open the GraphQL editor
-   - Use the "Sample" button to generate example queries
-
-## Usage Guide
-
-### Managing Connections
-
-```typescript
-// Example connection configuration
-{
-  "name": "Local Development",
-  "url": "http://localhost:8080",
-  "apiKey": "optional-api-key"
-}
-```
-
-### Writing GraphQL Queries
-
-The extension provides intelligent auto-completion and validation:
-
-```graphql
-{
-  Get {
-    Article(limit: 10) {
-      title
-      content
-      author {
-        ... on Person {
-          name
-          email
-          _additional {
-            id
-          }
-        }
-      }
-      _additional {
-        id
-        distance
-      }
-    }
-  }
-}
-```
 
 ### Query Templates
 

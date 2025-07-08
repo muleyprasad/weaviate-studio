@@ -395,8 +395,8 @@ describe('Add Collection', () => {
       expect(html).toContain('.form-section');
       expect(html).toContain('.property-card');
       expect(html).toContain('.section-header');
-      expect(html).toContain('background: #F7F7F7');
-      expect(html).toContain('border: 1px solid #E0E0E0');
+      expect(html).toContain('var(--vscode-sideBar-background, #F7F7F7)');
+      expect(html).toContain('var(--vscode-panel-border, #E0E0E0)');
     });
   });
 }); 

@@ -246,11 +246,11 @@ Property: ${prop.name}
                     }
                     
                     .header {
-                        font-family: "Inter", Arial, sans-serif;
+                        font-family: var(--vscode-font-family, "Inter", Arial, sans-serif);
                         font-size: 18px;
                         font-weight: bold;
-                        color: #222b45;
-                        background-color: #f5f6fa;
+                        color: var(--vscode-foreground, #222b45);
+                        background-color: var(--vscode-sideBar-background, #f5f6fa);
                         padding: 12px 20px;
                         margin: 0;
                         border: none;
@@ -261,10 +261,10 @@ Property: ${prop.name}
                         display: flex;
                         align-items: center;
                         gap: 10px;
-                        font-family: "Inter", Arial, sans-serif;
+                        font-family: var(--vscode-font-family, "Inter", Arial, sans-serif);
                         font-size: 18px;
                         font-weight: bold;
-                        color: #222b45;
+                        color: var(--vscode-foreground, #222b45);
                     }
                     
                     .header .stats-grid {
