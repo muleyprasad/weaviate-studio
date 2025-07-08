@@ -107,7 +107,7 @@ jobs:
         VSCE_PAT: ${{ secrets.VSCE_PAT }}
     
     - name: Create GitHub Release Asset
-      run: vsce package
+      run: vsce package -o weaviate-studio-${{ github.event.release.tag_name }}.vsix
     
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
