@@ -8,11 +8,11 @@
   "publisher": "muleyprasad",
   "repository": {
     "type": "git",
-    "url": "https://github.com/prasadmuley/weaviate-studio.git"
+    "url": "https://github.com/muleyprasad/weaviate-studio.git"
   },
-  "homepage": "https://github.com/prasadmuley/weaviate-studio#readme",
+  "homepage": "https://github.com/muleyprasad/weaviate-studio#readme",
   "bugs": {
-    "url": "https://github.com/prasadmuley/weaviate-studio/issues"
+    "url": "https://github.com/muleyprasad/weaviate-studio/issues"
   },
   "keywords": [
     "weaviate",
