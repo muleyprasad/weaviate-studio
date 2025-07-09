@@ -5,14 +5,14 @@
   "version": "1.0.2",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
-  "publisher": "muleyprasad",
+  "publisher": "prasadmuley",
   "repository": {
     "type": "git",
-    "url": "https://github.com/muleyprasad/weaviate-studio.git"
+    "url": "https://github.com/prasadmuley/weaviate-studio.git"
   },
-  "homepage": "https://github.com/muleyprasad/weaviate-studio#readme",
+  "homepage": "https://github.com/prasadmuley/weaviate-studio#readme",
   "bugs": {
-    "url": "https://github.com/muleyprasad/weaviate-studio/issues"
+    "url": "https://github.com/prasadmuley/weaviate-studio/issues"
   },
   "keywords": [
     "weaviate",
