@@ -15,7 +15,7 @@
 ### 🚀 **Available On Multiple Platforms**
 | **VS Code** | **Cursor** | **Windsurf** | **Manual Install** |
 |-------------|------------|--------------|-------------------|
-| [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Download VSIX](https://github.com/prasadmuley/weaviate-studio/releases) |
+| [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Download VSIX](https://github.com/muleyprasad/weaviate-studio/releases) |
 
 </div>
 
@@ -156,7 +156,7 @@ Each template includes:
 
 ```bash
 # Clone the repository
-git clone https://github.com/prasadmuley/weaviate-studio.git
+git clone https://github.com/muleyprasad/weaviate-studio.git
 cd weaviate-studio
 
 # Install dependencies
@@ -297,7 +297,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/prasadmuley/weaviate-studio/issues)
+- **Issues**: [GitHub Issues](https://github.com/muleyprasad/weaviate-studio/issues)
 - **Marketplace**: [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio)
 - **Open VSX**: [Open VSX Registry](https://open-vsx.org/extension/prasadmuley/weaviate-studio)
 
