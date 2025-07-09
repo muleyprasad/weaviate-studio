@@ -5,7 +5,7 @@
   "version": "1.0.2",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
-  "publisher": "prasadmuley",
+  "publisher": "muleyprasad",
   "repository": {
     "type": "git",
     "url": "https://github.com/prasadmuley/weaviate-studio.git"
