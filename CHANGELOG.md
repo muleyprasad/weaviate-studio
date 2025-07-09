@@ -4,6 +4,15 @@ All notable changes to the "weaviate-studio" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.0.2] — 2025-01-27
+### Added
+* Support for Windsurf and Cursor marketplace publishing
+* Enhanced compatibility with VS Code-based editors
+
+### Fixed
+* Improved error handling in test scenarios
+* Better console error management
+
 ## [1.0.1] — 2025-07-08
 ### Added
 * WebviewNoncePlugin to fix CSP violation.
