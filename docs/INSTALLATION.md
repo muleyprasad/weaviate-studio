@@ -23,7 +23,7 @@
 ## Manual Installation
 
 ### Download VSIX File
-1. Go to [GitHub Releases](https://github.com/prasadmuley/weaviate-studio/releases)
+1. Go to [GitHub Releases](https://github.com/muleyprasad/weaviate-studio/releases)
 2. Download the latest `.vsix` file
 3. Install using command: `code --install-extension weaviate-studio-1.0.0.vsix`
 
@@ -82,6 +82,6 @@ cursor --install-extension prasadmuley.weaviate-studio
 ## Getting Help
 
 - **Documentation**: [README.md](../README.md)
-- **Issues**: [GitHub Issues](https://github.com/prasadmuley/weaviate-studio/issues)
+- **Issues**: [GitHub Issues](https://github.com/muleyprasad/weaviate-studio/issues)
 - **Community**: [Weaviate Discord](https://discord.com/invite/weaviate)
 - **Support**: [Weaviate Support](https://weaviate.io/support) 
