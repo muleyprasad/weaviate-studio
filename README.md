@@ -6,8 +6,8 @@
 
 **A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL interface**
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=muleyprasad.weaviate-studio)
-[![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-Registry-purple?style=flat-square&logo=eclipse-ide)](https://open-vsx.org/extension/muleyprasad/weaviate-studio)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio)
+[![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-Registry-purple?style=flat-square&logo=eclipse-ide)](https://open-vsx.org/extension/prasadmuley/weaviate-studio)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://reactjs.org/)
@@ -15,7 +15,7 @@
 ### 🚀 **Available On Multiple Platforms**
 | **VS Code** | **Cursor** | **Windsurf** | **Manual Install** |
 |-------------|------------|--------------|-------------------|
-| [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=muleyprasad.weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/muleyprasad/weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/muleyprasad/weaviate-studio) | [Download VSIX](https://github.com/muleyprasad/weaviate-studio/releases) |
+| [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Install from Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Download VSIX](https://github.com/muleyprasad/weaviate-studio/releases) |
 
 </div>
 

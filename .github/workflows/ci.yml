@@ -153,4 +153,9 @@ jobs:
       run: vsce package
     
     - name: Publish to Open VSX Registry
-      run: ovsx publish weaviate-studio-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_PAT }} 
+      env:
+        TAG_NAME: ${{ github.event.release.tag_name }}
+        OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      run: |
+        FILE_VERSION=${TAG_NAME#v}
+        ovsx publish "weaviate-studio-${FILE_VERSION}.vsix" -p "$OVSX_PAT" 
