@@ -119,4 +119,36 @@ jobs:
         upload_url: ${{ github.event.release.upload_url }}
         asset_path: ./weaviate-studio-${{ github.event.release.tag_name }}.vsix
         asset_name: weaviate-studio-${{ github.event.release.tag_name }}.vsix
-        asset_content_type: application/zip 
+        asset_content_type: application/zip
+
+  publish-openvsx:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install ovsx
+      run: npm install -g ovsx
+    
+    - name: Build extension
+      run: npm run compile
+    
+    - name: Build webview
+      run: npm run build:webview
+    
+    - name: Package extension
+      run: vsce package
+    
+    - name: Publish to Open VSX Registry
+      run: ovsx publish weaviate-studio-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_PAT }} 
