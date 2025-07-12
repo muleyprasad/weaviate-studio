@@ -14,8 +14,10 @@ Thank you for your interest in contributing to Weaviate Studio! We welcome contr
 ### Development Setup
 
 1. **Fork and Clone**
+   - Fork the repository on GitHub: https://github.com/muleyprasad/weaviate-studio
+   - Then clone your fork (replace `YOUR_GITHUB_USERNAME` with your GitHub username):
    ```bash
-   git clone https://github.com/muleyprasad/weaviate-studio.git
+   git clone https://github.com/YOUR_GITHUB_USERNAME/weaviate-studio.git
    cd weaviate-studio
    ```
 2. **Install Dependencies**
