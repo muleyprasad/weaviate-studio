@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
-import { CollectionConfig, VectorConfig } from 'weaviate-client';
+import { CollectionConfig, ShardingConfig, VectorConfig } from 'weaviate-client';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -431,7 +431,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             
             return items;
         }
-
         else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
             // Find the collection schema
             const collection = this.collections[element.connectionId]?.find(
@@ -566,24 +565,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         'weaviateVectorConfig'
                     ));
             }
-            // if (collection.schema?.vectorizers) {
-            //     vectorItems.push(new WeaviateTreeItem(
-            //         `Index Type: ${collection.schema.vectorIndexType}`,
-            //         vscode.TreeItemCollapsibleState.None,
-            //         'object',
-            //         element.connectionId,
-            //         element.collectionName,
-            //         'vectorIndexType',
-            //         new vscode.ThemeIcon('list-tree'),
-            //         'weaviateVectorConfig'
-            //     ));
-            // }
 
-            //              if (vectorItems.length === 0) {
-            //      return [
-            //          new WeaviateTreeItem('No vector configuration found', vscode.TreeItemCollapsibleState.None, 'message')
-            //      ];
-            //  }
+            if (vectorItems.length === 0) {
+                 return [
+                     new WeaviateTreeItem('No vector configuration found', vscode.TreeItemCollapsibleState.None, 'message')
+                 ];
+             }
 
             return vectorItems;
         }
@@ -668,46 +655,48 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                 const statsItems: WeaviateTreeItem[] = [];
 
-                // Get object count
-                try {
-                    const aggregate = await client.collections.get(element.collectionName).aggregate.overAll()
-                    const count = aggregate.totalCount || 0;
-                    statsItems.push(new WeaviateTreeItem(
-                        `Objects: ${count.toLocaleString()}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        'objectCount',
-                        new vscode.ThemeIcon('database'),
-                        'weaviateStatistic'
-                    ));
-                } catch (error) {
-                    console.warn('Could not fetch object count:', error);
-                    statsItems.push(new WeaviateTreeItem(
-                        'Objects: Unable to fetch',
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        'objectCount',
-                        new vscode.ThemeIcon('database'),
-                        'weaviateStatistic'
-                    ));
-                }
-
                 // Get tenant count if multi-tenancy is enabled
                 const collection = this.collections[element.connectionId]?.find(
                     item => item.label === element.collectionName
                 );
                 const schema = (collection as any)?.schema;
+                // Get object count
+                if (!schema.multiTenancy?.enabled) {
+                    try {
+                        const aggregate = await client.collections.get(element.collectionName).aggregate.overAll();
+                        const count = aggregate.totalCount || 0;
+                        statsItems.push(new WeaviateTreeItem(
+                            `Objects: ${count.toLocaleString()}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'object',
+                            element.connectionId,
+                            element.collectionName,
+                            'objectCount',
+                            new vscode.ThemeIcon('database'),
+                            'weaviateStatistic'
+                        ));
+                    } catch (error) {
+                        console.warn('Could not fetch object count:', error);
+                        statsItems.push(new WeaviateTreeItem(
+                            'Objects: Unable to fetch',
+                            vscode.TreeItemCollapsibleState.None,
+                            'object',
+                            element.connectionId,
+                            element.collectionName,
+                            'objectCount',
+                            new vscode.ThemeIcon('database'),
+                            'weaviateStatistic'
+                        ));
+                    }
+                }
                 
-                if ((schema as any)?.multiTenancyConfig?.enabled) {
+                if ((schema as any)?.multiTenancy?.enabled) {
                     try {
                         const multiCollection =  client.collections.use(element.collectionName);
                         const tenants = await multiCollection.tenants.get();
+                        const tenantCount = Object.keys(tenants).length;
                         statsItems.push(new WeaviateTreeItem(
-                            `Tenants: ${tenants.length}`,
+                            `Tenants: ${tenantCount}`,
                             vscode.TreeItemCollapsibleState.None,
                             'object',
                             element.connectionId,
@@ -735,7 +724,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 item => item.label === element.collectionName
             );
             
-                         if (!collection) {
+            if (!collection) {
                  return [
                      new WeaviateTreeItem('No sharding information available', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
@@ -745,86 +734,64 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const shardingItems: WeaviateTreeItem[] = [];
             
             // Sharding config
-            if (schema?.shardingConfig) {
-                const config = schema.shardingConfig;
-                
-                if (config.virtualPerPhysical) {
+            if (schema?.sharding) {
+                const config = schema.sharding as ShardingConfig;
+                for (const [key, value] of Object.entries(config)) {
                     shardingItems.push(new WeaviateTreeItem(
-                        `Virtual Per Physical: ${config.virtualPerPhysical}`,
+                        `${key}: ${value}`,
                         vscode.TreeItemCollapsibleState.None,
                         'object',
                         element.connectionId,
                         element.collectionName,
-                        'virtualPerPhysical',
-                        new vscode.ThemeIcon('layout'),
-                        'weaviateSharding'
-                    ));
-                }
-
-                if (config.desiredCount) {
-                    shardingItems.push(new WeaviateTreeItem(
-                        `Desired Count: ${config.desiredCount}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        'desiredCount',
-                        new vscode.ThemeIcon('layout'),
-                        'weaviateSharding'
-                    ));
-                }
-
-                if (config.actualCount) {
-                    shardingItems.push(new WeaviateTreeItem(
-                        `Actual Count: ${config.actualCount}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        'actualCount',
+                        key,
                         new vscode.ThemeIcon('layout'),
                         'weaviateSharding'
                     ));
                 }
             }
+            
+                            
+            // Sharding: Replication config
+            if (schema?.replication) {
 
-            // Replication config
-            if (schema?.replicationConfig) {
-                const replicationFactor = schema.replicationConfig.factor || 1;
-                shardingItems.push(new WeaviateTreeItem(
-                    `Replication Factor: ${replicationFactor}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    'replicationFactor',
-                    new vscode.ThemeIcon('mirror'),
-                    'weaviateSharding'
-                ));
+                for (const [key, value] of Object.entries(schema.replication)) {
+                    shardingItems.push(new WeaviateTreeItem(
+                        `Replication ${key}: ${value}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'object',
+                        element.connectionId,
+                        element.collectionName,
+                        key,
+                        new vscode.ThemeIcon('mirror'),
+                        'weaviateSharding'
+                    ));
+                }
             }
 
             // Multi-tenancy
-            if (schema?.multiTenancyConfig) {
-                const isEnabled = schema.multiTenancyConfig.enabled ? 'Enabled' : 'Disabled';
-                shardingItems.push(new WeaviateTreeItem(
-                    `Multi-Tenancy: ${isEnabled}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    'multiTenancy',
-                    new vscode.ThemeIcon('organization'),
-                    'weaviateSharding'
-                ));
+            if (schema?.multiTenancy) {
+                for (const [key, value] of Object.entries(schema.multiTenancy)) {
+                    shardingItems.push(new WeaviateTreeItem(
+                        `Multi-Tenancy ${key}: ${value}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'object',
+                        element.connectionId,
+                        element.collectionName,
+                        key,
+                        new vscode.ThemeIcon('organization'),
+                        'MultiTenancy'
+                    ));                    
+                }
+               
             }
 
-                         if (shardingItems.length === 0) {
+            if (shardingItems.length === 0) {
                  return [
                      new WeaviateTreeItem('No sharding configuration found', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
              }
 
-                          return shardingItems;
+            return shardingItems;
          }
          else if (element.itemType === 'serverInfo' && element.connectionId) {
              // Server information section
@@ -1173,7 +1140,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const collections = await client.collections.listAll();
             // Store collections with their schema
             if (collections && Array.isArray(collections)) {
-                this.collections[connectionId] = collections.map((collection) => ({
+                this.collections[connectionId] = collections.slice().sort((a, b) => a.name.localeCompare(b.name)).map((collection) => ({
                     label: collection.name,
                     description: collection.description,
                     collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
