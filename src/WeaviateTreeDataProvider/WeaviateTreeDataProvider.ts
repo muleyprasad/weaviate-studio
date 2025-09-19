@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
+import { CollectionConfig, VectorConfig } from 'weaviate-client';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -153,7 +154,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * Generates HTML for displaying detailed schema in a webview
      * @param schema The schema to display
      */
-    private getDetailedSchemaHtml(schema: SchemaClass): string {
+    private getDetailedSchemaHtml(schema: CollectionConfig): string {
         return this.viewRenderer.renderDetailedSchema(schema);
     }
 
@@ -273,7 +274,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     this.getStatusIcon(conn.status),
                     contextValue
                 );
-                item.tooltip = `${conn.name} (${conn.url})\nStatus: ${conn.status}`;
+                item.tooltip = `${conn.name} (${conn.httpHost})\nStatus: ${conn.status}`;
                 
                 // Only expand connected clusters
                 if (conn.status === 'connected') {
@@ -513,61 +514,78 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  ];
              }
             
-            const schema = (collection as any).schema;
-            const vectorItems: WeaviateTreeItem[] = [];
-            
-            // Vectorizer info
-            if (schema?.vectorizer) {
-                vectorItems.push(new WeaviateTreeItem(
-                    `Vectorizer: ${schema.vectorizer}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    'vectorizer',
-                    new vscode.ThemeIcon('gear'),
-                    'weaviateVectorConfig'
-                ));
-            }
+            // const vectorItems: WeaviateTreeItem[] = [];
+            // const schema = collection.schema;
+            // const schema_config = schema.config.get()
+            // // Vectorizer info
+            // if (schema?.vectorizers) {
+            //     schema.vectorizers.forEach((vec: string) => {
+            //         vectorItems.push(new WeaviateTreeItem(
+            //             `Vectorizer: ${vec}`,
+            //             vscode.TreeItemCollapsibleState.None,
+            //             'object',
+            //             element.connectionId,
+            //             element.collectionName,
+            //             'vectorizer',
+            //             new vscode.ThemeIcon('gear'),
+            //             'weaviateVectorConfig'
+            //         ));
+            //     });
+            // }
 
             // Module config
-            if (schema?.moduleConfig) {
-                const moduleNames = Object.keys(schema.moduleConfig);
-                moduleNames.forEach(moduleName => {
+            // if (schema?.moduleConfig) {
+            //     const moduleNames = Object.keys(schema.moduleConfig);
+            //     moduleNames.forEach(moduleName => {
+            //         vectorItems.push(new WeaviateTreeItem(
+            //             `Module: ${moduleName}`,
+            //             vscode.TreeItemCollapsibleState.None,
+            //             'object',
+            //             element.connectionId,
+            //             element.collectionName,
+            //             moduleName,
+            //             new vscode.ThemeIcon('extensions'),
+            //             'weaviateVectorConfig'
+            //         ));
+            //     });
+            // }
+
+            
+            // Vectorizers
+            const vectorItems: WeaviateTreeItem[] = [];
+            for (let key in collection.schema?.vectorizers) {
+               let value = collection.schema?.vectorizers[key];
                     vectorItems.push(new WeaviateTreeItem(
-                        `Module: ${moduleName}`,
+                        `Vector: ${key} - ${value.vectorizer.name}`,
                         vscode.TreeItemCollapsibleState.None,
                         'object',
                         element.connectionId,
                         element.collectionName,
-                        moduleName,
-                        new vscode.ThemeIcon('extensions'),
+                        'vectorIndexType',
+                        new vscode.ThemeIcon('list-tree'),
                         'weaviateVectorConfig'
                     ));
-                });
             }
+            // if (collection.schema?.vectorizers) {
+            //     vectorItems.push(new WeaviateTreeItem(
+            //         `Index Type: ${collection.schema.vectorIndexType}`,
+            //         vscode.TreeItemCollapsibleState.None,
+            //         'object',
+            //         element.connectionId,
+            //         element.collectionName,
+            //         'vectorIndexType',
+            //         new vscode.ThemeIcon('list-tree'),
+            //         'weaviateVectorConfig'
+            //     ));
+            // }
 
-            // Vector index type
-            if (schema?.vectorIndexType) {
-                vectorItems.push(new WeaviateTreeItem(
-                    `Index Type: ${schema.vectorIndexType}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    'vectorIndexType',
-                    new vscode.ThemeIcon('list-tree'),
-                    'weaviateVectorConfig'
-                ));
-            }
+            //              if (vectorItems.length === 0) {
+            //      return [
+            //          new WeaviateTreeItem('No vector configuration found', vscode.TreeItemCollapsibleState.None, 'message')
+            //      ];
+            //  }
 
-                         if (vectorItems.length === 0) {
-                 return [
-                     new WeaviateTreeItem('No vector configuration found', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-
-             return vectorItems;
+            return vectorItems;
         }
         else if (element.itemType === 'indexes' && element.connectionId && element.collectionName) {
             // Indexes section
@@ -585,7 +603,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const indexItems: WeaviateTreeItem[] = [];
             
             // Inverted index
-            if (schema?.invertedIndexConfig) {
+            if (schema?.InvertedIndexConfig) {
                 indexItems.push(new WeaviateTreeItem(
                     'Inverted Index: Enabled',
                     vscode.TreeItemCollapsibleState.None,
@@ -652,12 +670,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                 // Get object count
                 try {
-                    const aggregate = await client.graphql.aggregate()
-                        .withClassName(element.collectionName)
-                        .withFields('meta { count }')
-                        .do();
-                    
-                    const count = aggregate?.data?.Aggregate?.[element.collectionName]?.[0]?.meta?.count || 0;
+                    const aggregate = await client.collections.get(element.collectionName).aggregate.overAll()
+                    const count = aggregate.totalCount || 0;
                     statsItems.push(new WeaviateTreeItem(
                         `Objects: ${count.toLocaleString()}`,
                         vscode.TreeItemCollapsibleState.None,
@@ -690,7 +704,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 
                 if ((schema as any)?.multiTenancyConfig?.enabled) {
                     try {
-                        const tenants = await client.schema.tenantsGetter(element.collectionName).do();
+                        const multiCollection =  client.collections.use(element.collectionName);
+                        const tenants = await multiCollection.tenants.get();
                         statsItems.push(new WeaviateTreeItem(
                             `Tenants: ${tenants.length}`,
                             vscode.TreeItemCollapsibleState.None,
@@ -825,7 +840,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                  // Get server meta information
                  try {
-                     const meta = await client.misc.metaGetter().do();
+                     const meta = await client.getMeta();
                      
                      if (meta.version) {
                          serverItems.push(new WeaviateTreeItem(
@@ -840,14 +855,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                          ));
                      }
 
-                     if (meta.gitHash) {
+                     if (meta.grpcMaxMessageSize) {
                          serverItems.push(new WeaviateTreeItem(
-                             `Git Hash: ${meta.gitHash.substring(0, 8)}`,
+                             `gRPC Max Message Size: ${meta.grpcMaxMessageSize}`,
                              vscode.TreeItemCollapsibleState.None,
                              'object',
                              element.connectionId,
                              undefined,
-                             'gitHash',
+                             'grpcMaxMessageSize',
                              new vscode.ThemeIcon('git-commit'),
                              'weaviateServerDetail'
                          ));
@@ -897,7 +912,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                  try {
                      // Try to get cluster status (this might not be available in all Weaviate versions)
-                     const meta = await client.misc.metaGetter().do();
+                     const meta = await client.cluster.nodes();
                      
                      // Show basic connectivity status
                      healthItems.push(new WeaviateTreeItem(
@@ -912,8 +927,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                      ));
 
                      // If we can get schema, show collection count
-                     const schema = await client.schema.getter().do();
-                     const collectionCount = schema?.classes?.length || 0;
+                     const collections = await client.collections.listAll();
+                     const collectionCount = collections.length;
                      healthItems.push(new WeaviateTreeItem(
                          `Collections: ${collectionCount}`,
                          vscode.TreeItemCollapsibleState.None,
@@ -960,15 +975,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  const moduleItems: WeaviateTreeItem[] = [];
 
                  try {
-                     const meta = await client.misc.metaGetter().do();
+                     const meta = await client.getMeta();
                      
                      if (meta.modules) {
                          const modules = Object.keys(meta.modules);
                          
                          if (modules.length > 0) {
                              modules.forEach(moduleName => {
-                                 const moduleInfo = meta.modules[moduleName];
-                                 const version = moduleInfo?.version || 'unknown';
+                                 const moduleInfo = meta.modules?.[moduleName];
+                                 const version = meta.version || 'unknown';
                                  
                                  moduleItems.push(new WeaviateTreeItem(
                                      `${moduleName} (v${version})`,
@@ -1020,7 +1035,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // --- Connection Management Methods ---
     
     // Add a new connection
-    async addConnection(connectionDetails?: { name: string; url: string; apiKey?: string }): Promise<WeaviateConnection | null> {
+    async addConnection(connectionDetails?: WeaviateConnection): Promise<WeaviateConnection | null> {
         try {
             if (!connectionDetails) {
                 // If no details provided, show the dialog
@@ -1028,13 +1043,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             }
 
             // Validate connection details
-            if (!connectionDetails.name || !connectionDetails.url) {
-                throw new Error('Name and URL are required');
+            if (!connectionDetails.name || !connectionDetails.httpHost) {
+                throw new Error('Name and HTTP host are required');
             }
-
-            // Add the connection
+            // Add the connection with required fields
             const connection = await this.connectionManager.addConnection(connectionDetails);
-            
+
             if (connection) {
                 // Try to connect to the new connection
                 await this.connect(connection.id);
@@ -1142,6 +1156,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     
     // Fetch collections from Weaviate
     async fetchCollections(connectionId: string): Promise<void> {
+        console.log("Fetching collections for ", connectionId);
         try {
             const connection = this.connectionManager.getConnection(connectionId);
             if (!connection) {
@@ -1154,23 +1169,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 throw new Error('Client not initialized');
             }
 
-            // Get schema from Weaviate
-            const schema = await client.schema.getter().do() as { classes?: ExtendedSchemaClass[] };
-            
+            // Get collections from Weaviate
+            const collections = await client.collections.listAll();
             // Store collections with their schema
-            if (schema.classes && Array.isArray(schema.classes)) {
-                this.collections[connectionId] = schema.classes.map((cls: ExtendedSchemaClass) => ({
-                    label: cls.class,
-                    description: '',
+            if (collections && Array.isArray(collections)) {
+                this.collections[connectionId] = collections.map((collection) => ({
+                    label: collection.name,
+                    description: collection.description,
                     collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                     itemType: 'collection',
                     connectionId: connectionId,
-                    collectionName: cls.class,
+                    collectionName: collection.name,
                     iconPath: new vscode.ThemeIcon('database'),
                     contextValue: 'weaviateCollection',
-                    tooltip: cls.description,
-                    schema: cls
-                } as CollectionWithSchema));
+                    tooltip: collection.description,
+                    schema: collection
+                } as unknown as CollectionWithSchema));
             } else {
                 this.collections[connectionId] = [];
             }
@@ -1224,9 +1238,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             }
             
             // Delete the collection using the schema API
-            await client.schema.classDeleter()
-                .withClassName(collectionName)
-                .do();
+            await client.collections.delete(collectionName);
             
             // Update local state
             if (this.collections[connectionId]) {
@@ -1384,10 +1396,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 // Also send server version information
                                 try {
                                     if (client) {
-                                        const meta = await client.misc.metaGetter().do();
+                                        const version = (await client.getMeta()).version;
                                         panel.webview.postMessage({
                                             command: 'serverVersion',
-                                            version: meta.version || 'unknown'
+                                            version: version || 'unknown'
                                         });
                                     }
                                 } catch (_) {
@@ -1465,9 +1477,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
         
         // Create the collection using the schema API
-        await client.schema.classCreator()
-            .withClass(schemaObject)
-            .do();
+        await client.collections.createFromSchema(schemaObject)
     }
 
     /**
@@ -1496,7 +1506,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 throw new Error('Client not initialized');
             }
 
-            const meta = await client.misc.metaGetter().do();
+            const meta = await client.getMeta();
             
             // If no modules info available, return all vectorizers
             if (!meta?.modules) {

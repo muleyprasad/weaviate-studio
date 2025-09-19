@@ -1,13 +1,18 @@
 import * as vscode from 'vscode';
-import weaviate from 'weaviate-ts-client';
+import weaviate, { WeaviateClient } from 'weaviate-client';
 
 export interface WeaviateConnection {
     id: string;
     name: string;
-    url: string;
     apiKey?: string;
     status: 'connected' | 'disconnected';
     lastUsed?: number;
+    httpHost: string;
+    httpPort: number;
+    grpcHost: string;
+    grpcPort: number;
+    grpcSecure: boolean;
+    httpSecure: boolean;
 }
 
 export class ConnectionManager {
@@ -16,7 +21,7 @@ export class ConnectionManager {
     private _onConnectionsChanged = new vscode.EventEmitter<void>();
     public readonly onConnectionsChanged = this._onConnectionsChanged.event;
     private connections: WeaviateConnection[] = [];
-    private clients: Map<string, any> = new Map();
+    private clients: Map<string, WeaviateClient> = new Map();
 
     private constructor(private readonly context: vscode.ExtensionContext) {
         this.loadConnections();
@@ -46,23 +51,11 @@ export class ConnectionManager {
 
     public async addConnection(connection: Omit<WeaviateConnection, 'id' | 'status'>): Promise<WeaviateConnection> {
         try {
-            // Validate connection URL
-            try {
-                new URL(connection.url);
-            } catch (error) {
-                throw new Error('Invalid URL format. Please include http:// or https://');
-            }
 
             // Check for duplicate connection names
             const nameExists = this.connections.some(c => c.name.toLowerCase() === connection.name.toLowerCase());
             if (nameExists) {
                 throw new Error('A connection with this name already exists');
-            }
-
-            // Check for duplicate URLs
-            const urlExists = this.connections.some(c => c.url === connection.url);
-            if (urlExists) {
-                throw new Error('A connection with this URL already exists');
             }
 
             const newConnection: WeaviateConnection = {
@@ -123,15 +116,11 @@ export class ConnectionManager {
         }
 
         try {
-            const client = weaviate.client({
-                scheme: connection.url.startsWith('https') ? 'https' : 'http',
-                host: connection.url.replace(/^https?:\/\//, ''),
-                apiKey: connection.apiKey ? new weaviate.ApiKey(connection.apiKey) : undefined,
-            });
+            const client = await weaviate.connectToCustom(connection);
 
             // Test connection by getting server meta
-            await client.misc.metaGetter().do();
-            
+
+            const is_ready = await client.isReady();
             this.clients.set(id, client);
             const updated = await this.updateConnection(id, { status: 'connected' });
             return updated || null;
@@ -152,7 +141,7 @@ export class ConnectionManager {
         }
     }
 
-    public getClient(id: string): any | undefined {
+    public getClient(id: string): WeaviateClient | undefined {
         return this.clients.get(id);
     }
 
@@ -188,22 +177,11 @@ export class ConnectionManager {
                     switch (message.command) {
                         case 'save':
                             try {
-                                const { name, url, apiKey } = message.connection;
-                                if (!name || !url) {
+                                const { name, httpHost, apiKey } = message.connection;
+                                if (!name || !httpHost) {
                                     panel.webview.postMessage({
                                         command: 'error',
-                                        message: 'Name and URL are required'
-                                    });
-                                    return;
-                                }
-
-                                // Validate URL format
-                                try {
-                                    new URL(url);
-                                } catch (e) {
-                                    panel.webview.postMessage({
-                                        command: 'error',
-                                        message: 'Please enter a valid URL (e.g., http://localhost:8080)'
+                                        message: 'Name and httpHost are required'
                                     });
                                     return;
                                 }
@@ -212,16 +190,17 @@ export class ConnectionManager {
                                 
                                 if (isEditMode && connection) {
                                     // Update existing connection
-                                    updatedConnection = await this.updateConnection(connection.id, {
-                                        name: name.trim(),
-                                        url: url.trim(),
-                                        apiKey: apiKey?.trim() || undefined
-                                    });
+                                    updatedConnection = await this.updateConnection(connection.id,connection);
                                 } else {
                                     // Add new connection
                                     updatedConnection = await this.addConnection({
-                                        name: name.trim(),
-                                        url: url.trim(),
+                                        name: message.connection.name.trim(),
+                                        httpHost: message.connection.httpHost.trim(),
+                                        httpPort: message.connection.httpPort,
+                                        grpcHost: message.connection.grpcHost.trim(),
+                                        grpcPort: message.connection.grpcPort,
+                                        grpcSecure: message.connection.grpcSecure,
+                                        httpSecure: message.connection.httpSecure,
                                         apiKey: apiKey?.trim() || undefined
                                     });
                                 }
@@ -320,11 +299,47 @@ export class ConnectionManager {
                     <input type="text" id="connectionName" placeholder="e.g., Production Cluster" value="${connection?.name || ''}">
                     <div id="nameError" class="error"></div>
                 </div>
+
+                <!-- httpHost -->
                 <div class="form-group">
-                    <label for="connectionUrl">Weaviate URL</label>
-                    <input type="text" id="connectionUrl" placeholder="http://localhost:8080" value="${connection?.url || ''}">
-                    <div id="urlError" class="error"></div>
+                    <label for="httpHost">Weaviate HTTP Host</label>
+                    <input type="text" id="httpHost" placeholder="localhost" value="${connection?.httpHost || 'localhost'}">
+                    <div id="httpHostError" class="error"></div>
                 </div>
+                <!-- httpPort -->
+                <div class="form-group">
+                    <label for="httpPort">Weaviate HTTP Port</label>
+                    <input type="number" id="httpPort" placeholder="8080" value="${connection?.httpPort || 8080}">
+                    <div id="httpPortError" class="error"></div>
+                </div>
+                <!-- httpSecure -->
+                <div class="form-group">
+                    <label for="httpSecure">
+                        <input type="checkbox" id="httpSecure" ${connection?.httpSecure ? 'checked' : ''}>
+                        Use Secure HTTP (HTTPS)
+                    </label>
+                </div>                
+                <!-- grpcHost -->
+                <div class="form-group">
+                    <label for="grpcHost">Weaviate gRPC Host</label>
+                    <input type="text" id="grpcHost" placeholder="localhost" value="${connection?.grpcHost || 'localhost'}">
+                    <div id="grpcHostError" class="error"></div>
+                </div>
+                <!-- grpcPort -->
+                <div class="form-group">
+                    <label for="grpcPort">Weaviate gRPC Port</label>
+                    <input type="number" id="grpcPort" placeholder="9090" value="${connection?.grpcPort || 50051}">
+                    <div id="grpcPortError" class="error"></div>
+                </div>
+                <!-- grpcSecure -->
+                <div class="form-group">
+                    <label for="grpcSecure">
+                        <input type="checkbox" id="grpcSecure" ${connection?.grpcSecure ? 'checked' : ''}>
+                        Use Secure gRPC (TLS)
+                    </label>
+                </div>
+
+                <!-- apiKey -->
                 <div class="form-group">
                     <label for="apiKey">API Key (optional)</label>
                     <input type="password" id="apiKey" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
@@ -340,7 +355,12 @@ export class ConnectionManager {
                     
                     document.getElementById('saveButton').addEventListener('click', () => {
                         const name = document.getElementById('connectionName').value.trim();
-                        const url = document.getElementById('connectionUrl').value.trim();
+                        const httpHost = document.getElementById('httpHost').value.trim();
+                        const httpPort = parseInt(document.getElementById('httpPort').value.trim(), 10);
+                        const grpcHost = document.getElementById('grpcHost').value.trim();
+                        const grpcPort = parseInt(document.getElementById('grpcPort').value.trim(), 10);
+                        const grpcSecure = document.getElementById('grpcSecure').checked;
+                        const httpSecure = document.getElementById('httpSecure').checked;
                         const apiKey = document.getElementById('apiKey').value.trim();
                         
                         // Clear previous errors
@@ -355,15 +375,15 @@ export class ConnectionManager {
                             return;
                         }
                         
-                        if (!url) {
-                            showError('urlError', 'URL is required');
+                        if (!httpHost) {
+                            showError('httpHostError', 'HTTP Host is required');
                             return;
                         }
                         
                         // Send data to extension
                         vscode.postMessage({
                             command: 'save',
-                            connection: { name, url, apiKey }
+                            connection: { name, httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey }
                         });
                     });
                     

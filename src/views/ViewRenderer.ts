@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SchemaProperty, SchemaClass } from '../types';
+import { CollectionConfig } from 'weaviate-client';
 
 /**
  * Service responsible for rendering views in webview panels
@@ -127,7 +128,7 @@ export class ViewRenderer {
     /**
      * Renders detailed schema view with multiple tabs
      */
-    public renderDetailedSchema(schema: SchemaClass): string {
+    public renderDetailedSchema(schema: CollectionConfig): string {
         const formatDataType = (dataType: string | string[] | undefined): string => {
             if (!dataType) {
                 return 'Unknown';
@@ -147,17 +148,15 @@ export class ViewRenderer {
                 ${prop.description ? `<div class="property-description">${this.escapeHtml(prop.description)}</div>` : ''}
                 <div class="property-details">
                     <span class="property-detail">Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</span>
-                    ${prop.moduleConfig ? `<span class="property-detail">Module: ${Object.keys(prop.moduleConfig).join(', ')}</span>` : ''}
                 </div>
             </div>
         `).join('') || '<div>No properties found</div>';
 
         // Generate REST API equivalent for collection creation
         const apiEquivalent = {
-            class: schema.class,
+            class: schema.name,
             description: schema.description,
-            vectorizer: schema.vectorizer,
-            moduleConfig: schema.moduleConfig,
+            vectorizers: schema.vectorizers,
             properties: schema.properties,
             vectorIndexType: (schema as any).vectorIndexType || 'hnsw',
             vectorIndexConfig: (schema as any).vectorIndexConfig,
@@ -199,7 +198,7 @@ export class ViewRenderer {
         // Generate creation script for the 5th tab
         const creationScript = `# Weaviate Collection Definition
 # Generated on: ${new Date().toLocaleString()}
-# Collection: ${schema.class}
+# Collection: ${schema.name}
 
 # ========================================
 # CREATE COLLECTION SCRIPT
@@ -207,13 +206,13 @@ export class ViewRenderer {
 
 import weaviate
 
-client = weaviate.Client("http://localhost:8080")
+client = weaviate.connectToLocal()
 
 # Collection definition
 collection_config = ${JSON.stringify(apiEquivalent, null, 4)}
 
 # Create the collection
-client.schema.create_class(collection_config)
+client.collections.create_from_dict(collection_config)
 
 # ========================================
 # EQUIVALENT REST API CALL
@@ -226,7 +225,6 @@ Property: ${prop.name}
   Type: ${Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType}
   Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}
   ${prop.description ? `Description: ${prop.description}` : ''}
-  ${prop.moduleConfig ? `Module Config: ${JSON.stringify(prop.moduleConfig, null, 2)}` : ''}
 `).join('\n') || 'No properties defined';
 
         return `
@@ -235,7 +233,7 @@ Property: ${prop.name}
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Schema: ${this.escapeHtml(schema.class)}</title>
+                <title>Collection: ${this.escapeHtml(schema.name)}</title>
                 <style>
                     body {
                         font-family: var(--vscode-font-family);
@@ -517,7 +515,7 @@ Property: ${prop.name}
             </head>
             <body>
                 <div class="header">
-                    <h1>Schema: ${this.escapeHtml(schema.class)}</h1>
+                    <h1>Collection Name: ${this.escapeHtml(schema.name)}</h1>
                 </div>
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('overview')">Overview</div>
@@ -534,19 +532,16 @@ Property: ${prop.name}
                     <div class="section-content">
                         <div class="config-grid">
                             <div class="config-item">
-                                <span class="config-label">Vectorizer:</span>
-                                <span class="config-value">${this.escapeHtml(schema.vectorizer || 'None')}</span>
+                                <span class="config-label">Vectorizers:</span>
+                                
+
+                                <span class="config-value"></span>
                             </div>
                             <div class="config-item">
                                 <span class="config-label">Index Type:</span>
                                 <span class="config-value">${this.escapeHtml((schema as any).vectorIndexType || 'HNSW')}</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="section-header">Module Configuration</div>
-                    <div class="section-content">
-                        <pre><code>${this.formatJsonClean(schema.moduleConfig)}</code></pre>
                     </div>
                     
                     ${scalingHtml}
@@ -790,14 +785,14 @@ Property: ${prop.name}
     /**
      * Renders raw collection configuration view
      */
-    public renderRawConfig(schema: SchemaClass, connectionId: string): string {
+    public renderRawConfig(schema: CollectionConfig, connectionId: string): string {
         // Get connection info for context
         const timestamp = new Date().toLocaleString();
         
         // Generate creation script
         const creationScript = `# Weaviate Collection Configuration
 # Generated: ${timestamp}
-# Collection: ${schema.class}
+# Collection: ${schema.name}
 
 import weaviate
 
@@ -817,7 +812,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Raw Config: ${this.escapeHtml(schema.class)}</title>
+                <title>Raw Config: ${this.escapeHtml(schema.name)}</title>
                 <style>
                     body {
                         font-family: var(--vscode-font-family);
@@ -898,7 +893,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
                     
                     <div id="creation" class="tab-content active">
                         <div class="context-info">
-                            <strong>Collection:</strong> ${this.escapeHtml(schema.class)}<br>
+                            <strong>Collection:</strong> ${this.escapeHtml(schema.name)}<br>
                             <strong>Generated:</strong> ${timestamp}<br>
                             <strong>Properties:</strong> ${schema.properties?.length || 0}
                         </div>
@@ -913,7 +908,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
                         <h3>Property Details</h3>
                         ${schema.properties?.map(prop => `
                             <div style="background: var(--vscode-editor-lineHighlightBackground); padding: 10px; margin: 10px 0; border-radius: 4px;">
-                                <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType?.join(' | ') || 'Unknown'})<br>
+                                <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType || 'Unknown'})<br>
                                 ${prop.description ? `<em>${this.escapeHtml(prop.description)}</em><br>` : ''}
                                 <small>Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</small>
                             </div>
@@ -977,11 +972,16 @@ print(f"Collection '{schema.class}' created successfully!")`;
         const apiEquivalent = this.convertToApiFormat(schema);
         return `import weaviate
 
-client = weaviate.Client("http://localhost:8080")
+const client = await weaviate.connectToLocal({
+    host: process.env.WEAVIATE_HOST || 'localhost',
+    port: parseInt(process.env.WEAVIATE_PORT || '8080'),
+    grpcPort: parseInt(process.env.WEAVIATE_GRPC_PORT || '50051'),
+    headers: { 'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY as string }, // Replace with your inference API key
+  });
 
 schema = ${JSON.stringify(apiEquivalent, null, 2)}
 
-client.schema.create_class(schema)`;
+client.collections.createFromSchema(schema)`;
     }
 
     private convertToApiFormat(schema: any): any {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { WeaviateConnection } from '../services/ConnectionManager';
+import { CollectionConfig } from 'weaviate-client';
 
 // Extended schema interfaces to include vector-related fields
 export interface ExtendedSchemaProperty extends SchemaProperty {
@@ -54,7 +55,7 @@ export interface SchemaClass {
  * Extends WeaviateTreeItem to include schema information
  */
 export interface CollectionWithSchema extends WeaviateTreeItem {
-    schema?: SchemaClass;
+    schema?: CollectionConfig;
 }
 
 /**

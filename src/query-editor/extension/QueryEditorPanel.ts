@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { URL } from 'url';
 import { ConnectionManager } from '../../services/ConnectionManager';
-import { WeaviateClient } from 'weaviate-ts-client';
+import { WeaviateClient } from 'weaviate-client';
 
 // Helper function to generate a nonce
 function getNonce() {
@@ -514,9 +514,9 @@ export class QueryEditorPanel {
                 
                 let weaviateImport;
                 try {
-                    weaviateImport = await import('weaviate-ts-client');
+                    weaviateImport = await import('weaviate-client');
                 } catch (e) {
-                    vscode.window.showErrorMessage('Weaviate TS Client not found. Please ensure it is installed in your project.');
+                    vscode.window.showErrorMessage('Weaviate Client not found. Please ensure it is installed in your project.');
                     return null;
                 }
 
