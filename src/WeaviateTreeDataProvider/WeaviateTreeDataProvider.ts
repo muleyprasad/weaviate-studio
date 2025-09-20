@@ -208,9 +208,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         } else if (element.itemType === 'serverInfo' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('server');
             element.tooltip = 'Server version and information';
-        } else if (element.itemType === 'clusterHealth' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('pulse');
-            element.tooltip = 'Cluster status and health';
         } else if (element.itemType === 'modules' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('extensions');
             element.tooltip = 'Available Weaviate modules';
@@ -325,21 +322,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 'weaviateServerInfo'
             ));
 
-            // Add cluster health section
-            items.push(new WeaviateTreeItem(
-                'Cluster Health',
-                vscode.TreeItemCollapsibleState.Collapsed,
-                'clusterHealth',
-                element.connectionId,
-                undefined,
-                'clusterHealth',
-                new vscode.ThemeIcon('pulse'),
-                'weaviateClusterHealth'
-            ));
-
             // Add cluster nodes section
             items.push(new WeaviateTreeItem(
-                'Nodes',
+                `Nodes (${this.clusterNodesCache[element.connectionId]?.length || 0})`,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 'clusterNodes',
                 element.connectionId,
@@ -878,68 +863,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  ];
              }
         }
-         else if (element.itemType === 'clusterHealth' && element.connectionId) {
-             // Cluster health section
-             try {
-                 const client = this.connectionManager.getClient(element.connectionId);
-                 if (!client) {
-                     return [
-                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
-                     ];
-                 }
 
-                 const healthItems: WeaviateTreeItem[] = [];
-
-                 try {
-                     
-                     // Show basic connectivity status
-                     healthItems.push(new WeaviateTreeItem(
-                         'Status: Connected',
-                         vscode.TreeItemCollapsibleState.None,
-                         'object',
-                         element.connectionId,
-                         undefined,
-                         'status',
-                         new vscode.ThemeIcon('check', new vscode.ThemeColor('testing.iconPassed')),
-                         'weaviateClusterDetail'
-                     ));
-
-                     // If we can get schema, show collection count
-                     const collections = await client.collections.listAll();
-                     const collectionCount = collections.length;
-                     healthItems.push(new WeaviateTreeItem(
-                         `Collections: ${collectionCount}`,
-                         vscode.TreeItemCollapsibleState.None,
-                         'object',
-                         element.connectionId,
-                         undefined,
-                         'collectionCount',
-                         new vscode.ThemeIcon('database'),
-                         'weaviateClusterDetail'
-                     ));
-
-                 } catch (error) {
-                     console.warn('Could not fetch cluster health:', error);
-                     healthItems.push(new WeaviateTreeItem(
-                         'Status: Connected (limited info)',
-                         vscode.TreeItemCollapsibleState.None,
-                         'object',
-                         element.connectionId,
-                         undefined,
-                         'status',
-                         new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground')),
-                         'weaviateClusterDetail'
-                     ));
-                 }
-
-                 return healthItems;
-             } catch (error) {
-                 console.error('Error fetching cluster health:', error);
-                 return [
-                     new WeaviateTreeItem('Error fetching cluster health', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-        }
          else if (element.itemType === 'modules' && element.connectionId) {
              // Available modules section
              try {
@@ -1018,8 +942,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 const clusterNodeItems: WeaviateTreeItem[] = [];
 
                 try {
-                    const clusterNodes = await client.cluster.nodes({output: 'verbose'});
-                    this.clusterNodesCache[element.connectionId] = clusterNodes;
+                    const clusterNodes = this.clusterNodesCache[element.connectionId];
                     if (clusterNodes && clusterNodes.length > 0) {
                         clusterNodes.forEach(node => {
                             clusterNodeItems.push(new WeaviateTreeItem(
@@ -1319,6 +1242,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Get metaData from Weaviate
             const metaData = await client.getMeta();
             this.clusterMetadataCache[connectionId] = metaData;
+
+            // Get Nodes from Weaviate
+            const clusterNodes = await client.cluster.nodes({output: 'verbose'});
+            this.clusterNodesCache[connectionId] = clusterNodes;
+
             // Refresh the tree view to show updated collections
             this.refresh();
             
