@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
-import { CollectionConfig, ShardingConfig, VectorConfig } from 'weaviate-client';
+import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
+import { skip } from 'node:test';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -28,6 +29,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     
     /** Map of connection IDs to their collections */
     private collections: CollectionsMap = {};
+
+    /** Cache of cluster nodes per connection */
+    private clusterNodesCache: Record<string, Node<"verbose">[]> = {};
     
     /** VS Code extension context */
     private readonly context: vscode.ExtensionContext;
@@ -330,6 +334,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 new vscode.ThemeIcon('pulse'),
                 'weaviateClusterHealth'
             ));
+
+            // Add cluster nodes section
+            items.push(new WeaviateTreeItem(
+                'Nodes',
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'clusterNodes',
+                element.connectionId,
+                undefined,
+                'clusterNodes',
+                new vscode.ThemeIcon('terminal-ubuntu'),
+                'weaviateClusterNodes'
+            ));            
 
             // Add modules section
             items.push(new WeaviateTreeItem(
@@ -792,7 +808,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
              }
 
             return shardingItems;
-         }
+        }
          else if (element.itemType === 'serverInfo' && element.connectionId) {
              // Server information section
              try {
@@ -864,7 +880,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                      new WeaviateTreeItem('Error fetching server information', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
              }
-         }
+        }
          else if (element.itemType === 'clusterHealth' && element.connectionId) {
              // Cluster health section
              try {
@@ -878,8 +894,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  const healthItems: WeaviateTreeItem[] = [];
 
                  try {
-                     // Try to get cluster status (this might not be available in all Weaviate versions)
-                     const meta = await client.cluster.nodes();
                      
                      // Show basic connectivity status
                      healthItems.push(new WeaviateTreeItem(
@@ -928,7 +942,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                      new WeaviateTreeItem('Error fetching cluster health', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
              }
-         }
+        }
          else if (element.itemType === 'modules' && element.connectionId) {
              // Available modules section
              try {
@@ -994,7 +1008,155 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                      new WeaviateTreeItem('Error fetching modules', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
              }
-         }
+        }
+         else if (element.itemType === 'clusterNodes' && element.connectionId) {
+            try {
+                const client = this.connectionManager.getClient(element.connectionId);
+                if (!client) {
+                    return [
+                        new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
+                    ];
+                }
+
+                const clusterNodeItems: WeaviateTreeItem[] = [];
+
+                try {
+                    const clusterNodes = await client.cluster.nodes({output: 'verbose'});
+                    this.clusterNodesCache[element.connectionId] = clusterNodes;
+                    if (clusterNodes && clusterNodes.length > 0) {
+                        clusterNodes.forEach(node => {
+                            clusterNodeItems.push(new WeaviateTreeItem(
+                                `${node.status === "HEALTHY" ? '🟩' : '🟥'} ${node.name} (${node.stats.objectCount} objects and ${node.stats.shardCount} shards)`,
+                                vscode.TreeItemCollapsibleState.Collapsed,
+                                'clusterNode',
+                                element.connectionId,
+                                undefined,
+                                node.name,
+                                new vscode.ThemeIcon('server'),
+                                'weaviateClusterNode'
+                            ));
+                        });
+                    } else {
+                        clusterNodeItems.push(new WeaviateTreeItem(
+                            'No cluster nodes available',
+                            vscode.TreeItemCollapsibleState.None,
+                            'message'
+                        ));
+                    }
+                } catch (error) {
+                    console.warn('Could not fetch cluster nodes:', error);
+                    clusterNodeItems.push(new WeaviateTreeItem(
+                        'Unable to fetch cluster node information',
+                        vscode.TreeItemCollapsibleState.None,
+                        'message'
+                    ));
+                }
+                return clusterNodeItems;
+            } catch (error) {
+                console.error('Error fetching cluster nodes:', error);
+                return [
+                    new WeaviateTreeItem('Error fetching cluster nodes', vscode.TreeItemCollapsibleState.None, 'message')
+                ];
+            }
+        }
+        else if (element.itemType === 'clusterNode' && element.connectionId ) {
+            try {
+                console.log("element.itemId", element.itemId);
+                const node = this.clusterNodesCache[element.connectionId]?.find(n => n.name === element.itemId);
+                console.log("node", JSON.stringify(node));
+                if (!node) {
+                    return [ new WeaviateTreeItem('No node details to show', vscode.TreeItemCollapsibleState.None, 'message') ];
+                }
+
+                const nodeDetails: WeaviateTreeItem[] = [];
+                // Flatten an object one level deep
+                function flattenNode(node: Record<string, unknown>): Record<string, unknown> {
+                    return Object.keys(node).reduce((acc, key) => {
+                        if (key !== 'shards') {
+                            const value = node[key];
+                            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                                Object.keys(value).forEach(subKey => {
+                                    acc[`${key} ${subKey}`] = (value as Record<string, unknown>)[subKey];
+                                });
+                            } else {
+                                acc[key] = value;
+                            }
+                        }
+                        return acc;
+                    }, {} as Record<string, unknown>);
+                }
+
+                const flatten_node = flattenNode(node);
+                // sort this object
+                const sorted_flatten_node = Object.keys(flatten_node).sort().reduce((obj, key) => {
+                    obj[key] = flatten_node[key];
+                    return obj;
+                }, {} as Record<string, unknown>);
+
+                // Node status except for shards key
+                Object.keys(flatten_node).forEach(key => {
+                    const value = flatten_node[key]; 
+
+                    nodeDetails.push(new WeaviateTreeItem(
+                        `${key}: ${value}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'object',
+                        element.connectionId,
+                        undefined,
+                        'status',
+                        new vscode.ThemeIcon(
+                            node.status === 'HEALTHY' ? 'check' : 'warning',
+                            new vscode.ThemeColor(node.status === 'HEALTHY' ? 'testing.iconPassed' : 'problemsWarningIcon.foreground')
+                        ),
+                        'weaviateClusterNodeDetail'
+                    ));
+                });
+
+                // Optionally, add more node details here if needed
+                return nodeDetails;
+            } catch (error) {
+                console.error(`Error fetching node details for node ${element.label}:`, error);
+                return [ new WeaviateTreeItem('Error fetching node details', vscode.TreeItemCollapsibleState.None, 'message') ];
+            }
+        }
+        else if (element.itemType === 'clusterShards' && element.connectionId) {
+            try {
+                const shards = this.clusterNodesCache[element.connectionId]?.find(n => n.name === element.label)?.shards || [];
+                if (!shards) {
+                    return [ new WeaviateTreeItem('No Shards to show', vscode.TreeItemCollapsibleState.None, 'message') ];
+                }
+                console.log("shards", shards);
+                console.log("cache", JSON.stringify(this.clusterNodesCache[element.connectionId]));
+
+                const shardItems: WeaviateTreeItem[] = [];
+
+                if (shards.length > 0) {
+                    shards.forEach(shard => {
+                        shardItems.push(new WeaviateTreeItem(
+                            `Shard ${shard.name} - ${shard.class}`,
+                            vscode.TreeItemCollapsibleState.None,
+                            'clusterShards',
+                            element.connectionId,
+                            undefined,
+                            shard.name,
+                            new vscode.ThemeIcon('database'),
+                            'weaviateClusterShard'
+                        ));
+                    });
+                } else {
+                    shardItems.push(new WeaviateTreeItem(
+                        'No shards available',
+                        vscode.TreeItemCollapsibleState.None,
+                        'message'
+                    ));
+                }
+
+                return shardItems;
+            } catch (error) {
+                console.error(`Error fetching shards for node ${element.nodeName}:`, error);
+                return [ new WeaviateTreeItem('Error fetching shard info', vscode.TreeItemCollapsibleState.None, 'message') ];
+            }        
+        }
          
          return [];
     }
@@ -1123,7 +1285,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     
     // Fetch collections from Weaviate
     async fetchCollections(connectionId: string): Promise<void> {
-        console.log("Fetching collections for ", connectionId);
+
         try {
             const connection = this.connectionManager.getConnection(connectionId);
             if (!connection) {
@@ -1444,7 +1606,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
         
         // Create the collection using the schema API
-        await client.collections.createFromSchema(schemaObject)
+        await client.collections.createFromSchema(schemaObject);
     }
 
     /**

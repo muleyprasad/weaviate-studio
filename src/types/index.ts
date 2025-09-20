@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { WeaviateConnection } from '../services/ConnectionManager';
-import { CollectionConfig } from 'weaviate-client';
+import { CollectionConfig, Node } from 'weaviate-client';
 
 // Extended schema interfaces to include vector-related fields
 export interface ExtendedSchemaProperty extends SchemaProperty {
@@ -56,6 +56,7 @@ export interface SchemaClass {
  */
 export interface CollectionWithSchema extends WeaviateTreeItem {
     schema?: CollectionConfig;
+    nodes?: Node<"verbose">[];
 }
 
 /**
@@ -94,7 +95,7 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'indexes' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup',
+        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'indexes' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup' | 'clusterNodes' | 'clusterNode' | 'clusterShards',
         public readonly connectionId?: string,
         public readonly collectionName?: string,
         public readonly itemId?: string,
