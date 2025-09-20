@@ -51,12 +51,29 @@ export interface SchemaClass {
     [key: string]: unknown;
 }
 
+export interface WeaviateMetadata {
+        /**
+         * Format: url
+         * @description The url of the host.
+         */
+        hostname?: string;
+        /** @description The Weaviate server version. */
+        version?: string;
+        /** @description Module-specific meta information. */
+        modules?: {
+            [key: string]: unknown;
+        };
+        /** @description Max message size for GRPC connection in bytes. */
+        grpcMaxMessageSize?: number;
+    }
+
 /**
  * Extends WeaviateTreeItem to include schema information
  */
 export interface CollectionWithSchema extends WeaviateTreeItem {
     schema?: CollectionConfig;
     nodes?: Node<"verbose">[];
+    metaData?: typeof Meta;
 }
 
 /**

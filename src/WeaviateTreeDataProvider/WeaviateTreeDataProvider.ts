@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
-import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass } from '../types';
+import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass, WeaviateMetadata } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
-import { skip } from 'node:test';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -32,6 +31,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     /** Cache of cluster nodes per connection */
     private clusterNodesCache: Record<string, Node<"verbose">[]> = {};
+
+    /** Cache of cluster metadata per connection */
+    private clusterMetadataCache: Record<string, WeaviateMetadata> = {};
     
     /** VS Code extension context */
     private readonly context: vscode.ExtensionContext;
@@ -345,18 +347,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 'clusterNodes',
                 new vscode.ThemeIcon('terminal-ubuntu'),
                 'weaviateClusterNodes'
-            ));            
-
-            // Add modules section
-            items.push(new WeaviateTreeItem(
-                'Available Modules',
-                vscode.TreeItemCollapsibleState.Collapsed,
-                'modules',
-                element.connectionId,
-                undefined,
-                'modules',
-                new vscode.ThemeIcon('extensions'),
-                'weaviateModules'
             ));
 
             // Add collections section
@@ -812,18 +802,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
          else if (element.itemType === 'serverInfo' && element.connectionId) {
              // Server information section
              try {
-                 const client = this.connectionManager.getClient(element.connectionId);
-                 if (!client) {
-                     return [
-                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
-                     ];
-                 }
-
                  const serverItems: WeaviateTreeItem[] = [];
-
                  // Get server meta information
                  try {
-                     const meta = await client.getMeta();
+                     const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
+                     if (!meta) {
+                         throw new Error('Meta not available');
+                     }
                      
                      if (meta.version) {
                          serverItems.push(new WeaviateTreeItem(
@@ -863,6 +848,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                              'weaviateServerDetail'
                          ));
                      }
+
+                    // available modules
+                    serverItems.push(new WeaviateTreeItem(
+                        'Available Modules',
+                        vscode.TreeItemCollapsibleState.Collapsed,
+                        'modules',
+                        element.connectionId,
+                        undefined,
+                        'modules',
+                        new vscode.ThemeIcon('extensions'),
+                        'weaviateModules'
+                    ));                     
 
                  } catch (error) {
                      console.warn('Could not fetch server meta:', error);
@@ -956,7 +953,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  const moduleItems: WeaviateTreeItem[] = [];
 
                  try {
-                     const meta = await client.getMeta();
+                     const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
                      
                      if (meta.modules) {
                          const modules = Object.keys(meta.modules);
@@ -1302,6 +1299,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const collections = await client.collections.listAll();
             // Store collections with their schema
             if (collections && Array.isArray(collections)) {
+                // sort collections alphabetically by name
                 this.collections[connectionId] = collections.slice().sort((a, b) => a.name.localeCompare(b.name)).map((collection) => ({
                     label: collection.name,
                     description: collection.description,
@@ -1317,7 +1315,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             } else {
                 this.collections[connectionId] = [];
             }
-            
+
+            // Get metaData from Weaviate
+            const metaData = await client.getMeta();
+            this.clusterMetadataCache[connectionId] = metaData;
+            // Refresh the tree view to show updated collections
             this.refresh();
             
         } catch (error: unknown) {
@@ -1525,7 +1527,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 // Also send server version information
                                 try {
                                     if (client) {
-                                        const version = (await client.getMeta()).version;
+                                        const version = this.clusterMetadataCache[connectionId]?.version;
                                         panel.webview.postMessage({
                                             command: 'serverVersion',
                                             version: version || 'unknown'
@@ -1635,7 +1637,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 throw new Error('Client not initialized');
             }
 
-            const meta = await client.getMeta();
+            const meta = this.clusterMetadataCache[connectionId];
             
             // If no modules info available, return all vectorizers
             if (!meta?.modules) {
