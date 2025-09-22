@@ -73,7 +73,7 @@ export interface WeaviateMetadata {
 export interface CollectionWithSchema extends WeaviateTreeItem {
     schema?: CollectionConfig;
     nodes?: Node<"verbose">[];
-    metaData?: typeof Meta;
+    metaData?: WeaviateMetadata;
 }
 
 /**

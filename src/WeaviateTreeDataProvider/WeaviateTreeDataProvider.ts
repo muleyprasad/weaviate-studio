@@ -1047,8 +1047,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 if (!shards) {
                     return [ new WeaviateTreeItem('No Shards to show', vscode.TreeItemCollapsibleState.None, 'message') ];
                 }
-                console.log("shards", shards);
-                console.log("cache", JSON.stringify(this.clusterNodesCache[element.connectionId]));
 
                 const shardItems: WeaviateTreeItem[] = [];
 
@@ -1075,15 +1073,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                 return shardItems;
             } catch (error) {
-                console.error(`Error fetching shards for node ${element.nodeName}:`, error);
+                console.error(`Error fetching shards for node ${element.itemId}:`, error);
                 return [ new WeaviateTreeItem('Error fetching shard info', vscode.TreeItemCollapsibleState.None, 'message') ];
             }        
         }
         else if (element.itemType === 'weaviateClusterNodeStatistics' && element.connectionId) {
             const nodeStats: WeaviateTreeItem[] = [];
             const raw_stats = element.itemId ? this.clusterStatisticsCache[element.connectionId] : undefined;
-            // filter raw_stats["statistics"] to only the one for the node name
-            console.log(raw_stats);
             const this_node_stats = await this.flattenObject(raw_stats["statistics"].find((n: any) => n.name === element.itemId));
             const statistics = await this.flattenObject(this_node_stats);
             // Node status except for shards key
@@ -1278,7 +1274,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
             // Get Raft stats from Weaviate
             // use direct request as the client does not support this endpoint yet
-            const clusterStats = await this.fetchClusterStatistics(connection, connectionId);
+            const clusterStats = await this.fetchClusterStatistics({
+                httpSecure: connection.httpSecure ?? false,
+                httpHost: connection.httpHost ?? '',
+                httpPort: connection.httpPort ?? 8080,
+                apiKey: connection.apiKey,
+                cloudUrl: connection.cloudUrl ?? ''
+            }, connectionId);
             // map the the result per node name
             let clusterStatsMapped: { [key: string]: any } = {};
             if (clusterStats) {
@@ -1294,7 +1296,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 }
             }
             this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
-            console.log("Cluster statistics cache updated:", this.clusterStatisticsCache[connectionId]);
 
             // Refresh the tree view to show updated collections
             this.refresh();
@@ -2832,11 +2833,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             httpHost: string;
             httpPort:number;
             apiKey?: string;
+            cloudUrl?: string;
             }, 
-            connectionId: string
+        connectionId: string
         ) {
-        const protocol = connection.httpSecure ? https : http;
-        const url = `${connection.httpSecure ? 'https' : 'http'}://${connection.httpHost}:${connection.httpPort}/v1/cluster/statistics`;
+        var protocol = connection.httpSecure ? https : http;
+        let url: string = '';
+        if (connection.cloudUrl){
+            url = `https://${connection.cloudUrl}/v1/cluster/statistics`;
+            protocol = https;
+        } else {
+            url = `${connection.httpSecure ? 'https' : 'http'}://${connection.httpHost}:${connection.httpPort}/v1/cluster/statistics`;
+        }
 
         return new Promise<any>((resolve, reject) => {
             protocol.get(url, {

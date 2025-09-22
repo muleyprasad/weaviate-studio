@@ -45,7 +45,8 @@ describe('ConnectionManager', () => {
       grpcHost: 'localhost',
       grpcPort: 50051,
       grpcSecure: false,
-      httpSecure: false
+      httpSecure: false,
+      type: 'custom'
     });
 
     expect(connection).toMatchObject({
@@ -74,7 +75,8 @@ describe('ConnectionManager', () => {
       grpcHost: '',
       grpcPort: 0,
       grpcSecure: false,
-      httpSecure: false
+      httpSecure: false,
+      type: 'custom'
     });
 
     await expect(
@@ -86,7 +88,8 @@ describe('ConnectionManager', () => {
         grpcHost: '',
         grpcPort: 0,
         grpcSecure: false,
-        httpSecure: false
+        httpSecure: false,
+        type: 'custom'
       })
     ).rejects.toThrow(/already exists/);
   });
@@ -123,7 +126,10 @@ describe('ConnectionManager', () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
     const conn = await mgr.addConnection(
-      { name: 'Good', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false }
+      {
+        name: 'Good', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
+        type: 'custom'
+      }
     );
 
     const updated = await mgr.connect(conn.id);
@@ -134,7 +140,10 @@ describe('ConnectionManager', () => {
   test('handles connection failure gracefully', async () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
-    const conn = await mgr.addConnection({ name: 'Fail', httpHost: 'fail', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false });
+    const conn = await mgr.addConnection({
+      name: 'Fail', httpHost: 'fail', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
+      type: 'custom'
+    });
 
     // Force weaviate client to throw for this test
     jest
@@ -151,7 +160,10 @@ describe('ConnectionManager', () => {
   test('disconnects a connection', async () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
-    const conn = await mgr.addConnection({ name: 'Disc', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false });
+    const conn = await mgr.addConnection({
+      name: 'Disc', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
+      type: 'custom'
+    });
     await mgr.connect(conn.id);
 
     const success = await mgr.disconnect(conn.id);

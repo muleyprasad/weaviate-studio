@@ -85,7 +85,7 @@ export class SchemaProvider {
           throw new Error('No active Weaviate connection found');
         }
 
-        connectionUrl = connection.httpHost;
+        connectionUrl = connection.httpHost || connection.cloudUrl || 'localhost';
         weaviateClient = this.connectionManager.getClient(connection.id);
       } else {
         // Try to extract URL from client if possible
@@ -158,7 +158,7 @@ export class SchemaProvider {
           throw new Error('No active Weaviate connection found');
         }
         
-        connectionUrl = connection.httpHost;
+        connectionUrl = connection.httpHost || connection.cloudUrl || 'localhost';
         weaviateClient = this.connectionManager.getClient(connection.id);
       } else {
         // Try to extract URL from client if possible
@@ -219,7 +219,7 @@ export class SchemaProvider {
       // Clear specific connection cache
       const connection = this.connectionManager.getConnection(connectionId);
       if (connection) {
-        this.schemaCache.delete(connection.httpHost);
+        this.schemaCache.delete(connection.httpHost || connection.cloudUrl || 'localhost');
       }
     } else {
       // Clear all cache

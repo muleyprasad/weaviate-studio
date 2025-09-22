@@ -4,15 +4,30 @@ import weaviate, { WeaviateClient } from 'weaviate-client';
 export interface WeaviateConnection {
     id: string;
     name: string;
-    apiKey?: string;
     status: 'connected' | 'disconnected';
     lastUsed?: number;
-    httpHost: string;
-    httpPort: number;
-    grpcHost: string;
-    grpcPort: number;
-    grpcSecure: boolean;
-    httpSecure: boolean;
+
+    // Either cloud or custom (discriminated union with "type")
+    type: 'custom' | 'cloud';
+
+    // Common (for both types)
+    apiKey?: string;
+
+    // Custom connection fields
+    httpHost?: string;
+    httpPort?: number;
+    grpcHost?: string;
+    grpcPort?: number;
+    grpcSecure?: boolean;
+    httpSecure?: boolean;
+
+    // Cloud connection fields
+    cloudUrl?: string;
+
+    // Advanced settings
+    timeoutInit?: number;
+    timeoutQuery?: number;
+    timeoutInsert?: number;
 }
 
 export class ConnectionManager {
@@ -116,7 +131,22 @@ export class ConnectionManager {
         }
 
         try {
-            const client = await weaviate.connectToCustom(connection);
+            let client: WeaviateClient | undefined;
+            if (connection.cloudUrl){
+                client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
+                    authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
+                    timeout: {
+                        init: connection.timeoutInit,
+                        query: connection.timeoutQuery,
+                        insert: connection.timeoutInsert,
+                    }
+                });
+            } else {
+                client = await weaviate.connectToCustom(connection);
+            }
+            if (!client) {
+                throw new Error('Failed to create Weaviate client');
+            }
 
             // Test connection by getting server meta
 
@@ -177,13 +207,24 @@ export class ConnectionManager {
                     switch (message.command) {
                         case 'save':
                             try {
-                                const { name, httpHost, apiKey } = message.connection;
-                                if (!name || !httpHost) {
-                                    panel.webview.postMessage({
-                                        command: 'error',
-                                        message: 'Name and httpHost are required'
-                                    });
-                                    return;
+                                const { name, httpHost, apiKey, type } = message.connection;
+                                if (type === 'custom') {
+                                    if (!name || !httpHost) {
+                                        panel.webview.postMessage({
+                                            command: 'error',
+                                            message: 'Name and httpHost are required'
+                                        });
+                                        return;
+                                    }
+                                }
+                                if (type === 'cloud') {
+                                    if (!name || !message.connection.cloudUrl || !apiKey) {
+                                        panel.webview.postMessage({
+                                            command: 'error',
+                                            message: 'Name, cloudUrl and apiKey are required'
+                                        });
+                                        return;
+                                    }
                                 }
 
                                 let updatedConnection: WeaviateConnection | null = null;
@@ -195,13 +236,18 @@ export class ConnectionManager {
                                     // Add new connection
                                     updatedConnection = await this.addConnection({
                                         name: message.connection.name.trim(),
-                                        httpHost: message.connection.httpHost.trim(),
+                                        httpHost: message.connection.httpHost?.trim(),
                                         httpPort: message.connection.httpPort,
-                                        grpcHost: message.connection.grpcHost.trim(),
+                                        grpcHost: message.connection.grpcHost?.trim(),
                                         grpcPort: message.connection.grpcPort,
                                         grpcSecure: message.connection.grpcSecure,
                                         httpSecure: message.connection.httpSecure,
-                                        apiKey: apiKey?.trim() || undefined
+                                        apiKey: apiKey?.trim() || undefined,
+                                        type: message.connection.cloudUrl === undefined? 'custom' : 'cloud',
+                                        cloudUrl: message.connection.cloudUrl?.trim() || undefined,
+                                        timeoutInit: message.connection.timeoutInit || undefined,
+                                        timeoutQuery: message.connection.timeoutQuery || undefined,
+                                        timeoutInsert: message.connection.timeoutInsert || undefined,
                                     });
                                 }
                                 
@@ -235,196 +281,299 @@ export class ConnectionManager {
 
     private getWebviewContent(connection?: WeaviateConnection): string {
         return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Add Weaviate Connection</title>
-                <style>
-                    body {
-                        font-family: var(--vscode-font-family);
-                        padding: 20px;
-                        background-color: var(--vscode-editor-background);
-                        color: var(--vscode-foreground);
-                    }
-                    .form-group {
-                        margin-bottom: 15px;
-                    }
-                    label {
-                        display: block;
-                        margin-bottom: 5px;
-                        font-weight: bold;
-                    }
-                    input[type="text"],
-                    input[type="password"] {
-                        width: 100%;
-                        padding: 8px;
-                        border: 1px solid var(--vscode-input-border);
-                        background-color: var(--vscode-input-background);
-                        color: var(--vscode-input-foreground);
-                        border-radius: 2px;
-                        box-sizing: border-box;
-                    }
-                    .error {
-                        color: var(--vscode-errorForeground);
-                        margin-top: 5px;
-                        display: none;
-                    }
-                    .button-container {
-                        display: flex;
-                        justify-content: flex-end;
-                        margin-top: 20px;
-                    }
-                    button {
-                        margin-left: 10px;
-                        padding: 5px 12px;
-                        border: none;
-                        border-radius: 2px;
-                        cursor: pointer;
-                    }
-                    .save-button {
-                        background-color: var(--vscode-button-background);
-                        color: var(--vscode-button-foreground);
-                    }
-                    .cancel-button {
-                        background-color: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="form-group">
-                    <label for="connectionName">Connection Name</label>
-                    <input type="text" id="connectionName" placeholder="e.g., Production Cluster" value="${connection?.name || ''}">
-                    <div id="nameError" class="error"></div>
-                </div>
-
-                <!-- httpHost -->
-                <div class="form-group">
-                    <label for="httpHost">Weaviate HTTP Host</label>
-                    <input type="text" id="httpHost" placeholder="localhost" value="${connection?.httpHost || 'localhost'}">
-                    <div id="httpHostError" class="error"></div>
-                </div>
-                <!-- httpPort -->
-                <div class="form-group">
-                    <label for="httpPort">Weaviate HTTP Port</label>
-                    <input type="number" id="httpPort" placeholder="8080" value="${connection?.httpPort || 8080}">
-                    <div id="httpPortError" class="error"></div>
-                </div>
-                <!-- httpSecure -->
-                <div class="form-group">
-                    <label for="httpSecure">
-                        <input type="checkbox" id="httpSecure" ${connection?.httpSecure ? 'checked' : ''}>
-                        Use Secure HTTP (HTTPS)
-                    </label>
-                </div>                
-                <!-- grpcHost -->
-                <div class="form-group">
-                    <label for="grpcHost">Weaviate gRPC Host</label>
-                    <input type="text" id="grpcHost" placeholder="localhost" value="${connection?.grpcHost || 'localhost'}">
-                    <div id="grpcHostError" class="error"></div>
-                </div>
-                <!-- grpcPort -->
-                <div class="form-group">
-                    <label for="grpcPort">Weaviate gRPC Port</label>
-                    <input type="number" id="grpcPort" placeholder="9090" value="${connection?.grpcPort || 50051}">
-                    <div id="grpcPortError" class="error"></div>
-                </div>
-                <!-- grpcSecure -->
-                <div class="form-group">
-                    <label for="grpcSecure">
-                        <input type="checkbox" id="grpcSecure" ${connection?.grpcSecure ? 'checked' : ''}>
-                        Use Secure gRPC (TLS)
-                    </label>
-                </div>
-
-                <!-- apiKey -->
-                <div class="form-group">
-                    <label for="apiKey">API Key (optional)</label>
-                    <input type="password" id="apiKey" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
-                </div>
-                <div id="formError" class="error"></div>
-                <div class="button-container">
-                    <button class="cancel-button" id="cancelButton">Cancel</button>
-                    <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'} Connection</button>
-                </div>
-
-                <script>
-                    const vscode = acquireVsCodeApi();
-                    
-                    document.getElementById('saveButton').addEventListener('click', () => {
-                        const name = document.getElementById('connectionName').value.trim();
-                        const httpHost = document.getElementById('httpHost').value.trim();
-                        const httpPort = parseInt(document.getElementById('httpPort').value.trim(), 10);
-                        const grpcHost = document.getElementById('grpcHost').value.trim();
-                        const grpcPort = parseInt(document.getElementById('grpcPort').value.trim(), 10);
-                        const grpcSecure = document.getElementById('grpcSecure').checked;
-                        const httpSecure = document.getElementById('httpSecure').checked;
-                        const apiKey = document.getElementById('apiKey').value.trim();
-                        
-                        // Clear previous errors
-                        document.querySelectorAll('.error').forEach(el => {
-                            el.style.display = 'none';
-                            el.textContent = '';
-                        });
-                        
-                        // Basic validation
-                        if (!name) {
-                            showError('nameError', 'Name is required');
-                            return;
-                        }
-                        
-                        if (!httpHost) {
-                            showError('httpHostError', 'HTTP Host is required');
-                            return;
-                        }
-                        
-                        // Send data to extension
-                        vscode.postMessage({
-                            command: 'save',
-                            connection: { name, httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey }
-                        });
-                    });
-                    
-                    document.getElementById('cancelButton').addEventListener('click', () => {
-                        vscode.postMessage({
-                            command: 'cancel'
-                        });
-                    });
-                    
-                    // Handle Enter key in input fields
-                    document.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') {
-                            document.getElementById('saveButton').click();
-                        } else if (e.key === 'Escape') {
-                            document.getElementById('cancelButton').click();
-                        }
-                    });
-                    
-                    // Listen for messages from the extension
-                    window.addEventListener('message', event => {
-                        const message = event.data;
-                        if (message.command === 'error') {
-                            showError('formError', message.message);
-                        }
-                    });
-                    
-                    function showError(elementId, message) {
-                        const element = document.getElementById(elementId);
-                        if (element) {
-                            element.textContent = message;
-                            element.style.display = 'block';
-                        }
-                    }
-                    
-                    // Focus the first input field when the webview loads
-                    document.getElementById('connectionName').focus();
-                </script>
-            </body>
-            </html>
-        `;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Weaviate Connection</title>
+  <style>
+    body {
+      font-family: var(--vscode-font-family);
+      padding: 20px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
     }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--vscode-input-border);
+      margin-bottom: 15px;
+    }
+    .tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      border: 1px solid var(--vscode-input-border);
+      border-bottom: none;
+      background-color: var(--vscode-editor-background);
+    }
+    .tab.active {
+      background-color: var(--vscode-editor-selectionBackground);
+      font-weight: bold;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--vscode-input-border);
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border-radius: 2px;
+      box-sizing: border-box;
+    }
+    .error {
+      color: var(--vscode-errorForeground);
+      margin-top: 5px;
+      display: none;
+    }
+    .button-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    button {
+      margin-left: 10px;
+      padding: 5px 12px;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .save-button {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    .cancel-button {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+    .advanced {
+      margin-top: 10px;
+    }
+    .advanced-toggle {
+      cursor: pointer;
+      color: var(--vscode-textLink-foreground);
+      margin-bottom: 10px;
+      display: inline-block;
+    }
+    .advanced-settings {
+      display: none;
+      margin-top: 10px;
+      border: 1px solid var(--vscode-input-border);
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab active" data-target="customTab">Custom Connection</div>
+    <div class="tab" data-target="cloudTab">Cloud Connection</div>
+  </div>
+
+  <div class="form-group">
+    <label for="connectionName">Connection Name</label>
+    <input type="text" id="connectionName" placeholder="e.g., Production Cluster" value="${connection?.name || ''}">
+    <div id="nameError" class="error"></div>
+  </div>
+
+  <!-- Custom tab -->
+  <div id="customTab" class="tab-content active">
+    <div class="form-group">
+      <label for="httpHost">Weaviate HTTP Host</label>
+      <input type="text" id="httpHost" placeholder="localhost" value="${connection?.httpHost || 'localhost'}">
+      <div id="httpHostError" class="error"></div>
+    </div>
+    <div class="form-group">
+      <label for="httpPort">Weaviate HTTP Port</label>
+      <input type="number" id="httpPort" placeholder="8080" value="${connection?.httpPort || 8080}">
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" id="httpSecure" ${connection?.httpSecure ? 'checked' : ''}> Use Secure HTTP (HTTPS)</label>
+    </div>
+    <div class="form-group">
+      <label for="grpcHost">Weaviate gRPC Host</label>
+      <input type="text" id="grpcHost" placeholder="localhost" value="${connection?.grpcHost || 'localhost'}">
+    </div>
+    <div class="form-group">
+      <label for="grpcPort">Weaviate gRPC Port</label>
+      <input type="number" id="grpcPort" placeholder="9090" value="${connection?.grpcPort || 50051}">
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" id="grpcSecure" ${connection?.grpcSecure ? 'checked' : ''}> Use Secure gRPC (TLS)</label>
+    </div>
+  </div>
+
+  <!-- Cloud tab -->
+  <div id="cloudTab" class="tab-content">
+    <div class="form-group">
+      <label for="cloudUrl">Cloud URL</label>
+      <input type="text" id="cloudUrl" placeholder="https://your-instance.weaviate.network" value="${connection?.cloudUrl || ''}">
+      <div id="cloudUrlError" class="error"></div>
+    </div>
+    <div class="form-group">
+      <label for="apiKey">API Key</label>
+      <input type="password" id="apiKeyCloud" placeholder="Required for cloud" value="${connection?.apiKey || ''}">
+      <div id="apiKeyError" class="error"></div>
+    </div>
+  </div>
+
+  <!-- API Key (for custom, optional) -->
+  <div id="customApiKeyContainer" class="form-group">
+    <label for="apiKey">API Key (optional)</label>
+    <input type="password" id="apiKeyCustom" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
+  </div>
+
+  <!-- Advanced settings -->
+  <div class="advanced">
+    <span class="advanced-toggle" id="toggleAdvanced">Show Advanced Settings ▾</span>
+    <div class="advanced-settings" id="advancedSettings">
+      <div class="form-group">
+        <label for="timeoutInit">Timeout (Init, ms)</label>
+        <input type="number" id="timeoutInit" value="${connection?.timeoutInit || 3000}">
+      </div>
+      <div class="form-group">
+        <label for="timeoutQuery">Timeout (Query, ms)</label>
+        <input type="number" id="timeoutQuery" value="${connection?.timeoutQuery || 5000}">
+      </div>
+      <div class="form-group">
+        <label for="timeoutInsert">Timeout (Insert, ms)</label>
+        <input type="number" id="timeoutInsert" value="${connection?.timeoutInsert || 5000}">
+      </div>
+    </div>
+  </div>
+
+  <div id="formError" class="error"></div>
+  <div class="button-container">
+    <button class="cancel-button" id="cancelButton">Cancel</button>
+    <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'} Connection</button>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    let currentType = "custom";
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.target).classList.add('active');
+        currentType = tab.dataset.target === "cloudTab" ? "cloud" : "custom";
+
+        // toggle API key field visibility
+        document.getElementById("customApiKeyContainer").style.display = currentType === "custom" ? "block" : "none";
+      });
+    });
+
+    // Advanced toggle
+    document.getElementById('toggleAdvanced').addEventListener('click', () => {
+      const adv = document.getElementById('advancedSettings');
+      adv.style.display = adv.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.getElementById('saveButton').addEventListener('click', () => {
+      const name = document.getElementById('connectionName').value.trim();
+      const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
+      const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
+      const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
+      const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
+      const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
+
+      // Clear errors
+      document.querySelectorAll('.error').forEach(el => {
+        el.style.display = 'none';
+        el.textContent = '';
+      });
+
+      if (!name) {
+        showError('nameError', 'Name is required');
+        return;
+      }
+
+      let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert };
+
+      if (currentType === "custom") {
+        const httpHost = document.getElementById('httpHost').value.trim();
+        const httpPort = parseInt(document.getElementById('httpPort').value, 10);
+        const grpcHost = document.getElementById('grpcHost').value.trim();
+        const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
+        const httpSecure = document.getElementById('httpSecure').checked;
+        const grpcSecure = document.getElementById('grpcSecure').checked;
+
+        if (!httpHost) {
+          showError('httpHostError', 'HTTP Host is required');
+          return;
+        }
+
+        connection = { ...connection, httpHost, httpPort, grpcHost, grpcPort, httpSecure, grpcSecure, apiKey: apiKeyCustom };
+      } else {
+        const cloudUrl = document.getElementById('cloudUrl').value.trim();
+        if (!cloudUrl) {
+          showError('cloudUrlError', 'Cloud URL is required');
+          return;
+        }
+        if (!apiKeyCloud) {
+          showError('apiKeyError', 'API Key is required for cloud connection');
+          return;
+        }
+        connection = { ...connection, cloudUrl, apiKey: apiKeyCloud };
+      }
+
+      vscode.postMessage({ command: 'save', connection });
+    });
+
+    document.getElementById('cancelButton').addEventListener('click', () => {
+      vscode.postMessage({ command: 'cancel' });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('saveButton').click();
+      } else if (e.key === 'Escape') {
+        document.getElementById('cancelButton').click();
+      }
+    });
+
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.command === 'error') {
+        showError('formError', message.message);
+      }
+    });
+
+    function showError(elementId, message) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.textContent = message;
+        element.style.display = 'block';
+      }
+    }
+
+    document.getElementById('connectionName').focus();
+  </script>
+</body>
+</html>
+
+
+        `;
+    }    
+
 }
 
 // Helper function to get the connection manager instance
