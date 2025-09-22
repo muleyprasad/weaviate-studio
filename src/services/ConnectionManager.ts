@@ -94,6 +94,7 @@ export class ConnectionManager {
     }
 
     public async updateConnection(id: string, updates: Partial<WeaviateConnection>) {
+        console.log("Updatingg connection", id, updates);
         const index = this.connections.findIndex(c => c.id === id);
         if (index === -1) {
             return null;
@@ -231,7 +232,7 @@ export class ConnectionManager {
                                 
                                 if (isEditMode && connection) {
                                     // Update existing connection
-                                    updatedConnection = await this.updateConnection(connection.id,connection);
+                                    updatedConnection = await this.updateConnection(connection.id,message.connection);
                                 } else {
                                     // Add new connection
                                     updatedConnection = await this.addConnection({
@@ -294,28 +295,6 @@ export class ConnectionManager {
       background-color: var(--vscode-editor-background);
       color: var(--vscode-foreground);
     }
-    .tabs {
-      display: flex;
-      border-bottom: 1px solid var(--vscode-input-border);
-      margin-bottom: 15px;
-    }
-    .tab {
-      padding: 8px 16px;
-      cursor: pointer;
-      border: 1px solid var(--vscode-input-border);
-      border-bottom: none;
-      background-color: var(--vscode-editor-background);
-    }
-    .tab.active {
-      background-color: var(--vscode-editor-selectionBackground);
-      font-weight: bold;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
     .form-group {
       margin-bottom: 15px;
     }
@@ -326,7 +305,8 @@ export class ConnectionManager {
     }
     input[type="text"],
     input[type="password"],
-    input[type="number"] {
+    input[type="number"],
+    select {
       width: 100%;
       padding: 8px;
       border: 1px solid var(--vscode-input-border);
@@ -379,19 +359,24 @@ export class ConnectionManager {
   </style>
 </head>
 <body>
-  <div class="tabs">
-    <div class="tab active" data-target="customTab">Custom Connection</div>
-    <div class="tab" data-target="cloudTab">Cloud Connection</div>
+  <!-- Connection type dropdown -->
+  <div class="form-group">
+    <label for="connectionType">Connection Type</label>
+    <select id="connectionType">
+    <option value="custom">Custom</option>
+    <option value="cloud">Cloud</option>
+    </select>
   </div>
-
+a: ${connection?.type}
+  <!-- Connection name -->
   <div class="form-group">
     <label for="connectionName">Connection Name</label>
     <input type="text" id="connectionName" placeholder="e.g., Production Cluster" value="${connection?.name || ''}">
     <div id="nameError" class="error"></div>
   </div>
 
-  <!-- Custom tab -->
-  <div id="customTab" class="tab-content active">
+  <!-- Custom fields -->
+  <div id="customFields">
     <div class="form-group">
       <label for="httpHost">Weaviate HTTP Host</label>
       <input type="text" id="httpHost" placeholder="localhost" value="${connection?.httpHost || 'localhost'}">
@@ -415,26 +400,24 @@ export class ConnectionManager {
     <div class="form-group">
       <label><input type="checkbox" id="grpcSecure" ${connection?.grpcSecure ? 'checked' : ''}> Use Secure gRPC (TLS)</label>
     </div>
+    <div id="customApiKeyContainer" class="form-group">
+      <label for="apiKeyCustom">API Key (optional)</label>
+      <input type="password" id="apiKeyCustom" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
+    </div>
   </div>
 
-  <!-- Cloud tab -->
-  <div id="cloudTab" class="tab-content">
+  <!-- Cloud fields -->
+  <div id="cloudFields" style="display: none;">
     <div class="form-group">
       <label for="cloudUrl">Cloud URL</label>
       <input type="text" id="cloudUrl" placeholder="https://your-instance.weaviate.network" value="${connection?.cloudUrl || ''}">
       <div id="cloudUrlError" class="error"></div>
     </div>
     <div class="form-group">
-      <label for="apiKey">API Key</label>
+      <label for="apiKeyCloud">API Key</label>
       <input type="password" id="apiKeyCloud" placeholder="Required for cloud" value="${connection?.apiKey || ''}">
       <div id="apiKeyError" class="error"></div>
     </div>
-  </div>
-
-  <!-- API Key (for custom, optional) -->
-  <div id="customApiKeyContainer" class="form-group">
-    <label for="apiKey">API Key (optional)</label>
-    <input type="password" id="apiKeyCustom" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
   </div>
 
   <!-- Advanced settings -->
@@ -463,111 +446,122 @@ export class ConnectionManager {
   </div>
 
   <script>
-    const vscode = acquireVsCodeApi();
-    let currentType = "custom";
+  const vscode = acquireVsCodeApi();
 
-    // Tabs
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  // Get dropdown element
+  const connectionTypeDropdown = document.getElementById('connectionType');
+  let currentType = '${connection?.type || "custom"}';
+  connectionTypeDropdown.value = currentType;
 
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.target).classList.add('active');
-        currentType = tab.dataset.target === "cloudTab" ? "cloud" : "custom";
+  // Function to update which fields are visible
+  const updateFieldsVisibility = (type) => {
+    document.getElementById('customFields').style.display = type === 'custom' ? 'block' : 'none';
+    document.getElementById('cloudFields').style.display = type === 'cloud' ? 'block' : 'none';
+  };
 
-        // toggle API key field visibility
-        document.getElementById("customApiKeyContainer").style.display = currentType === "custom" ? "block" : "none";
-      });
+  // Set initial visibility based on connection type
+  updateFieldsVisibility(currentType);
+
+  // Dropdown change listener
+  connectionTypeDropdown.addEventListener('change', (e) => {
+    currentType = e.target.value;
+    updateFieldsVisibility(currentType);
+  });
+
+  // Advanced toggle
+  document.getElementById('toggleAdvanced').addEventListener('click', () => {
+    const adv = document.getElementById('advancedSettings');
+    adv.style.display = adv.style.display === 'block' ? 'none' : 'block';
+  });
+
+  // Save button
+  document.getElementById('saveButton').addEventListener('click', () => {
+    const name = document.getElementById('connectionName').value.trim();
+    const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
+    const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
+    const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
+    const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
+    const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
+
+    // Clear errors
+    document.querySelectorAll('.error').forEach(el => {
+      el.style.display = 'none';
+      el.textContent = '';
     });
 
-    // Advanced toggle
-    document.getElementById('toggleAdvanced').addEventListener('click', () => {
-      const adv = document.getElementById('advancedSettings');
-      adv.style.display = adv.style.display === 'block' ? 'none' : 'block';
-    });
+    if (!name) {
+      showError('nameError', 'Name is required');
+      return;
+    }
 
-    document.getElementById('saveButton').addEventListener('click', () => {
-      const name = document.getElementById('connectionName').value.trim();
-      const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
-      const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
-      const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
-      const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
-      const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert };
 
-      // Clear errors
-      document.querySelectorAll('.error').forEach(el => {
-        el.style.display = 'none';
-        el.textContent = '';
-      });
+    if (currentType === "custom") {
+      const httpHost = document.getElementById('httpHost').value.trim();
+      const httpPort = parseInt(document.getElementById('httpPort').value, 10);
+      const grpcHost = document.getElementById('grpcHost').value.trim();
+      const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
+      const httpSecure = document.getElementById('httpSecure').checked;
+      const grpcSecure = document.getElementById('grpcSecure').checked;
 
-      if (!name) {
-        showError('nameError', 'Name is required');
+      if (!httpHost) {
+        showError('httpHostError', 'HTTP Host is required');
         return;
       }
 
-      let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert };
-
-      if (currentType === "custom") {
-        const httpHost = document.getElementById('httpHost').value.trim();
-        const httpPort = parseInt(document.getElementById('httpPort').value, 10);
-        const grpcHost = document.getElementById('grpcHost').value.trim();
-        const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
-        const httpSecure = document.getElementById('httpSecure').checked;
-        const grpcSecure = document.getElementById('grpcSecure').checked;
-
-        if (!httpHost) {
-          showError('httpHostError', 'HTTP Host is required');
-          return;
-        }
-
-        connection = { ...connection, httpHost, httpPort, grpcHost, grpcPort, httpSecure, grpcSecure, apiKey: apiKeyCustom };
-      } else {
-        const cloudUrl = document.getElementById('cloudUrl').value.trim();
-        if (!cloudUrl) {
-          showError('cloudUrlError', 'Cloud URL is required');
-          return;
-        }
-        if (!apiKeyCloud) {
-          showError('apiKeyError', 'API Key is required for cloud connection');
-          return;
-        }
-        connection = { ...connection, cloudUrl, apiKey: apiKeyCloud };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey: apiKeyCustom };
+    } else {
+      const cloudUrl = document.getElementById('cloudUrl').value.trim();
+      if (!cloudUrl) {
+        showError('cloudUrlError', 'Cloud URL is required');
+        return;
       }
-
-      vscode.postMessage({ command: 'save', connection });
-    });
-
-    document.getElementById('cancelButton').addEventListener('click', () => {
-      vscode.postMessage({ command: 'cancel' });
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        document.getElementById('saveButton').click();
-      } else if (e.key === 'Escape') {
-        document.getElementById('cancelButton').click();
+      if (!apiKeyCloud) {
+        showError('apiKeyError', 'API Key is required for cloud connection');
+        return;
       }
-    });
-
-    window.addEventListener('message', event => {
-      const message = event.data;
-      if (message.command === 'error') {
-        showError('formError', message.message);
-      }
-    });
-
-    function showError(elementId, message) {
-      const element = document.getElementById(elementId);
-      if (element) {
-        element.textContent = message;
-        element.style.display = 'block';
-      }
+      connection = { name, type: "cloud", cloudUrl, apiKey: apiKeyCloud };
     }
 
-    document.getElementById('connectionName').focus();
-  </script>
-</body>
+    vscode.postMessage({ command: 'save', connection });
+  });
+
+  // Cancel button
+  document.getElementById('cancelButton').addEventListener('click', () => {
+    vscode.postMessage({ command: 'cancel' });
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('saveButton').click();
+    } else if (e.key === 'Escape') {
+      document.getElementById('cancelButton').click();
+    }
+  });
+
+  // Handle messages from extension
+  window.addEventListener('message', event => {
+    const message = event.data;
+    if (message.command === 'error') {
+      showError('formError', message.message);
+    }
+  });
+
+  function showError(elementId, message) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = message;
+      element.style.display = 'block';
+    }
+  }
+
+  // Focus on the connection name input
+  document.getElementById('connectionName').focus();
+</script>
+
+
+  </body>
 </html>
 
 

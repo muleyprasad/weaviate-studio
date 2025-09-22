@@ -273,7 +273,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const connectionItems = this.connections.map(conn => {
                 const contextValue = conn.status === 'connected' ? 'weaviateConnectionActive' : 'weaviateConnection';
                 const item = new WeaviateTreeItem(
-                    conn.name,
+                    `${conn.type === 'cloud' ? '☁️' : ''} ${conn.name}`,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'connection',
                     conn.id,
