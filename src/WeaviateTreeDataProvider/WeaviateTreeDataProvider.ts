@@ -267,13 +267,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 )
             ];
         }
+        if (element && !element.connectionId) {
+            // If no connection ID is present, we are at the root level
+            throw new Error('Invalid tree item: Missing connection ID');
+        }
 
         if (!element) {
             // Root level - show connections
             const connectionItems = this.connections.map(conn => {
                 const contextValue = conn.status === 'connected' ? 'weaviateConnectionActive' : 'weaviateConnection';
                 const item = new WeaviateTreeItem(
-                    `${conn.type === 'cloud' ? '☁️' : ''} ${conn.name}`,
+                    `${conn.type === 'cloud' ? '☁️' : '🔗'} ${conn.name}`,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'connection',
                     conn.id,
@@ -323,7 +327,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 element.connectionId,
                 undefined,
                 'serverInfo',
-                new vscode.ThemeIcon('server'),
+                new vscode.ThemeIcon('info'),
                 'weaviateServerInfo'
             ));
 
@@ -375,11 +379,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             
             return collections;
         }
-        else if (element.itemType === 'collection') {
+        else if (element.itemType === 'collection' && element.connectionId) {
             // Collection level - show various collection aspects
+            let property_count = 0;
+            console.log("Collection element", element);
+            let properties = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.properties
+            property_count = properties ? properties.length : 0;
+            console.log("element", element);
             const items = [
                 new WeaviateTreeItem(
-                    'Properties',
+                    `Properties (${property_count})`,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'properties',
                     element.connectionId,
@@ -643,7 +652,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Statistics section - fetch live data
             try {
                 const client = this.connectionManager.getClient(element.connectionId);
-                                 if (!client) {
+                if (!client) {
                      return [
                          new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
                      ];
