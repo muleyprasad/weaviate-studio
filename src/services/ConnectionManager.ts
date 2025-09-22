@@ -94,7 +94,6 @@ export class ConnectionManager {
     }
 
     public async updateConnection(id: string, updates: Partial<WeaviateConnection>) {
-        console.log("Updatingg connection", id, updates);
         const index = this.connections.findIndex(c => c.id === id);
         if (index === -1) {
             return null;
@@ -133,7 +132,7 @@ export class ConnectionManager {
 
         try {
             let client: WeaviateClient | undefined;
-            if (connection.cloudUrl){
+            if (connection.type === 'cloud' && connection.cloudUrl) {
                 client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
                     authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
                     timeout: {

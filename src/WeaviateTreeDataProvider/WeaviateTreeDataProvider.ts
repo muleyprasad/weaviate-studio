@@ -1279,7 +1279,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 httpHost: connection.httpHost ?? '',
                 httpPort: connection.httpPort ?? 8080,
                 apiKey: connection.apiKey,
-                cloudUrl: connection.cloudUrl ?? ''
+                cloudUrl: connection.cloudUrl ?? '',
+                type: connection.type ?? 'local'
             }, connectionId);
             // map the the result per node name
             let clusterStatsMapped: { [key: string]: any } = {};
@@ -2834,12 +2835,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             httpPort:number;
             apiKey?: string;
             cloudUrl?: string;
+            type: string
             }, 
         connectionId: string
         ) {
         var protocol = connection.httpSecure ? https : http;
         let url: string = '';
-        if (connection.cloudUrl){
+        if (connection.type === 'cloud'){
             url = `https://${connection.cloudUrl}/v1/cluster/statistics`;
             protocol = https;
         } else {
