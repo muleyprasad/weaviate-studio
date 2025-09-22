@@ -3,6 +3,8 @@ import { ConnectionManager, WeaviateConnection } from '../services/ConnectionMan
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass, WeaviateMetadata } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
+import * as https from 'https';
+import * as http from 'http';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -34,6 +36,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     /** Cache of cluster metadata per connection */
     private clusterMetadataCache: Record<string, WeaviateMetadata> = {};
+
+    /** Cache of cluster metadata per connection */
+    private clusterStatisticsCache: Record<string, any> = {};    
     
     /** VS Code extension context */
     private readonly context: vscode.ExtensionContext;
@@ -324,7 +329,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
             // Add cluster nodes section
             items.push(new WeaviateTreeItem(
-                `Nodes (${this.clusterNodesCache[element.connectionId]?.length || 0})`,
+                `Nodes (${this.clusterNodesCache[element.connectionId]?.length || 0}) ${this.clusterStatisticsCache[element.connectionId].synchronized ? 'Synchronized' : 'Not Synchronized'}`,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 'clusterNodes',
                 element.connectionId,
@@ -836,7 +841,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                     // available modules
                     serverItems.push(new WeaviateTreeItem(
-                        'Available Modules',
+                        `Available Modules (${meta.modules ? Object.keys(meta.modules).length : 0})`,
                         vscode.TreeItemCollapsibleState.Collapsed,
                         'modules',
                         element.connectionId,
@@ -863,7 +868,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  ];
              }
         }
-
          else if (element.itemType === 'modules' && element.connectionId) {
              // Available modules section
              try {
@@ -945,8 +949,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     const clusterNodes = this.clusterNodesCache[element.connectionId];
                     if (clusterNodes && clusterNodes.length > 0) {
                         clusterNodes.forEach(node => {
+                            let is_leader = false;
+                            if(element.connectionId){
+                                is_leader = this.clusterStatisticsCache[element.connectionId]?.statistics[0]?.leaderId === node.name;
+                            }
                             clusterNodeItems.push(new WeaviateTreeItem(
-                                `${node.status === "HEALTHY" ? '🟩' : '🟥'} ${node.name} (${node.stats.objectCount} objects and ${node.stats.shardCount} shards)`,
+                                `${is_leader ? '👑' : '🫡'} ${node.status === "HEALTHY" ? '🟩' : '🟥'} ${node.name} (${node.stats.objectCount} objects and ${node.stats.shardCount} shards)`,
                                 vscode.TreeItemCollapsibleState.Collapsed,
                                 'clusterNode',
                                 element.connectionId,
@@ -981,37 +989,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
         else if (element.itemType === 'clusterNode' && element.connectionId ) {
             try {
-                console.log("element.itemId", element.itemId);
                 const node = this.clusterNodesCache[element.connectionId]?.find(n => n.name === element.itemId);
-                console.log("node", JSON.stringify(node));
                 if (!node) {
                     return [ new WeaviateTreeItem('No node details to show', vscode.TreeItemCollapsibleState.None, 'message') ];
                 }
 
                 const nodeDetails: WeaviateTreeItem[] = [];
-                // Flatten an object one level deep
-                function flattenNode(node: Record<string, unknown>): Record<string, unknown> {
-                    return Object.keys(node).reduce((acc, key) => {
-                        if (key !== 'shards') {
-                            const value = node[key];
-                            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                                Object.keys(value).forEach(subKey => {
-                                    acc[`${key} ${subKey}`] = (value as Record<string, unknown>)[subKey];
-                                });
-                            } else {
-                                acc[key] = value;
-                            }
-                        }
-                        return acc;
-                    }, {} as Record<string, unknown>);
-                }
-
-                const flatten_node = flattenNode(node);
+                const flatten_node = await this.flattenObject(node, ["shards"]);
                 // sort this object
                 const sorted_flatten_node = Object.keys(flatten_node).sort().reduce((obj, key) => {
                     obj[key] = flatten_node[key];
                     return obj;
                 }, {} as Record<string, unknown>);
+
+                // node statistics from cache
+                const node_stats = this.clusterStatisticsCache[element.connectionId]?.[node.name];
+                nodeDetails.push(new WeaviateTreeItem(
+                    `Statistics`,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'weaviateClusterNodeStatistics',
+                    element.connectionId,
+                    undefined,
+                    node.name,
+                    new vscode.ThemeIcon('graph'),
+                    'weaviateClusterNodeStatistics',
+                ));
 
                 // Node status except for shards key
                 Object.keys(flatten_node).forEach(key => {
@@ -1076,6 +1078,33 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 console.error(`Error fetching shards for node ${element.nodeName}:`, error);
                 return [ new WeaviateTreeItem('Error fetching shard info', vscode.TreeItemCollapsibleState.None, 'message') ];
             }        
+        }
+        else if (element.itemType === 'weaviateClusterNodeStatistics' && element.connectionId) {
+            const nodeStats: WeaviateTreeItem[] = [];
+            const raw_stats = element.itemId ? this.clusterStatisticsCache[element.connectionId] : undefined;
+            // filter raw_stats["statistics"] to only the one for the node name
+            console.log(raw_stats);
+            const this_node_stats = await this.flattenObject(raw_stats["statistics"].find((n: any) => n.name === element.itemId));
+            const statistics = await this.flattenObject(this_node_stats);
+            // Node status except for shards key
+            Object.keys(statistics).forEach(key => {
+                const value = statistics[key];
+
+                nodeStats.push(new WeaviateTreeItem(
+                    `${key}: ${value}`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'object',
+                    element.connectionId,
+                    undefined,
+                    'status',
+                    new vscode.ThemeIcon(
+                        statistics["status"] === 'HEALTHY' ? 'check' : 'warning',
+                        new vscode.ThemeColor(statistics["status"] === 'HEALTHY' ? 'testing.iconPassed' : 'problemsWarningIcon.foreground')
+                    ),
+                    'weaviateStatusDetail'
+                ));
+            });            
+            return nodeStats;
         }
          
          return [];
@@ -1246,6 +1275,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Get Nodes from Weaviate
             const clusterNodes = await client.cluster.nodes({output: 'verbose'});
             this.clusterNodesCache[connectionId] = clusterNodes;
+
+            // Get Raft stats from Weaviate
+            // use direct request as the client does not support this endpoint yet
+            const clusterStats = await this.fetchClusterStatistics(connection, connectionId);
+            // map the the result per node name
+            let clusterStatsMapped: { [key: string]: any } = {};
+            if (clusterStats) {
+                try {
+                    const statsJson = JSON.parse(clusterStats);
+                    // Map the stats to the clusterStatsMapped object
+                    for (const [nodeName, nodeStats] of Object.entries(statsJson)) {
+                        clusterStatsMapped[nodeName] = nodeStats;
+                    }
+                } catch (error: unknown) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    vscode.window.showErrorMessage(`Failed to parse cluster stats: ${errorMessage}`);
+                }
+            }
+            this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
+            console.log("Cluster statistics cache updated:", this.clusterStatisticsCache[connectionId]);
 
             // Refresh the tree view to show updated collections
             this.refresh();
@@ -2768,5 +2817,62 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete connection: ${errorMessage}`);
         }
+    }
+
+    /**
+     * Fetches cluster statistics from the Weaviate instance.
+     * Callers are responsible for showing confirmation dialogs if needed.
+     * @param connectionId The ID of the connection to fetch statistics for
+     * @returns The cluster statistics
+     * @throws Error if the connection doesn't exist or fetching fails
+     */
+    async fetchClusterStatistics(
+        connection: {
+            httpSecure: boolean;
+            httpHost: string;
+            httpPort:number;
+            apiKey?: string;
+            }, 
+            connectionId: string
+        ) {
+        const protocol = connection.httpSecure ? https : http;
+        const url = `${connection.httpSecure ? 'https' : 'http'}://${connection.httpHost}:${connection.httpPort}/v1/cluster/statistics`;
+
+        return new Promise<any>((resolve, reject) => {
+            protocol.get(url, {
+                headers: {
+                    ...(connection.apiKey && { Authorization: `Bearer ${connection.apiKey}` }),
+                },
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    try {
+                        resolve(data);
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+            }).on('error', reject);
+        });
+    }
+
+    async flattenObject(node: Record<string, unknown>, exclude_keys?: string[]): Promise<Record<string, unknown>> {
+        // remove exclude_keys from node
+        const filteredNode = exclude_keys ? Object.fromEntries(Object.entries(node).filter(([key]) => !exclude_keys.includes(key))) : node;
+
+        return Object.keys(filteredNode).reduce((acc, key) => {
+            if (!exclude_keys?.includes(key)) {
+                const value = filteredNode[key];
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                    Object.keys(value).forEach(subKey => {
+                        acc[`${key} ${subKey}`] = (value as Record<string, unknown>)[subKey];
+                    });
+                } else {
+                    acc[key] = value;
+                }
+            }
+            return acc;
+        }, {} as Record<string, unknown>);
     }
 }
