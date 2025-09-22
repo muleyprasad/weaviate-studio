@@ -98,7 +98,7 @@ export class ConnectionManager {
         if (index === -1) {
             return null;
         }
-        
+        // clear the connection index, keep only the id and last used
         this.connections[index] = { ...this.connections[index], ...updates, lastUsed: Date.now() };
         await this.saveConnections();
         return this.connections[index];
@@ -142,7 +142,17 @@ export class ConnectionManager {
                     }
                 });
             } else {
-                client = await weaviate.connectToCustom(connection);
+                // move timeout to connection.timeout{init, query,insert}
+                // and remove from base connection object
+                const { timeoutInit, timeoutQuery, timeoutInsert, ...rest } = connection;
+                client = await weaviate.connectToCustom({
+                    ...rest,
+                    timeout: {
+                        init: timeoutInit,
+                        query: timeoutQuery,
+                        insert: timeoutInsert,
+                    }
+                });
             }
             if (!client) {
                 throw new Error('Failed to create Weaviate client');
@@ -424,16 +434,16 @@ a: ${connection?.type}
     <span class="advanced-toggle" id="toggleAdvanced">Show Advanced Settings ▾</span>
     <div class="advanced-settings" id="advancedSettings">
       <div class="form-group">
-        <label for="timeoutInit">Timeout (Init, ms)</label>
-        <input type="number" id="timeoutInit" value="${connection?.timeoutInit || 3000}">
+        <label for="timeoutInit">Timeout (Init, seconds)</label>
+        <input type="number" id="timeoutInit" value="${connection?.timeoutInit || 30}">
       </div>
       <div class="form-group">
-        <label for="timeoutQuery">Timeout (Query, ms)</label>
-        <input type="number" id="timeoutQuery" value="${connection?.timeoutQuery || 5000}">
+        <label for="timeoutQuery">Timeout (Query, seconds)</label>
+        <input type="number" id="timeoutQuery" value="${connection?.timeoutQuery || 60}">
       </div>
       <div class="form-group">
-        <label for="timeoutInsert">Timeout (Insert, ms)</label>
-        <input type="number" id="timeoutInsert" value="${connection?.timeoutInsert || 5000}">
+        <label for="timeoutInsert">Timeout (Insert, seconds)</label>
+        <input type="number" id="timeoutInsert" value="${connection?.timeoutInsert || 120}">
       </div>
     </div>
   </div>
