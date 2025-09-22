@@ -332,8 +332,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             ));
 
             // Add cluster nodes section
+            let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
             items.push(new WeaviateTreeItem(
-                `Nodes (${this.clusterNodesCache[element.connectionId]?.length || 0}) ${this.clusterStatisticsCache[element.connectionId].synchronized ? 'Synchronized' : 'Not Synchronized'}`,
+                `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${this.clusterStatisticsCache[element.connectionId].synchronized ? 'Synchronized' : 'Not Synchronized'}`,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 'clusterNodes',
                 element.connectionId,
@@ -382,10 +383,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         else if (element.itemType === 'collection' && element.connectionId) {
             // Collection level - show various collection aspects
             let property_count = 0;
-            console.log("Collection element", element);
             let properties = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.properties
             property_count = properties ? properties.length : 0;
-            console.log("element", element);
+            // Configured Vectors Count
+            const vectorizers = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.vectorizers;
+            let configured_vectors_count = vectorizers ? Object.keys(vectorizers).length : 0;
             const items = [
                 new WeaviateTreeItem(
                     `Properties (${property_count})`,
@@ -397,7 +399,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('symbol-property')
                 ),
                 new WeaviateTreeItem(
-                    'Vector Configuration',
+                    `Configured Vectors (${configured_vectors_count})`,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'vectorConfig',
                     element.connectionId,
@@ -512,9 +514,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 item => item.label === element.collectionName
             );
             
-                         if (!collection) {
+            if (!collection) {
                  return [
-                     new WeaviateTreeItem('No vector configuration available', vscode.TreeItemCollapsibleState.None, 'message')
+                     new WeaviateTreeItem('No Vectors available', vscode.TreeItemCollapsibleState.None, 'message')
                  ];
              }
             
@@ -560,7 +562,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             for (let key in collection.schema?.vectorizers) {
                let value = collection.schema?.vectorizers[key];
                     vectorItems.push(new WeaviateTreeItem(
-                        `Vector: ${key} - ${value.vectorizer.name}`,
+                        `${key} - ${value.vectorizer.name}`,
                         vscode.TreeItemCollapsibleState.None,
                         'object',
                         element.connectionId,
