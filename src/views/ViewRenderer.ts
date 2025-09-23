@@ -166,10 +166,6 @@ export class ViewRenderer {
             multiTenancyConfig: (schema as any).multiTenancyConfig
         };
 
-        const curlCommand = `curl -X POST \\
-  "http://localhost:8080/v1/schema" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
 
         // Build scaling configuration sections dynamically
         const scalingSections: string[] = [];
@@ -184,9 +180,9 @@ export class ViewRenderer {
             }
         };
 
-        formatIfExists((schema as any).shardingConfig, 'Sharding');
-        formatIfExists((schema as any).replicationConfig, 'Replication');
-        formatIfExists((schema as any).multiTenancyConfig, 'Multi-Tenancy');
+        formatIfExists(schema.sharding, 'Sharding');
+        formatIfExists(schema.replication, 'Replication');
+        formatIfExists(schema.multiTenancy, 'Multi-Tenancy');
 
         const scalingHtml = scalingSections.length > 0 ? `
             <div class="section-header">Scaling Configuration</div>
@@ -194,38 +190,6 @@ export class ViewRenderer {
                 ${scalingSections.join('')}
             </div>
         ` : '';
-
-        // Generate creation script for the 5th tab
-        const creationScript = `# Weaviate Collection Definition
-# Generated on: ${new Date().toLocaleString()}
-# Collection: ${schema.name}
-
-# ========================================
-# CREATE COLLECTION SCRIPT
-# ========================================
-
-import weaviate
-
-client = weaviate.connectToLocal()
-
-# Collection definition
-collection_config = ${JSON.stringify(apiEquivalent, null, 4)}
-
-# Create the collection
-client.collections.create_from_dict(collection_config)
-
-# ========================================
-# EQUIVALENT REST API CALL
-# ========================================
-
-${curlCommand}`;
-
-        const propertyDetails = schema.properties?.map(prop => `
-Property: ${prop.name}
-  Type: ${Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType}
-  Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}
-  ${prop.description ? `Description: ${prop.description}` : ''}
-`).join('\n') || 'No properties defined';
 
         return `
             <!DOCTYPE html>
@@ -959,11 +923,10 @@ print(f"Collection '{schema.class}' created successfully!")`;
 
     private generateCurlCommand(schema: any): string {
         const apiEquivalent = this.convertToApiFormat(schema);
-        return `curl \\
+        return `curl http://localhost:8080/v1/schema \\
     -X POST \\
     -H "Content-Type: application/json" \\
-    -d '${JSON.stringify(apiEquivalent, null, 2)}' \\
-    http://localhost:8080/v1/schema`;
+    -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
     }
 
     private generatePythonScript(schema: any): string {
@@ -984,9 +947,29 @@ client.collections.createFromSchema(schema)`;
 
     private convertToApiFormat(schema: any): any {
         // Remove internal fields and format for API
-        const apiSchema = { ...schema };
+        // if tokenization for "none", make undefined
+        const fixed_properties = schema.properties?.map((prop: { dataType: string[]; tokenization?: string, indexInverted?: string }) => ({
+            ...prop,
+            dataType: [prop.dataType],
+            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+            indexSearchable: prop.indexInverted,
+        })) || [];
+        const apiSchema = { 
+            ...schema, 
+            class: schema.name, 
+            invertedIndexConfig: schema.invertedIndex,
+            moduleConfig: schema.generative,
+            multiTenancyConfig: schema.multiTenancyConfig,
+            properties: fixed_properties
+        };
         delete apiSchema.id;
         delete apiSchema._additional;
+        // delete all indexInverted for all properties
+        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+            delete prop.indexInverted;
+        });
+        delete apiSchema.indexInverted;
+        delete apiSchema.name;
         return apiSchema;
     }
 }
