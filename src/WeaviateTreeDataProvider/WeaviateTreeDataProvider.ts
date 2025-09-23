@@ -381,7 +381,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return collections;
         }
         else if (element.itemType === 'collection' && element.connectionId) {
-            // Collection level - show various collection aspects
             let property_count = 0;
             let properties = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.properties
             property_count = properties ? properties.length : 0;
@@ -399,13 +398,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('symbol-property')
                 ),
                 new WeaviateTreeItem(
-                    `Configured Vectors (${configured_vectors_count})`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
+                    `Vectors (${configured_vectors_count})`,
+                    configured_vectors_count ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
                     'vectorConfig',
                     element.connectionId,
                     element.label,
                     'vectorConfig',
                     new vscode.ThemeIcon('arrow-both')
+                ),
+                new WeaviateTreeItem(
+                    `Generative Configuration`,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'generativeConfig',
+                    element.connectionId,
+                    element.label,
+                    'generative',
+                    new vscode.ThemeIcon('lightbulb-autofix')
+                ),                
+                new WeaviateTreeItem(
+                    'Replication',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'collectionReplication',
+                    element.connectionId,
+                    element.label,
+                    'replication',
+                    new vscode.ThemeIcon('activate-breakpoints'),
                 ),
                 new WeaviateTreeItem(
                     'Indexes',
@@ -435,7 +452,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('layout')
                 )
             ];
-            
             return items;
         }
         else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
@@ -618,6 +634,55 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
              }
 
             return vectorItems;
+        }
+        else if (element.itemType === 'generativeConfig' && element.connectionId && element.collectionName) {
+            // Generative configuration section
+            const collection = this.collections[element.connectionId]?.find(
+                col => col.label === element.collectionName
+            );
+            let generativeItems: WeaviateTreeItem[] = [];
+            const data = await this.flattenObject(collection?.schema?.generative || {}, [], '', false);
+            Object.entries(data).forEach(([key, value]) => {
+                generativeItems.push(new WeaviateTreeItem(
+                    `${key}: ${value}`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'object',
+                    element.connectionId,
+                    element.collectionName,
+                    key,
+                    new vscode.ThemeIcon('lightbulb-autofix'),
+                    'generativeConfig'
+                ));
+            });
+            return generativeItems;
+        }
+        else if (element.itemType === 'collectionReplication' && element.connectionId && element.collectionName) {
+            // Replication section
+            const replicationItems: WeaviateTreeItem[] = [];
+            const collectionReplication = this.collections[element.connectionId]?.find(  
+                col => col.label === element.collectionName
+            )?.schema?.replication;
+
+            Object.entries(collectionReplication || {}).forEach(([key, value]) => {
+                replicationItems.push(new WeaviateTreeItem(
+                    `${key}: ${value}`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'object',
+                    element.connectionId,
+                    element.collectionName,
+                    key,
+                    new vscode.ThemeIcon('activate-breakpoints'),
+                    'collectionReplication'
+                ));
+            });
+
+            if (replicationItems.length === 0) {
+                return [
+                    new WeaviateTreeItem('No replication configuration found', vscode.TreeItemCollapsibleState.None, 'message')
+                ];
+            }
+
+            return replicationItems;
         }
         if (element.itemType === 'vectorConfigDetail' && element.connectionId && element.collectionName) {
             // Vector configuration detail section
