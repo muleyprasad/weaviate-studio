@@ -495,8 +495,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 
                 return new WeaviateTreeItem(
                     `${prop.name} (${dataType})${description}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'property',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'propertyItem',
                     element.connectionId,
                     element.collectionName,
                     prop.name,
@@ -507,6 +507,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             });
             
             return propertyItems;
+        }
+        else if (element.itemType === 'propertyItem' && element.connectionId && element.collectionName && element.itemId) {
+            const vectorItems: WeaviateTreeItem[] = [];
+            // Find the collection schema
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            
+            if (!collection) {
+                return [
+                    new WeaviateTreeItem('No properties available', vscode.TreeItemCollapsibleState.None, 'message')
+                ];
+            }
+
+            // Find the property
+            const property = collection.schema?.properties.find(
+                (prop: any) => prop.name === element.itemId
+            );
+
+            if (!property) {
+                return [
+                    new WeaviateTreeItem('Property not found', vscode.TreeItemCollapsibleState.None, 'message')
+                ];
+            }
+            // Show property details
+            for (const [key, value] of Object.entries(await this.flattenObject(property))) {
+                vectorItems.push(new WeaviateTreeItem(
+                    `${key}: ${value}`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'propertyItem',
+                    element.connectionId,
+                    element.collectionName,
+                    property.name,
+                    new vscode.ThemeIcon('symbol-property'),
+                    'weaviateProperty'
+                ));
+            }
+            return vectorItems;
         }
         else if (element.itemType === 'vectorConfig' && element.connectionId && element.collectionName) {
             // Vector configuration section
@@ -594,12 +632,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                  ];
              }
              const vectorizer = collection.schema?.vectorizers[element.itemId || ''];
-             const flattened_vectorizer = await this.flattenObject(vectorizer || {});
+             const flattened_vectorizer = await this.flattenObject(vectorizer || {}, [], '', true);
              // for each object in vectorizer, create a tree item
              for (let key in flattened_vectorizer) {
                  const value = flattened_vectorizer[key];
                  vectorItemDetails.push(new WeaviateTreeItem(
-                     `${key} - ${value}`,
+                     `${key}: ${value}`,
                      vscode.TreeItemCollapsibleState.None,
                      'object',
                      element.connectionId,
@@ -1038,15 +1076,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 }
 
                 const nodeDetails: WeaviateTreeItem[] = [];
-                const flatten_node = await this.flattenObject(node, ["shards"]);
-                // sort this object
-                const sorted_flatten_node = Object.keys(flatten_node).sort().reduce((obj, key) => {
-                    obj[key] = flatten_node[key];
-                    return obj;
-                }, {} as Record<string, unknown>);
+                const flatten_node = await this.flattenObject(node, ["shards"], '', true);
 
-                // node statistics from cache
-                const node_stats = this.clusterStatisticsCache[element.connectionId]?.[node.name];
                 nodeDetails.push(new WeaviateTreeItem(
                     `Statistics`,
                     vscode.TreeItemCollapsibleState.Collapsed,
@@ -2913,7 +2944,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     async  flattenObject(
         node: Record<string, unknown>,
         exclude_keys: string[] = [],
-        parentKey = ''
+        parentKey = '',
+        sorted?: boolean
     ): Promise<Record<string, unknown>> {
         const result: Record<string, unknown> = {};
 
@@ -2940,7 +2972,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             result[newKey] = value;
             }
         }
-
+        if (sorted) {
+            return Object.fromEntries(Object.entries(result).sort());
+        }
         return result;
     }
 }
