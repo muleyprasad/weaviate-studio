@@ -381,12 +381,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return collections;
         }
         else if (element.itemType === 'collection' && element.connectionId) {
-            let property_count = 0;
-            let properties = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.properties
-            property_count = properties ? properties.length : 0;
+            let collection = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema
+            if (!collection){
+                throw new Error('Collection data not available!');
+            }
+            let properties = collection?.properties || [];
+            let property_count = properties ? properties.length : 0;
             // Configured Vectors Count
-            const vectorizers = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema?.vectorizers;
+            const vectorizers = collection.vectorizers;
             let configured_vectors_count = vectorizers ? Object.keys(vectorizers).length : 0;
+            const multi_tenancy_enabled = collection?.multiTenancy.enabled;
             const items = [
                 new WeaviateTreeItem(
                     `Properties (${property_count})`,
@@ -434,15 +438,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('activate-breakpoints'),
                 ),
                 new WeaviateTreeItem(
-                    'Statistics',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'statistics',
-                    element.connectionId,
-                    element.label,
-                    'statistics',
-                    new vscode.ThemeIcon('graph')
-                ),
-                new WeaviateTreeItem(
                     'Sharding',
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'sharding',
@@ -450,7 +445,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.label,
                     'sharding',
                     new vscode.ThemeIcon('layout')
-                )
+                ),
+                new WeaviateTreeItem(
+                    multi_tenancy_enabled ? 'Multi Tenancy' : 'Multi Tenancy (Disabled)',
+                    multi_tenancy_enabled? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None ,
+                    'multiTenancy',
+                    element.connectionId,
+                    element.label,
+                    'multiTenancy',
+                    new vscode.ThemeIcon('organization')
+                ),
+                new WeaviateTreeItem(
+                    'Statistics',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'statistics',
+                    element.connectionId,
+                    element.label,
+                    'statistics',
+                    new vscode.ThemeIcon('graph')
+                ),                
+
             ];
             return items;
         }
@@ -892,41 +906,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     ));
                 }
             }
-            
-                            
-            // Sharding: Replication config
-            if (schema?.replication) {
 
-                for (const [key, value] of Object.entries(schema.replication)) {
-                    shardingItems.push(new WeaviateTreeItem(
-                        `Replication ${key}: ${value}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        key,
-                        new vscode.ThemeIcon('mirror'),
-                        'weaviateSharding'
-                    ));
-                }
-            }
-
-            // Multi-tenancy
-            if (schema?.multiTenancy) {
-                for (const [key, value] of Object.entries(schema.multiTenancy)) {
-                    shardingItems.push(new WeaviateTreeItem(
-                        `Multi-Tenancy ${key}: ${value}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        key,
-                        new vscode.ThemeIcon('organization'),
-                        'MultiTenancy'
-                    ));                    
-                }
-               
-            }
 
             if (shardingItems.length === 0) {
                  return [
@@ -1242,7 +1222,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             });            
             return nodeStats;
         }
-         
+        else if (element.itemType === 'multiTenancy' && element.connectionId){
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            const MultiTenancyItems: WeaviateTreeItem[] = [];
+            const schema = collection?.schema;
+            // Multi-tenancy
+            if (schema?.multiTenancy) {
+                for (const [key, value] of Object.entries(schema.multiTenancy)) {
+                    MultiTenancyItems.push(new WeaviateTreeItem(
+                        `${key}: ${value}`,
+                        vscode.TreeItemCollapsibleState.None,
+                        'object',
+                        element.connectionId,
+                        element.collectionName,
+                        key,
+                        new vscode.ThemeIcon('organization'),
+                        'MultiTenancy'
+                    ));                    
+                }
+            }
+            return MultiTenancyItems;
+        }
          return [];
     }
 
