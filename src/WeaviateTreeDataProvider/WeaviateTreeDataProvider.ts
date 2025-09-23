@@ -201,7 +201,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         } else if (element.itemType === 'vectorConfig' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('arrow-both');
             element.tooltip = 'Vector configuration and modules';
-        } else if (element.itemType === 'indexes' && !element.iconPath) {
+        } else if (element.itemType === 'invertedIndex' && !element.iconPath) {
             element.iconPath = new vscode.ThemeIcon('search');
             element.tooltip = 'Index configuration';
         } else if (element.itemType === 'statistics' && !element.iconPath) {
@@ -335,7 +335,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
             items.push(new WeaviateTreeItem(
                 `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${this.clusterStatisticsCache[element.connectionId].synchronized ? 'Synchronized' : 'Not Synchronized'}`,
-                vscode.TreeItemCollapsibleState.Collapsed,
+                vscode.TreeItemCollapsibleState.Expanded,
                 'clusterNodes',
                 element.connectionId,
                 undefined,
@@ -407,6 +407,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     new vscode.ThemeIcon('arrow-both')
                 ),
                 new WeaviateTreeItem(
+                    'Inverted Index',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'invertedIndex',
+                    element.connectionId,
+                    element.label,
+                    'invertedIndex',
+                    new vscode.ThemeIcon('search')
+                ),                
+                new WeaviateTreeItem(
                     `Generative Configuration`,
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'generativeConfig',
@@ -423,15 +432,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.label,
                     'replication',
                     new vscode.ThemeIcon('activate-breakpoints'),
-                ),
-                new WeaviateTreeItem(
-                    'Indexes',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'indexes',
-                    element.connectionId,
-                    element.label,
-                    'indexes',
-                    new vscode.ThemeIcon('search')
                 ),
                 new WeaviateTreeItem(
                     'Statistics',
@@ -716,7 +716,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
              
 
         }
-        else if (element.itemType === 'indexes' && element.connectionId && element.collectionName) {
+        else if (element.itemType === 'invertedIndex' && element.connectionId && element.collectionName) {
             // Indexes section
             const collection = this.collections[element.connectionId]?.find(
                 item => item.label === element.collectionName
@@ -732,18 +732,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const indexItems: WeaviateTreeItem[] = [];
             
             // Inverted index
-            if (schema?.InvertedIndexConfig) {
+            const invertedIndex = await this.flattenObject(schema.invertedIndex || {}, [], '', false);
+            Object.entries(invertedIndex || {}).forEach(([key, value]) => {
                 indexItems.push(new WeaviateTreeItem(
-                    'Inverted Index: Enabled',
+                    `${key}: ${value}`,
                     vscode.TreeItemCollapsibleState.None,
                     'object',
                     element.connectionId,
                     element.collectionName,
-                    'invertedIndex',
+                    key,
                     new vscode.ThemeIcon('search'),
-                    'weaviateIndex'
+                    'invertedIndexItem'
                 ));
-            }
+            });
 
             // Vector index
             if (schema?.vectorIndexConfig) {
