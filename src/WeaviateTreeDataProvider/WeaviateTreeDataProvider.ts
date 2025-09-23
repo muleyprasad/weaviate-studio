@@ -142,7 +142,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             // Create and show a webview with the detailed schema
             const panel = vscode.window.createWebviewPanel(
                 'weaviateDetailedSchema',
-                `Schema: ${collectionName}`,
+                `Collection: ${collectionName}`,
                 vscode.ViewColumn.One,
                 { 
                     enableScripts: true,

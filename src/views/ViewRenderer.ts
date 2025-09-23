@@ -147,7 +147,7 @@ export class ViewRenderer {
                 </div>
                 ${prop.description ? `<div class="property-description">${this.escapeHtml(prop.description)}</div>` : ''}
                 <div class="property-details">
-                    <span class="property-detail">Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</span>
+                    <span class="property-detail">${Object.entries(prop).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('<br /> ')}</span>
                 </div>
             </div>
         `).join('') || '<div>No properties found</div>';
@@ -515,7 +515,7 @@ Property: ${prop.name}
             </head>
             <body>
                 <div class="header">
-                    <h1>Collection Name: ${this.escapeHtml(schema.name)}</h1>
+                    <h1>Collection: ${this.escapeHtml(schema.name)}</h1>
                 </div>
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('overview')">Overview</div>
@@ -528,14 +528,12 @@ Property: ${prop.name}
                     <div class="section-header">Description</div>
                     <div class="section-content">${this.escapeHtml(schema.description || 'No description available')}</div>
                     
-                    <div class="section-header">Vector Configuration</div>
+                    <div class="section-header">Vectors</div>
                     <div class="section-content">
                         <div class="config-grid">
                             <div class="config-item">
                                 <span class="config-label">Vectorizers:</span>
-                                
-
-                                <span class="config-value"></span>
+                                <span class="config-value">${this.escapeHtml((schema as any).vectorizers || 'None')}</span>
                             </div>
                             <div class="config-item">
                                 <span class="config-label">Index Type:</span>
