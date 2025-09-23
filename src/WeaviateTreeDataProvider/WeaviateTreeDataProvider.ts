@@ -563,13 +563,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                let value = collection.schema?.vectorizers[key];
                     vectorItems.push(new WeaviateTreeItem(
                         `${key} - ${value.vectorizer.name}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
+                        vscode.TreeItemCollapsibleState.Collapsed,
+                        'vectorConfigDetail',
                         element.connectionId,
                         element.collectionName,
-                        'vectorIndexType',
+                        key,
                         new vscode.ThemeIcon('list-tree'),
-                        'weaviateVectorConfig'
+                        'vectorConfigDetail'
                     ));
             }
 
@@ -580,6 +580,38 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
              }
 
             return vectorItems;
+        }
+        if (element.itemType === 'vectorConfigDetail' && element.connectionId && element.collectionName) {
+            // Vector configuration detail section
+            const vectorItemDetails: WeaviateTreeItem[] = [];
+            const collection = this.collections[element.connectionId]?.find(
+                item => item.label === element.collectionName
+            );
+            
+            if (!collection) {
+                 return [
+                     new WeaviateTreeItem('No Vectors available', vscode.TreeItemCollapsibleState.None, 'message')
+                 ];
+             }
+             const vectorizer = collection.schema?.vectorizers[element.itemId || ''];
+             const flattened_vectorizer = await this.flattenObject(vectorizer || {});
+             // for each object in vectorizer, create a tree item
+             for (let key in flattened_vectorizer) {
+                 const value = flattened_vectorizer[key];
+                 vectorItemDetails.push(new WeaviateTreeItem(
+                     `${key} - ${value}`,
+                     vscode.TreeItemCollapsibleState.None,
+                     'object',
+                     element.connectionId,
+                     element.collectionName,
+                     key,
+                     new vscode.ThemeIcon('list-tree'),
+                     'vectorConfigDetail'
+                 ));
+             }
+             return vectorItemDetails;
+             
+
         }
         else if (element.itemType === 'indexes' && element.connectionId && element.collectionName) {
             // Indexes section
@@ -2878,22 +2910,37 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         });
     }
 
-    async flattenObject(node: Record<string, unknown>, exclude_keys?: string[]): Promise<Record<string, unknown>> {
-        // remove exclude_keys from node
-        const filteredNode = exclude_keys ? Object.fromEntries(Object.entries(node).filter(([key]) => !exclude_keys.includes(key))) : node;
+    async  flattenObject(
+        node: Record<string, unknown>,
+        exclude_keys: string[] = [],
+        parentKey = ''
+    ): Promise<Record<string, unknown>> {
+        const result: Record<string, unknown> = {};
 
-        return Object.keys(filteredNode).reduce((acc, key) => {
-            if (!exclude_keys?.includes(key)) {
-                const value = filteredNode[key];
-                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                    Object.keys(value).forEach(subKey => {
-                        acc[`${key} ${subKey}`] = (value as Record<string, unknown>)[subKey];
-                    });
-                } else {
-                    acc[key] = value;
-                }
+        const filteredNode = Object.fromEntries(
+            Object.entries(node).filter(([key]) => !exclude_keys.includes(key))
+        );
+
+        for (const [key, value] of Object.entries(filteredNode)) {
+            const newKey = parentKey ? `${parentKey} ${key}` : key;
+
+            if (
+            value &&
+            typeof value === 'object' &&
+            !Array.isArray(value)
+            ) {
+            // recurse into nested object
+            const flattenedChild = await this.flattenObject(
+                value as Record<string, unknown>,
+                exclude_keys,
+                newKey
+            );
+            Object.assign(result, flattenedChild);
+            } else {
+            result[newKey] = value;
             }
-            return acc;
-        }, {} as Record<string, unknown>);
+        }
+
+        return result;
     }
 }
