@@ -177,14 +177,11 @@ describe('Add Collection', () => {
     });
 
     it('handles create message successfully', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => ({
-            withClass: jest.fn().mockReturnThis(),
-            do: mockDo
-          })
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -205,14 +202,11 @@ describe('Add Collection', () => {
     });
 
     it('handles create message with error', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockRejectedValue(new Error('Schema error'));
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockRejectedValue(new Error('Schema error'));
       const mockClient = {
-        schema: {
-          classCreator: () => ({
-            withClass: jest.fn().mockReturnThis(),
-            do: mockDo
-          })
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);

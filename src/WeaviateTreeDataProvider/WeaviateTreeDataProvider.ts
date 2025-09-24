@@ -1659,15 +1659,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * @param connectionId - The ID of the connection to add the collection to
      */
     async addCollection(connectionId: string): Promise<void> {
-        try {
-            const connection = this.connectionManager.getConnection(connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
+        // Validate connection first - these errors should not be caught and re-wrapped
+        const connection = this.connectionManager.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
 
-            if (connection.status !== 'connected') {
-                throw new Error('Connection must be active to add collections');
-            }
+        if (connection.status !== 'connected') {
+            throw new Error('Connection must be active to add collections');
+        }
+
+        try {
 
             // Create and show the Add Collection webview panel
             const panel = vscode.window.createWebviewPanel(
