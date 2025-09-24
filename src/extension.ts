@@ -261,6 +261,84 @@ export function activate(context: vscode.ExtensionContext) {
                     `Failed to add collection: ${error instanceof Error ? error.message : String(error)}`
                 );
             }
+        }),
+
+        // DEBUG COMMANDS - for troubleshooting connection name conflicts
+        vscode.commands.registerCommand('weaviate.debug.listConnections', async () => {
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const names = connectionManager.getConnectionNames();
+                const connections = connectionManager.getConnections();
+                
+                const info = connections.map((c: any) => `- ${c.name} (ID: ${c.id}, Type: ${c.type}, Status: ${c.status})`).join('\n');
+                const message = `Current connections:\n${info || '(No connections found)'}`;
+                
+                await vscode.window.showInformationMessage(message, { modal: true });
+                console.log('Debug - Connection list:', connections);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Debug failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('weaviate.debug.checkNameConflict', async () => {
+            try {
+                const name = await vscode.window.showInputBox({
+                    prompt: 'Enter connection name to check for conflicts',
+                    placeHolder: 'Connection name...'
+                });
+                
+                if (!name) {
+                    return;
+                }
+                
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const result = connectionManager.checkNameConflict(name);
+                
+                if (result.exists) {
+                    const conflict = result.conflictingConnection!;
+                    vscode.window.showWarningMessage(
+                        `Name conflict found! Existing connection: "${conflict.name}" (ID: ${conflict.id}, Type: ${conflict.type})`
+                    );
+                } else {
+                    vscode.window.showInformationMessage(`No name conflict found. "${name}" is available.`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Debug failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('weaviate.debug.clearAllConnections', async () => {
+            try {
+                const confirm = await vscode.window.showWarningMessage(
+                    'This will DELETE ALL connections permanently. Are you sure?',
+                    { modal: true },
+                    'Yes, Clear All Connections'
+                );
+                
+                if (confirm !== 'Yes, Clear All Connections') {
+                    return;
+                }
+                
+                const secondConfirm = await vscode.window.showWarningMessage(
+                    'Last warning: This action cannot be undone. All connections will be lost!',
+                    { modal: true },
+                    'I understand, proceed'
+                );
+                
+                if (secondConfirm !== 'I understand, proceed') {
+                    return;
+                }
+                
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                await connectionManager.clearAllConnections();
+                
+                // Refresh the tree view to reflect changes
+                weaviateTreeDataProvider.refresh();
+                
+                vscode.window.showInformationMessage('All connections have been cleared successfully.');
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to clear connections: ${error instanceof Error ? error.message : String(error)}`);
+            }
         })
     );
 

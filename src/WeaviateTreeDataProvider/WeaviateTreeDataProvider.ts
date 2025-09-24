@@ -1370,6 +1370,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return this.connections.find(c => c.id === connectionId);
     }
 
+    // Get the connection manager (for debugging purposes)
+    getConnectionManager(): ConnectionManager {
+        return this.connectionManager;
+    }
+
     // --- Collection Management Methods ---
     
     // Fetch collections from Weaviate
