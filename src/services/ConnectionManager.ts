@@ -47,7 +47,7 @@ export class ConnectionManager {
         this.loadConnections();
     }
 
-    private async checkConnectionsMigration(connections: WeaviateConnection[]): Promise<WeaviateConnection[]> {
+    private checkConnectionsMigration(connections: WeaviateConnection[]): WeaviateConnection[] {
         // if migration detected, save the migrated connections
         let need_to_save = false;
         // if it doesn't have connectionVersion, need to migrate
@@ -91,8 +91,7 @@ export class ConnectionManager {
           return conn;
         });
         if (need_to_save) {
-          this.connections = connections as WeaviateConnection[];
-          this.saveConnections();
+          this.context.globalState.update(this.storageKey, connections);
         }
         return connections;
     }
@@ -107,9 +106,9 @@ export class ConnectionManager {
     private async loadConnections(): Promise<WeaviateConnection[]> {
         var connections = this.context.globalState.get<WeaviateConnection[]>(this.storageKey) || [];
         // Check and save migrations
-        connections = await this.checkConnectionsMigration(connections);
+        const migratedConnections = this.checkConnectionsMigration(connections);
         // Ensure all loaded connections start as disconnected
-        this.connections = connections.map((conn: WeaviateConnection) => ({
+        this.connections = migratedConnections.map((conn: WeaviateConnection) => ({
             ...conn,
             status: 'disconnected' as const
         }));
