@@ -77,14 +77,14 @@ describe('WeaviateTreeDataProvider', () => {
     const children = await provider.getChildren();
     expect(children).toHaveLength(mockConnections.length);
     const labels = children.map((c: any) => c.label);
-    expect(labels).toContain('Local');
-    expect(labels).toContain('Prod');
+    expect(labels).toContain('🔗 Local');
+    expect(labels).toContain('🔗 Prod');
   });
 
   it('sorts connections by lastUsed desc', async () => {
     const children = await provider.getChildren();
-    expect(children[0].label).toBe('Prod');
-    expect(children[1].label).toBe('Local');
+    expect(children[0].label).toBe('🔗 Prod');
+    expect(children[1].label).toBe('🔗 Local');
   });
 
   it('create TreeItem for connection has collapsibleState', async () => {
@@ -104,18 +104,18 @@ describe('WeaviateTreeDataProvider', () => {
 
   it('child nodes under a connected connection include expected sections', async () => {
     const rootChildren = await provider.getChildren();
-    const connected: any = rootChildren.find((c: any) => c.label === 'Prod');
+    const connected: any = rootChildren.find((c: any) => c.label.endsWith('Prod'));
     expect(connected).toBeDefined();
     const sections = await provider.getChildren(connected);
     const itemTypes = sections.map((s: any) => s.itemType);
-    expect(itemTypes).toEqual(expect.arrayContaining(['serverInfo', 'clusterHealth', 'modules', 'collectionsGroup']));
+    expect(itemTypes).toEqual(expect.arrayContaining(["serverInfo", "clusterNodes", "collectionsGroup"]));
   });
 
   it('collections group label reflects count', async () => {
     // inject 3 mock collections for Prod (id 2)
     (provider as any).collections['2'] = [ {label:'A'}, {label:'B'}, {label:'C'} ];
     const rootChildren = await provider.getChildren();
-    const connected: any = rootChildren.find((c: any) => c.label === 'Prod');
+    const connected: any = rootChildren.find((c: any) => c.label.endsWith('Prod'));
     expect(connected).toBeDefined();
     const sections = await provider.getChildren(connected);
     const collectionsGroup: any = sections.find((s: any) => s.itemType === 'collectionsGroup');
@@ -124,7 +124,7 @@ describe('WeaviateTreeDataProvider', () => {
 
   it('contextValue set correctly on connected connection', async () => {
     const rootChildren = await provider.getChildren();
-    const connected: any = rootChildren.find((c: any) => c.label === 'Prod');
+    const connected: any = rootChildren.find((c: any) => c.label.endsWith('Prod'));
     expect(connected).toBeDefined();
     expect(connected.contextValue).toBe('weaviateConnectionActive');
   });
