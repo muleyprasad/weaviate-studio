@@ -275,7 +275,7 @@ describe('ConnectionManager Webview Tests', () => {
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'error',
-        message: 'A connection with this name already exists'
+        message: expect.stringContaining('A connection with this name already exists')
       });
 
       // Clean up

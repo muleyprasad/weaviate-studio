@@ -12,6 +12,9 @@ export function activate(context: vscode.ExtensionContext) {
         treeDataProvider: weaviateTreeDataProvider,
         showCollapseAll: true
     });
+    
+    // Set the TreeView reference in the provider for programmatic control
+    weaviateTreeDataProvider.setTreeView(treeView);
 
     // Handle selection of tree items
     treeView.onDidChangeSelection(async e => {

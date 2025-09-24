@@ -49,6 +49,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     /** Handles view rendering */
     private readonly viewRenderer: ViewRenderer;
     
+    /** Reference to the TreeView for programmatic control */
+    private treeView?: vscode.TreeView<WeaviateTreeItem>;
+    
     private isRefreshing = false;
 
     /**
@@ -90,6 +93,45 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 }
             }, 100); // 100ms debounce
         });
+    }
+    
+    /**
+     * Sets the TreeView reference for programmatic control
+     * @param treeView - The TreeView instance
+     */
+    public setTreeView(treeView: vscode.TreeView<WeaviateTreeItem>): void {
+        this.treeView = treeView;
+    }
+    
+    /**
+     * Gets the parent of a tree element (required for TreeView.reveal API)
+     * @param element - The tree element to get the parent for
+     * @returns The parent element or undefined if it's a root element
+     */
+    public getParent(element: WeaviateTreeItem): vscode.ProviderResult<WeaviateTreeItem> {
+        // Root level connections have no parent
+        if (element.itemType === 'connection') {
+            return undefined;
+        }
+        
+        // For all other items, the parent is the connection
+        if (element.connectionId) {
+            const connection = this.connections.find(conn => conn.id === element.connectionId);
+            if (connection) {
+                return new WeaviateTreeItem(
+                    `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+                    vscode.TreeItemCollapsibleState.Expanded,
+                    'connection',
+                    connection.id,
+                    undefined, // collectionName
+                    undefined, // itemId
+                    this.getStatusIcon(connection.status),
+                    connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
+                );
+            }
+        }
+        
+        return undefined;
     }
     
     /**
@@ -383,7 +425,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return collections;
         }
         else if (element.itemType === 'collection' && element.connectionId) {
-            let collection = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema
+            let collection = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema;
             if (!collection){
                 throw new Error('Collection data not available!');
             }
@@ -1306,6 +1348,25 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     // Fire tree change event to update connection state right away
                     // This makes the connection item rerender with 'connected' status icon
                     this._onDidChangeTreeData.fire();
+                    
+                    // Auto-expand the connection tree item if TreeView is available
+                    if (this.treeView) {
+                        const connectionItem = new WeaviateTreeItem(
+                            `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+                            vscode.TreeItemCollapsibleState.Expanded,
+                            'connection',
+                            connection.id,
+                            undefined, // collectionName
+                            undefined, // itemId
+                            this.getStatusIcon(connection.status),
+                            'connectedConnection'
+                        );
+                        
+                        // Use setTimeout to ensure the tree has been updated before revealing
+                        setTimeout(() => {
+                            this.treeView?.reveal(connectionItem, { expand: true });
+                        }, 100);
+                    }
                 }
                 
                 // Only fetch collections if we're not in a refresh loop
