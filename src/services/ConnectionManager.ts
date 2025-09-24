@@ -28,6 +28,11 @@ export interface WeaviateConnection {
     timeoutInit?: number;
     timeoutQuery?: number;
     timeoutInsert?: number;
+
+    connectionVersion?: string; // future use
+
+    // backwards compatibility
+    url?: string; // old field, to be migrated
 }
 
 export class ConnectionManager {
@@ -42,6 +47,56 @@ export class ConnectionManager {
         this.loadConnections();
     }
 
+    private async checkConnectionsMigration(connections: WeaviateConnection[]): Promise<WeaviateConnection[]> {
+        // if migration detected, save the migrated connections
+        let need_to_save = false;
+        // if it doesn't have connectionVersion, need to migrate
+        connections = connections.map((conn) => {
+          if (conn.connectionVersion === '2') {
+            // future migrations here
+            return conn;
+          } else if (!conn.connectionVersion) {
+            // may be new connection without version
+            if (conn.httpHost || conn.cloudUrl) {
+              need_to_save = true;
+              return { ...conn, connectionVersion: '2' };
+            }
+            // old connection, need to migrate
+            if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io'))) {
+                conn.type = 'cloud';
+                conn.cloudUrl = conn.url;
+                delete conn.url;
+                conn.connectionVersion = '2';
+                need_to_save = true;
+            } else {
+              // custom connection
+                if (!conn.url) {
+                    // invalid connection, skip migration
+                    return conn;
+                }
+                conn.type = 'custom';
+                // url should be in format http(s)://host:port
+                const url = new URL(conn.url);
+                delete conn.url;
+                conn.httpHost = url.hostname;
+                conn.httpPort = parseInt(url.port) || 80;
+                conn.httpSecure = url.protocol === 'https:';
+                conn.grpcHost = url.hostname;
+                conn.grpcPort = 50051; // default grpc port
+                conn.grpcSecure = url.protocol === 'https:'; // default to false
+                conn.connectionVersion = '2';
+                need_to_save = true;
+            }
+          }
+          return conn;
+        });
+        if (need_to_save) {
+          this.connections = connections as WeaviateConnection[];
+          this.saveConnections();
+        }
+        return connections;
+    }
+
     public static getInstance(context: vscode.ExtensionContext): ConnectionManager {
         if (!ConnectionManager.instance) {
             ConnectionManager.instance = new ConnectionManager(context);
@@ -50,7 +105,9 @@ export class ConnectionManager {
     }
 
     private async loadConnections(): Promise<WeaviateConnection[]> {
-        const connections = this.context.globalState.get<WeaviateConnection[]>(this.storageKey) || [];
+        var connections = this.context.globalState.get<WeaviateConnection[]>(this.storageKey) || [];
+        // Check and save migrations
+        connections = await this.checkConnectionsMigration(connections);
         // Ensure all loaded connections start as disconnected
         this.connections = connections.map((conn: WeaviateConnection) => ({
             ...conn,
@@ -376,7 +433,7 @@ export class ConnectionManager {
     <option value="cloud">Cloud</option>
     </select>
   </div>
-a: ${connection?.type}
+  
   <!-- Connection name -->
   <div class="form-group">
     <label for="connectionName">Connection Name</label>
@@ -431,7 +488,9 @@ a: ${connection?.type}
 
   <!-- Advanced settings -->
   <div class="advanced">
+    <small>Connection version: ${connection ? connection.connectionVersion || 2 : 2}</small>
     <span class="advanced-toggle" id="toggleAdvanced">Show Advanced Settings ▾</span>
+    
     <div class="advanced-settings" id="advancedSettings">
       <div class="form-group">
         <label for="timeoutInit">Timeout (Init, seconds)</label>
