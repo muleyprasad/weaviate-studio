@@ -332,9 +332,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             ));
 
             // Add cluster nodes section
+            const stats = this.clusterStatisticsCache[element.connectionId];
+            let nodes_synchronized = stats?.synchronized ? 'Synchronized' : 'Not Synchronized';
             let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
             items.push(new WeaviateTreeItem(
-                `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${this.clusterStatisticsCache[element.connectionId].synchronized ? 'Synchronized' : 'Not Synchronized'}`,
+                `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${nodes_synchronized}`,
                 vscode.TreeItemCollapsibleState.Expanded,
                 'clusterNodes',
                 element.connectionId,
@@ -1385,6 +1387,32 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 throw new Error('Client not initialized');
             }
 
+            // Get stats from server
+            // use direct request as the client does not support this endpoint yet
+            const clusterStats = await this.fetchClusterStatistics({
+                httpSecure: connection.httpSecure ?? false,
+                httpHost: connection.httpHost ?? '',
+                httpPort: connection.httpPort ?? 8080,
+                apiKey: connection.apiKey,
+                cloudUrl: connection.cloudUrl ?? '',
+                type: connection.type ?? 'local'
+            }, connectionId);
+            // map the the result per node name
+            let clusterStatsMapped: { [key: string]: any } = {};
+            if (clusterStats) {
+                try {
+                    const statsJson = JSON.parse(clusterStats);
+                    // Map the stats to the clusterStatsMapped object
+                    for (const [nodeName, nodeStats] of Object.entries(statsJson)) {
+                        clusterStatsMapped[nodeName] = nodeStats;
+                    }
+                } catch (error: unknown) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    vscode.window.showErrorMessage(`Failed to parse cluster stats: ${errorMessage}`);
+                }
+            }
+            this.clusterStatisticsCache[connectionId] = clusterStatsMapped;            
+
             // Get collections from Weaviate
             const collections = await client.collections.listAll();
             // Store collections with their schema
@@ -1414,31 +1442,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const clusterNodes = await client.cluster.nodes({output: 'verbose'});
             this.clusterNodesCache[connectionId] = clusterNodes;
 
-            // Get Raft stats from Weaviate
-            // use direct request as the client does not support this endpoint yet
-            const clusterStats = await this.fetchClusterStatistics({
-                httpSecure: connection.httpSecure ?? false,
-                httpHost: connection.httpHost ?? '',
-                httpPort: connection.httpPort ?? 8080,
-                apiKey: connection.apiKey,
-                cloudUrl: connection.cloudUrl ?? '',
-                type: connection.type ?? 'local'
-            }, connectionId);
-            // map the the result per node name
-            let clusterStatsMapped: { [key: string]: any } = {};
-            if (clusterStats) {
-                try {
-                    const statsJson = JSON.parse(clusterStats);
-                    // Map the stats to the clusterStatsMapped object
-                    for (const [nodeName, nodeStats] of Object.entries(statsJson)) {
-                        clusterStatsMapped[nodeName] = nodeStats;
-                    }
-                } catch (error: unknown) {
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    vscode.window.showErrorMessage(`Failed to parse cluster stats: ${errorMessage}`);
-                }
-            }
-            this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
+
 
             // Refresh the tree view to show updated collections
             this.refresh();
@@ -2984,6 +2988,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         var protocol = connection.httpSecure ? https : http;
         let url: string = '';
         if (connection.type === 'cloud'){
+            // remove https or http if couldUrl has it
+            if (connection.cloudUrl) {
+                connection.cloudUrl = connection.cloudUrl.replace(/^https?:\/\//, '');
+            }
             url = `https://${connection.cloudUrl}/v1/cluster/statistics`;
             protocol = https;
         } else {
