@@ -1866,18 +1866,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         const schemaObject = {
             class: schema.class,
             description: schema.description || undefined,
-            vectorizer: schema.vectorizer === 'none' ? undefined : schema.vectorizer,
             properties: schema.properties || []  // Include properties from the form
         } as any;
         
-        if (schema.vectorIndexType) {
-            schemaObject.vectorIndexType = schema.vectorIndexType;
+        // Handle vectorConfig (new multi-vectorizer format)
+        if (schema.vectorConfig) {
+            schemaObject.vectorConfig = schema.vectorConfig;
+        } 
+        // Handle legacy single vectorizer format for backward compatibility
+        else if (schema.vectorizer && schema.vectorizer !== 'none') {
+            schemaObject.vectorizer = schema.vectorizer;
+            if (schema.vectorIndexType) {
+                schemaObject.vectorIndexType = schema.vectorIndexType;
+            }
+            if (schema.vectorIndexConfig) {
+                schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
+            }
+            if (schema.moduleConfig) {
+                schemaObject.moduleConfig = schema.moduleConfig;
+            }
         }
-        if (schema.vectorIndexConfig) {
-            schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
-        }
-        if (schema.moduleConfig) {
-            schemaObject.moduleConfig = schema.moduleConfig;
+        
+        // Handle multiTenancyConfig
+        if (schema.multiTenancyConfig) {
+            schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
         }
         
         // Create the collection using the schema API
@@ -2347,6 +2359,85 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         background: transparent;
                     }
                     
+                    /* Vectorizer Configuration */
+                    .vector-config-container {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                    }
+                    
+                    .vectorizer-card {
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        border: 1px solid var(--vscode-panel-border, #DADADA);
+                        border-radius: 4px;
+                        padding: 16px;
+                        position: relative;
+                    }
+                    
+                    .vectorizer-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 16px;
+                    }
+                    
+                    .vectorizer-name-input {
+                        display: flex;
+                        align-items: center;
+                        flex: 1;
+                    }
+                    
+                    .vectorizer-name-input label {
+                        margin-right: 8px;
+                        font-weight: bold;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .vectorizer-name-input input {
+                        flex: 1;
+                        max-width: 200px;
+                    }
+                    
+                    .vectorizer-name {
+                        font-weight: bold;
+                        font-size: 14px;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .vectorizer-remove-btn {
+                        background: transparent;
+                        color: var(--vscode-errorForeground, #D32F2F);
+                        border: none;
+                        cursor: pointer;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                    }
+                    
+                    .vectorizer-remove-btn:hover {
+                        background: var(--vscode-list-errorForeground, rgba(211, 47, 47, 0.1));
+                    }
+                    
+                    .vector-actions {
+                        margin-top: 16px;
+                    }
+                    
+                    .add-vectorizer-btn {
+                        background: transparent;
+                        color: var(--vscode-button-background, #007ACC);
+                        border: none;
+                        padding: 0;
+                        font-size: 14px;
+                        text-decoration: underline;
+                        text-align: left;
+                        cursor: pointer;
+                    }
+                    
+                    .add-vectorizer-btn:hover {
+                        color: #005A9E;
+                        background: transparent;
+                    }
+                    
                     /* Error Handling */
                     .error {
                         color: #D32F2F;
@@ -2446,36 +2537,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             </div>
                         </div>
                         
-                        <!-- Vectorizer & Index Type Section -->
-                        <div class="form-section">
-                            <div class="section-header" data-section="vectorizer">
-                                <span>Vectorizer & Index Type</span>
-                                <span class="icon">▼</span>
-                            </div>
-                            <div class="section-content" id="vectorizerContent">
-                                <div class="form-row">
-                                    <div class="form-field">
-                            <label for="vectorizer">Vectorizer</label>
-                                        <select id="vectorizer" name="vectorizer" aria-describedby="vectorizerHint">
-                                            <option value="none">None (Manual vectors)</option>
-                                <option value="text2vec-openai">OpenAI</option>
-                                <option value="text2vec-cohere">Cohere</option>
-                                <option value="text2vec-huggingface">Hugging Face</option>
-                            </select>
-                                        <div class="hint" id="vectorizerHint">How text will be converted to vectors</div>
-                        </div>
-                                    <div class="form-field">
-                                        <label for="vectorIndexType">Index Type</label>
-                                        <select id="vectorIndexType" name="vectorIndexType" aria-describedby="indexHint">
-                                            <option value="hnsw">HNSW (Recommended)</option>
-                                <option value="flat">Flat</option>
-                            </select>
-                                        <div class="hint" id="indexHint">Vector search algorithm</div>
-                        </div>
-                                </div>
-                            </div>
-                        </div>
-                        
                         <!-- Properties Section -->
                         <div class="form-section">
                             <div class="section-header" data-section="properties">
@@ -2487,6 +2548,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             <div class="properties-container" id="propertiesContainer">
                                     <div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>
                             </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vectorizer Configuration Section -->
+                        <div class="form-section">
+                            <div class="section-header" data-section="vectorizer">
+                                <span>Vectorizer Configuration</span>
+                                <span class="icon">▼</span>
+                            </div>
+                            <div class="section-content" id="vectorizerContent">
+                                <div id="vectorConfigContainer">
+                                    <!-- Multi-vectorizer support will be rendered here -->
+                                </div>
+                                <div class="vector-actions">
+                                    <button type="button" class="add-vectorizer-btn" id="addVectorizerButton">+ Add Vectorizer</button>
+                                </div>
                             </div>
                         </div>
                         
@@ -2516,7 +2593,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                     </label>
                                     <div class="hint" id="mtHint">Allow collection to be partitioned by tenant</div>
                                 </div>
-                                <div id="moduleConfigContainer"></div>
                             </div>
                         </div>
                         
@@ -2543,7 +2619,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 <script>
                     const vscode = acquireVsCodeApi();
                     let propertyCounter = 0;
+                    let vectorCounter = 0;
                     let properties = [];
+                    let vectorizers = [];
+                    let availableVectorizers = [];
                     let existingCollections = [];
                     let vectorIndexConfigState = { efConstruction: 128, maxConnections: 16 };
                     let moduleConfigState = {};
@@ -2591,23 +2670,43 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         if (!schema) return;
                         
                         // Basic settings
-                        if (schema.class) {
-                            document.getElementById('collectionName').value = schema.class;
-                        }
-                        if (schema.description) {
-                            document.getElementById('description').value = schema.description;
+                        const collectionNameInput = document.getElementById('collectionName');
+                        if (schema.class && collectionNameInput) {
+                            collectionNameInput.value = schema.class;
                         }
                         
-                        // Vectorizer settings
-                        if (schema.vectorizer) {
-                            const vectorizerSelect = document.getElementById('vectorizer');
-                            vectorizerSelect.value = schema.vectorizer;
+                        const descriptionInput = document.getElementById('description');
+                        if (schema.description && descriptionInput) {
+                            descriptionInput.value = schema.description;
+                        }
+                        
+                        // Handle vectorConfig (new format) or legacy vectorizer
+                        if (schema.vectorConfig) {
+                            // New multi-vectorizer format
+                            vectorizers = [];
+                            vectorCounter = 0;
+                            for (const [vectorName, vectorConfig] of Object.entries(schema.vectorConfig)) {
+                                const vectorizerType = Object.keys(vectorConfig.vectorizer)[0];
+                                const moduleConfig = vectorConfig.vectorizer[vectorizerType] || {};
+                                addVectorizer(vectorName, vectorizerType);
+                                const vectorizer = vectorizers[vectorizers.length - 1];
+                                vectorizer.moduleConfig = moduleConfig;
+                                vectorizer.vectorIndexType = vectorConfig.vectorIndexType || 'hnsw';
+                                vectorizer.vectorIndexConfig = vectorConfig.vectorIndexConfig || { efConstruction: 128, maxConnections: 16 };
+                            }
                         } else {
-                            document.getElementById('vectorizer').value = 'none';
-                        }
-                        
-                        if (schema.vectorIndexType) {
-                            document.getElementById('vectorIndexType').value = schema.vectorIndexType;
+                            // Legacy single vectorizer format
+                            const vectorizerType = schema.vectorizer || 'none';
+                            addVectorizer('default', vectorizerType);
+                            if (schema.moduleConfig && vectorizers.length > 0) {
+                                vectorizers[0].moduleConfig = schema.moduleConfig[vectorizerType] || {};
+                            }
+                            if (schema.vectorIndexType && vectorizers.length > 0) {
+                                vectorizers[0].vectorIndexType = schema.vectorIndexType;
+                            }
+                            if (schema.vectorIndexConfig && vectorizers.length > 0) {
+                                vectorizers[0].vectorIndexConfig = schema.vectorIndexConfig;
+                            }
                         }
                         
                         // Properties
@@ -2639,6 +2738,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         if (initialSchema) {
                             populateFormFromSchema(initialSchema);
                         }
+                        // Do not add default vectorizer - user will add them manually
                         
                         // Request data from extension
                     vscode.postMessage({ command: 'getVectorizers' });
@@ -2648,7 +2748,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         setupEventListeners();
                         
                         // Initial renders
-                        renderModuleConfig();
+                        renderVectorizers();
+                        renderProperties();
                         updateJsonPreview();
                         
                         // Focus collection name (unless pre-populated)
@@ -2659,7 +2760,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                                         function setupEventListeners() {
                         // Collection name validation with inline error
-                    document.getElementById('collectionName').addEventListener('input', (e) => {
+                    const collectionNameInput = document.getElementById('collectionName');
+                    if (collectionNameInput) {
+                        collectionNameInput.addEventListener('input', (e) => {
                         const input = e.target.value.trim();
                             const errorElement = document.getElementById('nameError');
                             
@@ -2678,71 +2781,231 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             
                         updateJsonPreview();
                     });
-                    
-                        // Other form fields
-                    document.getElementById('description').addEventListener('input', updateJsonPreview);
-                        document.getElementById('vectorizer').addEventListener('change', (e) => {
-                            updateJsonPreview();
-                    renderModuleConfig();
-                        });
-                        document.getElementById('vectorIndexType').addEventListener('change', updateJsonPreview);
-                        document.getElementById('multiTenancyToggle').addEventListener('change', (e) => {
-                            multiTenancyEnabled = e.target.checked;
-                            updateJsonPreview();
-                        });
-                        
-                        // Advanced settings
-                        document.getElementById('efConstruction').addEventListener('input', (e) => {
-                            vectorIndexConfigState.efConstruction = parseInt(e.target.value || 0);
-                            updateJsonPreview();
-                        });
-                        document.getElementById('maxConnections').addEventListener('input', (e) => {
-                            vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
-                            updateJsonPreview();
-                        });
-                    
-                    // Property management
-                        document.getElementById('addPropertyButton').addEventListener('click', addProperty);
-                        
-                        // Form submission
-                        document.getElementById('collectionForm').addEventListener('submit', handleSubmit);
-                        document.getElementById('cancelButton').addEventListener('click', () => {
-                            vscode.postMessage({ command: 'cancel' });
-                        });
                     }
                     
-                    function renderModuleConfig() {
-                        const container = document.getElementById('moduleConfigContainer');
-                        const vectorizer = document.getElementById('vectorizer').value;
-                        container.innerHTML = '';
-                        moduleConfigState = {};
+                        // Other form fields
+                    const descriptionInput = document.getElementById('description');
+                    if (descriptionInput) {
+                        descriptionInput.addEventListener('input', updateJsonPreview);
+                    }
                         
-                        if (vectorizer === 'text2vec-openai') {
-                            container.innerHTML = \`
-                                <div class="form-field">
-                                    <label>OpenAI Configuration</label>
-                                    <div class="form-row">
-                                        <div class="form-field">
-                                            <label for="openaiModel">Model</label>
-                                            <input type="text" id="openaiModel" placeholder="text-embedding-ada-002">
-                                        </div>
-                                        <div class="form-field">
-                                            <label for="openaiBaseUrl">Base URL (Optional)</label>
-                                            <input type="text" id="openaiBaseUrl" placeholder="https://api.openai.com/v1">
-                                        </div>
-                                    </div>
-                                </div>\`;
-                            
-                            document.getElementById('openaiModel').addEventListener('input', (e) => {
-                                moduleConfigState.model = e.target.value.trim();
-                                updateJsonPreview();
-                            });
-                            document.getElementById('openaiBaseUrl').addEventListener('input', (e) => {
-                                moduleConfigState.baseURL = e.target.value.trim();
+                        const multiTenancyToggle = document.getElementById('multiTenancyToggle');
+                        if (multiTenancyToggle) {
+                            multiTenancyToggle.addEventListener('change', (e) => {
+                                multiTenancyEnabled = e.target.checked;
                                 updateJsonPreview();
                             });
                         }
+                        
+                        // Advanced settings
+                        const efConstruction = document.getElementById('efConstruction');
+                        if (efConstruction) {
+                            efConstruction.addEventListener('input', (e) => {
+                                vectorIndexConfigState.efConstruction = parseInt(e.target.value || 0);
+                                updateJsonPreview();
+                            });
+                        }
+                        
+                        const maxConnections = document.getElementById('maxConnections');
+                        if (maxConnections) {
+                            maxConnections.addEventListener('input', (e) => {
+                                vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
+                                updateJsonPreview();
+                            });
+                        }
+                    
+                    // Property management
+                        const addPropertyButton = document.getElementById('addPropertyButton');
+                        if (addPropertyButton) {
+                            addPropertyButton.addEventListener('click', addProperty);
+                        }
+                        
+                        // Vectorizer management
+                        const addVectorizerButton = document.getElementById('addVectorizerButton');
+                        if (addVectorizerButton) {
+                            addVectorizerButton.addEventListener('click', () => {
+                                const suggestedName = vectorizers.length === 0 ? 'default' : \`vector\${vectorizers.length + 1}\`;
+                                addVectorizer(suggestedName, 'none');
+                                renderVectorizers();
+                                updateJsonPreview();
+                            });
+                        }
+                        
+                        // Form submission
+                        const collectionForm = document.getElementById('collectionForm');
+                        if (collectionForm) {
+                            collectionForm.addEventListener('submit', handleSubmit);
+                        }
+                        
+                        const cancelButton = document.getElementById('cancelButton');
+                        if (cancelButton) {
+                            cancelButton.addEventListener('click', () => {
+                                vscode.postMessage({ command: 'cancel' });
+                            });
+                        }
+                    }
+                    
+                    function addVectorizer(name, vectorizerType) {
+                        const vectorizer = {
+                            id: ++vectorCounter,
+                            name: name,
+                            vectorizer: vectorizerType,
+                            vectorIndexType: 'hnsw',
+                            vectorIndexConfig: { efConstruction: 128, maxConnections: 16 },
+                            moduleConfig: {}
+                        };
+                        vectorizers.push(vectorizer);
+                    }
+                    
+                    function removeVectorizer(id) {
+                        vectorizers = vectorizers.filter(v => v.id !== id);
+                        renderVectorizers();
                         updateJsonPreview();
+                    }
+                    
+                    function renderVectorizers() {
+                        const container = document.getElementById('vectorConfigContainer');
+                        if (!container) return;
+                        
+                        container.innerHTML = '';
+                        
+                        if (vectorizers.length === 0) {
+                            container.innerHTML = '<div class="no-vectorizers" style="text-align: center; color: var(--vscode-descriptionForeground); padding: 20px; font-style: italic;">No vectorizers added yet. Click "Add Vectorizer" to configure vector embeddings.</div>';
+                            return;
+                        }
+                        
+                        vectorizers.forEach(vectorizer => {
+                            const card = document.createElement('div');
+                            card.className = 'vectorizer-card';
+                            
+                            const removeButton = vectorizers.length > 0 
+                                ? \`<button type="button" class="vectorizer-remove-btn" onclick="removeVectorizer(\${vectorizer.id})">Remove</button>\`
+                                : '';
+                            
+                            card.innerHTML = \`
+                                <div class="vectorizer-header">
+                                    <div class="vectorizer-name-input">
+                                        <label>Vector Name:</label>
+                                        <input type="text" value="\${vectorizer.name}" onchange="updateVectorizerName(\${vectorizer.id}, this.value)" placeholder="e.g., default, semantic, content" style="margin-left: 8px; padding: 4px 8px; border: 1px solid var(--vscode-input-border); border-radius: 4px; background: var(--vscode-input-background); color: var(--vscode-input-foreground);">
+                                    </div>
+                                    \${removeButton}
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label for="vectorizer_\${vectorizer.id}">Vectorizer</label>
+                                        <select id="vectorizer_\${vectorizer.id}" onchange="updateVectorizerType(\${vectorizer.id}, this.value)">
+                                            <option value="none" \${vectorizer.vectorizer === 'none' ? 'selected' : ''}>None (Manual vectors)</option>
+                                            <option value="text2vec-openai" \${vectorizer.vectorizer === 'text2vec-openai' ? 'selected' : ''}>OpenAI</option>
+                                            <option value="text2vec-cohere" \${vectorizer.vectorizer === 'text2vec-cohere' ? 'selected' : ''}>Cohere</option>
+                                            <option value="text2vec-huggingface" \${vectorizer.vectorizer === 'text2vec-huggingface' ? 'selected' : ''}>Hugging Face</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="vectorIndexType_\${vectorizer.id}">Index Type</label>
+                                        <select id="vectorIndexType_\${vectorizer.id}" onchange="updateVectorizerIndexType(\${vectorizer.id}, this.value)">
+                                            <option value="hnsw" \${vectorizer.vectorIndexType === 'hnsw' ? 'selected' : ''}>HNSW (Recommended)</option>
+                                            <option value="flat" \${vectorizer.vectorIndexType === 'flat' ? 'selected' : ''}>Flat</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="moduleConfig_\${vectorizer.id}"></div>
+                            \`;
+                            container.appendChild(card);
+                            
+                            // Render module config for this vectorizer
+                            renderModuleConfigForVectorizer(vectorizer);
+                        });
+                    }
+                    
+                    function updateVectorizerType(id, vectorizerType) {
+                        const vectorizer = vectorizers.find(v => v.id === id);
+                        if (vectorizer) {
+                            vectorizer.vectorizer = vectorizerType;
+                            vectorizer.moduleConfig = {};
+                            renderModuleConfigForVectorizer(vectorizer);
+                            updateJsonPreview();
+                        }
+                    }
+                    
+                    function updateVectorizerName(id, name) {
+                        const vectorizer = vectorizers.find(v => v.id === id);
+                        if (vectorizer) {
+                            vectorizer.name = name.trim() || \`vector\${id}\`;
+                            updateJsonPreview();
+                        }
+                    }
+                    
+                    function updateVectorizerIndexType(id, indexType) {
+                        const vectorizer = vectorizers.find(v => v.id === id);
+                        if (vectorizer) {
+                            vectorizer.vectorIndexType = indexType;
+                            updateJsonPreview();
+                        }
+                    }
+                    
+                    function renderModuleConfigForVectorizer(vectorizer) {
+                        const container = document.getElementById(\`moduleConfig_\${vectorizer.id}\`);
+                        if (!container) return;
+                        
+                        container.innerHTML = '';
+                        
+                        if (vectorizer.vectorizer === 'text2vec-openai') {
+                            const configDiv = document.createElement('div');
+                            configDiv.className = 'module-config';
+                            
+                            const modelSelected1 = vectorizer.moduleConfig.model === 'text-embedding-3-small' ? 'selected' : '';
+                            const modelSelected2 = vectorizer.moduleConfig.model === 'text-embedding-3-large' ? 'selected' : '';
+                            const modelSelected3 = vectorizer.moduleConfig.model === 'text-embedding-ada-002' ? 'selected' : '';
+                            const baseUrlValue = vectorizer.moduleConfig.baseURL || 'https://api.openai.com';
+                            
+                            configDiv.innerHTML = \`
+                                <h4>OpenAI Configuration</h4>
+                                <div class="form-field">
+                                    <label for="openaiModel_\${vectorizer.id}">Model</label>
+                                    <select id="openaiModel_\${vectorizer.id}" onchange="updateVectorizerModuleConfig(\${vectorizer.id}, 'model', this.value)">
+                                        <option value="text-embedding-3-small" \${modelSelected1}>text-embedding-3-small</option>
+                                        <option value="text-embedding-3-large" \${modelSelected2}>text-embedding-3-large</option>
+                                        <option value="text-embedding-ada-002" \${modelSelected3}>text-embedding-ada-002</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label for="openaiBaseUrl_\${vectorizer.id}">Base URL</label>
+                                    <input type="url" id="openaiBaseUrl_\${vectorizer.id}" value="\${baseUrlValue}" onchange="updateVectorizerModuleConfig(\${vectorizer.id}, 'baseURL', this.value)" placeholder="https://api.openai.com">
+                                </div>
+                            \`;
+                            container.appendChild(configDiv);
+                        } else if (vectorizer.vectorizer === 'text2vec-cohere') {
+                            const configDiv = document.createElement('div');
+                            configDiv.className = 'module-config';
+                            
+                            const cohereModelSelected1 = vectorizer.moduleConfig.model === 'embed-multilingual-v3.0' ? 'selected' : '';
+                            const cohereModelSelected2 = vectorizer.moduleConfig.model === 'embed-english-v3.0' ? 'selected' : '';
+                            const cohereBaseUrlValue = vectorizer.moduleConfig.baseUrl || 'https://api.cohere.ai';
+                            
+                            configDiv.innerHTML = \`
+                                <h4>Cohere Configuration</h4>
+                                <div class="form-field">
+                                    <label for="cohereModel_\${vectorizer.id}">Model</label>
+                                    <select id="cohereModel_\${vectorizer.id}" onchange="updateVectorizerModuleConfig(\${vectorizer.id}, 'model', this.value)">
+                                        <option value="embed-multilingual-v3.0" \${cohereModelSelected1}>embed-multilingual-v3.0</option>
+                                        <option value="embed-english-v3.0" \${cohereModelSelected2}>embed-english-v3.0</option>
+                                    </select>
+                                </div>
+                                <div class="form-field">
+                                    <label for="cohereBaseUrl_\${vectorizer.id}">Base URL</label>
+                                    <input type="url" id="cohereBaseUrl_\${vectorizer.id}" value="\${cohereBaseUrlValue}" onchange="updateVectorizerModuleConfig(\${vectorizer.id}, 'baseUrl', this.value)" placeholder="https://api.cohere.ai">
+                                </div>
+                            \`;
+                            container.appendChild(configDiv);
+                        }
+                    }
+                    
+                    function updateVectorizerModuleConfig(id, key, value) {
+                        const vectorizer = vectorizers.find(v => v.id === id);
+                        if (vectorizer) {
+                            vectorizer.moduleConfig[key] = value;
+                            updateJsonPreview();
+                        }
                     }
                     
                     function addProperty() {
@@ -2979,9 +3242,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const formData = new FormData(e.target);
                         let collectionName = formData.get('collectionName').trim();
                         const description = formData.get('description').trim();
-                        const vectorizer = formData.get('vectorizer');
-                        const vectorIndexType = document.getElementById('vectorIndexType').value;
-                        const mtEnabled = document.getElementById('multiTenancyToggle').checked;
+                        const mtEnabled = document.getElementById('multiTenancyToggle') ? document.getElementById('multiTenancyToggle').checked : false;
                         
                         // Validation
                         if (!collectionName) {
@@ -2993,11 +3254,58 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             return;
                         }
                         
+                        // Build vectorConfig from vectorizers
+                        const vectorConfig = {};
+                        const moduleConfig = {};
+                        
+                        vectorizers.forEach(vectorizer => {
+                            if (vectorizer.vectorizer !== 'none') {
+                                vectorConfig[vectorizer.name] = {
+                                    vectorizer: {
+                                        [vectorizer.vectorizer]: { ...vectorizer.moduleConfig }
+                                    },
+                                    vectorIndexConfig: {
+                                        cleanupIntervalSeconds: 300,
+                                        distanceMetric: 'cosine',
+                                        dynamicEfMin: 100,
+                                        dynamicEfMax: 500,
+                                        dynamicEfFactor: 8,
+                                        ef: -1,
+                                        efConstruction: vectorizer.vectorIndexConfig.efConstruction,
+                                        filterStrategy: 'sweeping',
+                                        flatSearchCutoff: 40000,
+                                        maxConnections: vectorizer.vectorIndexConfig.maxConnections,
+                                        skip: false,
+                                        vectorCacheMaxObjects: 1000000000000
+                                    },
+                                    vectorIndexType: vectorizer.vectorIndexType
+                                };
+                            } else {
+                                vectorConfig[vectorizer.name] = {
+                                    vectorizer: { none: {} },
+                                    vectorIndexConfig: {
+                                        cleanupIntervalSeconds: 300,
+                                        distanceMetric: 'cosine',
+                                        dynamicEfMin: 100,
+                                        dynamicEfMax: 500,
+                                        dynamicEfFactor: 8,
+                                        ef: -1,
+                                        efConstruction: vectorizer.vectorIndexConfig.efConstruction,
+                                        filterStrategy: 'sweeping',
+                                        flatSearchCutoff: 40000,
+                                        maxConnections: vectorizer.vectorIndexConfig.maxConnections,
+                                        skip: false,
+                                        vectorCacheMaxObjects: 1000000000000
+                                    },
+                                    vectorIndexType: vectorizer.vectorIndexType
+                                };
+                            }
+                        });
+                        
                         // Build schema
                         const schema = {
                             class: collectionName,
                             description: description || undefined,
-                            vectorizer: vectorizer === 'none' ? undefined : vectorizer,
                             properties: properties.map(function(prop) {
                                 const propSchema = {
                                     name: prop.name.trim(),
@@ -3008,14 +3316,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 };
                                 return propSchema;
                             }),
-                            vectorIndexType: vectorIndexType,
-                            vectorIndexConfig: vectorIndexType === 'hnsw' ? {
-                                efConstruction: vectorIndexConfigState.efConstruction,
-                                maxConnections: vectorIndexConfigState.maxConnections
-                            } : undefined,
-                            moduleConfig: Object.keys(moduleConfigState).length > 0 && vectorizer !== 'none' ? { [vectorizer]: { ...moduleConfigState } } : undefined,
                             multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
                         };
+                        
+                        // Only add vectorConfig if there are vectorizers
+                        if (Object.keys(vectorConfig).length > 0) {
+                            schema.vectorConfig = vectorConfig;
+                        }
                         
                         vscode.postMessage({
                             command: 'create',
@@ -3026,16 +3333,57 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     function updateJsonPreview() {
                         const collectionName = document.getElementById('collectionName').value.trim();
                         const descriptionVal = document.getElementById('description').value.trim();
-                        const vectorizerVal = document.getElementById('vectorizer').value;
-                        const vectorIndexTypeVal = document.getElementById('vectorIndexType').value;
-                        const vectorIndexConfigVal = vectorIndexTypeVal === 'hnsw' ? { ...vectorIndexConfigState } : null;
-                        const moduleConfigVal = Object.keys(moduleConfigState).length > 0 && vectorizerVal !== 'none' ? { [vectorizerVal]: { ...moduleConfigState } } : null;
-                        const mtVal = document.getElementById('multiTenancyToggle').checked ? { enabled: true } : undefined;
+                        const mtVal = document.getElementById('multiTenancyToggle') ? document.getElementById('multiTenancyToggle').checked : false;
+                        
+                        // Build vectorConfig from vectorizers
+                        const vectorConfig = {};
+                        vectorizers.forEach(vectorizer => {
+                            if (vectorizer.vectorizer !== 'none') {
+                                vectorConfig[vectorizer.name] = {
+                                    vectorizer: {
+                                        [vectorizer.vectorizer]: { ...vectorizer.moduleConfig }
+                                    },
+                                    vectorIndexConfig: {
+                                        cleanupIntervalSeconds: 300,
+                                        distanceMetric: 'cosine',
+                                        dynamicEfMin: 100,
+                                        dynamicEfMax: 500,
+                                        dynamicEfFactor: 8,
+                                        ef: -1,
+                                        efConstruction: vectorizer.vectorIndexConfig.efConstruction,
+                                        filterStrategy: 'sweeping',
+                                        flatSearchCutoff: 40000,
+                                        maxConnections: vectorizer.vectorIndexConfig.maxConnections,
+                                        skip: false,
+                                        vectorCacheMaxObjects: 1000000000000
+                                    },
+                                    vectorIndexType: vectorizer.vectorIndexType
+                                };
+                            } else {
+                                vectorConfig[vectorizer.name] = {
+                                    vectorizer: { none: {} },
+                                    vectorIndexConfig: {
+                                        cleanupIntervalSeconds: 300,
+                                        distanceMetric: 'cosine',
+                                        dynamicEfMin: 100,
+                                        dynamicEfMax: 500,
+                                        dynamicEfFactor: 8,
+                                        ef: -1,
+                                        efConstruction: vectorizer.vectorIndexConfig.efConstruction,
+                                        filterStrategy: 'sweeping',
+                                        flatSearchCutoff: 40000,
+                                        maxConnections: vectorizer.vectorIndexConfig.maxConnections,
+                                        skip: false,
+                                        vectorCacheMaxObjects: 1000000000000
+                                    },
+                                    vectorIndexType: vectorizer.vectorIndexType
+                                };
+                            }
+                        });
                         
                         const schemaObj = {
                             class: collectionName || '<collectionName>',
                             description: descriptionVal || undefined,
-                            vectorizer: vectorizerVal === 'none' ? undefined : vectorizerVal,
                             properties: properties.map(function(prop) {
                                 const dataType = prop.dataType === 'reference' && prop.targetCollection
                                     ? [prop.targetCollection]
@@ -3046,11 +3394,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                     description: prop.description ? prop.description.trim() : undefined
                                 };
                             }),
-                            vectorIndexType: vectorIndexTypeVal,
-                            vectorIndexConfig: vectorIndexConfigVal,
-                            moduleConfig: moduleConfigVal,
-                            multiTenancyConfig: mtVal
+                            multiTenancyConfig: mtVal ? { enabled: true } : undefined
                         };
+                        
+                        // Only add vectorConfig if there are vectorizers
+                        if (Object.keys(vectorConfig).length > 0) {
+                            schemaObj.vectorConfig = vectorConfig;
+                        }
+                        
                         document.getElementById('jsonPreview').textContent = JSON.stringify(schemaObj, null, 2);
                     }
                     
@@ -3099,16 +3450,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                     });
                     
-                    function updateVectorizerOptions(vectorizers) {
-                        const select = document.getElementById('vectorizer');
-                        select.innerHTML = '';
-                        
+                    function updateVectorizerOptions(vectorizerList) {
+                        availableVectorizers = vectorizerList;
+                        // Update all vectorizer selects in the vectorizer cards
                         vectorizers.forEach(vectorizer => {
-                            const option = document.createElement('option');
-                            option.value = vectorizer;
-                            option.textContent = vectorizer === 'none' ? 'None (Manual vectors)' : 
-                                vectorizer.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
-                            select.appendChild(option);
+                            const select = document.getElementById(\`vectorizer_\${vectorizer.id}\`);
+                            if (select) {
+                                select.innerHTML = '';
+                                vectorizerList.forEach(v => {
+                                    const option = document.createElement('option');
+                                    option.value = v;
+                                    option.textContent = v === 'none' ? 'None (Manual vectors)' : 
+                                        v.replace('text2vec-', '').replace('multi2vec-', '').replace('img2vec-', '');
+                                    if (v === vectorizer.vectorizer) {
+                                        option.selected = true;
+                                    }
+                                    select.appendChild(option);
+                                });
+                            }
                         });
                     }
                     
@@ -3135,8 +3494,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         updateJsonPreview();
                     }
                     
+                    // Make functions globally accessible for onclick handlers
+                    window.removeVectorizer = removeVectorizer;
+                    window.updateVectorizerType = updateVectorizerType;
+                    window.updateVectorizerName = updateVectorizerName;
+                    window.updateVectorizerIndexType = updateVectorizerIndexType;
+                    window.updateVectorizerModuleConfig = updateVectorizerModuleConfig;
+                    
                     // Initialize when DOM is ready
-                    document.addEventListener('DOMContentLoaded', initForm);
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initForm);
+                    } else {
+                        // DOM is already ready, call initForm with a small delay to ensure everything is rendered
+                        setTimeout(initForm, 10);
+                    }
                 </script>
             </body>
             </html>
