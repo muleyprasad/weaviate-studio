@@ -1658,7 +1658,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
      * Shows the Add Collection dialog for creating a new collection
      * @param connectionId - The ID of the connection to add the collection to
      */
-    async addCollection(connectionId: string): Promise<void> {
+    /**
+     * Shows the Add Collection dialog for creating a new collection
+     * @param connectionId - The ID of the connection to add the collection to
+     * @param initialSchema - Optional initial schema to pre-populate the form
+     */
+    async addCollection(connectionId: string, initialSchema?: any): Promise<void> {
         // Validate connection first - these errors should not be caught and re-wrapped
         const connection = this.connectionManager.getConnection(connectionId);
         if (!connection) {
@@ -1684,7 +1689,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             );
 
             // Set the webview content
-            panel.webview.html = this.getAddCollectionHtml();
+            panel.webview.html = this.getAddCollectionHtml(initialSchema);
 
             // Handle messages from the webview
             panel.webview.onDidReceiveMessage(
@@ -1763,6 +1768,81 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error('Error showing add collection dialog:', error);
             throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Shows the Add Collection with Options dialog for creating a new collection
+     * @param connectionId - The ID of the connection to add the collection to
+     */
+    async addCollectionWithOptions(connectionId: string): Promise<void> {
+        // Validate connection first - these errors should not be caught and re-wrapped
+        const connection = this.connectionManager.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+
+        if (connection.status !== 'connected') {
+            throw new Error('Connection must be active to add collections');
+        }
+
+        try {
+            // Create and show the Collection Options webview panel
+            const panel = vscode.window.createWebviewPanel(
+                'weaviateAddCollectionOptions',
+                'Create Collection',
+                vscode.ViewColumn.Active,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: []
+                }
+            );
+
+            // Set the webview content
+            panel.webview.html = this.getCollectionOptionsHtml();
+
+            // Handle messages from the webview
+            panel.webview.onDidReceiveMessage(
+                async (message) => {
+                    switch (message.command) {
+                        case 'selectOption':
+                            // Handle option selection
+                            switch (message.option) {
+                                case 'fromScratch':
+                                    // Switch to the existing add collection form
+                                    panel.webview.html = this.getAddCollectionHtml();
+                                    this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                                    break;
+                                case 'cloneExisting':
+                                    // Show clone collection selection first
+                                    panel.webview.html = await this.getCloneCollectionHtml(connectionId);
+                                    this.setupCloneCollectionMessageHandlers(panel, connectionId);
+                                    break;
+                                case 'importFromFile':
+                                    // Show import file selection first
+                                    panel.webview.html = this.getImportCollectionHtml();
+                                    this.setupImportCollectionMessageHandlers(panel, connectionId);
+                                    break;
+                            }
+                            break;
+                        case 'back':
+                            // Return to options selection
+                            panel.webview.html = this.getCollectionOptionsHtml();
+                            break;
+                        case 'cancel':
+                            panel.dispose();
+                            break;
+                    }
+                },
+                undefined,
+                this.context.subscriptions
+            );
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error showing add collection options dialog:', error);
+            throw new Error(`Failed to show add collection options dialog: ${errorMessage}`);
         }
     }
 
@@ -1859,9 +1939,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     /**
      * Generates HTML for the Add Collection webview
+     * @param initialSchema - Optional initial schema to pre-populate the form
      * @returns The HTML content for the webview
      */
-    private getAddCollectionHtml(): string {
+    private getAddCollectionHtml(initialSchema?: any): string {
         return `
             <!DOCTYPE html>
             <html lang="en">
@@ -2469,6 +2550,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     let multiTenancyEnabled = false;
                     let serverVersion = 'unknown';
                     
+                    // Initial schema data (if provided)
+                    const initialSchema = ${initialSchema ? JSON.stringify(initialSchema) : 'null'};
+                    
                     // Data type definitions
                     const dataTypes = [
                         { value: 'text', label: 'Text', description: 'Long text content, vectorizable', supportsArray: true },
@@ -2503,7 +2587,59 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     });
                     
                     // Initialize form
+                    function populateFormFromSchema(schema) {
+                        if (!schema) return;
+                        
+                        // Basic settings
+                        if (schema.class) {
+                            document.getElementById('collectionName').value = schema.class;
+                        }
+                        if (schema.description) {
+                            document.getElementById('description').value = schema.description;
+                        }
+                        
+                        // Vectorizer settings
+                        if (schema.vectorizer) {
+                            const vectorizerSelect = document.getElementById('vectorizer');
+                            vectorizerSelect.value = schema.vectorizer;
+                        } else {
+                            document.getElementById('vectorizer').value = 'none';
+                        }
+                        
+                        if (schema.vectorIndexType) {
+                            document.getElementById('vectorIndexType').value = schema.vectorIndexType;
+                        }
+                        
+                        // Properties
+                        if (schema.properties && Array.isArray(schema.properties)) {
+                            properties = [...schema.properties];
+                            propertyCounter = properties.length;
+                            renderProperties();
+                        }
+                        
+                        // Module config
+                        if (schema.moduleConfig) {
+                            moduleConfigState = { ...schema.moduleConfig[schema.vectorizer] || {} };
+                        }
+                        
+                        // Vector index config
+                        if (schema.vectorIndexConfig) {
+                            vectorIndexConfigState = { ...schema.vectorIndexConfig };
+                        }
+                        
+                        // Multi-tenancy
+                        if (schema.multiTenancyConfig && schema.multiTenancyConfig.enabled) {
+                            multiTenancyEnabled = true;
+                            document.getElementById('multiTenancyToggle').checked = true;
+                        }
+                    }
+                    
                     function initForm() {
+                        // Initialize form with initial schema if provided
+                        if (initialSchema) {
+                            populateFormFromSchema(initialSchema);
+                        }
+                        
                         // Request data from extension
                     vscode.postMessage({ command: 'getVectorizers' });
                     vscode.postMessage({ command: 'getCollections' });
@@ -2515,8 +2651,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         renderModuleConfig();
                         updateJsonPreview();
                         
-                        // Focus collection name
-                        document.getElementById('collectionName').focus();
+                        // Focus collection name (unless pre-populated)
+                        if (!initialSchema) {
+                            document.getElementById('collectionName').focus();
+                        }
                     }
                     
                                         function setupEventListeners() {
@@ -3120,5 +3258,1067 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             return Object.fromEntries(Object.entries(result).sort());
         }
         return result;
+    }
+
+    /**
+     * Generates HTML for the Collection Options selection webview
+     * @returns The HTML content for the webview
+     */
+    private getCollectionOptionsHtml(): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Create Collection</title>
+                <style>
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif);
+                        font-size: 14px;
+                        line-height: 1.4;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        background-color: var(--vscode-editor-background, #FFFFFF);
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    .container {
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 24px;
+                    }
+                    
+                    .header {
+                        text-align: center;
+                        margin-bottom: 32px;
+                    }
+                    
+                    .header h2 {
+                        margin: 0 0 8px 0;
+                        font-size: 20px;
+                        font-weight: bold;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .header .subtitle {
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        font-size: 14px;
+                    }
+                    
+                    .options-container {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                        margin-bottom: 24px;
+                    }
+                    
+                    .option-card {
+                        border: 1px solid var(--vscode-panel-border, #CCCCCC);
+                        border-radius: 8px;
+                        padding: 20px;
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .option-card:hover {
+                        border-color: var(--vscode-focusBorder, #007ACC);
+                        box-shadow: 0 2px 8px rgba(0, 122, 204, 0.1);
+                    }
+                    
+                    .option-icon {
+                        font-size: 24px;
+                        margin-bottom: 12px;
+                        display: block;
+                    }
+                    
+                    .option-title {
+                        font-size: 16px;
+                        font-weight: bold;
+                        margin-bottom: 8px;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .option-description {
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        font-size: 13px;
+                        line-height: 1.5;
+                    }
+                    
+                    .button-group {
+                        display: flex;
+                        justify-content: flex-end;
+                        gap: 12px;
+                        margin-top: 24px;
+                        padding-top: 16px;
+                        border-top: 1px solid var(--vscode-panel-border, #CCCCCC);
+                    }
+                    
+                    .cancel-button {
+                        background: transparent;
+                        border: 1px solid var(--vscode-button-secondaryBorder, #CCCCCC);
+                        color: var(--vscode-button-secondaryForeground, #2D2D2D);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .cancel-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground, #F3F3F3);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>Create Collection</h2>
+                        <div class="subtitle">Choose how you want to create your new collection</div>
+                    </div>
+                    
+                    <div class="options-container">
+                        <div class="option-card" onclick="selectOption('fromScratch')">
+                            <span class="option-icon">📝</span>
+                            <div class="option-title">From Scratch</div>
+                            <div class="option-description">Create a new collection by defining its structure, properties, and configuration from the ground up.</div>
+                        </div>
+                        
+                        <div class="option-card" onclick="selectOption('cloneExisting')">
+                            <span class="option-icon">📋</span>
+                            <div class="option-title">Clone Existing Collection</div>
+                            <div class="option-description">Create a new collection based on an existing collection's schema and configuration. Perfect for creating similar collections.</div>
+                        </div>
+                        
+                        <div class="option-card" onclick="selectOption('importFromFile')">
+                            <span class="option-icon">📁</span>
+                            <div class="option-title">Import from File</div>
+                            <div class="option-description">Import a collection schema from a JSON file. Useful for recreating collections or sharing configurations.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button type="button" class="cancel-button" onclick="cancel()">Cancel</button>
+                    </div>
+                </div>
+                
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    
+                    function selectOption(option) {
+                        vscode.postMessage({
+                            command: 'selectOption',
+                            option: option
+                        });
+                    }
+                    
+                    function cancel() {
+                        vscode.postMessage({
+                            command: 'cancel'
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Generates HTML for the Clone Collection webview
+     * @param connectionId - The ID of the connection
+     * @returns The HTML content for the webview
+     */
+    private async getCloneCollectionHtml(connectionId: string): Promise<string> {
+        const collections = this.collections[connectionId] || [];
+        const collectionsJson = JSON.stringify(collections.map(col => col.label));
+
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Clone Collection</title>
+                <style>
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif);
+                        font-size: 14px;
+                        line-height: 1.4;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        background-color: var(--vscode-editor-background, #FFFFFF);
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    .container {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 24px;
+                    }
+                    
+                    .header {
+                        margin-bottom: 32px;
+                    }
+                    
+                    .header h2 {
+                        margin: 0 0 8px 0;
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .header .subtitle {
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        font-size: 14px;
+                    }
+                    
+                    .form-section {
+                        margin-bottom: 24px;
+                        border: 1px solid var(--vscode-panel-border, #CCCCCC);
+                        border-radius: 4px;
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        padding: 20px;
+                    }
+                    
+                    .form-field {
+                        margin-bottom: 16px;
+                    }
+                    
+                    .form-field label {
+                        display: block;
+                        margin-bottom: 6px;
+                        font-weight: 500;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .form-field input,
+                    .form-field select {
+                        width: 100%;
+                        padding: 8px 12px;
+                        border: 1px solid var(--vscode-input-border, #CCCCCC);
+                        background: var(--vscode-input-background, #F3F3F3);
+                        color: var(--vscode-input-foreground, #2D2D2D);
+                        border-radius: 4px;
+                        font-family: inherit;
+                        font-size: 14px;
+                    }
+                    
+                    .form-field input:focus,
+                    .form-field select:focus {
+                        outline: none;
+                        border-color: var(--vscode-focusBorder, #007ACC);
+                        box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+                    }
+                    
+                    .hint {
+                        font-size: 12px;
+                        color: var(--vscode-descriptionForeground, #9E9E9E);
+                        margin-top: 4px;
+                        font-style: italic;
+                    }
+                    
+                    .error {
+                        display: none;
+                        padding: 12px;
+                        margin: 16px 0;
+                        background: var(--vscode-inputValidation-errorBackground, #5A1D1D);
+                        border: 1px solid var(--vscode-inputValidation-errorBorder, #FF5555);
+                        border-radius: 4px;
+                        color: var(--vscode-errorForeground, #F85149);
+                        font-size: 13px;
+                    }
+                    
+                    .schema-preview {
+                        background: var(--vscode-textBlockQuote-background, #F6F8FA);
+                        border: 1px solid var(--vscode-textBlockQuote-border, #D0D7DE);
+                        border-radius: 4px;
+                        padding: 16px;
+                        font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace);
+                        font-size: 12px;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        white-space: pre;
+                        color: var(--vscode-editor-foreground, #2D2D2D);
+                    }
+                    
+                    .button-group {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 12px;
+                        margin-top: 24px;
+                        padding-top: 16px;
+                        border-top: 1px solid var(--vscode-panel-border, #CCCCCC);
+                    }
+                    
+                    .back-button {
+                        background: transparent;
+                        border: 1px solid var(--vscode-button-secondaryBorder, #CCCCCC);
+                        color: var(--vscode-button-secondaryForeground, #2D2D2D);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                    }
+                    
+                    .back-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground, #F3F3F3);
+                    }
+                    
+                    .action-buttons {
+                        display: flex;
+                        gap: 12px;
+                    }
+                    
+                    .cancel-button {
+                        background: transparent;
+                        border: 1px solid var(--vscode-button-secondaryBorder, #CCCCCC);
+                        color: var(--vscode-button-secondaryForeground, #2D2D2D);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                    }
+                    
+                    .cancel-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground, #F3F3F3);
+                    }
+                    
+                    .primary-button {
+                        background: var(--vscode-button-background, #0E639C);
+                        border: none;
+                        color: var(--vscode-button-foreground, #FFFFFF);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                        font-weight: 500;
+                    }
+                    
+                    .primary-button:hover:not(:disabled) {
+                        background: var(--vscode-button-hoverBackground, #1177BB);
+                    }
+                    
+                    .primary-button:disabled {
+                        background: var(--vscode-button-secondaryBackground, #5F6A79);
+                        cursor: not-allowed;
+                        opacity: 0.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>Clone Collection</h2>
+                        <div class="subtitle">Create a new collection based on an existing one</div>
+                    </div>
+                    
+                    <form id="cloneForm">
+                        <div class="form-section">
+                            <div class="form-field">
+                                <label for="sourceCollection">Source Collection</label>
+                                <select id="sourceCollection" required>
+                                    <option value="">Select a collection to clone...</option>
+                                </select>
+                                <div class="hint">Choose the collection you want to clone</div>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="newCollectionName">New Collection Name</label>
+                                <input type="text" id="newCollectionName" required placeholder="e.g., Articles_v2, Products_Test">
+                                <div class="hint">Enter a name for the new collection</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>Schema Preview</h3>
+                            <div id="schemaPreview" class="schema-preview">Select a source collection to see its schema...</div>
+                        </div>
+                        
+                        <div class="error" id="formError" role="alert"></div>
+                        
+                        <div class="button-group">
+                            <button type="button" class="back-button" onclick="goBack()">Back</button>
+                            <div class="action-buttons">
+                                <button type="button" class="cancel-button" onclick="cancel()">Cancel</button>
+                                <button type="submit" class="primary-button" id="cloneButton" disabled>Clone Collection</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    const existingCollections = ${collectionsJson};
+                    let sourceSchema = null;
+                    
+                    // Populate source collections dropdown
+                    const sourceSelect = document.getElementById('sourceCollection');
+                    existingCollections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection;
+                        option.textContent = collection;
+                        sourceSelect.appendChild(option);
+                    });
+                    
+                    // Handle source collection selection
+                    document.getElementById('sourceCollection').addEventListener('change', async (e) => {
+                        const selectedCollection = e.target.value;
+                        const cloneButton = document.getElementById('cloneButton');
+                        const schemaPreview = document.getElementById('schemaPreview');
+                        
+                        if (selectedCollection) {
+                            // Request schema from the extension
+                            vscode.postMessage({
+                                command: 'getSchema',
+                                collectionName: selectedCollection
+                            });
+                            
+                            schemaPreview.textContent = 'Loading schema...';
+                            cloneButton.disabled = false;
+                        } else {
+                            sourceSchema = null;
+                            schemaPreview.textContent = 'Select a source collection to see its schema...';
+                            cloneButton.disabled = true;
+                        }
+                    });
+                    
+                    // Handle form submission
+                    document.getElementById('cloneForm').addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        
+                        const sourceCollection = document.getElementById('sourceCollection').value;
+                        const newCollectionName = document.getElementById('newCollectionName').value.trim();
+                        
+                        if (!sourceCollection) {
+                            showError('Please select a source collection');
+                            return;
+                        }
+                        
+                        if (!newCollectionName) {
+                            showError('Please enter a name for the new collection');
+                            return;
+                        }
+                        
+                        if (existingCollections.includes(newCollectionName)) {
+                            showError('A collection with this name already exists');
+                            return;
+                        }
+                        
+                        if (!sourceSchema) {
+                            showError('Schema not loaded. Please select a source collection again.');
+                            return;
+                        }
+                        
+                        // Send clone request
+                        vscode.postMessage({
+                            command: 'clone',
+                            sourceCollection: sourceCollection,
+                            newCollectionName: newCollectionName,
+                            schema: sourceSchema
+                        });
+                    });
+                    
+                    // Handle messages from extension
+                    window.addEventListener('message', event => {
+                        const message = event.data;
+                        switch (message.command) {
+                            case 'schema':
+                                sourceSchema = message.schema;
+                                document.getElementById('schemaPreview').textContent = JSON.stringify(message.schema, null, 2);
+                                break;
+                            case 'error':
+                                showError(message.message);
+                                break;
+                        }
+                    });
+                    
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
+                    }
+                    
+                    function hideError() {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.style.display = 'none';
+                    }
+                    
+                    function goBack() {
+                        vscode.postMessage({
+                            command: 'back'
+                        });
+                    }
+                    
+                    function cancel() {
+                        vscode.postMessage({
+                            command: 'cancel'
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Generates HTML for the Import Collection webview
+     * @returns The HTML content for the webview
+     */
+    private getImportCollectionHtml(): string {
+        return `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Import Collection</title>
+                <style>
+                    * {
+                        box-sizing: border-box;
+                    }
+                    
+                    body {
+                        font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif);
+                        font-size: 14px;
+                        line-height: 1.4;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        background-color: var(--vscode-editor-background, #FFFFFF);
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    .container {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 24px;
+                    }
+                    
+                    .header {
+                        margin-bottom: 32px;
+                    }
+                    
+                    .header h2 {
+                        margin: 0 0 8px 0;
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .header .subtitle {
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        font-size: 14px;
+                    }
+                    
+                    .form-section {
+                        margin-bottom: 24px;
+                        border: 1px solid var(--vscode-panel-border, #CCCCCC);
+                        border-radius: 4px;
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        padding: 20px;
+                    }
+                    
+                    .file-drop-area {
+                        border: 2px dashed var(--vscode-panel-border, #CCCCCC);
+                        border-radius: 8px;
+                        padding: 40px;
+                        text-align: center;
+                        background: var(--vscode-textBlockQuote-background, #F6F8FA);
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
+                    
+                    .file-drop-area:hover,
+                    .file-drop-area.dragover {
+                        border-color: var(--vscode-focusBorder, #007ACC);
+                        background: rgba(0, 122, 204, 0.05);
+                    }
+                    
+                    .file-drop-area .icon {
+                        font-size: 48px;
+                        margin-bottom: 16px;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                    }
+                    
+                    .file-drop-area .text {
+                        font-size: 16px;
+                        margin-bottom: 8px;
+                        color: var(--vscode-foreground, #2D2D2D);
+                    }
+                    
+                    .file-drop-area .subtext {
+                        font-size: 13px;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                    }
+                    
+                    .file-input {
+                        display: none;
+                    }
+                    
+                    .file-info {
+                        display: none;
+                        margin-top: 16px;
+                        padding: 12px;
+                        background: var(--vscode-editor-background, #FFFFFF);
+                        border: 1px solid var(--vscode-panel-border, #CCCCCC);
+                        border-radius: 4px;
+                    }
+                    
+                    .file-name {
+                        font-weight: 500;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        margin-bottom: 4px;
+                    }
+                    
+                    .file-size {
+                        font-size: 12px;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                    }
+                    
+                    .schema-preview {
+                        background: var(--vscode-textBlockQuote-background, #F6F8FA);
+                        border: 1px solid var(--vscode-textBlockQuote-border, #D0D7DE);
+                        border-radius: 4px;
+                        padding: 16px;
+                        font-family: var(--vscode-editor-font-family, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace);
+                        font-size: 12px;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        white-space: pre;
+                        color: var(--vscode-editor-foreground, #2D2D2D);
+                        margin-top: 16px;
+                    }
+                    
+                    .error {
+                        display: none;
+                        padding: 12px;
+                        margin: 16px 0;
+                        background: var(--vscode-inputValidation-errorBackground, #5A1D1D);
+                        border: 1px solid var(--vscode-inputValidation-errorBorder, #FF5555);
+                        border-radius: 4px;
+                        color: var(--vscode-errorForeground, #F85149);
+                        font-size: 13px;
+                    }
+                    
+                    .button-group {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 12px;
+                        margin-top: 24px;
+                        padding-top: 16px;
+                        border-top: 1px solid var(--vscode-panel-border, #CCCCCC);
+                    }
+                    
+                    .back-button {
+                        background: transparent;
+                        border: 1px solid var(--vscode-button-secondaryBorder, #CCCCCC);
+                        color: var(--vscode-button-secondaryForeground, #2D2D2D);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                    }
+                    
+                    .back-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground, #F3F3F3);
+                    }
+                    
+                    .action-buttons {
+                        display: flex;
+                        gap: 12px;
+                    }
+                    
+                    .cancel-button {
+                        background: transparent;
+                        border: 1px solid var(--vscode-button-secondaryBorder, #CCCCCC);
+                        color: var(--vscode-button-secondaryForeground, #2D2D2D);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                    }
+                    
+                    .cancel-button:hover {
+                        background: var(--vscode-button-secondaryHoverBackground, #F3F3F3);
+                    }
+                    
+                    .primary-button {
+                        background: var(--vscode-button-background, #0E639C);
+                        border: none;
+                        color: var(--vscode-button-foreground, #FFFFFF);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-family: inherit;
+                        font-size: 13px;
+                        font-weight: 500;
+                    }
+                    
+                    .primary-button:hover:not(:disabled) {
+                        background: var(--vscode-button-hoverBackground, #1177BB);
+                    }
+                    
+                    .primary-button:disabled {
+                        background: var(--vscode-button-secondaryBackground, #5F6A79);
+                        cursor: not-allowed;
+                        opacity: 0.6;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>Import Collection</h2>
+                        <div class="subtitle">Import a collection schema from a JSON file</div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <div class="file-drop-area" onclick="selectFile()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                            <div class="icon">📁</div>
+                            <div class="text">Drop a JSON file here or click to browse</div>
+                            <div class="subtext">Supported formats: .json</div>
+                        </div>
+                        
+                        <input type="file" id="fileInput" class="file-input" accept=".json" onchange="handleFileSelect(event)">
+                        
+                        <div class="file-info" id="fileInfo">
+                            <div class="file-name" id="fileName"></div>
+                            <div class="file-size" id="fileSize"></div>
+                        </div>
+                        
+                        <div id="schemaPreview" class="schema-preview" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="error" id="formError" role="alert"></div>
+                    
+                    <div class="button-group">
+                        <button type="button" class="back-button" onclick="goBack()">Back</button>
+                        <div class="action-buttons">
+                            <button type="button" class="cancel-button" onclick="cancel()">Cancel</button>
+                            <button type="button" class="primary-button" id="importButton" disabled onclick="importCollection()">Import Collection</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    const vscode = acquireVsCodeApi();
+                    let selectedSchema = null;
+                    
+                    function selectFile() {
+                        document.getElementById('fileInput').click();
+                    }
+                    
+                    function handleFileSelect(event) {
+                        const file = event.target.files[0];
+                        if (file) {
+                            processFile(file);
+                        }
+                    }
+                    
+                    function handleDrop(event) {
+                        event.preventDefault();
+                        const dropArea = event.currentTarget;
+                        dropArea.classList.remove('dragover');
+                        
+                        const files = event.dataTransfer.files;
+                        if (files.length > 0) {
+                            processFile(files[0]);
+                        }
+                    }
+                    
+                    function handleDragOver(event) {
+                        event.preventDefault();
+                        event.currentTarget.classList.add('dragover');
+                    }
+                    
+                    function handleDragLeave(event) {
+                        event.currentTarget.classList.remove('dragover');
+                    }
+                    
+                    function processFile(file) {
+                        if (!file.name.endsWith('.json')) {
+                            showError('Please select a JSON file');
+                            return;
+                        }
+                        
+                        // Show file info
+                        const fileInfo = document.getElementById('fileInfo');
+                        const fileName = document.getElementById('fileName');
+                        const fileSize = document.getElementById('fileSize');
+                        
+                        fileName.textContent = file.name;
+                        fileSize.textContent = formatFileSize(file.size);
+                        fileInfo.style.display = 'block';
+                        
+                        // Read file content
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            try {
+                                const content = e.target.result;
+                                selectedSchema = JSON.parse(content);
+                                
+                                // Validate schema structure
+                                if (!selectedSchema.class) {
+                                    throw new Error('Invalid schema: missing "class" property');
+                                }
+                                
+                                // Show schema preview
+                                const schemaPreview = document.getElementById('schemaPreview');
+                                schemaPreview.textContent = JSON.stringify(selectedSchema, null, 2);
+                                schemaPreview.style.display = 'block';
+                                
+                                // Enable import button
+                                document.getElementById('importButton').disabled = false;
+                                hideError();
+                                
+                            } catch (error) {
+                                showError('Invalid JSON file: ' + error.message);
+                                selectedSchema = null;
+                                document.getElementById('importButton').disabled = true;
+                                document.getElementById('schemaPreview').style.display = 'none';
+                            }
+                        };
+                        
+                        reader.onerror = function() {
+                            showError('Error reading file');
+                        };
+                        
+                        reader.readAsText(file);
+                    }
+                    
+                    function formatFileSize(bytes) {
+                        if (bytes === 0) return '0 Bytes';
+                        
+                        const k = 1024;
+                        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                        const i = Math.floor(Math.log(bytes) / Math.log(k));
+                        
+                        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                    }
+                    
+                    function importCollection() {
+                        if (!selectedSchema) {
+                            showError('Please select a valid JSON file');
+                            return;
+                        }
+                        
+                        vscode.postMessage({
+                            command: 'import',
+                            schema: selectedSchema
+                        });
+                    }
+                    
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
+                    }
+                    
+                    function hideError() {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.style.display = 'none';
+                    }
+                    
+                    function goBack() {
+                        vscode.postMessage({
+                            command: 'back'
+                        });
+                    }
+                    
+                    function cancel() {
+                        vscode.postMessage({
+                            command: 'cancel'
+                        });
+                    }
+                </script>
+            </body>
+            </html>
+        `;
+    }
+
+    /**
+     * Sets up message handlers for the Add Collection webview
+     * @param panel - The webview panel
+     * @param connectionId - The connection ID
+     * @param showOptionsOnBack - Whether to show options on back (for multi-step flow)
+     */
+    private setupAddCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string, showOptionsOnBack: boolean = false): void {
+        panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.command) {
+                    case 'create':
+                        try {
+                            await this.createCollection(connectionId, message.schema);
+                            panel.dispose();
+                            vscode.window.showInformationMessage(`Collection "${message.schema.class}" created successfully`);
+                            await this.fetchCollections(connectionId);
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: error instanceof Error ? error.message : String(error)
+                            });
+                        }
+                        break;
+                    case 'cancel':
+                        panel.dispose();
+                        break;
+                    case 'back':
+                        if (showOptionsOnBack) {
+                            panel.webview.html = this.getCollectionOptionsHtml();
+                        } else {
+                            panel.dispose();
+                        }
+                        break;
+                    case 'getVectorizers':
+                        try {
+                            const client = this.connectionManager.getClient(connectionId);
+                            const vectorizers = await this.getAvailableVectorizers(connectionId);
+
+                            panel.webview.postMessage({
+                                command: 'vectorizers',
+                                vectorizers: vectorizers
+                            });
+
+                            try {
+                                if (client) {
+                                    const version = this.clusterMetadataCache[connectionId]?.version;
+                                    panel.webview.postMessage({
+                                        command: 'serverVersion',
+                                        version: version || 'unknown'
+                                    });
+                                }
+                            } catch (_) {
+                                // ignore version errors
+                            }
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`
+                            });
+                        }
+                        break;
+                    case 'getCollections':
+                        try {
+                            const collections = this.collections[connectionId] || [];
+                            panel.webview.postMessage({
+                                command: 'collections',
+                                collections: collections.map(col => col.label)
+                            });
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`
+                            });
+                        }
+                        break;
+                }
+            },
+            undefined,
+            this.context.subscriptions
+        );
+    }
+
+    /**
+     * Sets up message handlers for the Clone Collection webview
+     */
+    private setupCloneCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string): void {
+        panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.command) {
+                    case 'getSchema':
+                        try {
+                            const collections = this.collections[connectionId] || [];
+                            const targetCollection = collections.find((col: any) => col.label === message.collectionName);
+                            
+                            if (!targetCollection) {
+                                throw new Error(`Collection "${message.collectionName}" not found`);
+                            }
+                            
+                            panel.webview.postMessage({
+                                command: 'schema',
+                                schema: targetCollection.schema
+                            });
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: `Failed to fetch schema: ${error instanceof Error ? error.message : String(error)}`
+                            });
+                        }
+                        break;
+                    case 'clone':
+                        try {
+                            // Create a new schema based on the source schema with new name
+                            const clonedSchema = {
+                                ...message.schema,
+                                class: message.newCollectionName
+                            };
+                            
+                            // Switch to unified collection form with cloned schema
+                            panel.webview.html = this.getAddCollectionHtml(clonedSchema);
+                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: error instanceof Error ? error.message : String(error)
+                            });
+                        }
+                        break;
+                    case 'back':
+                        panel.webview.html = this.getCollectionOptionsHtml();
+                        break;
+                    case 'cancel':
+                        panel.dispose();
+                        break;
+                }
+            },
+            undefined,
+            this.context.subscriptions
+        );
+    }
+
+    /**
+     * Sets up message handlers for the Import Collection webview
+     */
+    private setupImportCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string): void {
+        panel.webview.onDidReceiveMessage(
+            async (message) => {
+                switch (message.command) {
+                    case 'import':
+                        try {
+                            // Switch to unified collection form with imported schema
+                            panel.webview.html = this.getAddCollectionHtml(message.schema);
+                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: error instanceof Error ? error.message : String(error)
+                            });
+                        }
+                        break;
+                    case 'back':
+                        panel.webview.html = this.getCollectionOptionsHtml();
+                        break;
+                    case 'cancel':
+                        panel.dispose();
+                        break;
+                }
+            },
+            undefined,
+            this.context.subscriptions
+        );
     }
 }

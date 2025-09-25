@@ -258,7 +258,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             try {
-                await weaviateTreeDataProvider.addCollection(item.connectionId);
+                await weaviateTreeDataProvider.addCollectionWithOptions(item.connectionId);
             } catch (error) {
                 vscode.window.showErrorMessage(
                     `Failed to add collection: ${error instanceof Error ? error.message : String(error)}`
