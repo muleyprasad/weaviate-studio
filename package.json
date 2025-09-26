@@ -46,7 +46,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "weaviate.refreshConnections",
+        "command": "weaviate.refresh",
         "title": "Refresh Connections",
         "icon": "$(refresh)"
       },
@@ -151,7 +151,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "weaviate.refreshConnections",
+          "command": "weaviate.refresh",
           "when": "view == weaviateConnectionsView",
           "group": "navigation@2"
         }
