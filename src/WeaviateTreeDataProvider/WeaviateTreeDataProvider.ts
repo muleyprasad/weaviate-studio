@@ -1629,7 +1629,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
             // Show save dialog
             const saveUri = await vscode.window.showSaveDialog({
-                defaultUri: vscode.Uri.file(`${collectionName}_schema.json`),
+                defaultUri: vscode.Uri.file(`${collectionName}_weaviate_schema.json`),
                 filters: {
                     'JSON Files': ['json'],
                     'All Files': ['*']
@@ -1641,7 +1641,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             }
 
             // Export schema as formatted JSON
-            const schemaJson = JSON.stringify(collection.schema, null, 2);
+            // TODO: find a better way for this directly on client
+            const schema = collection.schema;
+            const fixed_properties = schema.properties?.map((prop: any) => ({
+                ...prop,
+                dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType],
+                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+                indexSearchable: prop.indexInverted,
+            })) || [];
+            const apiSchema = { 
+                ...schema, 
+                class: schema.name, 
+                invertedIndexConfig: schema.invertedIndex,
+                moduleConfig: schema.generative,
+                multiTenancyConfig: schema.multiTenancy,
+                properties: fixed_properties
+            };
+            // delete all indexInverted for all properties
+            apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+                delete prop.indexInverted;
+            });
+            //        delete apiSchema.indexInverted;            
+            //
+            const schemaJson = JSON.stringify(apiSchema, null, 2);
             await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
             
             vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
