@@ -1646,6 +1646,56 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
+     * Converts a raw Weaviate schema to a properly formatted API schema
+     * @param schema - The raw schema from Weaviate
+     * @returns The formatted schema ready for API consumption
+     */
+    private convertSchemaToApiFormat(schema: any): any {
+        const fixed_properties = schema.properties?.map((prop: any) => ({
+            ...prop,
+            dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType],
+            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+            indexSearchable: prop.indexInverted,
+        })) || [];
+                
+        const fixed_vectorizers = schema.vectorizers ? Object.fromEntries(
+            Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
+                const vectorizerName = vec.vectorizer?.name || 'none';
+                const vectorizerConfig = vec.vectorizer?.config || {};
+                const vectorIndexType = vec.vectorIndexType || 'hnsw';
+                const vectorIndexConfig = vec.vectorIndexConfig || {};
+                return [
+                    key,
+                    {
+                        vectorizer: { [vectorizerName]: vectorizerConfig },
+                        vectorIndexType,
+                        vectorIndexConfig
+                    }
+                ];
+            })
+        ) : undefined;
+        
+        // now build the final schema object
+        const apiSchema = { 
+            ...schema, 
+            class: schema.name, 
+            invertedIndexConfig: schema.invertedIndex,
+            moduleConfig: schema.generative,
+            multiTenancyConfig: schema.multiTenancy,
+            properties: fixed_properties,
+            vectorConfig: fixed_vectorizers
+        } as any;
+        
+        // delete all indexInverted for all properties
+        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+            delete prop.indexInverted;
+        });
+        delete apiSchema.vectorizers;
+        
+        return apiSchema;
+    }
+
+    /**
      * Exports a collection schema to a file
      * @param connectionId - The ID of the connection
      * @param collectionName - The name of the collection to export
@@ -1673,76 +1723,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 return; // User cancelled
             }
 
-            // Export schema as formatted JSON
-            // TODO: find a better way for this directly on client
+            // Export schema as formatted JSON using the conversion helper
             const schema = collection.schema;
-            const fixed_properties = schema.properties?.map((prop: any) => ({
-                ...prop,
-                dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType],
-                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-                indexSearchable: prop.indexInverted,
-            })) || [];
-            // fix vectorizers. Make it from this:
-            // "t1": {
-            // "vectorizer": {
-            //     "name": "text2vec-openai",
-            //     "config": {
-            //     "vectorizeCollectionName": true,
-            //     "baseURL": "https://api.openai.com",
-            //     "model": "text-embedding-3-small"
-            //     }
-            // },
-            //to this:
-            //
-            // {'t1': {'vectorizer': {'text2vec-openai': {'baseURL': 'https://api.openai.com',
-            //     'model': 'text-embedding-3-small',
-            //     'vectorizeClassName': True}},
-            // 'vectorIndexConfig': {'cleanupIntervalSeconds': 300,
-            // 'distanceMetric': 'cosine',
-            // 'dynamicEfMin': 100,
-            // 'dynamicEfMax': 500,
-            // 'dynamicEfFactor': 8,
-            // 'ef': -1,
-            // 'efConstruction': 128,
-            // 'filterStrategy': 'sweeping',
-            // 'flatSearchCutoff': 40000,
-            // 'maxConnections': 16,
-            // 'skip': False,
-            // 'vectorCacheMaxObjects': 1000000000000},
-            // 'vectorIndexType': 'hnsw'}}            
-            const fixed_vectorizers = schema.vectorizers ? Object.fromEntries(
-                Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-                    const vectorizerName = vec.vectorizer?.name;
-                    const vectorizerConfig = vec.vectorizer?.config || {};
-                    const vectorIndexType = vec.vectorIndexType;
-                    const vectorIndexConfig = vec.vectorIndexConfig || {};
-                    return [
-                        key,
-                        {
-                            vectorizer: vectorizerName ? { [vectorizerName]: vectorizerConfig } : {},
-                            vectorIndexType,
-                            vectorIndexConfig
-                        }
-                    ];
-                })
-            ) : undefined;
-            // now build the final schema object
-            const apiSchema = { 
-                ...schema, 
-                class: schema.name, 
-                invertedIndexConfig: schema.invertedIndex,
-                moduleConfig: schema.generative,
-                multiTenancyConfig: schema.multiTenancy,
-                properties: fixed_properties,
-                vectorConfig: fixed_vectorizers
-            } as any;
-            // delete all indexInverted for all properties
-            apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-                delete prop.indexInverted;
-            });
-            delete apiSchema.vectorizers;
-            //        delete apiSchema.indexInverted;            
-            //
+            const apiSchema = this.convertSchemaToApiFormat(schema);
             const schemaJson = JSON.stringify(apiSchema, null, 2);
             await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
             
@@ -5009,9 +4992,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 throw new Error(`Collection "${message.collectionName}" not found`);
                             }
                             
+                            // Convert the raw schema to API format for preview
+                            const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
+                            
                             panel.webview.postMessage({
                                 command: 'schema',
-                                schema: targetCollection.schema
+                                schema: convertedSchema
                             });
                         } catch (error) {
                             panel.webview.postMessage({
@@ -5022,11 +5008,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         break;
                     case 'clone':
                         try {
-                            // Create a new schema based on the source schema with new name
+                            // Get the original schema from the collection, not from the message
+                            const collections = this.collections[connectionId] || [];
+                            const targetCollection = collections.find((col: any) => col.label === message.sourceCollection);
+                            
+                            if (!targetCollection) {
+                                throw new Error(`Collection "${message.sourceCollection}" not found`);
+                            }
+                            
+                            // Convert the raw schema to API format first using the same logic as exportSchema
+                            const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
+                            
+                            // Create a new schema based on the converted schema with new name
                             const clonedSchema = {
-                                ...message.schema,
+                                ...convertedSchema,
                                 class: message.newCollectionName
                             };
+                            
                             // Instead of creating immediately, open the Add Collection form
                             // pre-filled with the cloned schema so the user can review/edit
                             panel.webview.html = this.getAddCollectionHtml(clonedSchema);
