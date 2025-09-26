@@ -1682,18 +1682,65 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
                 indexSearchable: prop.indexInverted,
             })) || [];
+            // fix vectorizers. Make it from this:
+            // "t1": {
+            // "vectorizer": {
+            //     "name": "text2vec-openai",
+            //     "config": {
+            //     "vectorizeCollectionName": true,
+            //     "baseURL": "https://api.openai.com",
+            //     "model": "text-embedding-3-small"
+            //     }
+            // },
+            //to this:
+            //
+            // {'t1': {'vectorizer': {'text2vec-openai': {'baseURL': 'https://api.openai.com',
+            //     'model': 'text-embedding-3-small',
+            //     'vectorizeClassName': True}},
+            // 'vectorIndexConfig': {'cleanupIntervalSeconds': 300,
+            // 'distanceMetric': 'cosine',
+            // 'dynamicEfMin': 100,
+            // 'dynamicEfMax': 500,
+            // 'dynamicEfFactor': 8,
+            // 'ef': -1,
+            // 'efConstruction': 128,
+            // 'filterStrategy': 'sweeping',
+            // 'flatSearchCutoff': 40000,
+            // 'maxConnections': 16,
+            // 'skip': False,
+            // 'vectorCacheMaxObjects': 1000000000000},
+            // 'vectorIndexType': 'hnsw'}}            
+            const fixed_vectorizers = schema.vectorizers ? Object.fromEntries(
+                Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
+                    const vectorizerName = vec.vectorizer?.name;
+                    const vectorizerConfig = vec.vectorizer?.config || {};
+                    const vectorIndexType = vec.vectorIndexType;
+                    const vectorIndexConfig = vec.vectorIndexConfig || {};
+                    return [
+                        key,
+                        {
+                            vectorizer: vectorizerName ? { [vectorizerName]: vectorizerConfig } : {},
+                            vectorIndexType,
+                            vectorIndexConfig
+                        }
+                    ];
+                })
+            ) : undefined;
+            // now build the final schema object
             const apiSchema = { 
                 ...schema, 
                 class: schema.name, 
                 invertedIndexConfig: schema.invertedIndex,
                 moduleConfig: schema.generative,
                 multiTenancyConfig: schema.multiTenancy,
-                properties: fixed_properties
-            };
+                properties: fixed_properties,
+                vectorConfig: fixed_vectorizers
+            } as any;
             // delete all indexInverted for all properties
             apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
                 delete prop.indexInverted;
             });
+            delete apiSchema.vectorizers;
             //        delete apiSchema.indexInverted;            
             //
             const schemaJson = JSON.stringify(apiSchema, null, 2);
@@ -2889,6 +2936,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             propertyCounter = properties.length;
                             renderProperties();
                         }
+                        
+                        // Render vectorizers after populating them
+                        renderVectorizers();
                         
                         // Module config
                         if (schema.moduleConfig) {
@@ -4700,7 +4750,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <button type="button" class="back-button" onclick="goBack()">Back</button>
                         <div class="action-buttons">
                             <button type="button" class="cancel-button" onclick="cancel()">Cancel</button>
-                            <button type="button" class="primary-button" id="importButton" disabled onclick="importCollection()">Import Collection</button>
+                            <button type="button" class="primary-button" id="editBeforeButton" disabled onclick="editBeforeImport()">Edit Before</button>
+                            <button type="button" class="primary-button" id="createButton" disabled onclick="createCollection()">Create</button>
                         </div>
                     </div>
                 </div>
@@ -4772,14 +4823,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 schemaPreview.textContent = JSON.stringify(selectedSchema, null, 2);
                                 schemaPreview.style.display = 'block';
                                 
-                                // Enable import button
-                                document.getElementById('importButton').disabled = false;
+                                // Enable buttons
+                                document.getElementById('editBeforeButton').disabled = false;
+                                document.getElementById('createButton').disabled = false;
                                 hideError();
                                 
                             } catch (error) {
                                 showError('Invalid JSON file: ' + error.message);
                                 selectedSchema = null;
-                                document.getElementById('importButton').disabled = true;
+                                document.getElementById('editBeforeButton').disabled = true;
+                                document.getElementById('createButton').disabled = true;
                                 document.getElementById('schemaPreview').style.display = 'none';
                             }
                         };
@@ -4801,7 +4854,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                     }
                     
-                    function importCollection() {
+                    function createCollection() {
                         if (!selectedSchema) {
                             showError('Please select a valid JSON file');
                             return;
@@ -4811,6 +4864,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             command: 'import',
                             schema: selectedSchema
                         });
+                    }
+                    
+                    function editBeforeImport() {
+                        if (!selectedSchema) {
+                            showError('Please select a valid JSON file');
+                            return;
+                        }
+                        
+                        vscode.postMessage({
+                            command: 'editBefore',
+                            schema: selectedSchema
+                        });
+                    }
+                    
+                    function importCollection() {
+                        // This function is kept for backward compatibility, but redirects to createCollection
+                        createCollection();
                     }
                     
                     function showError(message) {
@@ -4994,6 +5064,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             panel.dispose();
                             vscode.window.showInformationMessage(`Collection "${message.schema.class}" imported successfully`);
                             await this.fetchCollections(connectionId);
+                        } catch (error) {
+                            panel.webview.postMessage({
+                                command: 'error',
+                                message: error instanceof Error ? error.message : String(error)
+                            });
+                        }
+                        break;
+                    case 'editBefore':
+                        try {
+                            // Open the Add Collection form pre-filled with the imported schema
+                            panel.webview.html = this.getAddCollectionHtml(message.schema);
+                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
                         } catch (error) {
                             panel.webview.postMessage({
                                 command: 'error',
