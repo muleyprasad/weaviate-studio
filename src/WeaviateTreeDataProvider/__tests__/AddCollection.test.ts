@@ -268,6 +268,111 @@ describe('Add Collection', () => {
         message: 'Schema error'
       });
     });
+
+    it('when cloning, should open Add Collection prefilled without creating immediately', async () => {
+      // Prepare: collections with schema
+      (provider as any).collections = {
+        'conn1': [
+          {
+            label: 'SourceCollection',
+            schema: {
+              class: 'SourceCollection',
+              description: 'desc',
+              properties: [
+                { name: 'title', dataType: ['text'] }
+              ]
+            }
+          }
+        ]
+      };
+
+      // Re-render clone view and capture clone handlers
+      // Simulate navigating to cloneExisting option by calling addCollectionWithOptions flow pieces directly
+      // Create a fresh panel and handler for clone webview
+      await (provider as any).addCollectionWithOptions('conn1');
+      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+
+      // Select cloneExisting to load clone UI
+      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
+      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+
+      // First request schema
+      await cloneHandler({ command: 'getSchema', collectionName: 'SourceCollection' });
+
+      // Then trigger clone with new name
+      await cloneHandler({
+        command: 'clone',
+        sourceCollection: 'SourceCollection',
+        newCollectionName: 'ClonedCollection',
+        schema: (provider as any).collections['conn1'][0].schema
+      });
+
+      // Should not dispose panel nor call create immediately; instead should update HTML to Add form
+      expect(mockPanel.dispose).not.toHaveBeenCalled();
+      expect(mockPanel.webview.html).toContain('Create New Collection');
+      expect(mockPanel.webview.html).toContain('id="collectionForm"');
+      // Prefilled name must be present in the HTML JSON preview or input field
+      expect(mockPanel.webview.html).toContain('ClonedCollection');
+    });
+
+    it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
+      // Prepare: collections with multi-tenant schema
+      (provider as any).collections = {
+        'conn1': [
+          {
+            label: 'MultiTenantCollection',
+            schema: {
+              class: 'MultiTenantCollection',
+              description: 'Multi-tenant collection',
+              multiTenancy: {  // Using multiTenancy (not multiTenancyConfig) as shown in user's data
+                enabled: true,
+                autoTenantCreation: true,
+                autoTenantActivation: true
+              },
+              properties: [
+                { name: 'title', dataType: ['text'] }
+              ]
+            }
+          }
+        ]
+      };
+
+      // Navigate to clone view and trigger clone
+      await (provider as any).addCollectionWithOptions('conn1');
+      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      
+      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
+      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      
+      await cloneHandler({ command: 'getSchema', collectionName: 'MultiTenantCollection' });
+      
+      await cloneHandler({
+        command: 'clone',
+        sourceCollection: 'MultiTenantCollection',
+        newCollectionName: 'ClonedMultiTenant',
+        schema: (provider as any).collections['conn1'][0].schema
+      });
+
+      // Should populate Add Collection form with multi-tenancy settings
+      expect(mockPanel.webview.html).toContain('Create New Collection');
+      
+      // Check that the initial schema data is properly embedded in the JavaScript
+      // The multiTenancyConfig should be passed as initialSchema to the form
+      const htmlContent = mockPanel.webview.html;
+      expect(htmlContent).toContain('const initialSchema =');
+      
+      // Extract the initialSchema JSON from the HTML
+      const initialSchemaMatch = htmlContent.match(/const initialSchema = ({.*?});/s);
+      expect(initialSchemaMatch).toBeTruthy();
+      
+      if (initialSchemaMatch) {
+        const initialSchemaStr = initialSchemaMatch[1];
+        expect(initialSchemaStr).toContain('"multiTenancy"');
+        expect(initialSchemaStr).toContain('"enabled":true');
+        expect(initialSchemaStr).toContain('"autoTenantCreation":true');
+        expect(initialSchemaStr).toContain('"autoTenantActivation":true');
+      }
+    });
   });
 
   describe('createCollection', () => {
@@ -409,7 +514,7 @@ describe('Add Collection', () => {
       expect(html).toContain('id="collectionForm"');
       expect(html).toContain('Basic Settings');
       expect(html).toContain('Properties');
-      expect(html).toContain('Advanced Settings');
+      expect(html).toContain('Multi-Tenancy');
       expect(html).toContain('Schema Preview');
     });
 

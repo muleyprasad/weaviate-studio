@@ -2694,31 +2694,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             </div>
                         </div>
                         
-                        <!-- Advanced Settings Section -->
+                        <!-- Multi-Tenancy Section -->
                         <div class="form-section">
-                            <div class="section-header collapsed" data-section="advanced">
-                                <span>Advanced Settings</span>
+                            <div class="section-header" data-section="multitenancy">
+                                <span>Multi-Tenancy</span>
                                 <span class="icon">▼</span>
                             </div>
-                            <div class="section-content collapsed" id="advancedContent">
-                                <div class="form-row">
-                                    <div class="form-field">
-                                        <label for="efConstruction">EF Construction</label>
-                                        <input type="number" id="efConstruction" min="4" value="128" aria-describedby="efHint">
-                                        <div class="hint" id="efHint">HNSW build quality (higher = better, slower)</div>
-                                    </div>
-                                    <div class="form-field">
-                                        <label for="maxConnections">Max Connections</label>
-                                        <input type="number" id="maxConnections" min="4" value="16" aria-describedby="maxConnHint">
-                                        <div class="hint" id="maxConnHint">HNSW graph connections</div>
-                                    </div>
-                                </div>
+                            <div class="section-content" id="multitenancyContent">
                                 <div class="form-field">
                                     <label class="inline-checkbox">
                                         <input type="checkbox" id="multiTenancyToggle" aria-describedby="mtHint">
                                         <span>Enable Multi-Tenancy</span>
                                     </label>
                                     <div class="hint" id="mtHint">Allow collection to be partitioned by tenant</div>
+                                </div>
+                                <div class="form-field" id="multiTenancyOptions" style="display:none;">
+                                    <div class="checkbox-group">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="autoTenantCreation">
+                                            <span class="checkbox-text">Auto Tenant Creation</span>
+                                        </label>
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="autoTenantActivation">
+                                            <span class="checkbox-text">Auto Tenant Activation</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2751,9 +2751,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     let vectorizers = [];
                     let availableVectorizers = [];
                     let existingCollections = [];
-                    let vectorIndexConfigState = { efConstruction: 128, maxConnections: 16 };
                     let moduleConfigState = {};
                     let multiTenancyEnabled = false;
+                    let autoTenantCreation = false;
+                    let autoTenantActivation = false;
                     let serverVersion = 'unknown';
                     
                     // Initial schema data (if provided)
@@ -2861,31 +2862,40 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             moduleConfigState = { ...schema.moduleConfig[schema.vectorizer] || {} };
                         }
                         
-                        // Vector index config
-                        if (schema.vectorIndexConfig) {
-                            vectorIndexConfigState = { ...schema.vectorIndexConfig };
-                        }
+                        // Vector index config (handled per vectorizer in vectorizers array)
                         
-                        // Multi-tenancy
-                        if (schema.multiTenancyConfig && schema.multiTenancyConfig.enabled) {
-                            multiTenancyEnabled = true;
-                            document.getElementById('multiTenancyToggle').checked = true;
+                        // Multi-tenancy - check both multiTenancyConfig and multiTenancy properties
+                        const mtConfig = schema.multiTenancyConfig || schema.multiTenancy;
+                        if (mtConfig) {
+                            multiTenancyEnabled = !!mtConfig.enabled;
+                            const mtToggle = document.getElementById('multiTenancyToggle');
+                            if (mtToggle) {
+                                mtToggle.checked = multiTenancyEnabled;
+                                // Trigger change event to ensure options are shown/hidden properly
+                                mtToggle.dispatchEvent(new Event('change'));
+                            }
+                            autoTenantCreation = !!mtConfig.autoTenantCreation;
+                            autoTenantActivation = !!mtConfig.autoTenantActivation;
+                            const atc = document.getElementById('autoTenantCreation');
+                            const ata = document.getElementById('autoTenantActivation');
+                            if (atc) atc.checked = autoTenantCreation;
+                            if (ata) ata.checked = autoTenantActivation;
                         }
                     }
                     
                     function initForm() {
+                        // Request data from extension first
+                    vscode.postMessage({ command: 'getVectorizers' });
+                    vscode.postMessage({ command: 'getCollections' });
+                    
+                        // Set up event listeners first
+                        setupEventListeners();
+                        
                         // Initialize form with initial schema if provided
                         if (initialSchema) {
                             populateFormFromSchema(initialSchema);
                         }
                         // Do not add default vectorizer - user will add them manually
-                        
-                        // Request data from extension
-                    vscode.postMessage({ command: 'getVectorizers' });
-                    vscode.postMessage({ command: 'getCollections' });
-                    
-                        // Set up event listeners
-                        setupEventListeners();
                         
                         // Initial renders
                         renderVectorizers();
@@ -2930,26 +2940,27 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                         
                         const multiTenancyToggle = document.getElementById('multiTenancyToggle');
+                        const multiTenancyOptions = document.getElementById('multiTenancyOptions');
+                        const autoTenantCreationEl = document.getElementById('autoTenantCreation');
+                        const autoTenantActivationEl = document.getElementById('autoTenantActivation');
                         if (multiTenancyToggle) {
                             multiTenancyToggle.addEventListener('change', (e) => {
                                 multiTenancyEnabled = e.target.checked;
+                                if (multiTenancyOptions) {
+                                    multiTenancyOptions.style.display = multiTenancyEnabled ? 'block' : 'none';
+                                }
                                 updateJsonPreview();
                             });
                         }
-                        
-                        // Advanced settings
-                        const efConstruction = document.getElementById('efConstruction');
-                        if (efConstruction) {
-                            efConstruction.addEventListener('input', (e) => {
-                                vectorIndexConfigState.efConstruction = parseInt(e.target.value || 0);
+                        if (autoTenantCreationEl) {
+                            autoTenantCreationEl.addEventListener('change', (e) => {
+                                autoTenantCreation = e.target.checked;
                                 updateJsonPreview();
                             });
                         }
-                        
-                        const maxConnections = document.getElementById('maxConnections');
-                        if (maxConnections) {
-                            maxConnections.addEventListener('input', (e) => {
-                                vectorIndexConfigState.maxConnections = parseInt(e.target.value || 0);
+                        if (autoTenantActivationEl) {
+                            autoTenantActivationEl.addEventListener('change', (e) => {
+                                autoTenantActivation = e.target.checked;
                                 updateJsonPreview();
                             });
                         }
@@ -3559,7 +3570,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                                 return propSchema;
                             }),
-                            multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
+                            multiTenancyConfig: {
+                                enabled: mtEnabled,
+                                autoTenantCreation: mtEnabled ? !!autoTenantCreation : false,
+                                autoTenantActivation: mtEnabled ? !!autoTenantActivation : false
+                            }
                         };
                         
                         // Only add vectorConfig if there are vectorizers
@@ -3655,7 +3670,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
                                 return propObj;
                             }),
-                            multiTenancyConfig: mtVal ? { enabled: true } : undefined
+                            multiTenancyConfig: {
+                                enabled: mtVal,
+                                autoTenantCreation: mtVal ? !!autoTenantCreation : false,
+                                autoTenantActivation: mtVal ? !!autoTenantActivation : false
+                            }
                         };
                         
                         // Only add vectorConfig if there are vectorizers
@@ -4296,6 +4315,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     const existingCollections = ${collectionsJson};
                     let sourceSchema = null;
                     
+                    function showError(message) {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.textContent = message;
+                        errorElement.style.display = 'block';
+                    }
+                    
+                    function hideError() {
+                        const errorElement = document.getElementById('formError');
+                        errorElement.style.display = 'none';
+                    }
+                    
+                    function goBack() {
+                        vscode.postMessage({
+                            command: 'back'
+                        });
+                    }
+                    
+                    function cancel() {
+                        vscode.postMessage({
+                            command: 'cancel'
+                        });
+                    }
+                    
                     // Populate source collections dropdown
                     const sourceSelect = document.getElementById('sourceCollection');
                     existingCollections.forEach(collection => {
@@ -4376,29 +4418,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 break;
                         }
                     });
-                    
-                    function showError(message) {
-                        const errorElement = document.getElementById('formError');
-                        errorElement.textContent = message;
-                        errorElement.style.display = 'block';
-                    }
-                    
-                    function hideError() {
-                        const errorElement = document.getElementById('formError');
-                        errorElement.style.display = 'none';
-                    }
-                    
-                    function goBack() {
-                        vscode.postMessage({
-                            command: 'back'
-                        });
-                    }
-                    
-                    function cancel() {
-                        vscode.postMessage({
-                            command: 'cancel'
-                        });
-                    }
                 </script>
             </body>
             </html>
@@ -4898,11 +4917,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 ...message.schema,
                                 class: message.newCollectionName
                             };
-                            
-                            await this.createCollection(connectionId, clonedSchema);
-                            panel.dispose();
-                            vscode.window.showInformationMessage(`Collection "${message.newCollectionName}" schema cloned successfully from "${message.sourceCollection}"`);
-                            await this.fetchCollections(connectionId);
+                            // Instead of creating immediately, open the Add Collection form
+                            // pre-filled with the cloned schema so the user can review/edit
+                            panel.webview.html = this.getAddCollectionHtml(clonedSchema);
+                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
                         } catch (error) {
                             panel.webview.postMessage({
                                 command: 'error',
