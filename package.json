@@ -113,6 +113,10 @@
       {
         "command": "weaviate.openNewQueryTab",
         "title": "Open New Query Tab"
+      },
+      {
+        "command": "weaviate.deleteAllCollections",
+        "title": "Delete All Collections"
       }
     ],
     "viewsContainers": {
@@ -207,6 +211,11 @@
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "inline@1",
           "icon": "$(add)"
+        },
+        {
+          "command": "weaviate.deleteAllCollections",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "3_modification@1"
         },
         {
           "command": "weaviate.deleteCollection",

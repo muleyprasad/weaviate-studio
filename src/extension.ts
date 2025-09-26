@@ -200,6 +200,33 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
+        // Delete all collections command
+        vscode.commands.registerCommand('weaviate.deleteAllCollections', async (item: { connectionId: string }) => {
+            if (!item?.connectionId) {
+                vscode.window.showErrorMessage('Missing connection ID');
+                return;
+            }
+            
+            const confirm = await vscode.window.showWarningMessage(
+                `Are you sure you want to delete ALL collections from this Weaviate instance? This action cannot be undone and will permanently remove all collections and their data.`,
+                { modal: true },
+                'Delete All Collections'
+            );
+            
+            if (confirm !== 'Delete All Collections') {
+                return;
+            }
+            
+            try {
+                await weaviateTreeDataProvider.deleteAllCollections(item.connectionId);
+                vscode.window.showInformationMessage('All collections deleted successfully');
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to delete all collections: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
         // Refresh connection info command
         vscode.commands.registerCommand('weaviate.refreshConnection', async (item) => {
             if (!item?.connectionId) {

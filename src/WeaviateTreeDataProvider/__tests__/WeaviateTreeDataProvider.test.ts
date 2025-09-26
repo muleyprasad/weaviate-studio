@@ -128,4 +128,108 @@ describe('WeaviateTreeDataProvider', () => {
     expect(connected).toBeDefined();
     expect(connected.contextValue).toBe('weaviateConnectionActive');
   });
+
+  describe('deleteAllCollections', () => {
+    let provider: WeaviateTreeDataProvider;
+    
+    beforeEach(() => {
+      // Create a fresh provider instance for isolated testing
+      const mockCtx = {
+        globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+        subscriptions: []
+      } as unknown as vscode.ExtensionContext;
+      
+      provider = new WeaviateTreeDataProvider(mockCtx);
+    });
+
+    it('should call client.collections.deleteAll and clear collections state', async () => {
+      const mockClient = {
+        collections: {
+          deleteAll: jest.fn()
+        }
+      };
+
+      const mockConnectionManager = {
+        getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
+        getClient: jest.fn().mockReturnValue(mockClient)
+      };
+
+      // Mock the connectionManager property
+      (provider as any).connectionManager = mockConnectionManager;
+
+      // Set up some collections to be deleted
+      (provider as any).collections['1'] = [
+        { label: 'Collection1' },
+        { label: 'Collection2' },
+        { label: 'Collection3' }
+      ];
+
+      // Mock the refresh method
+      const refreshSpy = jest.spyOn(provider, 'refresh').mockImplementation(() => {});
+
+      await provider.deleteAllCollections('1');
+
+      expect(mockConnectionManager.getConnection).toHaveBeenCalledWith('1');
+      expect(mockConnectionManager.getClient).toHaveBeenCalledWith('1');
+      expect(mockClient.collections.deleteAll).toHaveBeenCalled();
+      expect((provider as any).collections['1']).toEqual([]);
+      expect(refreshSpy).toHaveBeenCalled();
+
+      refreshSpy.mockRestore();
+    });
+
+    it('should throw error when connection not found', async () => {
+      const mockConnectionManager = {
+        getConnection: jest.fn().mockReturnValue(null),
+        getClient: jest.fn()
+      };
+
+      (provider as any).connectionManager = mockConnectionManager;
+
+      // Suppress console.error for this test since we expect an error
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(provider.deleteAllCollections('invalid')).rejects.toThrow('Failed to delete all collections: Connection not found');
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should throw error when client not initialized', async () => {
+      const mockConnectionManager = {
+        getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
+        getClient: jest.fn().mockReturnValue(null)
+      };
+
+      (provider as any).connectionManager = mockConnectionManager;
+
+      // Suppress console.error for this test since we expect an error
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(provider.deleteAllCollections('1')).rejects.toThrow('Failed to delete all collections: Client not initialized');
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle client API errors gracefully', async () => {
+      const mockClient = {
+        collections: {
+          deleteAll: jest.fn().mockRejectedValue(new Error('API Error'))
+        }
+      };
+
+      const mockConnectionManager = {
+        getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
+        getClient: jest.fn().mockReturnValue(mockClient)
+      };
+
+      (provider as any).connectionManager = mockConnectionManager;
+
+      // Suppress console.error for this test since we expect an error
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(provider.deleteAllCollections('1')).rejects.toThrow('Failed to delete all collections: API Error');
+      
+      consoleSpy.mockRestore();
+    });
+  });
 });

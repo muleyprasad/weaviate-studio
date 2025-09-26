@@ -1580,6 +1580,39 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     /**
+     * Deletes all collections from the Weaviate instance
+     * @param connectionId - The ID of the connection
+     * @throws Error if deletion fails
+     */
+    async deleteAllCollections(connectionId: string): Promise<void> {
+        try {
+            // Get client for this connection
+            const connection = this.connectionManager.getConnection(connectionId);
+            if (!connection) {
+                throw new Error('Connection not found');
+            }
+            
+            const client = this.connectionManager.getClient(connectionId);
+            if (!client) {
+                throw new Error('Client not initialized');
+            }
+            
+            // Delete all collections using the collections API
+            await client.collections.deleteAll();
+            
+            // Clear local collections state
+            this.collections[connectionId] = [];
+            
+            // Refresh the tree view
+            this.refresh();
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Error in deleteAllCollections:', error);
+            throw new Error(`Failed to delete all collections: ${errorMessage}`);
+        }
+    }
+
+    /**
      * Refreshes connection info for a specific connection
      * @param connectionId - The ID of the connection to refresh
      */
@@ -1822,7 +1855,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             );
 
             // Set the webview content
-            panel.webview.html = this.getCollectionOptionsHtml();
+            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
 
             // Handle messages from the webview
             panel.webview.onDidReceiveMessage(
@@ -1850,7 +1883,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             break;
                         case 'back':
                             // Return to options selection
-                            panel.webview.html = this.getCollectionOptionsHtml();
+                            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
                             break;
                         case 'cancel':
                             panel.dispose();
@@ -3913,9 +3946,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     /**
      * Generates HTML for the Collection Options selection webview
+     * @param connectionId - The ID of the connection to check for existing collections
      * @returns The HTML content for the webview
      */
-    private getCollectionOptionsHtml(): string {
+    private getCollectionOptionsHtml(connectionId: string): string {
+        // Check if there are existing collections to determine if clone option should be shown
+        const collections = this.collections[connectionId] || [];
+        const hasCollections = collections.length > 0;
+        
+        // Generate clone option HTML conditionally
+        const cloneOptionHtml = hasCollections ? `
+                        <div class="option-card" onclick="selectOption('cloneExisting')">
+                            <span class="option-icon">📋</span>
+                            <div class="option-title">Clone Existing Collection</div>
+                            <div class="option-description">Create a new collection based on an existing collection's schema and configuration. Perfect for creating similar collections.</div>
+                        </div>` : '';
+        
         return `
             <!DOCTYPE html>
             <html lang="en">
@@ -4040,13 +4086,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             <div class="option-title">From Scratch</div>
                             <div class="option-description">Create a new collection by defining its structure, properties, and configuration from the ground up.</div>
                         </div>
-                        
-                        <div class="option-card" onclick="selectOption('cloneExisting')">
-                            <span class="option-icon">📋</span>
-                            <div class="option-title">Clone Existing Collection</div>
-                            <div class="option-description">Create a new collection based on an existing collection's schema and configuration. Perfect for creating similar collections.</div>
-                        </div>
-                        
+                        ${cloneOptionHtml}
                         <div class="option-card" onclick="selectOption('importFromFile')">
                             <span class="option-icon">📁</span>
                             <div class="option-title">Import from File</div>
@@ -4829,7 +4869,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         break;
                     case 'back':
                         if (showOptionsOnBack) {
-                            panel.webview.html = this.getCollectionOptionsHtml();
+                            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
                         } else {
                             panel.dispose();
                         }
@@ -4929,7 +4969,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                         break;
                     case 'back':
-                        panel.webview.html = this.getCollectionOptionsHtml();
+                        panel.webview.html = this.getCollectionOptionsHtml(connectionId);
                         break;
                     case 'cancel':
                         panel.dispose();
@@ -4962,7 +5002,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         }
                         break;
                     case 'back':
-                        panel.webview.html = this.getCollectionOptionsHtml();
+                        panel.webview.html = this.getCollectionOptionsHtml(connectionId);
                         break;
                     case 'cancel':
                         panel.dispose();
