@@ -9,6 +9,24 @@ function createClient() {
         do: jest.fn().mockResolvedValue({ data: {} })
       })
     },
+    collections: {
+      listAll: jest.fn().mockResolvedValue([]),
+      get: jest.fn().mockReturnValue({
+        aggregate: {
+          overAll: jest.fn().mockResolvedValue({ totalCount: 0 })
+        }
+      }),
+      delete: jest.fn().mockResolvedValue({}),
+      createFromSchema: jest.fn().mockResolvedValue({})
+    },
+    getMeta: jest.fn().mockResolvedValue({ 
+      version: 'mock',
+      hostname: 'localhost',
+      modules: {}
+    }),
+    cluster: {
+      nodes: jest.fn().mockResolvedValue({})
+    },
     isReady: jest.fn().mockResolvedValue(true)
   };
 }
@@ -26,6 +44,24 @@ const exported = {
         do: jest.fn().mockResolvedValue({ data: {} })
       })
     },
+    collections: {
+      listAll: jest.fn().mockResolvedValue([]),
+      get: jest.fn().mockReturnValue({
+        aggregate: {
+          overAll: jest.fn().mockResolvedValue({ totalCount: 0 })
+        }
+      }),
+      delete: jest.fn().mockResolvedValue({}),
+      createFromSchema: jest.fn().mockResolvedValue({})
+    },
+    getMeta: jest.fn().mockResolvedValue({ 
+      version: 'mock',
+      hostname: 'localhost',
+      modules: {}
+    }),
+    cluster: {
+      nodes: jest.fn().mockResolvedValue({})
+    },
     isReady: jest.fn().mockResolvedValue(true)
   }),
   connectToWeaviateCloud: jest.fn().mockResolvedValue({
@@ -37,6 +73,24 @@ const exported = {
         withFields: jest.fn().mockReturnThis(),
         do: jest.fn().mockResolvedValue({ data: {} })
       })
+    },
+    collections: {
+      listAll: jest.fn().mockResolvedValue([]),
+      get: jest.fn().mockReturnValue({
+        aggregate: {
+          overAll: jest.fn().mockResolvedValue({ totalCount: 0 })
+        }
+      }),
+      delete: jest.fn().mockResolvedValue({}),
+      createFromSchema: jest.fn().mockResolvedValue({})
+    },
+    getMeta: jest.fn().mockResolvedValue({ 
+      version: 'mock',
+      hostname: 'localhost',
+      modules: {}
+    }),
+    cluster: {
+      nodes: jest.fn().mockResolvedValue({})
     },
     isReady: jest.fn().mockResolvedValue(true)
   })

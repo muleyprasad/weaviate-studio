@@ -68,7 +68,15 @@ describe('Add Collection', () => {
     mockConnectionManager.getConnection.mockReturnValue({
       id: 'conn1',
       name: 'Test Connection',
-      status: 'connected'
+      status: 'connected',
+      type: 'custom',
+      httpHost: 'localhost',
+      httpPort: 8080,
+      httpSecure: false,
+      grpcHost: 'localhost',
+      grpcPort: 50051,
+      grpcSecure: false,
+      apiKey: ''
     });
   });
 
@@ -97,7 +105,15 @@ describe('Add Collection', () => {
     it('throws error for disconnected connection', async () => {
       mockConnectionManager.getConnection.mockReturnValue({
         id: 'conn1',
-        status: 'disconnected'
+        status: 'disconnected',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        grpcSecure: false,
+        apiKey: ''
       });
 
       await expect(provider.addCollection('conn1')).rejects.toThrow('Connection must be active');
@@ -168,6 +184,16 @@ describe('Add Collection', () => {
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
+      // Setup cluster metadata cache to match the mock
+      (provider as any).clusterMetadataCache = {
+        'conn1': {
+          modules: {
+            'text2vec-openai': {},
+            'text2vec-cohere': {}
+          }
+        }
+      };
+
       await messageHandler({ command: 'getVectorizers' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
@@ -179,9 +205,20 @@ describe('Add Collection', () => {
     it('handles create message successfully', async () => {
       const mockCreateFromSchema = jest.fn() as any;
       mockCreateFromSchema.mockResolvedValue({});
+      const mockListAll = jest.fn() as any;
+      mockListAll.mockResolvedValue([]);
+      const mockGetMeta = jest.fn() as any;
+      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
+      const mockClusterNodes = jest.fn() as any;
+      mockClusterNodes.mockResolvedValue({});
       const mockClient = {
         collections: {
-          createFromSchema: mockCreateFromSchema
+          createFromSchema: mockCreateFromSchema,
+          listAll: mockListAll
+        },
+        getMeta: mockGetMeta,
+        cluster: {
+          nodes: mockClusterNodes
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -204,9 +241,20 @@ describe('Add Collection', () => {
     it('handles create message with error', async () => {
       const mockCreateFromSchema = jest.fn() as any;
       mockCreateFromSchema.mockRejectedValue(new Error('Schema error'));
+      const mockListAll = jest.fn() as any;
+      mockListAll.mockResolvedValue([]);
+      const mockGetMeta = jest.fn() as any;
+      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
+      const mockClusterNodes = jest.fn() as any;
+      mockClusterNodes.mockResolvedValue({});
       const mockClient = {
         collections: {
-          createFromSchema: mockCreateFromSchema
+          createFromSchema: mockCreateFromSchema,
+          listAll: mockListAll
+        },
+        getMeta: mockGetMeta,
+        cluster: {
+          nodes: mockClusterNodes
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -233,15 +281,11 @@ describe('Add Collection', () => {
     });
 
     it('builds correct schema object', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
-      const mockClassCreator = {
-        withClass: jest.fn().mockReturnThis(),
-        do: mockDo
-      };
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => mockClassCreator
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -262,7 +306,7 @@ describe('Add Collection', () => {
 
       await (provider as any).createCollection('conn1', inputSchema);
 
-      expect(mockClassCreator.withClass).toHaveBeenCalledWith({
+      expect(mockCreateFromSchema).toHaveBeenCalledWith({
         class: 'TestCollection',
         description: 'Test description',
         vectorizer: 'text2vec-openai',
@@ -278,15 +322,11 @@ describe('Add Collection', () => {
     });
 
     it('handles vectorizer "none" correctly', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
-      const mockClassCreator = {
-        withClass: jest.fn().mockReturnThis(),
-        do: mockDo
-      };
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => mockClassCreator
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -296,7 +336,7 @@ describe('Add Collection', () => {
         vectorizer: 'none'
       });
 
-      const calledSchema = mockClassCreator.withClass.mock.calls[0][0] as any;
+      const calledSchema = mockCreateFromSchema.mock.calls[0][0] as any;
       expect(calledSchema.vectorizer).toBeUndefined();
     });
   });
