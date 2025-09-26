@@ -2039,6 +2039,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     .section-header.collapsed .icon {
                         transform: rotate(-90deg);
                     }
+
+                    .section-counter {
+                        font-weight: normal;
+                        font-size: 14px;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        margin-left: 8px;
+                    }
                     
                     .section-content {
                         padding: 20px;
@@ -2195,8 +2202,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     .property-fields {
                         display: flex;
-                        flex-direction: row;
+                        flex-direction: column;
+                        gap: 16px;
+                    }
+
+                    .property-field-row {
+                        display: flex;
                         gap: 12px;
+                        align-items: flex-end;
                     }
                     
                     .property-field {
@@ -2209,7 +2222,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     }
                     
                     .property-field.type-field {
-                        flex: 1;
+                        flex: 1.5;
+                    }
+
+                    .property-field.array-field {
+                        flex: 0 0 auto;
+                        min-width: 80px;
                     }
                     
                     .property-field label {
@@ -2289,16 +2307,103 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         margin-bottom: 0;
                         cursor: pointer;
                     }
+
+                    /* Enhanced checkbox group styling */
+                    .checkbox-group {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 16px;
+                        padding: 12px 16px;
+                        background: var(--vscode-sideBar-background, #F7F7F7);
+                        border-radius: 4px;
+                        border: 1px solid var(--vscode-panel-border, #E0E0E0);
+                    }
+
+                    .checkbox-label {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        margin-bottom: 0;
+                        cursor: pointer;
+                        font-size: 13px;
+                        color: var(--vscode-foreground, #2D2D2D);
+                        transition: color 0.2s ease;
+                    }
+
+                    .checkbox-label:hover {
+                        color: var(--vscode-button-background, #007ACC);
+                    }
+
+                    .checkbox-label input[type="checkbox"] {
+                        width: 16px;
+                        height: 16px;
+                        margin: 0;
+                        appearance: none;
+                        border: 2px solid var(--vscode-input-border, #CCCCCC);
+                        border-radius: 3px;
+                        background: var(--vscode-input-background, #FFFFFF);
+                        cursor: pointer;
+                        position: relative;
+                        transition: all 0.2s ease;
+                        flex-shrink: 0;
+                    }
+
+                    .checkbox-label input[type="checkbox"]:hover {
+                        border-color: var(--vscode-button-background, #007ACC);
+                    }
+
+                    .checkbox-label input[type="checkbox"]:checked {
+                        background: var(--vscode-button-background, #007ACC);
+                        border-color: var(--vscode-button-background, #007ACC);
+                    }
+
+                    .checkbox-label input[type="checkbox"]:checked::after {
+                        content: '✓';
+                        position: absolute;
+                        top: -1px;
+                        left: 2px;
+                        color: var(--vscode-button-foreground, #FFFFFF);
+                        font-size: 12px;
+                        font-weight: bold;
+                    }
+
+                    .checkbox-text {
+                        font-weight: 500;
+                        user-select: none;
+                    }
+
+                    .index-config-row {
+                        margin-top: 8px;
+                    }
+
+                    /* Tokenization field styling */
+                    .tokenization-field {
+                        margin-top: 8px;
+                    }
+
+                    .tokenization-field label {
+                        font-size: 12px;
+                        color: var(--vscode-descriptionForeground, #6A6A6A);
+                        margin-bottom: 4px;
+                    }
                     
                     /* Mobile responsive for properties */
                     @media (max-width: 600px) {
-                        .property-fields {
+                        .property-field-row {
                             flex-direction: column;
+                            gap: 8px;
+                            align-items: stretch;
                         }
                         
                         .property-field.name-field,
-                        .property-field.type-field {
+                        .property-field.type-field,
+                        .property-field.array-field {
                             flex: 1;
+                        }
+                        
+                        .checkbox-group {
+                            flex-direction: column;
+                            gap: 12px;
                         }
                     }
                     
@@ -2540,7 +2645,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <!-- Properties Section -->
                         <div class="form-section">
                             <div class="section-header" data-section="properties">
-                                <span>Properties</span>
+                                <span>Properties <span class="section-counter" id="propertiesCounter">(0)</span></span>
                                 <span class="icon">▼</span>
                             </div>
                             <div class="section-content" id="propertiesContent">
@@ -2554,7 +2659,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         <!-- Vectorizer Configuration Section -->
                         <div class="form-section">
                             <div class="section-header" data-section="vectorizer">
-                                <span>Vectorizer Configuration</span>
+                                <span>Vectorizer Configuration <span class="section-counter" id="vectorizersCounter">(0)</span></span>
                                 <span class="icon">▼</span>
                             </div>
                             <div class="section-content" id="vectorizerContent">
@@ -2646,6 +2751,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         { value: 'object', label: 'Object', description: 'Nested JSON objects', supportsArray: true },
                         { value: 'uuid', label: 'UUID', description: 'Universally unique identifiers', supportsArray: true },
                         { value: 'reference', label: 'Reference', description: 'Reference to another collection', supportsArray: true }
+                    ];
+                    
+                    // Tokenization options
+                    const tokenizationOptions = [
+                        { value: '', label: 'Default', description: 'Use default tokenization' },
+                        { value: 'word', label: 'Word', description: 'Tokenize by word' },
+                        { value: 'whitespace', label: 'Whitespace', description: 'Tokenize by whitespace' },
+                        { value: 'lowercase', label: 'Lowercase', description: 'Tokenize by lowercase' },
+                        { value: 'field', label: 'Field', description: 'Tokenize by field' },
+                        { value: 'gse', label: 'GSE', description: 'Tokenize using GSE (Chinese/Japanese) - requires server support' },
+                        { value: 'trigram', label: 'Trigram', description: 'Tokenize into trigrams - requires server support' },
+                        { value: 'kagome_ja', label: 'Kagome JA', description: 'Tokenize using Kagome (Japanese) - requires server support' },
+                        { value: 'kagome_kr', label: 'Kagome KR', description: 'Tokenize using Kagome (Korean) - requires server support' }
                     ];
                     
                     // Section toggle functionality
@@ -2824,7 +2942,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         const addVectorizerButton = document.getElementById('addVectorizerButton');
                         if (addVectorizerButton) {
                             addVectorizerButton.addEventListener('click', () => {
-                                const suggestedName = vectorizers.length === 0 ? 'default' : \`vector\${vectorizers.length + 1}\`;
+                                const suggestedName = vectorizers.length === 0 ? 'default' : 'vector' + (vectorizers.length + 1);
                                 addVectorizer(suggestedName, 'none');
                                 renderVectorizers();
                                 updateJsonPreview();
@@ -2844,6 +2962,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             });
                         }
                     }
+
+                    // Expose functions to window for HTML event handlers
+                    window.updateProperty = updateProperty;
                     
                     function addVectorizer(name, vectorizerType) {
                         const vectorizer = {
@@ -2865,7 +2986,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     function renderVectorizers() {
                         const container = document.getElementById('vectorConfigContainer');
+                        const counter = document.getElementById('vectorizersCounter');
                         if (!container) return;
+                        
+                        // Update counter
+                        if (counter) {
+                            counter.textContent = '(' + vectorizers.length + ')';
+                        }
                         
                         container.innerHTML = '';
                         
@@ -2930,7 +3057,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     function updateVectorizerName(id, name) {
                         const vectorizer = vectorizers.find(v => v.id === id);
                         if (vectorizer) {
-                            vectorizer.name = name.trim() || \`vector\${id}\`;
+                            vectorizer.name = name.trim() || 'vector' + id;
                             updateJsonPreview();
                         }
                     }
@@ -3015,7 +3142,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             name: '',
                             dataType: 'text',
                             isArray: false,
-                            description: ''
+                            description: '',
+                            tokenization: '',
+                            indexFilterable: true,
+                            indexSearchable: true,
+                            indexRangeFilters: false
                         };
                         
                         properties.push(property);
@@ -3047,6 +3178,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     
                     function renderProperties() {
                         const container = document.getElementById('propertiesContainer');
+                        const counter = document.getElementById('propertiesCounter');
+                        
+                        // Update counter
+                        if (counter) {
+                            counter.textContent = '(' + properties.length + ')';
+                        }
                         
                         if (properties.length === 0) {
                             container.innerHTML = '<div class="no-properties">No properties added yet. Click "Add Property" to define your data structure.</div>';
@@ -3089,9 +3226,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         header.appendChild(actions);
                         card.appendChild(header);
                         
-                        // Fields
+                        // Fields - reorganized in multiple rows
                         const fields = document.createElement('div');
                         fields.className = 'property-fields';
+                        
+                        // First row: Name, Type, Array
+                        const firstRow = document.createElement('div');
+                        firstRow.className = 'property-field-row';
                         
                         // Name field
                         const nameField = createField('Name', 'input', prop.id + '_name', {
@@ -3100,7 +3241,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             onchange: (e) => updateProperty(prop.id, 'name', e.target.value)
                         });
                         nameField.classList.add('name-field');
-                        fields.appendChild(nameField);
+                        firstRow.appendChild(nameField);
                         
                         // Data type field
                         const typeField = createSelectField('Type', prop.id + '_type', dataTypes.map(dt => ({
@@ -3112,19 +3253,59 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             updateProperty(prop.id, 'dataType', newDataType);
                             updateArrayCheckbox(prop);
                             updateTargetCollectionField(prop);
+                            updateTokenizationField(prop);
+                            updateRangeFiltersField(prop);
                             
                             if (newDataType === 'reference') {
                                 vscode.postMessage({ command: 'getCollections' });
                             }
                         });
                         typeField.classList.add('type-field');
-                        fields.appendChild(typeField);
+                        firstRow.appendChild(typeField);
                         
                         // Array checkbox
                         const arrayField = createArrayField(prop);
-                        fields.appendChild(arrayField);
+                        arrayField.classList.add('array-field');
+                        firstRow.appendChild(arrayField);
                         
-                        // Description field
+                        fields.appendChild(firstRow);
+
+                        // Second row: Tokenization (for text and string types)
+                        const tokenizationField = createSelectField('Tokenization', prop.id + '_tokenization', tokenizationOptions.map(opt => ({
+                            value: opt.value,
+                            label: opt.label,
+                            selected: prop.tokenization === opt.value
+                        })), (e) => updateProperty(prop.id, 'tokenization', e.target.value));
+                        tokenizationField.classList.add('tokenization-field', 'full-width');
+                        tokenizationField.id = prop.id + '_tokenization_field';
+                        tokenizationField.style.display = (prop.dataType === 'text' || prop.dataType === 'string') ? 'block' : 'none';
+                        fields.appendChild(tokenizationField);
+
+                        // Third row: Index configuration checkboxes
+                        const indexConfigRow = document.createElement('div');
+                        indexConfigRow.className = 'property-field full-width index-config-row';
+                        indexConfigRow.innerHTML = \`
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="\${prop.id}_indexFilterable" \${prop.indexFilterable ? 'checked' : ''} 
+                                           onchange="updateProperty('\${prop.id}', 'indexFilterable', this.checked)">
+                                    <span class="checkbox-text">Index Filterable</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="\${prop.id}_indexSearchable" \${prop.indexSearchable ? 'checked' : ''} 
+                                           onchange="updateProperty('\${prop.id}', 'indexSearchable', this.checked)">
+                                    <span class="checkbox-text">Index Searchable</span>
+                                </label>
+                                <label class="checkbox-label" id="\${prop.id}_indexRangeFilters_label" style="display: \${['int', 'number', 'date'].includes(prop.dataType) ? 'flex' : 'none'}">
+                                    <input type="checkbox" id="\${prop.id}_indexRangeFilters" \${prop.indexRangeFilters ? 'checked' : ''} 
+                                           onchange="updateProperty('\${prop.id}', 'indexRangeFilters', this.checked)">
+                                    <span class="checkbox-text">Index Range Filters</span>
+                                </label>
+                            </div>
+                        \`;
+                        fields.appendChild(indexConfigRow);
+
+                        // Fourth row: Description field
                         const descField = createField('Description', 'textarea', prop.id + '_desc', {
                             value: prop.description,
                             placeholder: 'Optional description',
@@ -3235,6 +3416,29 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             field.style.display = prop.dataType === 'reference' ? 'block' : 'none';
                         }
                     }
+
+                    function updateTokenizationField(prop) {
+                        const field = document.getElementById(prop.id + '_tokenization_field');
+                        if (field) {
+                            const showTokenization = prop.dataType === 'text' || prop.dataType === 'string';
+                            field.style.display = showTokenization ? 'block' : 'none';
+                        }
+                    }
+
+                    function updateRangeFiltersField(prop) {
+                        const label = document.getElementById(prop.id + '_indexRangeFilters_label');
+                        if (label) {
+                            const showRangeFilters = ['int', 'number', 'date'].includes(prop.dataType);
+                            label.style.display = showRangeFilters ? 'flex' : 'none';
+                            if (!showRangeFilters) {
+                                const checkbox = document.getElementById(prop.id + '_indexRangeFilters');
+                                if (checkbox) {
+                                    checkbox.checked = false;
+                                    prop.indexRangeFilters = false;
+                                }
+                            }
+                        }
+                    }
                     
                     function handleSubmit(e) {
                         e.preventDefault();
@@ -3314,6 +3518,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                         : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]),
                                     description: prop.description ? prop.description.trim() : undefined
                                 };
+
+                                // Add tokenization if specified and applicable
+                                if (prop.tokenization && prop.tokenization !== '' && (prop.dataType === 'text' || prop.dataType === 'string')) {
+                                    propSchema.tokenization = prop.tokenization;
+                                }
+
+                                // Add indexing properties
+                                if (typeof prop.indexFilterable === 'boolean') {
+                                    propSchema.indexFilterable = prop.indexFilterable;
+                                }
+                                if (typeof prop.indexSearchable === 'boolean') {
+                                    propSchema.indexSearchable = prop.indexSearchable;
+                                }
+                                if (typeof prop.indexRangeFilters === 'boolean' && ['int', 'number', 'date'].includes(prop.dataType)) {
+                                    propSchema.indexRangeFilters = prop.indexRangeFilters;
+                                }
+
                                 return propSchema;
                             }),
                             multiTenancyConfig: mtEnabled ? { enabled: true } : undefined
@@ -3382,17 +3603,35 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         });
                         
                         const schemaObj = {
-                            class: collectionName || '<collectionName>',
+                            class: collectionName || 'collectionName',
                             description: descriptionVal || undefined,
                             properties: properties.map(function(prop) {
                                 const dataType = prop.dataType === 'reference' && prop.targetCollection
                                     ? [prop.targetCollection]
                                     : (prop.isArray ? [prop.dataType + '[]'] : [prop.dataType]);
-                                return {
-                                    name: prop.name.trim() || '<propertyName>',
+                                const propObj = {
+                                    name: prop.name.trim() || 'propertyName',
                                     dataType: dataType,
                                     description: prop.description ? prop.description.trim() : undefined
                                 };
+
+                                // Add tokenization if specified and applicable
+                                if (prop.tokenization && prop.tokenization !== '' && (prop.dataType === 'text' || prop.dataType === 'string')) {
+                                    propObj.tokenization = prop.tokenization;
+                                }
+
+                                // Add indexing properties
+                                if (typeof prop.indexFilterable === 'boolean') {
+                                    propObj.indexFilterable = prop.indexFilterable;
+                                }
+                                if (typeof prop.indexSearchable === 'boolean') {
+                                    propObj.indexSearchable = prop.indexSearchable;
+                                }
+                                if (typeof prop.indexRangeFilters === 'boolean' && ['int', 'number', 'date'].includes(prop.dataType)) {
+                                    propObj.indexRangeFilters = prop.indexRangeFilters;
+                                }
+
+                                return propObj;
                             }),
                             multiTenancyConfig: mtVal ? { enabled: true } : undefined
                         };
@@ -4638,9 +4877,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                                 class: message.newCollectionName
                             };
                             
-                            // Switch to unified collection form with cloned schema
-                            panel.webview.html = this.getAddCollectionHtml(clonedSchema);
-                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                            await this.createCollection(connectionId, clonedSchema);
+                            panel.dispose();
+                            vscode.window.showInformationMessage(`Collection "${message.newCollectionName}" schema cloned successfully from "${message.sourceCollection}"`);
+                            await this.fetchCollections(connectionId);
                         } catch (error) {
                             panel.webview.postMessage({
                                 command: 'error',
@@ -4670,9 +4910,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 switch (message.command) {
                     case 'import':
                         try {
-                            // Switch to unified collection form with imported schema
-                            panel.webview.html = this.getAddCollectionHtml(message.schema);
-                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                            await this.createCollection(connectionId, message.schema);
+                            panel.dispose();
+                            vscode.window.showInformationMessage(`Collection "${message.schema.class}" imported successfully`);
+                            await this.fetchCollections(connectionId);
                         } catch (error) {
                             panel.webview.postMessage({
                                 command: 'error',

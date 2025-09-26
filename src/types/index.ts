@@ -35,6 +35,10 @@ export interface SchemaProperty {
     dataType: string[];
     description?: string;
     indexInverted?: boolean;
+    tokenization?: string;
+    indexFilterable?: boolean;
+    indexSearchable?: boolean;
+    indexRangeFilters?: boolean;
     moduleConfig?: Record<string, unknown>;
     [key: string]: unknown;
 }
