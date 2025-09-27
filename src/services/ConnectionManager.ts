@@ -77,13 +77,14 @@ export class ConnectionManager {
                 if (conn.httpHost || conn.cloudUrl) {
                   need_to_save = true;
                   return { ...conn, connectionVersion: ConnectionManager.currentVersion };
-                }
+
                 // old connection, need to migrate
                 if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io'))) {
                     conn.type = 'cloud';
                     conn.cloudUrl = conn.url;
                     delete conn.url;
                     conn.connectionVersion = ConnectionManager.currentVersion;
+
                     need_to_save = true;
                 } else {
                   // custom connection
@@ -102,6 +103,7 @@ export class ConnectionManager {
                     conn.grpcPort = 50051; // default grpc port
                     conn.grpcSecure = url.protocol === 'https:'; // default to false
                     conn.connectionVersion = ConnectionManager.currentVersion;
+
                     need_to_save = true;
                 }
               }
@@ -296,6 +298,7 @@ export class ConnectionManager {
                 client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
                     authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
                     skipInitChecks: connection.skipInitChecks,
+
                     timeout: {
                         init: connection.timeoutInit,
                         query: connection.timeoutQuery,
