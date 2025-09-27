@@ -307,8 +307,7 @@ export class ConnectionManager {
                     grpcPort: connection.grpcPort,
                     httpSecure: connection.httpSecure,
                     grpcSecure: connection.grpcSecure,
-                    apiKey: connection.apiKey,
-                    type: connection.type,
+                    authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
                     timeout: {
                         init: connection.timeoutInit,
                         query: connection.timeoutQuery,
