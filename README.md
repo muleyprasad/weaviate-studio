@@ -66,7 +66,6 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 4. **Explore your schema, run queries, and manage your data—all within VS Code!**
 
 ---
-
 <details>
 <summary><strong>Full Feature List</strong></summary>
 
@@ -115,6 +114,45 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 </details>
 
 ---
+
+## Sample Datasets (Local)
+
+New to Weaviate self-hosting? Spin up local demo datasets with Docker using the included helper script.
+
+- Prerequisites: Docker Desktop with Docker Compose v2
+- Script: `./scripts/weaviate-sample-datasets.sh`
+
+Examples
+- Start News dataset: `./scripts/weaviate-sample-datasets.sh news`
+- Start Wikipedia dataset (CPU): `./scripts/weaviate-sample-datasets.sh wiki`
+- Start Wikipedia dataset (GPU): `./scripts/weaviate-sample-datasets.sh wiki-gpu`
+- Preload Wikipedia backup (~112GB) and start: `./scripts/weaviate-sample-datasets.sh --wiki-backup wiki`
+- Start both: `./scripts/weaviate-sample-datasets.sh all`
+- Stop a dataset: `./scripts/weaviate-sample-datasets.sh --down news`
+- List available datasets: `./scripts/weaviate-sample-datasets.sh --list`
+
+Notes
+- The script caches upstream Docker Compose files under `.weaviate-samples/` (ignored by git).
+- For Wikipedia, using `--wiki-backup` downloads and mounts the pre-vectorized dataset so Weaviate starts with data immediately. You can override the backup URL via `--wiki-backup-url <URL>` or `WEAVIATE_WIKI_BACKUP_URL`.
+- Upstream demos typically expose Weaviate on `localhost:8080`. If you run multiple datasets simultaneously, adjust the cached compose files to use different host ports.
+
+Port override example
+- To run multiple stacks side-by-side, create a compose override that remaps the Weaviate port, then pass it to the script with `--compose-arg "-f <override.yml>"`.
+
+Example override file `weaviate-port-8081.override.yml`:
+
+```
+services:
+  weaviate:
+    ports:
+      - "8081:8080"
+```
+
+Usage:
+
+```
+./scripts/weaviate-sample-datasets.sh --compose-arg "-f weaviate-port-8081.override.yml" wiki
+```
 
 ## Development & Contributing
 
