@@ -77,7 +77,7 @@ export class ConnectionManager {
                 if (conn.httpHost || conn.cloudUrl) {
                   need_to_save = true;
                   return { ...conn, connectionVersion: ConnectionManager.currentVersion };
-
+                }
                 // old connection, need to migrate
                 if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io'))) {
                     conn.type = 'cloud';
