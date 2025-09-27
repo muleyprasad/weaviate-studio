@@ -77,7 +77,7 @@ export class ConnectionManager {
                   return { ...conn, connectionVersion: '2' };
                 }
                 // old connection, need to migrate
-                if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io'))) {
+                if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io') || conn.url.includes('weaviate.network'))) {
                     conn.type = 'cloud';
                     conn.cloudUrl = conn.url;
                     delete conn.url;
@@ -90,11 +90,17 @@ export class ConnectionManager {
                         return conn;
                     }
                     conn.type = 'custom';
-                    // url should be in format http(s)://host:port
-                    const url = new URL(conn.url);
+                    // url should be in format http(s)://host:port; add default scheme if missing
+                    let rawUrl = conn.url;
+                    if (!/^https?:\/\//i.test(rawUrl)) {
+                        rawUrl = `http://${rawUrl}`;
+                    }
+                    const url = new URL(rawUrl);
                     delete conn.url;
                     conn.httpHost = url.hostname;
-                    conn.httpPort = parseInt(url.port) || 80;
+                    // If no port is specified, choose sensible defaults: 443 for https, 8080 for http
+                    const hasExplicitPort = url.port && url.port.trim().length > 0;
+                    conn.httpPort = hasExplicitPort ? parseInt(url.port, 10) : (url.protocol === 'https:' ? 443 : 8080);
                     conn.httpSecure = url.protocol === 'https:';
                     conn.grpcHost = url.hostname;
                     conn.grpcPort = 50051; // default grpc port
