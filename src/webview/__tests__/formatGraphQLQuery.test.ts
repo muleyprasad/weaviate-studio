@@ -26,9 +26,18 @@ describe('formatGraphQLQuery', () => {
   });
 
   it('returns original query when prettier throws', async () => {
+    // Mock console.error para evitar logs no teste
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    
     mockFormat.mockImplementationOnce(() => { throw new Error('boom'); });
     const input = '{bad}';
     const result = await formatGraphQLQuery(input);
     expect(result).toBe(input);
+    
+    // Verifica que o error foi logado
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error formatting GraphQL query:', expect.any(Error));
+    
+    // Limpa o spy
+    consoleErrorSpy.mockRestore();
   });
 }); 

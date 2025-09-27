@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SchemaProperty, SchemaClass } from '../types';
+import { CollectionConfig } from 'weaviate-client';
 
 /**
  * Service responsible for rendering views in webview panels
@@ -127,7 +128,7 @@ export class ViewRenderer {
     /**
      * Renders detailed schema view with multiple tabs
      */
-    public renderDetailedSchema(schema: SchemaClass): string {
+    public renderDetailedSchema(schema: CollectionConfig): string {
         const formatDataType = (dataType: string | string[] | undefined): string => {
             if (!dataType) {
                 return 'Unknown';
@@ -146,18 +147,16 @@ export class ViewRenderer {
                 </div>
                 ${prop.description ? `<div class="property-description">${this.escapeHtml(prop.description)}</div>` : ''}
                 <div class="property-details">
-                    <span class="property-detail">Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</span>
-                    ${prop.moduleConfig ? `<span class="property-detail">Module: ${Object.keys(prop.moduleConfig).join(', ')}</span>` : ''}
+                    <span class="property-detail">${Object.entries(prop).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('<br /> ')}</span>
                 </div>
             </div>
         `).join('') || '<div>No properties found</div>';
 
         // Generate REST API equivalent for collection creation
         const apiEquivalent = {
-            class: schema.class,
+            class: schema.name,
             description: schema.description,
-            vectorizer: schema.vectorizer,
-            moduleConfig: schema.moduleConfig,
+            vectorizers: schema.vectorizers,
             properties: schema.properties,
             vectorIndexType: (schema as any).vectorIndexType || 'hnsw',
             vectorIndexConfig: (schema as any).vectorIndexConfig,
@@ -167,10 +166,6 @@ export class ViewRenderer {
             multiTenancyConfig: (schema as any).multiTenancyConfig
         };
 
-        const curlCommand = `curl -X POST \\
-  "http://localhost:8080/v1/schema" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
 
         // Build scaling configuration sections dynamically
         const scalingSections: string[] = [];
@@ -185,9 +180,9 @@ export class ViewRenderer {
             }
         };
 
-        formatIfExists((schema as any).shardingConfig, 'Sharding');
-        formatIfExists((schema as any).replicationConfig, 'Replication');
-        formatIfExists((schema as any).multiTenancyConfig, 'Multi-Tenancy');
+        formatIfExists(schema.sharding, 'Sharding');
+        formatIfExists(schema.replication, 'Replication');
+        formatIfExists(schema.multiTenancy, 'Multi-Tenancy');
 
         const scalingHtml = scalingSections.length > 0 ? `
             <div class="section-header">Scaling Configuration</div>
@@ -196,46 +191,13 @@ export class ViewRenderer {
             </div>
         ` : '';
 
-        // Generate creation script for the 5th tab
-        const creationScript = `# Weaviate Collection Definition
-# Generated on: ${new Date().toLocaleString()}
-# Collection: ${schema.class}
-
-# ========================================
-# CREATE COLLECTION SCRIPT
-# ========================================
-
-import weaviate
-
-client = weaviate.Client("http://localhost:8080")
-
-# Collection definition
-collection_config = ${JSON.stringify(apiEquivalent, null, 4)}
-
-# Create the collection
-client.schema.create_class(collection_config)
-
-# ========================================
-# EQUIVALENT REST API CALL
-# ========================================
-
-${curlCommand}`;
-
-        const propertyDetails = schema.properties?.map(prop => `
-Property: ${prop.name}
-  Type: ${Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType}
-  Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}
-  ${prop.description ? `Description: ${prop.description}` : ''}
-  ${prop.moduleConfig ? `Module Config: ${JSON.stringify(prop.moduleConfig, null, 2)}` : ''}
-`).join('\n') || 'No properties defined';
-
         return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Schema: ${this.escapeHtml(schema.class)}</title>
+                <title>Collection: ${this.escapeHtml(schema.name)}</title>
                 <style>
                     body {
                         font-family: var(--vscode-font-family);
@@ -517,7 +479,7 @@ Property: ${prop.name}
             </head>
             <body>
                 <div class="header">
-                    <h1>Schema: ${this.escapeHtml(schema.class)}</h1>
+                    <h1>Collection: ${this.escapeHtml(schema.name)}</h1>
                 </div>
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('overview')">Overview</div>
@@ -530,23 +492,18 @@ Property: ${prop.name}
                     <div class="section-header">Description</div>
                     <div class="section-content">${this.escapeHtml(schema.description || 'No description available')}</div>
                     
-                    <div class="section-header">Vector Configuration</div>
+                    <div class="section-header">Vectors</div>
                     <div class="section-content">
                         <div class="config-grid">
                             <div class="config-item">
-                                <span class="config-label">Vectorizer:</span>
-                                <span class="config-value">${this.escapeHtml(schema.vectorizer || 'None')}</span>
+                                <span class="config-label">Vectorizers:</span>
+                                <span class="config-value">${this.escapeHtml((schema as any).vectorizers || 'None')}</span>
                             </div>
                             <div class="config-item">
                                 <span class="config-label">Index Type:</span>
                                 <span class="config-value">${this.escapeHtml((schema as any).vectorIndexType || 'HNSW')}</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="section-header">Module Configuration</div>
-                    <div class="section-content">
-                        <pre><code>${this.formatJsonClean(schema.moduleConfig)}</code></pre>
                     </div>
                     
                     ${scalingHtml}
@@ -790,14 +747,14 @@ Property: ${prop.name}
     /**
      * Renders raw collection configuration view
      */
-    public renderRawConfig(schema: SchemaClass, connectionId: string): string {
+    public renderRawConfig(schema: CollectionConfig, connectionId: string): string {
         // Get connection info for context
         const timestamp = new Date().toLocaleString();
         
         // Generate creation script
         const creationScript = `# Weaviate Collection Configuration
 # Generated: ${timestamp}
-# Collection: ${schema.class}
+# Collection: ${schema.name}
 
 import weaviate
 
@@ -817,7 +774,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Raw Config: ${this.escapeHtml(schema.class)}</title>
+                <title>Raw Config: ${this.escapeHtml(schema.name)}</title>
                 <style>
                     body {
                         font-family: var(--vscode-font-family);
@@ -898,7 +855,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
                     
                     <div id="creation" class="tab-content active">
                         <div class="context-info">
-                            <strong>Collection:</strong> ${this.escapeHtml(schema.class)}<br>
+                            <strong>Collection:</strong> ${this.escapeHtml(schema.name)}<br>
                             <strong>Generated:</strong> ${timestamp}<br>
                             <strong>Properties:</strong> ${schema.properties?.length || 0}
                         </div>
@@ -913,7 +870,7 @@ print(f"Collection '{schema.class}' created successfully!")`;
                         <h3>Property Details</h3>
                         ${schema.properties?.map(prop => `
                             <div style="background: var(--vscode-editor-lineHighlightBackground); padding: 10px; margin: 10px 0; border-radius: 4px;">
-                                <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType?.join(' | ') || 'Unknown'})<br>
+                                <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType || 'Unknown'})<br>
                                 ${prop.description ? `<em>${this.escapeHtml(prop.description)}</em><br>` : ''}
                                 <small>Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</small>
                             </div>
@@ -966,29 +923,53 @@ print(f"Collection '{schema.class}' created successfully!")`;
 
     private generateCurlCommand(schema: any): string {
         const apiEquivalent = this.convertToApiFormat(schema);
-        return `curl \\
+        return `curl http://localhost:8080/v1/schema \\
     -X POST \\
     -H "Content-Type: application/json" \\
-    -d '${JSON.stringify(apiEquivalent, null, 2)}' \\
-    http://localhost:8080/v1/schema`;
+    -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
     }
 
     private generatePythonScript(schema: any): string {
         const apiEquivalent = this.convertToApiFormat(schema);
         return `import weaviate
 
-client = weaviate.Client("http://localhost:8080")
+const client = await weaviate.connectToLocal({
+    host: process.env.WEAVIATE_HOST || 'localhost',
+    port: parseInt(process.env.WEAVIATE_PORT || '8080'),
+    grpcPort: parseInt(process.env.WEAVIATE_GRPC_PORT || '50051'),
+    headers: { 'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY as string }, // Replace with your inference API key
+  });
 
 schema = ${JSON.stringify(apiEquivalent, null, 2)}
 
-client.schema.create_class(schema)`;
+client.collections.createFromSchema(schema)`;
     }
 
     private convertToApiFormat(schema: any): any {
         // Remove internal fields and format for API
-        const apiSchema = { ...schema };
+        // if tokenization for "none", make undefined
+        const fixed_properties = schema.properties?.map((prop: { dataType: string[]; tokenization?: string, indexInverted?: string }) => ({
+            ...prop,
+            dataType: [prop.dataType],
+            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+            indexSearchable: prop.indexInverted,
+        })) || [];
+        const apiSchema = { 
+            ...schema, 
+            class: schema.name, 
+            invertedIndexConfig: schema.invertedIndex,
+            moduleConfig: schema.generative,
+            multiTenancyConfig: schema.multiTenancyConfig,
+            properties: fixed_properties
+        };
         delete apiSchema.id;
         delete apiSchema._additional;
+        // delete all indexInverted for all properties
+        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+            delete prop.indexInverted;
+        });
+        delete apiSchema.indexInverted;
+        delete apiSchema.name;
         return apiSchema;
     }
 }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { WeaviateConnection } from '../services/ConnectionManager';
+import { CollectionConfig, Node } from 'weaviate-client';
 
 // Extended schema interfaces to include vector-related fields
 export interface ExtendedSchemaProperty extends SchemaProperty {
@@ -34,6 +35,10 @@ export interface SchemaProperty {
     dataType: string[];
     description?: string;
     indexInverted?: boolean;
+    tokenization?: string;
+    indexFilterable?: boolean;
+    indexSearchable?: boolean;
+    indexRangeFilters?: boolean;
     moduleConfig?: Record<string, unknown>;
     [key: string]: unknown;
 }
@@ -50,11 +55,29 @@ export interface SchemaClass {
     [key: string]: unknown;
 }
 
+export interface WeaviateMetadata {
+        /**
+         * Format: url
+         * @description The url of the host.
+         */
+        hostname?: string;
+        /** @description The Weaviate server version. */
+        version?: string;
+        /** @description Module-specific meta information. */
+        modules?: {
+            [key: string]: unknown;
+        };
+        /** @description Max message size for GRPC connection in bytes. */
+        grpcMaxMessageSize?: number;
+    }
+
 /**
  * Extends WeaviateTreeItem to include schema information
  */
 export interface CollectionWithSchema extends WeaviateTreeItem {
-    schema?: SchemaClass;
+    schema?: CollectionConfig;
+    nodes?: Node<"verbose">[];
+    metaData?: WeaviateMetadata;
 }
 
 /**
@@ -93,7 +116,7 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'indexes' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup',
+        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'invertedIndex' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup' | 'clusterNodes' | 'clusterNode' | 'clusterShards' | 'weaviateClusterNodeStatistics' | 'vectorConfigDetail'| 'propertyItem' | 'collectionReplication' | 'generativeConfig',
         public readonly connectionId?: string,
         public readonly collectionName?: string,
         public readonly itemId?: string,

@@ -68,7 +68,15 @@ describe('Add Collection', () => {
     mockConnectionManager.getConnection.mockReturnValue({
       id: 'conn1',
       name: 'Test Connection',
-      status: 'connected'
+      status: 'connected',
+      type: 'custom',
+      httpHost: 'localhost',
+      httpPort: 8080,
+      httpSecure: false,
+      grpcHost: 'localhost',
+      grpcPort: 50051,
+      grpcSecure: false,
+      apiKey: ''
     });
   });
 
@@ -97,7 +105,15 @@ describe('Add Collection', () => {
     it('throws error for disconnected connection', async () => {
       mockConnectionManager.getConnection.mockReturnValue({
         id: 'conn1',
-        status: 'disconnected'
+        status: 'disconnected',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        grpcSecure: false,
+        apiKey: ''
       });
 
       await expect(provider.addCollection('conn1')).rejects.toThrow('Connection must be active');
@@ -168,6 +184,16 @@ describe('Add Collection', () => {
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
+      // Setup cluster metadata cache to match the mock
+      (provider as any).clusterMetadataCache = {
+        'conn1': {
+          modules: {
+            'text2vec-openai': {},
+            'text2vec-cohere': {}
+          }
+        }
+      };
+
       await messageHandler({ command: 'getVectorizers' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
@@ -177,14 +203,22 @@ describe('Add Collection', () => {
     });
 
     it('handles create message successfully', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
+      const mockListAll = jest.fn() as any;
+      mockListAll.mockResolvedValue([]);
+      const mockGetMeta = jest.fn() as any;
+      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
+      const mockClusterNodes = jest.fn() as any;
+      mockClusterNodes.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => ({
-            withClass: jest.fn().mockReturnThis(),
-            do: mockDo
-          })
+        collections: {
+          createFromSchema: mockCreateFromSchema,
+          listAll: mockListAll
+        },
+        getMeta: mockGetMeta,
+        cluster: {
+          nodes: mockClusterNodes
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -205,14 +239,22 @@ describe('Add Collection', () => {
     });
 
     it('handles create message with error', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockRejectedValue(new Error('Schema error'));
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockRejectedValue(new Error('Schema error'));
+      const mockListAll = jest.fn() as any;
+      mockListAll.mockResolvedValue([]);
+      const mockGetMeta = jest.fn() as any;
+      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
+      const mockClusterNodes = jest.fn() as any;
+      mockClusterNodes.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => ({
-            withClass: jest.fn().mockReturnThis(),
-            do: mockDo
-          })
+        collections: {
+          createFromSchema: mockCreateFromSchema,
+          listAll: mockListAll
+        },
+        getMeta: mockGetMeta,
+        cluster: {
+          nodes: mockClusterNodes
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -225,6 +267,111 @@ describe('Add Collection', () => {
         command: 'error',
         message: 'Schema error'
       });
+    });
+
+    it('when cloning, should open Add Collection prefilled without creating immediately', async () => {
+      // Prepare: collections with schema
+      (provider as any).collections = {
+        'conn1': [
+          {
+            label: 'SourceCollection',
+            schema: {
+              class: 'SourceCollection',
+              description: 'desc',
+              properties: [
+                { name: 'title', dataType: ['text'] }
+              ]
+            }
+          }
+        ]
+      };
+
+      // Re-render clone view and capture clone handlers
+      // Simulate navigating to cloneExisting option by calling addCollectionWithOptions flow pieces directly
+      // Create a fresh panel and handler for clone webview
+      await (provider as any).addCollectionWithOptions('conn1');
+      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+
+      // Select cloneExisting to load clone UI
+      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
+      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+
+      // First request schema
+      await cloneHandler({ command: 'getSchema', collectionName: 'SourceCollection' });
+
+      // Then trigger clone with new name
+      await cloneHandler({
+        command: 'clone',
+        sourceCollection: 'SourceCollection',
+        newCollectionName: 'ClonedCollection',
+        schema: (provider as any).collections['conn1'][0].schema
+      });
+
+      // Should not dispose panel nor call create immediately; instead should update HTML to Add form
+      expect(mockPanel.dispose).not.toHaveBeenCalled();
+      expect(mockPanel.webview.html).toContain('Create New Collection');
+      expect(mockPanel.webview.html).toContain('id="collectionForm"');
+      // Prefilled name must be present in the HTML JSON preview or input field
+      expect(mockPanel.webview.html).toContain('ClonedCollection');
+    });
+
+    it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
+      // Prepare: collections with multi-tenant schema
+      (provider as any).collections = {
+        'conn1': [
+          {
+            label: 'MultiTenantCollection',
+            schema: {
+              class: 'MultiTenantCollection',
+              description: 'Multi-tenant collection',
+              multiTenancy: {  // Using multiTenancy (not multiTenancyConfig) as shown in user's data
+                enabled: true,
+                autoTenantCreation: true,
+                autoTenantActivation: true
+              },
+              properties: [
+                { name: 'title', dataType: ['text'] }
+              ]
+            }
+          }
+        ]
+      };
+
+      // Navigate to clone view and trigger clone
+      await (provider as any).addCollectionWithOptions('conn1');
+      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      
+      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
+      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      
+      await cloneHandler({ command: 'getSchema', collectionName: 'MultiTenantCollection' });
+      
+      await cloneHandler({
+        command: 'clone',
+        sourceCollection: 'MultiTenantCollection',
+        newCollectionName: 'ClonedMultiTenant',
+        schema: (provider as any).collections['conn1'][0].schema
+      });
+
+      // Should populate Add Collection form with multi-tenancy settings
+      expect(mockPanel.webview.html).toContain('Create New Collection');
+      
+      // Check that the initial schema data is properly embedded in the JavaScript
+      // The multiTenancyConfig should be passed as initialSchema to the form
+      const htmlContent = mockPanel.webview.html;
+      expect(htmlContent).toContain('const initialSchema =');
+      
+      // Extract the initialSchema JSON from the HTML
+      const initialSchemaMatch = htmlContent.match(/const initialSchema = ({.*?});/s);
+      expect(initialSchemaMatch).toBeTruthy();
+      
+      if (initialSchemaMatch) {
+        const initialSchemaStr = initialSchemaMatch[1];
+        expect(initialSchemaStr).toContain('"multiTenancy"');
+        expect(initialSchemaStr).toContain('"enabled":true');
+        expect(initialSchemaStr).toContain('"autoTenantCreation":true');
+        expect(initialSchemaStr).toContain('"autoTenantActivation":true');
+      }
     });
   });
 
@@ -239,15 +386,11 @@ describe('Add Collection', () => {
     });
 
     it('builds correct schema object', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
-      const mockClassCreator = {
-        withClass: jest.fn().mockReturnThis(),
-        do: mockDo
-      };
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => mockClassCreator
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -268,7 +411,7 @@ describe('Add Collection', () => {
 
       await (provider as any).createCollection('conn1', inputSchema);
 
-      expect(mockClassCreator.withClass).toHaveBeenCalledWith({
+      expect(mockCreateFromSchema).toHaveBeenCalledWith({
         class: 'TestCollection',
         description: 'Test description',
         vectorizer: 'text2vec-openai',
@@ -284,15 +427,11 @@ describe('Add Collection', () => {
     });
 
     it('handles vectorizer "none" correctly', async () => {
-      const mockDo = jest.fn() as any;
-      mockDo.mockResolvedValue(undefined);
-      const mockClassCreator = {
-        withClass: jest.fn().mockReturnThis(),
-        do: mockDo
-      };
+      const mockCreateFromSchema = jest.fn() as any;
+      mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
-        schema: {
-          classCreator: () => mockClassCreator
+        collections: {
+          createFromSchema: mockCreateFromSchema
         }
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
@@ -302,7 +441,7 @@ describe('Add Collection', () => {
         vectorizer: 'none'
       });
 
-      const calledSchema = mockClassCreator.withClass.mock.calls[0][0] as any;
+      const calledSchema = mockCreateFromSchema.mock.calls[0][0] as any;
       expect(calledSchema.vectorizer).toBeUndefined();
     });
   });
@@ -375,7 +514,7 @@ describe('Add Collection', () => {
       expect(html).toContain('id="collectionForm"');
       expect(html).toContain('Basic Settings');
       expect(html).toContain('Properties');
-      expect(html).toContain('Advanced Settings');
+      expect(html).toContain('Multi-Tenancy');
       expect(html).toContain('Schema Preview');
     });
 

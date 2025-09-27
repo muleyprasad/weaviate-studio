@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WeaviateClient } from 'weaviate-ts-client';
+import { CollectionConfig, PropertyConfig, WeaviateClient } from 'weaviate-client';
 import { ConnectionManager } from '../../services/ConnectionManager';
 
 export interface WeaviateSchemaProperty {
@@ -84,8 +84,8 @@ export class SchemaProvider {
         if (!connection) {
           throw new Error('No active Weaviate connection found');
         }
-        
-        connectionUrl = connection.url;
+
+        connectionUrl = connection.httpHost || connection.cloudUrl || 'localhost';
         weaviateClient = this.connectionManager.getClient(connection.id);
       } else {
         // Try to extract URL from client if possible
@@ -107,14 +107,15 @@ export class SchemaProvider {
         throw new Error('No Weaviate client available');
       }
 
-      const schema = await weaviateClient.schema.getter().do();
+      // get the list of collections
+      const collections = await weaviateClient.collections.listAll();
       
       // Cache the result
       const schemaData: WeaviateSchema = {
-        classes: (schema.classes || []).map((cls: any) => ({
-          class: cls.class || '',
-          description: cls.description,
-          properties: (cls.properties || []).map((prop: any) => ({
+        classes: (collections || []).map((collection: CollectionConfig) => ({
+          class: collection.name || '',
+          description: collection.description,
+          properties: (collection.properties || []).map((prop: PropertyConfig) => ({
             name: prop.name || '',
             dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType || 'string'],
             description: prop.description
@@ -157,7 +158,7 @@ export class SchemaProvider {
           throw new Error('No active Weaviate connection found');
         }
         
-        connectionUrl = connection.url;
+        connectionUrl = connection.httpHost || connection.cloudUrl || 'localhost';
         weaviateClient = this.connectionManager.getClient(connection.id);
       } else {
         // Try to extract URL from client if possible
@@ -218,7 +219,7 @@ export class SchemaProvider {
       // Clear specific connection cache
       const connection = this.connectionManager.getConnection(connectionId);
       if (connection) {
-        this.schemaCache.delete(connection.url);
+        this.schemaCache.delete(connection.httpHost || connection.cloudUrl || 'localhost');
       }
     } else {
       // Clear all cache

@@ -2,7 +2,7 @@
   "name": "weaviate-studio",
   "displayName": "Weaviate Studio",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
   "publisher": "prasadmuley",
@@ -16,6 +16,7 @@
   },
   "keywords": [
     "weaviate",
+    "vector",
     "vector-database",
     "graphql",
     "database",
@@ -45,7 +46,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "weaviate.refreshConnections",
+        "command": "weaviate.refresh",
         "title": "Refresh Connections",
         "icon": "$(refresh)"
       },
@@ -112,6 +113,10 @@
       {
         "command": "weaviate.openNewQueryTab",
         "title": "Open New Query Tab"
+      },
+      {
+        "command": "weaviate.deleteAllCollections",
+        "title": "Delete All Collections"
       }
     ],
     "viewsContainers": {
@@ -150,7 +155,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "weaviate.refreshConnections",
+          "command": "weaviate.refresh",
           "when": "view == weaviateConnectionsView",
           "group": "navigation@2"
         }
@@ -206,6 +211,11 @@
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "inline@1",
           "icon": "$(add)"
+        },
+        {
+          "command": "weaviate.deleteAllCollections",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "3_modification@1"
         },
         {
           "command": "weaviate.deleteCollection",
@@ -272,6 +282,6 @@
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",
     "react-json-view-lite": "^2.4.1",
-    "weaviate-ts-client": "^2.2.0"
+    "weaviate-client": "^3.8.0"
   }
 }
