@@ -43,6 +43,14 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ---
 
+## Breaking Changes
+
+- Weaviate client upgrade to `weaviate-client@^3` and move to the Collections API. This requires a Weaviate server that supports the Collections API; legacy class/schema‑only servers are not supported by this version.
+- Webview CSP hardened. Scripts are now nonce‑protected; if you previously saw CSP errors, please upgrade.
+- Command rename for refresh: `weaviate.refreshConnections` → `weaviate.refresh` (update custom keybindings if any).
+
+---
+
 ## Screenshots
 
 <table>
@@ -73,6 +81,10 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Connect to multiple Weaviate instances simultaneously
 - Secure credential storage with VS Code's built-in secret storage
 - Connection health monitoring and automatic reconnection
+- Cloud and Custom endpoints with API key support for Cloud
+- Advanced options: per-operation timeouts and skip-initialization checks
+- API keys are not displayed when editing existing connections
+- Optional connect‑on‑expand prompt for disconnected connections
 
 ### Data Visualization
 - Table view: Flattened, readable tables for nested JSON
@@ -93,10 +105,11 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - View detailed schema information, data types, and relationships
 - Support for cross-references and nested object structures
 - Visual representation of your data model
+- Create collections via three paths: From scratch, Copy from existing, or Import from JSON schema
 
 ### Tree View
 - Connection-level: Server info, cluster health, modules, collections overview
-- Collection-level: Properties, vector config, indexes, statistics, sharding, replication
+- Collection-level: Properties, vectors (with count), inverted index, generative config, statistics, sharding, replication, multi‑tenancy
 
 ### Schema Analysis
 - Enhanced schema viewer with overview, properties, raw JSON, API equivalents, and creation scripts
@@ -110,6 +123,9 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Core: Basic Get, Vector Search, Semantic Search, Hybrid Search
 - Advanced: Filter, Aggregation, Relationship, Sort, Explore
 - Schema-aware, type-safe, and educational templates
+
+### Bulk Operations
+- Delete All Collections (destructive) with double confirmation
 
 </details>
 

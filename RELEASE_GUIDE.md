@@ -8,11 +8,12 @@ This guide covers the complete process for releasing the Weaviate Studio extensi
 - [ ] All tests passing (`npm test`)
 - [ ] Linting passes (`npm run lint`)
 - [ ] Extension builds successfully (`npm run compile && npm run build:webview`)
-- [ ] Manual testing completed across different VS Code versions
+- [ ] Manual testing completed across supported VS Code versions
 - [ ] All features working as expected
 
 ### ✅ Documentation & Metadata
-- [ ] README.md updated with latest features
+- [ ] README.md updated with latest features and any Breaking Changes
+- [ ] Document Create Collection options (From scratch, Copy existing, Import JSON)
 - [ ] CHANGELOG.md updated with release notes
 - [ ] package.json version bumped appropriately
 - [ ] LICENSE file present and up-to-date
@@ -63,7 +64,7 @@ npm run build:webview
 vsce package
 
 # 3. Test the packaged extension
-code --install-extension weaviate-studio-1.0.0.vsix
+code --install-extension weaviate-studio-<version>.vsix
 
 # 4. Publish to marketplace
 vsce publish
@@ -97,9 +98,9 @@ vsce publish
    ```
 
 4. **Publish to Open VSX:**
-   ```bash
-   ovsx publish weaviate-studio-1.0.0.vsix -p YOUR_ACCESS_TOKEN
-   ```
+  ```bash
+  ovsx publish weaviate-studio-<version>.vsix -p YOUR_ACCESS_TOKEN
+  ```
 
 ### 3. Windsurf Marketplace
 
@@ -130,19 +131,20 @@ Our CI/CD pipeline (`/.github/workflows/ci.yml`) handles:
 
 1. **Version Bump:**
    ```bash
-   # Update package.json version
-   npm version patch|minor|major
+   # Update package.json version (no tag yet)
+   npm version patch|minor|major --no-git-tag-version
    ```
 
 2. **Update Documentation:**
    ```bash
-   # Update CHANGELOG.md
-   # Update README.md if needed
+   # Update CHANGELOG.md (Added/Changed/Fixed/Security/Breaking)
+   # Update README.md (include Breaking Changes if any)
    ```
 
 3. **Create Release:**
    ```bash
-   git tag v1.0.0
+   # Tag must match package.json version with a leading v
+   git tag v<version>
    git push origin main --tags
    
    # Or create release via GitHub web interface
@@ -178,7 +180,7 @@ npm run build:webview
 vsce package
 
 # Test locally
-code --install-extension weaviate-studio-1.0.0.vsix
+code --install-extension weaviate-studio-<version>.vsix
 ```
 
 ## 📊 Post-Release Monitoring
@@ -242,6 +244,9 @@ code --install-extension weaviate-studio-1.0.0.vsix
 
 ### Security
 - Security-related changes
+
+### Breaking
+- Changes that require user action or newer editor versions
 ```
 
 ## ⚡ Quick Release Checklist (CI/CD Pipeline)
@@ -268,6 +273,8 @@ when a Git tag that starts with `v` is pushed.
    * Something new.
    ### Fixed
    * Something fixed.
+   ### Breaking
+   * Describe any breaking change and required user action
    ```
 
 3. **Commit and push to `main`**  
@@ -300,7 +307,7 @@ when a Git tag that starts with `v` is pushed.
      job succeeds.  
    * Optionally test the artifact locally:
      ```bash
-     code --install-extension weaviate-studio-1.0.1.vsix --force
+     code --install-extension weaviate-studio-<version>.vsix --force
      ```
 
 That's it—no manual `vsce publish` needed.  Just remember: **version bump → changelog → commit → tag**.

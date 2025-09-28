@@ -4,6 +4,33 @@ All notable changes to the "weaviate-studio" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.1.0] — 2025-09-28
+### Added
+- New connection model supporting both Cloud and Custom endpoints with advanced options (timeouts, skip init checks).
+- Tree view enhancements: vector count, generative configuration, replication, multi‑tenancy, and more detailed property nodes.
+- Command: `weaviate.deleteAllCollections` (with double confirmation) to remove all collections from a connected instance.
+- Create Collection options: From scratch, Copy from existing collection, and Import from JSON file.
+
+### Changed
+- Migrated from `weaviate-ts-client@^2` to `weaviate-client@^3.8.0` and updated internal APIs to use the Collections API.
+- Query Editor: schema loading now uses Collections API and falls back to direct HTTP when GraphQL client helpers are unavailable.
+- Auto‑connect behavior: no longer auto‑connect on selection; prompts to connect when expanding a disconnected connection.
+- Command ID rename: `weaviate.refreshConnections` → `weaviate.refresh`.
+- Docs: Testing and Release guides generalized VSIX filenames and added compatibility/CSP checks.
+
+### Fixed
+- More robust connection persistence, validation, and name‑conflict handling.
+- Improved error messages and fallback paths for GraphQL execution.
+
+### Security
+- Connection form no longer pre-fills API keys when editing, avoiding accidental exposure in the UI.
+- Cloud connections now require an API key and enforce re-entry when the target cloud URL changes.
+- GraphQL fallback uses Authorization: Bearer headers when an API key is present.
+
+### Breaking
+- Requires a Weaviate server that supports the Collections API. Older servers exposing only legacy class/schema endpoints are not supported by this version of the extension.
+- Power users with custom keybindings targeting `weaviate.refreshConnections` should update them to `weaviate.refresh`.
+
 ## [1.0.2] — 2025-01-27
 ### Added
 * Support for Windsurf and Cursor marketplace publishing
