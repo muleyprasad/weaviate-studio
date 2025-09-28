@@ -28,6 +28,7 @@ export interface WeaviateConnection {
     timeoutInit?: number;
     timeoutQuery?: number;
     timeoutInsert?: number;
+    skipInitChecks?: boolean;
 
     connectionVersion?: string; // future use
 
@@ -37,6 +38,7 @@ export interface WeaviateConnection {
 
 export class ConnectionManager {
     private static instance: ConnectionManager;
+    private static readonly currentVersion = '2'; // Current connection configuration version
     private readonly storageKey = 'weaviate-connections';
     private _onConnectionsChanged = new vscode.EventEmitter<void>();
     public readonly onConnectionsChanged = this._onConnectionsChanged.event;
@@ -67,21 +69,22 @@ export class ConnectionManager {
         // if it doesn't have connectionVersion, need to migrate
         const migratedConnections = validConnections.map((conn) => {
           try {
-              if (conn.connectionVersion === '2') {
+              if (conn.connectionVersion === ConnectionManager.currentVersion) {
                 // future migrations here
                 return conn;
               } else if (!conn.connectionVersion) {
                 // may be new connection without version
                 if (conn.httpHost || conn.cloudUrl) {
                   need_to_save = true;
-                  return { ...conn, connectionVersion: '2' };
+                  return { ...conn, connectionVersion: ConnectionManager.currentVersion };
                 }
                 // old connection, need to migrate
                 if (conn.url && (conn.url.includes('weaviate.cloud') || conn.url.includes('weaviate.io'))) {
                     conn.type = 'cloud';
                     conn.cloudUrl = conn.url;
                     delete conn.url;
-                    conn.connectionVersion = '2';
+                    conn.connectionVersion = ConnectionManager.currentVersion;
+
                     need_to_save = true;
                 } else {
                   // custom connection
@@ -99,7 +102,8 @@ export class ConnectionManager {
                     conn.grpcHost = url.hostname;
                     conn.grpcPort = 50051; // default grpc port
                     conn.grpcSecure = url.protocol === 'https:'; // default to false
-                    conn.connectionVersion = '2';
+                    conn.connectionVersion = ConnectionManager.currentVersion;
+
                     need_to_save = true;
                 }
               }
@@ -213,7 +217,8 @@ export class ConnectionManager {
                     ...connection,
                     id: uniqueId,
                     status: 'disconnected',
-                    lastUsed: timestamp
+                    lastUsed: timestamp,
+                    connectionVersion: ConnectionManager.currentVersion
                 };
                 
                 this.connections.push(newConnection);
@@ -292,6 +297,8 @@ export class ConnectionManager {
             if (connection.type === 'cloud' && connection.cloudUrl) {
                 client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
                     authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
+                    skipInitChecks: connection.skipInitChecks,
+
                     timeout: {
                         init: connection.timeoutInit,
                         query: connection.timeoutQuery,
@@ -307,8 +314,9 @@ export class ConnectionManager {
                     grpcPort: connection.grpcPort,
                     httpSecure: connection.httpSecure,
                     grpcSecure: connection.grpcSecure,
-                    apiKey: connection.apiKey,
+                    authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
                     type: connection.type,
+                    skipInitChecks: connection.skipInitChecks,
                     timeout: {
                         init: connection.timeoutInit,
                         query: connection.timeoutQuery,
@@ -463,6 +471,7 @@ export class ConnectionManager {
                                         timeoutInit: message.connection.timeoutInit || undefined,
                                         timeoutQuery: message.connection.timeoutQuery || undefined,
                                         timeoutInsert: message.connection.timeoutInsert || undefined,
+                                        skipInitChecks: message.connection.skipInitChecks,
                                     });
                                 }
                                 
@@ -636,7 +645,7 @@ export class ConnectionManager {
 
   <!-- Advanced settings -->
   <div class="advanced">
-    <small>Connection version: ${connection ? connection.connectionVersion || 2 : 2}</small>
+    <small>Connection version: ${connection ? connection.connectionVersion || ConnectionManager.currentVersion : ConnectionManager.currentVersion}</small>
     <span class="advanced-toggle" id="toggleAdvanced">Show Advanced Settings ▾</span>
     
     <div class="advanced-settings" id="advancedSettings">
@@ -651,6 +660,9 @@ export class ConnectionManager {
       <div class="form-group">
         <label for="timeoutInsert">Timeout (Insert, seconds)</label>
         <input type="number" id="timeoutInsert" value="${connection?.timeoutInsert || 120}">
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="skipInitChecks" ${connection?.skipInitChecks ? 'checked' : ''}> Skip Initial Checks</label>
       </div>
     </div>
   </div>
@@ -698,6 +710,7 @@ export class ConnectionManager {
     const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
     const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
     const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
+    const skipInitChecks = document.getElementById('skipInitChecks').checked;
 
     // Clear errors
     document.querySelectorAll('.error').forEach(el => {
@@ -710,7 +723,7 @@ export class ConnectionManager {
       return;
     }
 
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert };
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
 
     if (currentType === "custom") {
       const httpHost = document.getElementById('httpHost').value.trim();
@@ -725,7 +738,7 @@ export class ConnectionManager {
         return;
       }
 
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey: apiKeyCustom };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey: apiKeyCustom, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
     } else {
       const cloudUrl = document.getElementById('cloudUrl').value.trim();
       if (!cloudUrl) {
@@ -736,7 +749,7 @@ export class ConnectionManager {
         showError('apiKeyError', 'API Key is required for cloud connection');
         return;
       }
-      connection = { name, type: "cloud", cloudUrl, apiKey: apiKeyCloud };
+      connection = { name, type: "cloud", cloudUrl, apiKey: apiKeyCloud, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
     }
 
     vscode.postMessage({ command: 'save', connection });

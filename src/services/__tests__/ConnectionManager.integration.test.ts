@@ -495,7 +495,7 @@ describe('ConnectionManager Integration Tests', () => {
       expect(conn.timeoutInit).toBeUndefined();
       expect(conn.timeoutQuery).toBeUndefined();
       expect(conn.timeoutInsert).toBeUndefined();
-      expect(conn.connectionVersion).toBeUndefined();
+      expect(conn.connectionVersion).toBe(ConnectionManager['currentVersion']);
     });
 
     test('handles connection with extreme timeout values', async () => {

@@ -174,7 +174,7 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         grpcPort: 50052,
         httpSecure: true,
         grpcSecure: true,
-        apiKey: 'mock-key',
+        authCredentials: { key: 'mock-key' },
         type: 'custom',
         timeout: {
           init: 25,

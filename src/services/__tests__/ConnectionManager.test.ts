@@ -258,7 +258,7 @@ describe('ConnectionManager', () => {
         grpcPort: 50051,
         httpSecure: false,
         grpcSecure: false,
-        apiKey: 'test-key',
+        authCredentials: { key: 'test-key' },
         type: 'custom',
         timeout: {
           init: 30,
@@ -280,7 +280,7 @@ describe('ConnectionManager', () => {
       const conn = await mgr.addConnection({
         name: 'Cloud Test',
         type: 'cloud',
-        cloudUrl: 'https://test.weaviate.network',
+        cloudUrl: 'https://test.weaviate.cloud',
         apiKey: 'cloud-key',
         timeoutInit: 45,
         timeoutQuery: 90,
@@ -289,7 +289,7 @@ describe('ConnectionManager', () => {
 
       await mgr.connect(conn.id);
 
-      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith('https://test.weaviate.network', {
+      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith('https://test.weaviate.cloud', {
         authCredentials: mockApiKey,
         timeout: {
           init: 45,
