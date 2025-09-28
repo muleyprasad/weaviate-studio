@@ -66,7 +66,6 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 4. **Explore your schema, run queries, and manage your data—all within VS Code!**
 
 ---
-
 <details>
 <summary><strong>Full Feature List</strong></summary>
 
