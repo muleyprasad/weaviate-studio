@@ -438,10 +438,14 @@ export class ConnectionManager {
                                     }
                                 }
                                 if (type === 'cloud') {
-                                    if (!name || !message.connection.cloudUrl || !apiKey) {
+                                    const cloudUrlChanged = !!(connection && connection.cloudUrl && message.connection.cloudUrl && connection.cloudUrl !== message.connection.cloudUrl);
+                                    const needsApiKey = !isEditMode || !connection || connection.type !== 'cloud' || !connection.apiKey || cloudUrlChanged;
+                                    if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
                                         panel.webview.postMessage({
                                             command: 'error',
-                                            message: 'Name, cloudUrl and apiKey are required'
+                                            message: needsApiKey
+                                                ? 'Name, cloudUrl and apiKey are required'
+                                                : 'Name and cloudUrl are required'
                                         });
                                         return;
                                     }
@@ -621,7 +625,8 @@ export class ConnectionManager {
     </div>
     <div id="customApiKeyContainer" class="form-group">
       <label for="apiKeyCustom">API Key (optional)</label>
-      <input type="password" id="apiKeyCustom" placeholder="Leave empty if not required" value="${connection?.apiKey || ''}">
+      <input type="password" id="apiKeyCustom" placeholder="${connection ? 'Leave blank to keep existing key' : 'Leave empty if not required'}" value="">
+      ${connection ? '<small>If you leave this blank, the current API key will remain unchanged.</small>' : ''}
     </div>
   </div>
 
@@ -634,7 +639,8 @@ export class ConnectionManager {
     </div>
     <div class="form-group">
       <label for="apiKeyCloud">API Key</label>
-      <input type="password" id="apiKeyCloud" placeholder="Required for cloud" value="${connection?.apiKey || ''}">
+      <input type="password" id="apiKeyCloud" placeholder="${connection ? 'Leave blank to keep existing key' : 'Required for cloud'}" value="">
+      ${connection ? '<small>If left blank, the existing API key will be preserved.</small>' : ''}
       <div id="apiKeyError" class="error"></div>
     </div>
   </div>
@@ -668,6 +674,12 @@ export class ConnectionManager {
 
   <script>
   const vscode = acquireVsCodeApi();
+
+  // Track edit state without exposing secrets
+  const isEditMode = ${connection ? 'true' : 'false'};
+  const existingType = '${connection?.type || ''}';
+  const existingApiKeyPresent = ${connection?.apiKey ? 'true' : 'false'};
+  const existingCloudUrl = '${connection?.cloudUrl || ''}'.trim();
 
   // Get dropdown element
   const connectionTypeDropdown = document.getElementById('connectionType');
@@ -730,18 +742,26 @@ export class ConnectionManager {
         return;
       }
 
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, apiKey: apiKeyCustom };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure };
+      if (apiKeyCustom) {
+        connection.apiKey = apiKeyCustom;
+      }
     } else {
       const cloudUrl = document.getElementById('cloudUrl').value.trim();
       if (!cloudUrl) {
         showError('cloudUrlError', 'Cloud URL is required');
         return;
       }
-      if (!apiKeyCloud) {
+      const cloudUrlChanged = isEditMode && existingCloudUrl && cloudUrl && existingCloudUrl !== cloudUrl;
+      const requiresApiKey = !isEditMode || currentType !== existingType || !existingApiKeyPresent || cloudUrlChanged;
+      if (requiresApiKey && !apiKeyCloud) {
         showError('apiKeyError', 'API Key is required for cloud connection');
         return;
       }
-      connection = { name, type: "cloud", cloudUrl, apiKey: apiKeyCloud };
+      connection = { name, type: "cloud", cloudUrl };
+      if (apiKeyCloud) {
+        connection.apiKey = apiKeyCloud;
+      }
     }
 
     vscode.postMessage({ command: 'save', connection });

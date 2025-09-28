@@ -341,7 +341,8 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.html).toContain('existing-host');
       expect(mockPanel.webview.html).toContain('9090');
       expect(mockPanel.webview.html).toContain('50052');
-      expect(mockPanel.webview.html).toContain('existing-key');
+      expect(mockPanel.webview.html).not.toContain('existing-key');
+      expect(mockPanel.webview.html).toContain('Leave blank to keep existing key');
       expect(mockPanel.webview.html).toContain('Update Connection');
 
       // Clean up
@@ -349,7 +350,7 @@ describe('ConnectionManager Webview Tests', () => {
       await dialogPromise;
     });
 
-    test('updates existing connection on save command', async () => {
+    test('updates existing connection on save command and allows API key change', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
       const connection = await mgr.addConnection({
@@ -388,6 +389,36 @@ describe('ConnectionManager Webview Tests', () => {
       expect(result?.httpHost).toBe('updated-host');
       expect(result?.httpPort).toBe(9090);
       expect(result?.httpSecure).toBe(true);
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+
+    test('retains existing API key when left blank during edit', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const connection = await mgr.addConnection({
+        name: 'Keep Key',
+        type: 'cloud',
+        cloudUrl: 'https://keep.weaviate.network',
+        apiKey: 'secret-key'
+      });
+
+      const dialogPromise = mgr.showEditConnectionDialog(connection.id);
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate save without providing apiKey
+      messageHandler({
+        command: 'save',
+        connection: {
+          name: 'Keep Key',
+          type: 'cloud',
+          cloudUrl: 'https://keep.weaviate.network'
+        }
+      });
+
+      const result = await dialogPromise;
+
+      expect(result?.apiKey).toBe('secret-key');
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
