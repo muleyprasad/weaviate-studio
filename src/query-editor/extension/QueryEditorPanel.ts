@@ -2,7 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { URL } from 'url';
 import { ConnectionManager } from '../../services/ConnectionManager';
-import { WeaviateClient } from 'weaviate-client';
+import { WeaviateClient, CollectionConfig, PropertyConfig } from 'weaviate-client';
+import type { WeaviateConnection } from '../../services/ConnectionManager';
+import * as http from 'http';
+import * as https from 'https';
 
 // Helper function to generate a nonce
 function getNonce() {
@@ -51,6 +54,124 @@ export class QueryEditorPanel {
     // Use definite assignment assertion to fix TypeScript error
     private _context!: vscode.ExtensionContext;
     private _connectionManager: any;
+
+    // Minimal schema types for webview compatibility
+    private async _fetchSchema(): Promise<{ classes: Array<{
+        class: string;
+        description?: string;
+        properties: Array<{
+            name: string;
+            dataType: string[];
+            description?: string;
+        }>;
+    }>; }> {
+        if (!this._weaviateClient) {
+            throw new Error('Not connected to Weaviate');
+        }
+
+        // Use Weaviate v3 collections API and adapt to legacy schema shape expected by webview
+        const collections: CollectionConfig[] = await this._weaviateClient.collections.listAll();
+        return {
+            classes: (collections || []).map((collection: CollectionConfig) => ({
+                class: collection.name || '',
+                description: (collection as any).description,
+                properties: (collection.properties || []).map((prop: PropertyConfig) => ({
+                    name: prop.name || '',
+                    dataType: Array.isArray((prop as any).dataType)
+                        ? (prop as any).dataType as string[]
+                        : [((prop as any).dataType as any) || 'string'],
+                    description: (prop as any).description,
+                }))
+            }))
+        };
+    }
+
+    private _getActiveConnection(): WeaviateConnection | null {
+        const connectionId = this._options.connectionId;
+        if (!connectionId) {
+            // Try to infer from active connections
+            const connections = this._connectionManager?.getConnections?.() || [];
+            const active = connections.find((c: any) => c.status === 'connected');
+            return active || null;
+        }
+        const conn = this._connectionManager?.getConnection?.(connectionId);
+        return conn || null;
+    }
+
+    private _buildGraphQLEndpoint(): string {
+        const conn = this._getActiveConnection();
+        if (!conn) {
+            throw new Error('No active connection for GraphQL request');
+        }
+
+        if (conn.type === 'cloud' && conn.cloudUrl) {
+            const base = conn.cloudUrl.replace(/\/$/, '');
+            return `${base}/v1/graphql`;
+        }
+
+        const protocol = conn.httpSecure ? 'https' : 'http';
+        const host = conn.httpHost || 'localhost';
+        const port = conn.httpPort || (conn.httpSecure ? 443 : 8080);
+        return `${protocol}://${host}:${port}/v1/graphql`;
+    }
+
+    private async _performGraphQLHttp(query: string): Promise<any> {
+        const urlStr = this._buildGraphQLEndpoint();
+        const conn = this._getActiveConnection();
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        };
+        if (conn?.apiKey) {
+            headers['Authorization'] = `Bearer ${conn.apiKey}`;
+        }
+
+        const url = new URL(urlStr);
+        const isHttps = url.protocol === 'https:';
+
+        const options: https.RequestOptions | http.RequestOptions = {
+            method: 'POST',
+            protocol: url.protocol,
+            hostname: url.hostname,
+            port: url.port || (isHttps ? 443 : 80),
+            path: url.pathname + url.search,
+            headers,
+        };
+
+        const body = JSON.stringify({ query });
+
+        const responseBody: string = await new Promise((resolve, reject) => {
+            const req = (isHttps ? https : http).request(options, (res) => {
+                const chunks: Buffer[] = [];
+                res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                res.on('end', () => {
+                    const text = Buffer.concat(chunks).toString('utf-8');
+                    if ((res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300) {
+                        resolve(text);
+                    } else {
+                        reject(new Error(`HTTP ${res.statusCode} ${res.statusMessage}${text ? ` - ${text}` : ''}`));
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.write(body);
+            req.end();
+        });
+
+        let json: any;
+        try {
+            json = JSON.parse(responseBody);
+        } catch {
+            throw new Error('Invalid JSON response from GraphQL endpoint');
+        }
+
+        if (json.errors && Array.isArray(json.errors) && json.errors.length > 0) {
+            const msg = json.errors.map((e: any) => e.message).filter(Boolean).join('; ');
+            throw new Error(msg || 'GraphQL returned errors');
+        }
+        return json.data ?? json;
+    }
     
     /**
      * Opens a new query editor instance for the specified collection
@@ -165,10 +286,7 @@ export class QueryEditorPanel {
                     
                 case 'getSchema':
                     try {
-                        if (!this._weaviateClient) {
-                            throw new Error('Not connected to Weaviate');
-                        }
-                        const schema = await this._weaviateClient.schema.getter().do();
+                        const schema = await this._fetchSchema();
                         this._panel.webview.postMessage({
                             type: 'schemaResult',
                             schema,
@@ -257,14 +375,41 @@ export class QueryEditorPanel {
     
     private async _performGraphQLQuery(query: string): Promise<any> {
         const client = this._weaviateClient as any;
-        
+
+        // Try client-provided GraphQL interfaces first (for older clients)
+        if (client?.graphql) {
+            try {
+                let result: any;
+                if (typeof client.graphql.raw === 'function') {
+                    if (client.graphql.raw.length >= 1) {
+                        // Signature raw({ query })
+                        result = await client.graphql.raw({ query });
+                    } else {
+                        // Signature raw().withQuery(query).do()
+                        result = await client.graphql.raw().withQuery(query).do();
+                    }
+                } else if (typeof client.graphql.query === 'function') {
+                    result = await client.graphql.query(query);
+                }
+
+                if (result !== undefined) {
+                    if (this._isEmptyResult(result)) {
+                        throw new Error('Query returned empty or invalid result');
+                    }
+                    return result;
+                }
+            } catch (e: any) {
+                // Fall back to HTTP if client method fails
+                console.warn('Client GraphQL interface failed, falling back to HTTP:', e?.message || e);
+            }
+        }
+
+        // Fallback to direct HTTP
         try {
-            const result = await client.graphql.raw().withQuery(query).do();
-            
+            const result = await this._performGraphQLHttp(query);
             if (this._isEmptyResult(result)) {
                 throw new Error('Query returned empty or invalid result');
             }
-            
             return result;
         } catch (apiError: any) {
             throw new Error(`GraphQL query failed: ${apiError.message || 'Unknown API error'}`);
@@ -326,7 +471,7 @@ export class QueryEditorPanel {
             if (!this._weaviateClient) {
                 throw new Error('Not connected to Weaviate');
             }
-            const schema = await this._weaviateClient.schema.getter().do();
+            const schema = await this._fetchSchema();
             
             // Get any saved state for this panel
             const savedState = this._getSavedWebviewState();
@@ -409,7 +554,7 @@ export class QueryEditorPanel {
         
         try {
             // Fetch the schema to get actual properties for this collection
-            const schema = await this._weaviateClient.schema.getter().do();
+            const schema = await this._fetchSchema();
             
             // Use the enhanced generateSampleQuery function that properly handles reference types
             const { generateSampleQuery } = require('../webview/graphqlTemplates');
@@ -458,30 +603,27 @@ export class QueryEditorPanel {
             const client = this._weaviateClient as any; // Use any for API version compatibility
             
             try {
-                // First try the standard approach if available
-                if (client.graphql && client.graphql.get) {
-                    // Use a standard GraphQL query with _additional.explain
-                    const className = this._options.collectionName || 'Things';
-                    const explainQuery = `{
-                        Get {
-                            ${className}(limit: 1) {
-                                _additional { explain }
-                            }
+                // Try via client.graphql if available, otherwise fall back to HTTP
+                const className = this._options.collectionName || 'Things';
+                const explainQuery = `{
+                    Get {
+                        ${className}(limit: 1) {
+                            _additional { explain }
                         }
-                    }`;
-                    
-                    if (typeof client.graphql.raw === 'function') {
+                    }
+                }`;
+
+                if (client.graphql && typeof client.graphql.raw === 'function') {
+                    if (client.graphql.raw.length >= 1) {
                         explainResult = await client.graphql.raw({ query: explainQuery });
                     } else {
-                        explainResult = { 
-                            message: 'Explain query not supported by this version of Weaviate client',
-                            clientInfo: {
-                                hasGraphQL: !!client.graphql,
-                                hasRaw: client.graphql ? !!client.graphql.raw : false,
-                                methods: Object.keys(client.graphql || {}).join(', ')
-                            }
-                        };
+                        explainResult = await client.graphql.raw().withQuery(explainQuery).do();
                     }
+                } else if (client.graphql && typeof client.graphql.query === 'function') {
+                    explainResult = await client.graphql.query(explainQuery);
+                } else {
+                    // Direct HTTP fallback
+                    explainResult = await this._performGraphQLHttp(explainQuery);
                 }
             } catch (explainError) {
                 explainResult = { 
@@ -529,7 +671,7 @@ export class QueryEditorPanel {
                 const url = new URL(weaviateUrl);
             }
             
-            const schema = await this._weaviateClient.schema.getter().do();
+            const schema = await this._fetchSchema();
             
             return {
                 classes: schema.classes || [],
