@@ -64,6 +64,9 @@ describe('Add Collection', () => {
     
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
     
+    // Mock fetchCollections to prevent real network calls
+    jest.spyOn(provider, 'fetchCollections').mockResolvedValue();
+    
     // Mock connected connection
     mockConnectionManager.getConnection.mockReturnValue({
       id: 'conn1',
