@@ -119,6 +119,21 @@
         "title": "Delete All Collections"
       }
     ],
+    "languages": [
+      {
+        "id": "weaviate",
+        "aliases": ["Weaviate Connection", "weaviate"],
+        "extensions": [".weaviate"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "weaviate",
+        "scopeName": "source.weaviate",
+        "path": "./syntaxes/weaviate.tmLanguage.json"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

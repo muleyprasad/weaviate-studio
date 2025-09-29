@@ -1,0 +1,7 @@
+{
+  "name": "Weaviate Cloud",
+  "type": "cloud",
+  "cloudUrl": "https://my-cluster.weaviate.network",
+  "apiKey": "your-api-key-here",
+  "connectionVersion": "2"
+}

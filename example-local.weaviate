@@ -1,0 +1,11 @@
+{
+  "name": "Local Weaviate Instance",
+  "type": "custom",
+  "httpHost": "localhost",
+  "httpPort": 8080,
+  "httpSecure": false,
+  "grpcHost": "localhost",
+  "grpcPort": 50051,
+  "grpcSecure": false,
+  "connectionVersion": "2"
+}
