@@ -114,15 +114,35 @@ export function activate(context: vscode.ExtensionContext) {
         if (e.selection && e.selection.length > 0) {
             const item = e.selection[0];
             
-            // Handle connection selection – auto connect if not connected
+            // Note: Auto-connect logic removed - now handled on expansion via dialog
+            // Handle connection selection – no longer auto connect on selection
             if (item.itemType === 'connection' && item.connectionId) {
-                // Get connection status
+                // Get connection status for future use if needed
                 const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
                 
-                // If disconnected, connect to it automatically
-                if (connection && connection.status !== 'connected') {
-                    console.log(`Auto-connecting to ${connection.name} (${item.connectionId})`);
-                    await weaviateTreeDataProvider.connect(item.connectionId, true); // silent=true to avoid notification on success
+                // Removed auto-connection logic - user will be prompted on expansion instead
+            }
+        }
+    });
+
+    // Handle expansion of tree items
+    treeView.onDidExpandElement(async e => {
+        const item = e.element;
+        
+        // Handle connection expansion - show dialog if disconnected
+        if (item.itemType === 'connection' && item.connectionId) {
+            const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+            
+            // If disconnected, show dialog asking to connect
+            if (connection && connection.status !== 'connected') {
+                const result = await vscode.window.showInformationMessage(
+                    `The connection "${connection.name}" is disconnected. Would you like to connect now?`,
+                    { modal: true },
+                    'Connect',
+                );
+                
+                if (result === 'Connect') {
+                    await weaviateTreeDataProvider.connect(item.connectionId);
                 }
             }
         }

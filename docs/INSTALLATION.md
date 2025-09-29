@@ -25,7 +25,7 @@
 ### Download VSIX File
 1. Go to [GitHub Releases](https://github.com/muleyprasad/weaviate-studio/releases)
 2. Download the latest `.vsix` file
-3. Install using command: `code --install-extension weaviate-studio-1.0.0.vsix`
+3. Install using command: `code --install-extension weaviate-studio-<version>.vsix`
 
 ### Command Line Installation
 ```bash
@@ -56,9 +56,9 @@ cursor --install-extension prasadmuley.weaviate-studio
 
 ## System Requirements
 
-- **VS Code**: Version 1.85.0 or higher
-- **Node.js**: Version 18.x or higher (for development)
-- **Weaviate**: Version 1.0.0 or higher
+- **VS Code**: Version matching `package.json` → `engines.vscode` (currently ^1.80.0)
+- **Node.js**: 18.x or higher (for development only)
+- **Weaviate**: A server version that supports the Collections API (required by `weaviate-client@^3`). Legacy class/schema‑only servers are not supported by this extension version.
 
 ## Troubleshooting
 

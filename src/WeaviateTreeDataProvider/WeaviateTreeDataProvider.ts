@@ -328,7 +328,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     this.getStatusIcon(conn.status),
                     contextValue
                 );
-                item.tooltip = `${conn.name} (${conn.httpHost})\nStatus: ${conn.status}`;
+                // Tooltip should reflect the connection type
+                const hostInfo = conn.type === 'cloud'
+                    ? (conn.cloudUrl || 'cloud')
+                    : `${conn.httpHost || ''}${conn.httpPort ? `:${conn.httpPort}` : ''}`;
+                item.tooltip = `${conn.name} (${hostInfo})\nStatus: ${conn.status}`;
                 
                 // Only expand connected clusters
                 if (conn.status === 'connected') {
