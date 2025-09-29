@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass, WeaviateMetadata } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
+import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -1376,6 +1377,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 // Only fetch collections if we're not in a refresh loop
                 if (!this.isRefreshing) {
                     await this.fetchCollections(connectionId);
+                }
+                
+                // Automatically open the query editor after successful connection (but not during silent connections)
+                if (!silent) {
+                    // Open the query editor without a specific collection (general extension page)
+                    QueryEditorPanel.createOrShow(this.context, { connectionId });
                 }
                 
                 return true;
