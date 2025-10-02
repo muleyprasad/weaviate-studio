@@ -117,6 +117,23 @@
       {
         "command": "weaviate.deleteAllCollections",
         "title": "Delete All Collections"
+      },
+      {
+        "command": "weaviate.addConnectionLink",
+        "title": "Add Link",
+        "icon": "$(link)"
+      },
+      {
+        "command": "weaviate.editConnectionLink",
+        "title": "Edit Link"
+      },
+      {
+        "command": "weaviate.deleteConnectionLink",
+        "title": "Delete Link"
+      },
+      {
+        "command": "weaviate-studio.openLink",
+        "title": "Open Link"
       }
     ],
     "languages": [
@@ -236,6 +253,21 @@
           "command": "weaviate.deleteCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "3_modification"
+        },
+        {
+          "command": "weaviate.addConnectionLink",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionLinks",
+          "group": "1_link_actions@1"
+        },
+        {
+          "command": "weaviate.editConnectionLink",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionLink",
+          "group": "1_link_actions@1"
+        },
+        {
+          "command": "weaviate.deleteConnectionLink",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionLink",
+          "group": "1_link_actions@2"
         }
       ]
     }

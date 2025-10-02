@@ -199,6 +199,163 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
+        // Open link command
+        vscode.commands.registerCommand('weaviate-studio.openLink', (url: string) => {
+            vscode.env.openExternal(vscode.Uri.parse(url));
+        }),
+
+        // Add connection link command
+        vscode.commands.registerCommand('weaviate.addConnectionLink', async (item: { connectionId: string }) => {
+            if (!item?.connectionId) {
+                return;
+            }
+
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter a name for the link',
+                placeHolder: 'e.g., Documentation, Dashboard, etc.',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return 'Link name is required';
+                    }
+                    return null;
+                }
+            });
+
+            if (!name) {
+                return;
+            }
+
+            const url = await vscode.window.showInputBox({
+                prompt: 'Enter the URL',
+                placeHolder: 'https://example.com',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return 'URL is required';
+                    }
+                    try {
+                        new URL(value);
+                        return null;
+                    } catch {
+                        return 'Please enter a valid URL';
+                    }
+                }
+            });
+
+            if (!url) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                await connectionManager.addConnectionLink(item.connectionId, { name: name.trim(), url: url.trim() });
+                vscode.window.showInformationMessage(`Link "${name}" added successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to add link: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Edit connection link command
+        vscode.commands.registerCommand('weaviate.editConnectionLink', async (item: { connectionId: string; itemId: string }) => {
+            if (!item?.connectionId || !item?.itemId) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const links = connectionManager.getConnectionLinks(item.connectionId);
+                const linkIndex = parseInt(item.itemId);
+                
+                if (linkIndex < 0 || linkIndex >= links.length) {
+                    vscode.window.showErrorMessage('Link not found');
+                    return;
+                }
+
+                const currentLink = links[linkIndex];
+
+                const name = await vscode.window.showInputBox({
+                    prompt: 'Enter a name for the link',
+                    placeHolder: 'e.g., Documentation, Dashboard, etc.',
+                    value: currentLink.name,
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'Link name is required';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!name) {
+                    return;
+                }
+
+                const url = await vscode.window.showInputBox({
+                    prompt: 'Enter the URL',
+                    placeHolder: 'https://example.com',
+                    value: currentLink.url,
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'URL is required';
+                        }
+                        try {
+                            new URL(value);
+                            return null;
+                        } catch {
+                            return 'Please enter a valid URL';
+                        }
+                    }
+                });
+
+                if (!url) {
+                    return;
+                }
+
+                await connectionManager.updateConnectionLink(item.connectionId, linkIndex, { name: name.trim(), url: url.trim() });
+                vscode.window.showInformationMessage(`Link "${name}" updated successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to edit link: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Delete connection link command
+        vscode.commands.registerCommand('weaviate.deleteConnectionLink', async (item: { connectionId: string; itemId: string }) => {
+            if (!item?.connectionId || !item?.itemId) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const links = connectionManager.getConnectionLinks(item.connectionId);
+                const linkIndex = parseInt(item.itemId);
+                
+                if (linkIndex < 0 || linkIndex >= links.length) {
+                    vscode.window.showErrorMessage('Link not found');
+                    return;
+                }
+
+                const currentLink = links[linkIndex];
+                const confirm = await vscode.window.showWarningMessage(
+                    `Are you sure you want to delete the link "${currentLink.name}"?`,
+                    { modal: true },
+                    'Delete'
+                );
+
+                if (confirm !== 'Delete') {
+                    return;
+                }
+
+                await connectionManager.removeConnectionLink(item.connectionId, linkIndex);
+                vscode.window.showInformationMessage(`Link "${currentLink.name}" deleted successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to delete link: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
         // Edit an existing connection
         vscode.commands.registerCommand('weaviate.editConnection', async (item: { connectionId: string }) => {
             if (!item?.connectionId) {

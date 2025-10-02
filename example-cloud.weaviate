@@ -3,5 +3,15 @@
   "type": "cloud",
   "cloudUrl": "https://my-cluster.weaviate.network",
   "apiKey": "your-api-key-here",
-  "connectionVersion": "2"
+  "connectionVersion": "2",
+  "links": [
+    {
+      "name": "Weaviate Docs",
+      "url": "https://docs.weaviate.io"
+    },
+    {
+      "name": "Weaviate Forums",
+      "url": "https://forum.weaviate.io/"
+    }
+  ]  
 }
