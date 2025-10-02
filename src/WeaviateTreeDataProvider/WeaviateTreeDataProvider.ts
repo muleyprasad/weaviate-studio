@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
 import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass, WeaviateMetadata } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
+import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -282,6 +283,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     element.iconPath = new vscode.ThemeIcon('symbol-property');
                 }
             }
+        } else if (element.itemType === 'connectionLink') {
+            // Make connection links clickable
+            if (element.description) {
+                element.tooltip = `Click to open: ${element.description}`;
+                element.command = {
+                    command: 'weaviate-studio.openLink',
+                    title: 'Open Link',
+                    arguments: [element.description]
+                };
+            }
         }
         
         return element;
@@ -376,6 +387,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 new vscode.ThemeIcon('info'),
                 'weaviateServerInfo'
             ));
+
+            // Add connection links section
+            const connectionData = this.connectionManager.getConnection(element.connectionId);
+            const links = connectionData?.links || [];
+            if (links.length > 0) {
+                items.push(new WeaviateTreeItem(
+                    `Links (${links.length})`,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'connectionLinks',
+                    element.connectionId,
+                    undefined,
+                    'connectionLinks',
+                    new vscode.ThemeIcon('link'),
+                    'weaviateConnectionLinks'
+                ));
+            }
 
             // Add cluster nodes section
             const stats = this.clusterStatisticsCache[element.connectionId];
@@ -1293,6 +1320,39 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             }
             return MultiTenancyItems;
         }
+        else if (element.itemType === 'connectionLinks' && element.connectionId) {
+            // Show individual connection links
+            const connectionData = this.connectionManager.getConnection(element.connectionId);
+            const links = connectionData?.links || [];
+            
+            const linkItems: WeaviateTreeItem[] = [];
+            
+            links.forEach((link, index) => {
+                linkItems.push(new WeaviateTreeItem(
+                    link.name,
+                    vscode.TreeItemCollapsibleState.None,
+                    'connectionLink',
+                    element.connectionId,
+                    undefined,
+                    index.toString(),
+                    new vscode.ThemeIcon('link-external'),
+                    'weaviateConnectionLink',
+                    link.url
+                ));
+            });
+            
+            if (linkItems.length === 0) {
+                return [
+                    new WeaviateTreeItem(
+                        'No links available',
+                        vscode.TreeItemCollapsibleState.None,
+                        'message'
+                    )
+                ];
+            }
+            
+            return linkItems;
+        }
          return [];
     }
 
@@ -1376,6 +1436,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 // Only fetch collections if we're not in a refresh loop
                 if (!this.isRefreshing) {
                     await this.fetchCollections(connectionId);
+                }
+                
+                // Automatically open the query editor after successful connection (but not during silent connections)
+                if (!silent) {
+                    // Open the query editor without a specific collection (general extension page)
+                    QueryEditorPanel.createOrShow(this.context, { connectionId });
                 }
                 
                 return true;

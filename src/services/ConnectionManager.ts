@@ -1,11 +1,17 @@
 import * as vscode from 'vscode';
 import weaviate, { WeaviateClient } from 'weaviate-client';
 
+export interface ConnectionLink {
+    name: string;
+    url: string;
+}
+
 export interface WeaviateConnection {
     id: string;
     name: string;
     status: 'connected' | 'disconnected';
     lastUsed?: number;
+    links?: ConnectionLink[];
 
     // Either cloud or custom (discriminated union with "type")
     type: 'custom' | 'cloud';
@@ -404,6 +410,84 @@ export class ConnectionManager {
         console.log('All connections have been cleared');
     }
 
+    /**
+     * Add a link to a connection
+     * @param connectionId - The ID of the connection
+     * @param link - The link to add
+     * @returns Promise that resolves when the link is added
+     */
+    public async addConnectionLink(connectionId: string, link: ConnectionLink): Promise<void> {
+        const connection = this.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+        
+        if (!connection.links) {
+            connection.links = [];
+        }
+        
+        connection.links.push(link);
+        await this.saveConnections();
+        this._onConnectionsChanged.fire();
+    }
+
+    /**
+     * Update a link in a connection
+     * @param connectionId - The ID of the connection
+     * @param linkIndex - The index of the link to update
+     * @param updatedLink - The updated link data
+     * @returns Promise that resolves when the link is updated
+     */
+    public async updateConnectionLink(connectionId: string, linkIndex: number, updatedLink: ConnectionLink): Promise<void> {
+        const connection = this.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+        
+        if (!connection.links || linkIndex < 0 || linkIndex >= connection.links.length) {
+            throw new Error('Link not found');
+        }
+        
+        connection.links[linkIndex] = updatedLink;
+        await this.saveConnections();
+        this._onConnectionsChanged.fire();
+    }
+
+    /**
+     * Remove a link from a connection
+     * @param connectionId - The ID of the connection
+     * @param linkIndex - The index of the link to remove
+     * @returns Promise that resolves when the link is removed
+     */
+    public async removeConnectionLink(connectionId: string, linkIndex: number): Promise<void> {
+        const connection = this.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+        
+        if (!connection.links || linkIndex < 0 || linkIndex >= connection.links.length) {
+            throw new Error('Link not found');
+        }
+        
+        connection.links.splice(linkIndex, 1);
+        await this.saveConnections();
+        this._onConnectionsChanged.fire();
+    }
+
+    /**
+     * Get all links for a connection
+     * @param connectionId - The ID of the connection
+     * @returns Array of connection links
+     */
+    public getConnectionLinks(connectionId: string): ConnectionLink[] {
+        const connection = this.getConnection(connectionId);
+        if (!connection) {
+            throw new Error('Connection not found');
+        }
+        
+        return connection.links || [];
+    }
+
     public async showAddConnectionDialog(): Promise<WeaviateConnection | null> {
         return this.showConnectionDialog();
     }
@@ -589,6 +673,35 @@ export class ConnectionManager {
       padding: 10px;
       border-radius: 4px;
     }
+    .link-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    .link-input {
+      flex: 1;
+    }
+    .link-input input {
+      width: 100%;
+      padding: 5px;
+      border: 1px solid var(--vscode-input-border);
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border-radius: 2px;
+    }
+    .remove-link-button {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+    .remove-link-button:hover {
+      background-color: var(--vscode-list-hoverBackground);
+    }
   </style>
 </head>
 <body>
@@ -657,7 +770,6 @@ export class ConnectionManager {
 
   <!-- Advanced settings -->
   <div class="advanced">
-    <small>Connection version: ${connection ? connection.connectionVersion || ConnectionManager.currentVersion : ConnectionManager.currentVersion}</small>
     <span class="advanced-toggle" id="toggleAdvanced">Show Advanced Settings ▾</span>
     
     <div class="advanced-settings" id="advancedSettings">
@@ -679,11 +791,22 @@ export class ConnectionManager {
     </div>
   </div>
 
+  <!-- Connection Links section -->
+  <div class="form-group">
+    <label>Connection Links</label>
+    <div id="linksContainer">
+      <!-- Links will be dynamically added here -->
+    </div>
+    <button type="button" id="addLinkButton" style="margin-top: 10px; padding: 5px 10px; background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 2px; cursor: pointer;">+ Add Link</button>
+  </div>
+
   <div id="formError" class="error"></div>
   <div class="button-container">
     <button class="cancel-button" id="cancelButton">Cancel</button>
     <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'} Connection</button>
   </div>
+  <small>Connection version: ${connection ? connection.connectionVersion || ConnectionManager.currentVersion : ConnectionManager.currentVersion}</small>
+
 
   <script>
   const vscode = acquireVsCodeApi();
@@ -699,6 +822,9 @@ export class ConnectionManager {
   let currentType = '${connection?.type || "custom"}';
   connectionTypeDropdown.value = currentType;
 
+  // Initialize links array
+  let links = ${connection?.links ? JSON.stringify(connection.links) : '[]'};
+
   // Function to update which fields are visible
   const updateFieldsVisibility = (type) => {
     document.getElementById('customFields').style.display = type === 'custom' ? 'block' : 'none';
@@ -707,6 +833,56 @@ export class ConnectionManager {
 
   // Set initial visibility based on connection type
   updateFieldsVisibility(currentType);
+
+  // Functions for managing links
+  function renderLinks() {
+    const container = document.getElementById('linksContainer');
+    container.innerHTML = '';
+    
+    links.forEach((link, index) => {
+      const linkDiv = document.createElement('div');
+      linkDiv.className = 'link-item';
+      linkDiv.innerHTML = \`
+        <div class="link-input">
+          <input type="text" placeholder="Link name" value="\${link.name}" data-index="\${index}" data-field="name">
+        </div>
+        <div class="link-input">
+          <input type="url" placeholder="https://example.com" value="\${link.url}" data-index="\${index}" data-field="url">
+        </div>
+        <button type="button" class="remove-link-button" data-index="\${index}">Remove</button>
+      \`;
+      container.appendChild(linkDiv);
+    });
+
+    // Add event listeners for link inputs
+    container.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = parseInt(e.target.dataset.index);
+        const field = e.target.dataset.field;
+        links[index][field] = e.target.value;
+      });
+    });
+
+    // Add event listeners for remove buttons
+    container.querySelectorAll('.remove-link-button').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = parseInt(e.target.dataset.index);
+        links.splice(index, 1);
+        renderLinks();
+      });
+    });
+  }
+
+  function addLink() {
+    links.push({ name: '', url: '' });
+    renderLinks();
+  }
+
+  // Initialize links display
+  renderLinks();
+
+  // Add link button listener
+  document.getElementById('addLinkButton').addEventListener('click', addLink);
 
   // Dropdown change listener
   connectionTypeDropdown.addEventListener('change', (e) => {
@@ -741,7 +917,10 @@ export class ConnectionManager {
       return;
     }
 
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
+    // Filter out empty links
+    const validLinks = links.filter(link => link.name.trim() && link.url.trim());
+
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
 
     if (currentType === "custom") {
       const httpHost = document.getElementById('httpHost').value.trim();
@@ -756,7 +935,7 @@ export class ConnectionManager {
         return;
       }
 
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
       if (apiKeyCustom) {
         connection.apiKey = apiKeyCustom;
       }
@@ -772,7 +951,7 @@ export class ConnectionManager {
         showError('apiKeyError', 'API Key is required for cloud connection');
         return;
       }
-      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks };
+      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
       if (apiKeyCloud) {
         connection.apiKey = apiKeyCloud;
       }

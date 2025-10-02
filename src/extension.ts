@@ -1,6 +1,99 @@
 import * as vscode from 'vscode';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTreeDataProvider';
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
+import { WeaviateConnection } from './services/ConnectionManager';
+import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
+
+/**
+ * Handles opening of .weaviate files
+ */
+async function handleWeaviateFile(document: vscode.TextDocument, weaviateTreeDataProvider: WeaviateTreeDataProvider): Promise<void> {
+    try {
+        const content = document.getText();
+        
+        // Parse and validate the .weaviate file
+        const parseResult = parseWeaviateFile(content);
+        
+        if (!parseResult.isValid) {
+            const errorMessage = parseResult.error === 'Invalid JSON format' 
+                ? 'The .weaviate file contains invalid JSON format.'
+                : 'The .weaviate file does not contain a valid Weaviate connection configuration.';
+            vscode.window.showWarningMessage(errorMessage, { modal: true });
+            return;
+        }
+
+        const connectionData = parseResult.connectionData!;
+
+        // Check if connection with same name already exists
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const existingConnections = await connectionManager.getConnections();
+        const existingConnection = existingConnections.find(c => 
+            c.name.toLowerCase() === connectionData.name.toLowerCase()
+        );
+
+        let selectedAction: string | undefined;
+
+        if (existingConnection) {
+            // Connection with same name exists - ask what to do
+            selectedAction = await vscode.window.showWarningMessage(
+                `A connection named "${connectionData.name}" already exists. What would you like to do?`,
+                { modal: true },
+                'Overwrite Existing',
+                'Add as New Connection',
+            );
+
+            if (selectedAction === 'Cancel' || !selectedAction) {
+                return;
+            }
+
+            if (selectedAction === 'Add as New Connection') {
+                // Generate unique name
+                const existingNames = existingConnections.map(c => c.name);
+                connectionData.name = generateUniqueConnectionName(connectionData.name, existingNames);
+            }
+        } else {
+            // No existing connection - show options to add
+            selectedAction = await vscode.window.showInformationMessage(
+                `Found valid Weaviate connection "${connectionData.name}". What would you like to do?`,
+                { modal: true },
+                'Add and Connect',
+                'Add Connection',
+            );
+
+            if (selectedAction === 'Cancel' || !selectedAction) {
+                return;
+            }
+        }
+
+        // Handle the selected action
+        try {
+            if (existingConnection && selectedAction === 'Overwrite Existing') {
+                // Remove the existing connection first
+                await connectionManager.deleteConnection(existingConnection.id);
+            }
+
+            // Add the new connection
+            const newConnection = await connectionManager.addConnection(connectionData);
+            
+            // Refresh the tree view
+            weaviateTreeDataProvider.refresh();
+
+            if (selectedAction === 'Add and Connect') {
+                // Auto-connect to the new connection
+                await weaviateTreeDataProvider.connect(newConnection.id);
+                vscode.window.showInformationMessage(`Connection "${newConnection.name}" added and connected successfully.`, { modal: true });
+            } else {
+                vscode.window.showInformationMessage(`Connection "${newConnection.name}" added successfully.`, { modal: true });
+            }
+
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to add connection: ${error instanceof Error ? error.message : String(error)}`, { modal: true });
+        }
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to process .weaviate file: ${error instanceof Error ? error.message : String(error)}`, { modal: true });
+    }
+}
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
@@ -62,6 +155,22 @@ export function activate(context: vscode.ExtensionContext) {
     weaviateTreeDataProvider.onDidChangeTreeData(() => {
         treeView.title = `Connections (${weaviateTreeDataProvider.getConnectionCount() || 0})`;
     });
+
+    // Handle .weaviate file opening
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(async (document) => {
+            if (document.fileName.endsWith('.weaviate')) {
+                await handleWeaviateFile(document, weaviateTreeDataProvider);
+            }
+        })
+    );
+
+    // Handle already open .weaviate files when extension activates
+    vscode.workspace.textDocuments.forEach(async (document) => {
+        if (document.fileName.endsWith('.weaviate')) {
+            await handleWeaviateFile(document, weaviateTreeDataProvider);
+        }
+    });
     
     // Register commands
     context.subscriptions.push(
@@ -87,6 +196,163 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('weaviate.disconnect', async (item: { connectionId: string }) => {
             if (item?.connectionId) {
                 await weaviateTreeDataProvider.disconnect(item.connectionId);
+            }
+        }),
+
+        // Open link command
+        vscode.commands.registerCommand('weaviate-studio.openLink', (url: string) => {
+            vscode.env.openExternal(vscode.Uri.parse(url));
+        }),
+
+        // Add connection link command
+        vscode.commands.registerCommand('weaviate.addConnectionLink', async (item: { connectionId: string }) => {
+            if (!item?.connectionId) {
+                return;
+            }
+
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter a name for the link',
+                placeHolder: 'e.g., Documentation, Dashboard, etc.',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return 'Link name is required';
+                    }
+                    return null;
+                }
+            });
+
+            if (!name) {
+                return;
+            }
+
+            const url = await vscode.window.showInputBox({
+                prompt: 'Enter the URL',
+                placeHolder: 'https://example.com',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return 'URL is required';
+                    }
+                    try {
+                        new URL(value);
+                        return null;
+                    } catch {
+                        return 'Please enter a valid URL';
+                    }
+                }
+            });
+
+            if (!url) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                await connectionManager.addConnectionLink(item.connectionId, { name: name.trim(), url: url.trim() });
+                vscode.window.showInformationMessage(`Link "${name}" added successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to add link: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Edit connection link command
+        vscode.commands.registerCommand('weaviate.editConnectionLink', async (item: { connectionId: string; itemId: string }) => {
+            if (!item?.connectionId || !item?.itemId) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const links = connectionManager.getConnectionLinks(item.connectionId);
+                const linkIndex = parseInt(item.itemId);
+                
+                if (linkIndex < 0 || linkIndex >= links.length) {
+                    vscode.window.showErrorMessage('Link not found');
+                    return;
+                }
+
+                const currentLink = links[linkIndex];
+
+                const name = await vscode.window.showInputBox({
+                    prompt: 'Enter a name for the link',
+                    placeHolder: 'e.g., Documentation, Dashboard, etc.',
+                    value: currentLink.name,
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'Link name is required';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!name) {
+                    return;
+                }
+
+                const url = await vscode.window.showInputBox({
+                    prompt: 'Enter the URL',
+                    placeHolder: 'https://example.com',
+                    value: currentLink.url,
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'URL is required';
+                        }
+                        try {
+                            new URL(value);
+                            return null;
+                        } catch {
+                            return 'Please enter a valid URL';
+                        }
+                    }
+                });
+
+                if (!url) {
+                    return;
+                }
+
+                await connectionManager.updateConnectionLink(item.connectionId, linkIndex, { name: name.trim(), url: url.trim() });
+                vscode.window.showInformationMessage(`Link "${name}" updated successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to edit link: ${error instanceof Error ? error.message : String(error)}`
+                );
+            }
+        }),
+
+        // Delete connection link command
+        vscode.commands.registerCommand('weaviate.deleteConnectionLink', async (item: { connectionId: string; itemId: string }) => {
+            if (!item?.connectionId || !item?.itemId) {
+                return;
+            }
+
+            try {
+                const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+                const links = connectionManager.getConnectionLinks(item.connectionId);
+                const linkIndex = parseInt(item.itemId);
+                
+                if (linkIndex < 0 || linkIndex >= links.length) {
+                    vscode.window.showErrorMessage('Link not found');
+                    return;
+                }
+
+                const currentLink = links[linkIndex];
+                const confirm = await vscode.window.showWarningMessage(
+                    `Are you sure you want to delete the link "${currentLink.name}"?`,
+                    { modal: true },
+                    'Delete'
+                );
+
+                if (confirm !== 'Delete') {
+                    return;
+                }
+
+                await connectionManager.removeConnectionLink(item.connectionId, linkIndex);
+                vscode.window.showInformationMessage(`Link "${currentLink.name}" deleted successfully`);
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to delete link: ${error instanceof Error ? error.message : String(error)}`
+                );
             }
         }),
 
