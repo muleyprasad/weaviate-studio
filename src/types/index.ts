@@ -116,7 +116,7 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'invertedIndex' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup' | 'clusterNodes' | 'clusterNode' | 'clusterShards' | 'weaviateClusterNodeStatistics' | 'vectorConfigDetail'| 'propertyItem' | 'collectionReplication' | 'generativeConfig',
+        public readonly itemType: 'connection' | 'collection' | 'metadata' | 'properties' | 'vectors' | 'property' | 'message' | 'object' | 'statistics' | 'invertedIndex' | 'vectorConfig' | 'sharding' | 'replication' | 'multiTenancy' | 'backup' | 'serverInfo' | 'clusterHealth' | 'modules' | 'collectionsGroup' | 'clusterNodes' | 'clusterNode' | 'clusterShards' | 'weaviateClusterNodeStatistics' | 'vectorConfigDetail'| 'propertyItem' | 'collectionReplication' | 'generativeConfig' | 'connectionLinks' | 'connectionLink',
         public readonly connectionId?: string,
         public readonly collectionName?: string,
         public readonly itemId?: string,

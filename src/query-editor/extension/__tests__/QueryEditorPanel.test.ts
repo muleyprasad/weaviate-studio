@@ -21,8 +21,26 @@ jest.mock('vscode', () => {
   vscodeMock.ViewColumn = { One: 1 };
   vscodeMock.window.activeTextEditor = undefined;
   vscodeMock.Uri = {
-    joinPath: jest.fn((uri: any, ...paths: string[]) => ({})),
-    file: jest.fn((p: string) => ({}))
+    joinPath: jest.fn((uri: any, ...paths: string[]) => ({
+      fsPath: uri.fsPath + '/' + paths.join('/'),
+      scheme: 'file',
+      authority: '',
+      path: uri.fsPath + '/' + paths.join('/'),
+      query: '',
+      fragment: '',
+      toString: () => 'file://' + uri.fsPath + '/' + paths.join('/'),
+      toJSON: () => ({ $mid: 1, fsPath: uri.fsPath + '/' + paths.join('/'), external: 'file://' + uri.fsPath + '/' + paths.join('/'), path: uri.fsPath + '/' + paths.join('/'), scheme: 'file' })
+    })),
+    file: jest.fn((p: string) => ({
+      fsPath: p,
+      scheme: 'file',
+      authority: '',
+      path: p,
+      query: '',
+      fragment: '',
+      toString: () => 'file://' + p,
+      toJSON: () => ({ $mid: 1, fsPath: p, external: 'file://' + p, path: p, scheme: 'file' })
+    }))
   };
   return vscodeMock;
 }, { virtual: true });
@@ -35,8 +53,19 @@ jest.spyOn(QueryEditorPanel.prototype as any, '_initializeWebview').mockImplemen
 
 
 describe('QueryEditorPanel.createOrShow unique key behaviour', () => {
+  const mockUri = {
+    fsPath: '/mock/path',
+    scheme: 'file',
+    authority: '',
+    path: '/mock/path',
+    query: '',
+    fragment: '',
+    toString: () => 'file:///mock/path',
+    toJSON: () => ({ $mid: 1, fsPath: '/mock/path', external: 'file:///mock/path', path: '/mock/path', scheme: 'file' })
+  };
+
   const dummyContext: any = {
-    extensionUri: { fsPath: '/' },
+    extensionUri: mockUri,
     workspaceState: { get: jest.fn(), update: jest.fn() },
     globalState: { get: jest.fn(), update: jest.fn() }
   };

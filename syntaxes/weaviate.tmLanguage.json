@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Weaviate Connection",
+  "scopeName": "source.weaviate",
+  "fileTypes": ["weaviate"],
+  "patterns": [
+    {
+      "include": "source.json"
+    }
+  ]
+}
