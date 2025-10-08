@@ -17,4 +17,4 @@ console.warn = (...args: any[]) => {
 };
 
 // Module path mapping in jest.config.js will redirect VS Code, Monaco and Weaviate imports
-// so we don't need additional setup code here, but we keep the file for future global hooks. 
+// so we don't need additional setup code here, but we keep the file for future global hooks.

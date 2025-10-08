@@ -1,24 +1,30 @@
 import { jest } from '@jest/globals';
 
 // Mock vscode API
-jest.mock('vscode', () => {
-  const vscodeMock = require('../../../test/mocks/vscode');
-  vscodeMock.ViewColumn = { One: 1 };
-  vscodeMock.window.activeTextEditor = undefined;
-  vscodeMock.Uri = { joinPath: jest.fn(() => ({})), file: jest.fn(() => ({})) };
-  return vscodeMock;
-}, { virtual: true });
+jest.mock(
+  'vscode',
+  () => {
+    const vscodeMock = require('../../../test/mocks/vscode');
+    vscodeMock.ViewColumn = { One: 1 };
+    vscodeMock.window.activeTextEditor = undefined;
+    vscodeMock.Uri = { joinPath: jest.fn(() => ({})), file: jest.fn(() => ({})) };
+    return vscodeMock;
+  },
+  { virtual: true }
+);
 
 import { QueryEditorPanel } from '../QueryEditorPanel';
 
 // Skip heavy initialization
-jest.spyOn(QueryEditorPanel.prototype as any, '_initializeWebview').mockImplementation(() => Promise.resolve());
+jest
+  .spyOn(QueryEditorPanel.prototype as any, '_initializeWebview')
+  .mockImplementation(() => Promise.resolve());
 
 describe('Sample query flow', () => {
   const dummyContext: any = {
     extensionUri: { fsPath: '/' },
     workspaceState: { get: jest.fn(), update: jest.fn() },
-    globalState: { get: jest.fn(), update: jest.fn() }
+    globalState: { get: jest.fn(), update: jest.fn() },
   };
 
   beforeEach(() => {
@@ -35,7 +41,7 @@ describe('Sample query flow', () => {
       dispose: jest.fn(),
       onDidChangeViewState: jest.fn(),
       onDidDispose: jest.fn(),
-      visible: true
+      visible: true,
     }));
 
     QueryEditorPanel.createOrShow(dummyContext, { connectionId: 'c1', collectionName: 'ColA' });
@@ -45,8 +51,8 @@ describe('Sample query flow', () => {
     panelInstance._weaviateClient = {
       schema: {
         // @ts-ignore
-        getter: () => ({ do: jest.fn().mockResolvedValue({}) })
-      }
+        getter: () => ({ do: jest.fn().mockResolvedValue({}) }),
+      },
     };
 
     await panelInstance._sendSampleQuery('ColA');
@@ -56,4 +62,4 @@ describe('Sample query flow', () => {
     expect(msg.type).toBe('sampleQuery');
     expect(msg.data.sampleQuery).toContain('ColA');
   });
-}); 
+});

@@ -24,12 +24,12 @@ describe('ConnectionManager', () => {
       update: jest.fn((key: string, value: any) => {
         globalState.storage[key] = value;
         return Promise.resolve();
-      })
+      }),
     } as unknown as MockGlobalState;
 
     mockContext = {
       globalState,
-      subscriptions: []
+      subscriptions: [],
     };
   });
 
@@ -48,7 +48,7 @@ describe('ConnectionManager', () => {
       grpcPort: 50051,
       grpcSecure: false,
       httpSecure: false,
-      type: 'custom'
+      type: 'custom',
     });
 
     expect(connection).toMatchObject({
@@ -60,7 +60,7 @@ describe('ConnectionManager', () => {
       grpcPort: 50051,
       grpcSecure: false,
       httpSecure: false,
-      status: 'disconnected'
+      status: 'disconnected',
     });
 
     // Check that ID is a string and starts with timestamp
@@ -74,13 +74,15 @@ describe('ConnectionManager', () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
     await mgr.addConnection({
-      name: 'Duplicate', httpHost: 'http://a.com', apiKey: '',
+      name: 'Duplicate',
+      httpHost: 'http://a.com',
+      apiKey: '',
       httpPort: 0,
       grpcHost: '',
       grpcPort: 0,
       grpcSecure: false,
       httpSecure: false,
-      type: 'custom'
+      type: 'custom',
     });
 
     await expect(
@@ -93,7 +95,7 @@ describe('ConnectionManager', () => {
         grpcPort: 0,
         grpcSecure: false,
         httpSecure: false,
-        type: 'custom'
+        type: 'custom',
       })
     ).rejects.toThrow(/already exists/);
   });
@@ -116,7 +118,7 @@ describe('ConnectionManager', () => {
   //   ).rejects.toThrow(/already exists/);
   // });
 
-  // in order to accomodate custom connections for newer versions, this 
+  // in order to accomodate custom connections for newer versions, this
   // dont need to be enforced
   // test('rejects invalid URL format', async () => {
   //   const mgr = ConnectionManager.getInstance(mockContext);
@@ -129,12 +131,17 @@ describe('ConnectionManager', () => {
   test('connects successfully to a connection', async () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
-    const conn = await mgr.addConnection(
-      {
-        name: 'Good', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
-        type: 'custom'
-      }
-    );
+    const conn = await mgr.addConnection({
+      name: 'Good',
+      httpHost: 'localhost',
+      apiKey: '',
+      httpPort: 8080,
+      grpcHost: 'localhost',
+      grpcPort: 50051,
+      grpcSecure: false,
+      httpSecure: false,
+      type: 'custom',
+    });
 
     const updated = await mgr.connect(conn.id);
     expect(updated?.status).toBe('connected');
@@ -145,8 +152,15 @@ describe('ConnectionManager', () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
     const conn = await mgr.addConnection({
-      name: 'Fail', httpHost: 'fail', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
-      type: 'custom'
+      name: 'Fail',
+      httpHost: 'fail',
+      apiKey: '',
+      httpPort: 8080,
+      grpcHost: 'localhost',
+      grpcPort: 50051,
+      grpcSecure: false,
+      httpSecure: false,
+      type: 'custom',
     });
 
     // Force weaviate client to throw for this test
@@ -163,8 +177,15 @@ describe('ConnectionManager', () => {
     const mgr = ConnectionManager.getInstance(mockContext);
 
     const conn = await mgr.addConnection({
-      name: 'Disc', httpHost: 'localhost', apiKey: '', httpPort: 8080, grpcHost: 'localhost', grpcPort: 50051, grpcSecure: false, httpSecure: false,
-      type: 'custom'
+      name: 'Disc',
+      httpHost: 'localhost',
+      apiKey: '',
+      httpPort: 8080,
+      grpcHost: 'localhost',
+      grpcPort: 50051,
+      grpcSecure: false,
+      httpSecure: false,
+      type: 'custom',
     });
     await mgr.connect(conn.id);
 
@@ -192,7 +213,7 @@ describe('ConnectionManager', () => {
         apiKey: 'custom-api-key',
         timeoutInit: 45,
         timeoutQuery: 90,
-        timeoutInsert: 180
+        timeoutInsert: 180,
       });
 
       expect(customConn.type).toBe('custom');
@@ -217,7 +238,7 @@ describe('ConnectionManager', () => {
         apiKey: 'cloud-api-key',
         timeoutInit: 30,
         timeoutQuery: 60,
-        timeoutInsert: 120
+        timeoutInsert: 120,
       });
 
       expect(cloudConn.type).toBe('cloud');
@@ -231,7 +252,7 @@ describe('ConnectionManager', () => {
     test('connects to custom connection with proper configuration', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const mockConnectToCustom = jest.spyOn(weaviateClient, 'connectToCustom').mockResolvedValue({
-        isReady: jest.fn().mockResolvedValue(true)
+        isReady: jest.fn().mockResolvedValue(true),
       } as any);
 
       const conn = await mgr.addConnection({
@@ -246,7 +267,7 @@ describe('ConnectionManager', () => {
         apiKey: 'test-key',
         timeoutInit: 30,
         timeoutQuery: 60,
-        timeoutInsert: 120
+        timeoutInsert: 120,
       });
 
       await mgr.connect(conn.id);
@@ -263,18 +284,20 @@ describe('ConnectionManager', () => {
         timeout: {
           init: 30,
           query: 60,
-          insert: 120
-        }
+          insert: 120,
+        },
       });
     });
 
     test('connects to cloud connection with proper configuration', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const mockApiKey = jest.fn();
-      const mockConnectToWeaviateCloud = jest.spyOn(weaviateClient, 'connectToWeaviateCloud').mockResolvedValue({
-        isReady: jest.fn().mockResolvedValue(true)
-      } as any);
-      
+      const mockConnectToWeaviateCloud = jest
+        .spyOn(weaviateClient, 'connectToWeaviateCloud')
+        .mockResolvedValue({
+          isReady: jest.fn().mockResolvedValue(true),
+        } as any);
+
       jest.spyOn(weaviateClient, 'ApiKey').mockImplementation(() => mockApiKey as any);
 
       const conn = await mgr.addConnection({
@@ -284,7 +307,7 @@ describe('ConnectionManager', () => {
         apiKey: 'cloud-key',
         timeoutInit: 45,
         timeoutQuery: 90,
-        timeoutInsert: 180
+        timeoutInsert: 180,
       });
 
       await mgr.connect(conn.id);
@@ -294,8 +317,8 @@ describe('ConnectionManager', () => {
         timeout: {
           init: 45,
           query: 90,
-          insert: 180
-        }
+          insert: 180,
+        },
       });
     });
   });
@@ -312,7 +335,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(conn.timeoutInit).toBeUndefined();
@@ -334,7 +357,7 @@ describe('ConnectionManager', () => {
         grpcSecure: false,
         timeoutInit: 10,
         timeoutQuery: 20,
-        timeoutInsert: 30
+        timeoutInsert: 30,
       });
 
       expect(conn.timeoutInit).toBe(10);
@@ -351,7 +374,7 @@ describe('ConnectionManager', () => {
         name: 'Old Cloud Connection',
         status: 'disconnected',
         url: 'https://my-cluster.weaviate.cloud',
-        apiKey: 'old-api-key'
+        apiKey: 'old-api-key',
       };
 
       globalState.storage['weaviate-connections'] = [oldCloudConnection];
@@ -359,7 +382,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const migratedConnection = connections.find(c => c.id === 'old-cloud');
+      const migratedConnection = connections.find((c) => c.id === 'old-cloud');
       expect(migratedConnection).toBeDefined();
       expect(migratedConnection?.type).toBe('cloud');
       expect(migratedConnection?.cloudUrl).toBe('https://my-cluster.weaviate.cloud');
@@ -374,7 +397,7 @@ describe('ConnectionManager', () => {
         name: 'Old Custom Connection',
         status: 'disconnected',
         url: 'http://localhost:8080',
-        apiKey: 'custom-key'
+        apiKey: 'custom-key',
       };
 
       globalState.storage['weaviate-connections'] = [oldCustomConnection];
@@ -382,7 +405,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const migratedConnection = connections.find(c => c.id === 'old-custom');
+      const migratedConnection = connections.find((c) => c.id === 'old-custom');
       expect(migratedConnection).toBeDefined();
       expect(migratedConnection?.type).toBe('custom');
       expect(migratedConnection?.httpHost).toBe('localhost');
@@ -402,7 +425,7 @@ describe('ConnectionManager', () => {
         name: 'Old HTTPS Custom Connection',
         status: 'disconnected',
         url: 'https://secure-server.com:9000',
-        apiKey: 'secure-key'
+        apiKey: 'secure-key',
       };
 
       globalState.storage['weaviate-connections'] = [oldCustomConnection];
@@ -410,7 +433,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const migratedConnection = connections.find(c => c.id === 'old-custom-https');
+      const migratedConnection = connections.find((c) => c.id === 'old-custom-https');
       expect(migratedConnection).toBeDefined();
       expect(migratedConnection?.type).toBe('custom');
       expect(migratedConnection?.httpHost).toBe('secure-server.com');
@@ -428,7 +451,7 @@ describe('ConnectionManager', () => {
         name: 'Old Weaviate.io Connection',
         status: 'disconnected',
         url: 'https://cluster.weaviate.io',
-        apiKey: 'weaviate-io-key'
+        apiKey: 'weaviate-io-key',
       };
 
       globalState.storage['weaviate-connections'] = [oldCloudConnection];
@@ -436,7 +459,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const migratedConnection = connections.find(c => c.id === 'old-weaviate-io');
+      const migratedConnection = connections.find((c) => c.id === 'old-weaviate-io');
       expect(migratedConnection?.type).toBe('cloud');
       expect(migratedConnection?.cloudUrl).toBe('https://cluster.weaviate.io');
     });
@@ -445,7 +468,7 @@ describe('ConnectionManager', () => {
       const invalidConnection = {
         id: 'invalid',
         name: 'Invalid Connection',
-        status: 'disconnected'
+        status: 'disconnected',
         // Missing url field
       };
 
@@ -454,7 +477,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const connection = connections.find(c => c.id === 'invalid');
+      const connection = connections.find((c) => c.id === 'invalid');
       expect(connection).toBeDefined();
       expect(connection?.connectionVersion).toBeUndefined();
       expect(connection?.type).toBeUndefined();
@@ -472,7 +495,7 @@ describe('ConnectionManager', () => {
         grpcPort: 50051,
         httpSecure: false,
         grpcSecure: false,
-        connectionVersion: '2'
+        connectionVersion: '2',
       };
 
       globalState.storage['weaviate-connections'] = [newConnection];
@@ -480,7 +503,7 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const connection = connections.find(c => c.id === 'new-format');
+      const connection = connections.find((c) => c.id === 'new-format');
       expect(connection).toEqual(newConnection);
       expect(globalState.update).not.toHaveBeenCalled(); // Should not save again
     });
@@ -491,20 +514,23 @@ describe('ConnectionManager', () => {
         name: 'To Migrate',
         status: 'disconnected',
         url: 'http://localhost:8080',
-        apiKey: 'key'
+        apiKey: 'key',
       };
 
       globalState.storage['weaviate-connections'] = [oldConnection];
 
       ConnectionManager.getInstance(mockContext);
 
-      expect(globalState.update).toHaveBeenCalledWith('weaviate-connections', expect.arrayContaining([
-        expect.objectContaining({
-          id: 'to-migrate',
-          connectionVersion: '2',
-          type: 'custom'
-        })
-      ]));
+      expect(globalState.update).toHaveBeenCalledWith(
+        'weaviate-connections',
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'to-migrate',
+            connectionVersion: '2',
+            type: 'custom',
+          }),
+        ])
+      );
     });
 
     test('handles mixed old and new connection formats', async () => {
@@ -513,7 +539,7 @@ describe('ConnectionManager', () => {
           id: 'old',
           name: 'Old Connection',
           status: 'disconnected',
-          url: 'http://old.server.com:8080'
+          url: 'http://old.server.com:8080',
         },
         {
           id: 'new',
@@ -526,8 +552,8 @@ describe('ConnectionManager', () => {
           grpcPort: 50051,
           httpSecure: false,
           grpcSecure: false,
-          connectionVersion: '2'
-        }
+          connectionVersion: '2',
+        },
       ];
 
       globalState.storage['weaviate-connections'] = mixedConnections;
@@ -535,8 +561,8 @@ describe('ConnectionManager', () => {
       const mgr = ConnectionManager.getInstance(mockContext);
       const connections = mgr.getConnections();
 
-      const oldConnection = connections.find(c => c.id === 'old');
-      const newConnection = connections.find(c => c.id === 'new');
+      const oldConnection = connections.find((c) => c.id === 'old');
+      const newConnection = connections.find((c) => c.id === 'new');
 
       expect(oldConnection?.connectionVersion).toBe('2');
       expect(oldConnection?.type).toBe('custom');
@@ -548,8 +574,10 @@ describe('ConnectionManager', () => {
   describe('Error Handling Tests', () => {
     test('handles connection timeout gracefully', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      
-      jest.spyOn(weaviateClient, 'connectToCustom').mockRejectedValue(new Error('Connection timeout'));
+
+      jest
+        .spyOn(weaviateClient, 'connectToCustom')
+        .mockRejectedValue(new Error('Connection timeout'));
 
       const conn = await mgr.addConnection({
         name: 'Timeout Test',
@@ -559,7 +587,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'unreachable-host',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const result = await mgr.connect(conn.id);
@@ -572,14 +600,16 @@ describe('ConnectionManager', () => {
 
     test('handles invalid cloud URL gracefully', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      
-      jest.spyOn(weaviateClient, 'connectToWeaviateCloud').mockRejectedValue(new Error('Invalid cloud URL'));
+
+      jest
+        .spyOn(weaviateClient, 'connectToWeaviateCloud')
+        .mockRejectedValue(new Error('Invalid cloud URL'));
 
       const conn = await mgr.addConnection({
         name: 'Invalid Cloud',
         type: 'cloud',
         cloudUrl: 'https://invalid.url',
-        apiKey: 'test-key'
+        apiKey: 'test-key',
       });
 
       const result = await mgr.connect(conn.id);
@@ -590,21 +620,23 @@ describe('ConnectionManager', () => {
     test('handles missing required fields for custom connection', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
-      await expect(mgr.addConnection({
-        name: '',
-        type: 'custom',
-        httpHost: 'localhost',
-        httpPort: 8080,
-        grpcHost: 'localhost',
-        grpcPort: 50051,
-        httpSecure: false,
-        grpcSecure: false
-      })).rejects.toThrow();
+      await expect(
+        mgr.addConnection({
+          name: '',
+          type: 'custom',
+          httpHost: 'localhost',
+          httpPort: 8080,
+          grpcHost: 'localhost',
+          grpcPort: 50051,
+          httpSecure: false,
+          grpcSecure: false,
+        })
+      ).rejects.toThrow();
     });
 
     test('handles client creation failure', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      
+
       jest.spyOn(weaviateClient, 'connectToCustom').mockResolvedValue(null as any);
 
       const conn = await mgr.addConnection({
@@ -615,7 +647,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const result = await mgr.connect(conn.id);
@@ -624,9 +656,9 @@ describe('ConnectionManager', () => {
 
     test('handles isReady check failure', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      
+
       jest.spyOn(weaviateClient, 'connectToCustom').mockResolvedValue({
-        isReady: jest.fn().mockRejectedValue(new Error('Server not ready'))
+        isReady: jest.fn().mockRejectedValue(new Error('Server not ready')),
       } as any);
 
       const conn = await mgr.addConnection({
@@ -637,7 +669,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const result = await mgr.connect(conn.id);
@@ -668,7 +700,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(eventListener).toHaveBeenCalled();
@@ -686,7 +718,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       eventListener.mockClear();
@@ -709,7 +741,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       eventListener.mockClear();
@@ -731,15 +763,18 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
-      expect(globalState.update).toHaveBeenCalledWith('weaviate-connections', expect.arrayContaining([
-        expect.objectContaining({
-          name: 'Persist Test',
-          type: 'custom'
-        })
-      ]));
+      expect(globalState.update).toHaveBeenCalledWith(
+        'weaviate-connections',
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Persist Test',
+            type: 'custom',
+          }),
+        ])
+      );
     });
 
     test('loads connections from globalState on initialization', () => {
@@ -755,8 +790,8 @@ describe('ConnectionManager', () => {
           grpcPort: 50051,
           httpSecure: false,
           grpcSecure: false,
-          connectionVersion: '2'
-        }
+          connectionVersion: '2',
+        },
       ];
 
       globalState.storage['weaviate-connections'] = existingConnections;
@@ -771,7 +806,8 @@ describe('ConnectionManager', () => {
     });
 
     test('sorts connections by lastUsed timestamp', async () => {
-      jest.spyOn(Date, 'now')
+      jest
+        .spyOn(Date, 'now')
         .mockReturnValueOnce(1000) // First connection
         .mockReturnValueOnce(2000) // Second connection
         .mockReturnValueOnce(3000); // Third connection
@@ -786,7 +822,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const conn2 = await mgr.addConnection({
@@ -797,7 +833,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50052,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const conn3 = await mgr.addConnection({
@@ -808,18 +844,19 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50053,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const connections = mgr.getConnections();
 
-      expect(connections[0].name).toBe('Third');  // Most recent
+      expect(connections[0].name).toBe('Third'); // Most recent
       expect(connections[1].name).toBe('Second');
-      expect(connections[2].name).toBe('First');  // Oldest
+      expect(connections[2].name).toBe('First'); // Oldest
     });
 
     test('updates lastUsed timestamp on connection update', async () => {
-      jest.spyOn(Date, 'now')
+      jest
+        .spyOn(Date, 'now')
         .mockReturnValueOnce(1000) // For addConnection (ID and lastUsed)
         .mockReturnValueOnce(2000); // For updateConnection lastUsed
 
@@ -833,7 +870,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(conn.lastUsed).toBe(1000);
@@ -857,7 +894,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       // Connect and check client is cached
@@ -883,7 +920,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       await mgr.connect(conn.id);
@@ -906,7 +943,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const retrieved = mgr.getConnection(conn.id);
@@ -931,12 +968,12 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const updated = await mgr.updateConnection(conn.id, {
         name: 'Updated Name',
-        httpPort: 9090
+        httpPort: 9090,
       });
 
       expect(updated?.name).toBe('Updated Name');
@@ -955,7 +992,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const initialCount = mgr.getConnections().length;
@@ -971,16 +1008,18 @@ describe('ConnectionManager', () => {
     test('handles empty name gracefully', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
-      await expect(mgr.addConnection({
-        name: '   ',  // Just whitespace
-        type: 'custom',
-        httpHost: 'localhost',
-        httpPort: 8080,
-        grpcHost: 'localhost',
-        grpcPort: 50051,
-        httpSecure: false,
-        grpcSecure: false
-      })).rejects.toThrow();
+      await expect(
+        mgr.addConnection({
+          name: '   ', // Just whitespace
+          type: 'custom',
+          httpHost: 'localhost',
+          httpPort: 8080,
+          grpcHost: 'localhost',
+          grpcPort: 50051,
+          httpSecure: false,
+          grpcSecure: false,
+        })
+      ).rejects.toThrow();
     });
 
     test('handles case insensitive name duplicates', async () => {
@@ -994,19 +1033,21 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
-      await expect(mgr.addConnection({
-        name: 'test connection',  // Different case
-        type: 'custom',
-        httpHost: 'localhost',
-        httpPort: 8081,
-        grpcHost: 'localhost',
-        grpcPort: 50052,
-        httpSecure: false,
-        grpcSecure: false
-      })).rejects.toThrow(/already exists/);
+      await expect(
+        mgr.addConnection({
+          name: 'test connection', // Different case
+          type: 'custom',
+          httpHost: 'localhost',
+          httpPort: 8081,
+          grpcHost: 'localhost',
+          grpcPort: 50052,
+          httpSecure: false,
+          grpcSecure: false,
+        })
+      ).rejects.toThrow(/already exists/);
     });
 
     test('handles zero and negative port numbers', async () => {
@@ -1020,7 +1061,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: -1,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(conn.httpPort).toBe(0);
@@ -1038,7 +1079,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
         // No timeouts, no API key
       });
 
@@ -1060,7 +1101,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(conn.name).toBe(longName);
@@ -1078,7 +1119,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       expect(conn.name).toBe(specialName);
@@ -1120,10 +1161,10 @@ describe('ConnectionManager', () => {
 
     test('handles disconnect errors gracefully', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      
+
       // Mock console.error to prevent error output during test
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
+
       const conn = await mgr.addConnection({
         name: 'Disconnect Error Test',
         type: 'custom',
@@ -1132,7 +1173,7 @@ describe('ConnectionManager', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       await mgr.connect(conn.id);
@@ -1145,12 +1186,12 @@ describe('ConnectionManager', () => {
 
       // Client should still be removed from cache
       expect(mgr.getClient(conn.id)).toBeUndefined();
-      
+
       // Verify that console.error was called
       expect(consoleErrorSpy).toHaveBeenCalled();
-      
+
       // Restore console.error
       consoleErrorSpy.mockRestore();
     });
   });
-}); 
+});

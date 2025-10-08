@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+out/
+*.vsix
+
+# Coverage
+coverage/
+*.lcov
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Webpack
+webpack.config.js
+webpack.webview.config.js
+
+# Config files
+*.config.js
+*.config.mjs
+tsconfig.json
+jsconfig.json
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# Test snapshots
+**/__snapshots__/
+
+# Markdown (optional - remove if you want to format markdown)
+# *.md
+
+# JSON files that should not be formatted
+syntaxes/**/*.json
+language-configuration.json

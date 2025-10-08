@@ -23,12 +23,12 @@ describe('ConnectionManager Integration Tests', () => {
       update: jest.fn((key: string, value: any) => {
         globalState.storage[key] = value;
         return Promise.resolve();
-      })
+      }),
     } as unknown as MockGlobalState;
 
     mockContext = {
       globalState,
-      subscriptions: []
+      subscriptions: [],
     };
   });
 
@@ -49,7 +49,7 @@ describe('ConnectionManager Integration Tests', () => {
             grpcHost: `host${i}.example.com`,
             grpcPort: 50051 + i,
             httpSecure: i % 2 === 0,
-            grpcSecure: i % 2 === 0
+            grpcSecure: i % 2 === 0,
           })
         );
       }
@@ -77,7 +77,7 @@ describe('ConnectionManager Integration Tests', () => {
           grpcHost: `host${i}.example.com`,
           grpcPort: 50051 + i,
           httpSecure: false,
-          grpcSecure: false
+          grpcSecure: false,
         });
         connections.push(conn);
       }
@@ -111,7 +111,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const statusChanges: string[] = [];
@@ -129,8 +129,8 @@ describe('ConnectionManager Integration Tests', () => {
       await Promise.all(promises);
 
       expect(statusChanges).toHaveLength(10);
-      expect(statusChanges.filter(s => s === 'connected')).toHaveLength(5);
-      expect(statusChanges.filter(s => s === 'disconnected')).toHaveLength(5);
+      expect(statusChanges.filter((s) => s === 'connected')).toHaveLength(5);
+      expect(statusChanges.filter((s) => s === 'disconnected')).toHaveLength(5);
     });
   });
 
@@ -149,7 +149,7 @@ describe('ConnectionManager Integration Tests', () => {
             grpcHost: `concurrent${i}.example.com`,
             grpcPort: 50051 + i,
             httpSecure: false,
-            grpcSecure: false
+            grpcSecure: false,
           })
         );
       }
@@ -160,7 +160,7 @@ describe('ConnectionManager Integration Tests', () => {
       expect(mgr.getConnections()).toHaveLength(20);
 
       // Check all connections have unique IDs
-      const ids = connections.map(c => c.id);
+      const ids = connections.map((c) => c.id);
       const uniqueIds = [...new Set(ids)];
       expect(uniqueIds).toHaveLength(20);
     });
@@ -176,20 +176,18 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const updatePromises = [];
       for (let i = 0; i < 5; i++) {
-        updatePromises.push(
-          mgr.updateConnection(conn.id, { name: `Updated ${i}` })
-        );
+        updatePromises.push(mgr.updateConnection(conn.id, { name: `Updated ${i}` }));
       }
 
       const results = await Promise.all(updatePromises);
 
       // All updates should succeed
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBeDefined();
         expect(result?.id).toBe(conn.id);
       });
@@ -214,7 +212,7 @@ describe('ConnectionManager Integration Tests', () => {
           grpcHost: `host${i}.example.com`,
           grpcPort: 50051 + i,
           httpSecure: false,
-          grpcSecure: false
+          grpcSecure: false,
         });
         connections.push(conn);
       }
@@ -222,7 +220,7 @@ describe('ConnectionManager Integration Tests', () => {
       const operationPromises: Promise<WeaviateConnection | null>[] = [];
 
       // Concurrent connect operations
-      connections.forEach(conn => {
+      connections.forEach((conn) => {
         operationPromises.push(mgr.connect(conn.id));
       });
 
@@ -230,21 +228,21 @@ describe('ConnectionManager Integration Tests', () => {
       await Promise.all(operationPromises);
 
       // Verify all are connected
-      connections.forEach(conn => {
+      connections.forEach((conn) => {
         expect(mgr.getClient(conn.id)).toBeDefined();
       });
 
       const disconnectPromises: Promise<boolean>[] = [];
 
       // Concurrent disconnect operations
-      connections.forEach(conn => {
+      connections.forEach((conn) => {
         disconnectPromises.push(mgr.disconnect(conn.id));
       });
 
       await Promise.all(disconnectPromises);
 
       // Verify all are disconnected
-      connections.forEach(conn => {
+      connections.forEach((conn) => {
         expect(mgr.getClient(conn.id)).toBeUndefined();
       });
     });
@@ -267,7 +265,7 @@ describe('ConnectionManager Integration Tests', () => {
           httpSecure: false,
           grpcSecure: false,
           cloudUrl: i % 2 === 1 ? `https://cloud${i}.weaviate.network` : undefined,
-          apiKey: `api-key-${i}`
+          apiKey: `api-key-${i}`,
         });
         connections.push(conn);
       }
@@ -275,7 +273,7 @@ describe('ConnectionManager Integration Tests', () => {
       // Update some connections
       for (let i = 0; i < 5; i++) {
         await mgr.updateConnection(connections[i].id, {
-          name: `Updated ${connections[i].name}`
+          name: `Updated ${connections[i].name}`,
         });
       }
 
@@ -287,22 +285,22 @@ describe('ConnectionManager Integration Tests', () => {
       const remainingConnections = mgr.getConnections();
 
       expect(remainingConnections).toHaveLength(8); // 10 - 2 deleted
-      
+
       // Check updated connections
       for (let i = 0; i < 5; i++) {
-        const conn = remainingConnections.find(c => c.id === connections[i].id);
+        const conn = remainingConnections.find((c) => c.id === connections[i].id);
         expect(conn?.name).toContain('Updated');
       }
 
       // Check deleted connections are gone
       for (let i = 5; i < 7; i++) {
-        const conn = remainingConnections.find(c => c.id === connections[i].id);
+        const conn = remainingConnections.find((c) => c.id === connections[i].id);
         expect(conn).toBeUndefined();
       }
 
       // Check remaining connections are intact
       for (let i = 7; i < 10; i++) {
-        const conn = remainingConnections.find(c => c.id === connections[i].id);
+        const conn = remainingConnections.find((c) => c.id === connections[i].id);
         expect(conn).toBeDefined();
         expect(conn?.name).toBe(`Data Integrity ${i}`);
       }
@@ -311,7 +309,8 @@ describe('ConnectionManager Integration Tests', () => {
     test('preserves connection order after operations', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
-      jest.spyOn(Date, 'now')
+      jest
+        .spyOn(Date, 'now')
         .mockReturnValueOnce(1000)
         .mockReturnValueOnce(2000)
         .mockReturnValueOnce(3000)
@@ -325,7 +324,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const conn2 = await mgr.addConnection({
@@ -336,7 +335,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50052,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const conn3 = await mgr.addConnection({
@@ -347,17 +346,17 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50053,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       let connections = mgr.getConnections();
-      expect(connections.map(c => c.name)).toEqual(['Third', 'Second', 'First']);
+      expect(connections.map((c) => c.name)).toEqual(['Third', 'Second', 'First']);
 
       // Update first connection (should move to top)
       await mgr.updateConnection(conn1.id, { name: 'First Updated' });
 
       connections = mgr.getConnections();
-      expect(connections.map(c => c.name)).toEqual(['First Updated', 'Third', 'Second']);
+      expect(connections.map((c) => c.name)).toEqual(['First Updated', 'Third', 'Second']);
     });
 
     test('handles storage persistence correctly', async () => {
@@ -371,14 +370,14 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       // Verify it's stored
       expect(globalState.storage['weaviate-connections']).toContainEqual(
         expect.objectContaining({
           id: conn1.id,
-          name: 'Persistent Connection'
+          name: 'Persistent Connection',
         })
       );
 
@@ -408,7 +407,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       // Connect
@@ -438,7 +437,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       // Connect
@@ -465,7 +464,7 @@ describe('ConnectionManager Integration Tests', () => {
           grpcHost: 'localhost',
           grpcPort: 50051 + i,
           httpSecure: false,
-          grpcSecure: false
+          grpcSecure: false,
         });
 
         // Immediately delete
@@ -487,7 +486,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
         // All optional fields omitted
       });
 
@@ -512,7 +511,7 @@ describe('ConnectionManager Integration Tests', () => {
         grpcSecure: false,
         timeoutInit: 0,
         timeoutQuery: 999999,
-        timeoutInsert: -1
+        timeoutInsert: -1,
       });
 
       expect(conn.timeoutInit).toBe(0);

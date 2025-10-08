@@ -11,10 +11,10 @@ interface LoadingIndicatorProps {
  */
 const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   message = 'Loading...',
-  isVisible
+  isVisible,
 }) => {
   if (!isVisible) return null;
-  
+
   return (
     <div className="loading-container">
       <div className="loading-spinner"></div>

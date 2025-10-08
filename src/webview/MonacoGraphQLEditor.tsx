@@ -27,7 +27,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   collectionName,
   showTemplateDropdown,
   onToggleTemplateDropdown,
-  onTemplateSelect
+  onTemplateSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<GraphQLEditor | null>(null);
@@ -40,38 +40,38 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
     if (containerRef.current && !editorRef.current) {
       setIsLoading(true);
       setLoadingMessage('Initializing editor...');
-      
+
       try {
         const editor = new GraphQLEditor(containerRef.current, initialValue);
-        
-                  const handleEditorDidMount = (editor: GraphQLEditor) => {
+
+        const handleEditorDidMount = (editor: GraphQLEditor) => {
           editorRef.current = editor;
           setIsEditorReady(true);
           setIsLoading(false);
-          
+
           // Register change listener using our custom method
           editor.onDidChangeModelContent((newValue: string) => {
             // Update parent with new content
             onChange(newValue);
-            
+
             // Trigger parameter validation
             editor.validateQueryParameters();
           });
-          
+
           // Initial validation
           editor.validateQueryParameters();
-          
+
           // Set initial value if provided
           if (initialValue) {
             editor.setValue(initialValue);
           }
-          
+
           // Update theme to match VS Code (delay to ensure proper initialization)
           setTimeout(() => {
             editor.updateTheme();
           }, 100);
         };
-        
+
         handleEditorDidMount(editor);
       } catch (error) {
         console.error('Error initializing Monaco editor:', error);
@@ -94,14 +94,15 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
     if (isEditorReady && editorRef.current && schemaConfig) {
       setIsLoading(true);
       setLoadingMessage('Configuring GraphQL language features...');
-      
-              editorRef.current.configureGraphQLLanguage(schemaConfig)
+
+      editorRef.current
+        .configureGraphQLLanguage(schemaConfig)
         .then(() => {
           // Update theme after configuration
           editorRef.current?.updateTheme();
           setIsLoading(false);
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Error configuring GraphQL language:', error);
           setIsLoading(false);
         });
@@ -138,22 +139,22 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
 
   return (
     <ErrorBoundary>
-      <div className="monaco-graphql-editor-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-        
+      <div
+        className="monaco-graphql-editor-container"
+        style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}
+      >
         {/* Editor container */}
-        <div 
-          ref={containerRef} 
+        <div
+          ref={containerRef}
           className="monaco-editor-container"
-          style={{ 
-            flex: 1, 
+          style={{
+            flex: 1,
             position: 'relative',
             overflow: 'hidden',
-            minHeight: '200px'
+            minHeight: '200px',
           }}
         />
-        
 
-        
         <LoadingIndicator isVisible={isLoading} message={loadingMessage} />
       </div>
     </ErrorBoundary>
