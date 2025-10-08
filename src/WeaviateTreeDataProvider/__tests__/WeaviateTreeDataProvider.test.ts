@@ -28,7 +28,7 @@ class MockConnectionManager {
 
   // additional stubs if needed later
   getConnection(_id: string) {
-    return this.connections.find(c => c.id === _id);
+    return this.connections.find((c) => c.id === _id);
   }
 }
 
@@ -36,8 +36,8 @@ class MockConnectionManager {
 jest.mock('../../services/ConnectionManager', () => {
   return {
     ConnectionManager: {
-      getInstance: (...args: any[]) => MockConnectionManager.getInstance(args[0], mockConnections)
-    }
+      getInstance: (...args: any[]) => MockConnectionManager.getInstance(args[0], mockConnections),
+    },
   };
 });
 
@@ -46,15 +46,15 @@ jest.mock('../../views/ViewRenderer', () => {
     ViewRenderer: {
       getInstance: () => ({
         renderDetailedSchema: jest.fn(),
-        renderRawConfig: jest.fn()
-      })
-    }
+        renderRawConfig: jest.fn(),
+      }),
+    },
   };
 });
 
 const mockConnections = [
   { id: '1', name: 'Local', url: 'http://a', status: 'disconnected', lastUsed: 1 },
-  { id: '2', name: 'Prod', url: 'http://b', status: 'connected', lastUsed: 2 }
+  { id: '2', name: 'Prod', url: 'http://b', status: 'connected', lastUsed: 2 },
 ];
 
 // ---------------------------------------------------------------------
@@ -63,7 +63,7 @@ describe('WeaviateTreeDataProvider', () => {
   let provider: WeaviateTreeDataProvider;
   const mockCtx = {
     globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
-    subscriptions: []
+    subscriptions: [],
   } as unknown as vscode.ExtensionContext;
 
   beforeEach(() => {
@@ -108,12 +108,14 @@ describe('WeaviateTreeDataProvider', () => {
     expect(connected).toBeDefined();
     const sections = await provider.getChildren(connected);
     const itemTypes = sections.map((s: any) => s.itemType);
-    expect(itemTypes).toEqual(expect.arrayContaining(["serverInfo", "clusterNodes", "collectionsGroup"]));
+    expect(itemTypes).toEqual(
+      expect.arrayContaining(['serverInfo', 'clusterNodes', 'collectionsGroup'])
+    );
   });
 
   it('collections group label reflects count', async () => {
     // inject 3 mock collections for Prod (id 2)
-    (provider as any).collections['2'] = [ {label:'A'}, {label:'B'}, {label:'C'} ];
+    (provider as any).collections['2'] = [{ label: 'A' }, { label: 'B' }, { label: 'C' }];
     const rootChildren = await provider.getChildren();
     const connected: any = rootChildren.find((c: any) => c.label.endsWith('Prod'));
     expect(connected).toBeDefined();
@@ -131,27 +133,27 @@ describe('WeaviateTreeDataProvider', () => {
 
   describe('deleteAllCollections', () => {
     let provider: WeaviateTreeDataProvider;
-    
+
     beforeEach(() => {
       // Create a fresh provider instance for isolated testing
       const mockCtx = {
         globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
-        subscriptions: []
+        subscriptions: [],
       } as unknown as vscode.ExtensionContext;
-      
+
       provider = new WeaviateTreeDataProvider(mockCtx);
     });
 
     it('should call client.collections.deleteAll and clear collections state', async () => {
       const mockClient = {
         collections: {
-          deleteAll: jest.fn()
-        }
+          deleteAll: jest.fn(),
+        },
       };
 
       const mockConnectionManager = {
         getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
-        getClient: jest.fn().mockReturnValue(mockClient)
+        getClient: jest.fn().mockReturnValue(mockClient),
       };
 
       // Mock the connectionManager property
@@ -161,7 +163,7 @@ describe('WeaviateTreeDataProvider', () => {
       (provider as any).collections['1'] = [
         { label: 'Collection1' },
         { label: 'Collection2' },
-        { label: 'Collection3' }
+        { label: 'Collection3' },
       ];
 
       // Mock the refresh method
@@ -181,7 +183,7 @@ describe('WeaviateTreeDataProvider', () => {
     it('should throw error when connection not found', async () => {
       const mockConnectionManager = {
         getConnection: jest.fn().mockReturnValue(null),
-        getClient: jest.fn()
+        getClient: jest.fn(),
       };
 
       (provider as any).connectionManager = mockConnectionManager;
@@ -189,15 +191,17 @@ describe('WeaviateTreeDataProvider', () => {
       // Suppress console.error for this test since we expect an error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      await expect(provider.deleteAllCollections('invalid')).rejects.toThrow('Failed to delete all collections: Connection not found');
-      
+      await expect(provider.deleteAllCollections('invalid')).rejects.toThrow(
+        'Failed to delete all collections: Connection not found'
+      );
+
       consoleSpy.mockRestore();
     });
 
     it('should throw error when client not initialized', async () => {
       const mockConnectionManager = {
         getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
-        getClient: jest.fn().mockReturnValue(null)
+        getClient: jest.fn().mockReturnValue(null),
       };
 
       (provider as any).connectionManager = mockConnectionManager;
@@ -205,21 +209,23 @@ describe('WeaviateTreeDataProvider', () => {
       // Suppress console.error for this test since we expect an error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      await expect(provider.deleteAllCollections('1')).rejects.toThrow('Failed to delete all collections: Client not initialized');
-      
+      await expect(provider.deleteAllCollections('1')).rejects.toThrow(
+        'Failed to delete all collections: Client not initialized'
+      );
+
       consoleSpy.mockRestore();
     });
 
     it('should handle client API errors gracefully', async () => {
       const mockClient = {
         collections: {
-          deleteAll: jest.fn().mockRejectedValue(new Error('API Error'))
-        }
+          deleteAll: jest.fn().mockRejectedValue(new Error('API Error')),
+        },
       };
 
       const mockConnectionManager = {
         getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Test Connection' }),
-        getClient: jest.fn().mockReturnValue(mockClient)
+        getClient: jest.fn().mockReturnValue(mockClient),
       };
 
       (provider as any).connectionManager = mockConnectionManager;
@@ -227,8 +233,10 @@ describe('WeaviateTreeDataProvider', () => {
       // Suppress console.error for this test since we expect an error
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      await expect(provider.deleteAllCollections('1')).rejects.toThrow('Failed to delete all collections: API Error');
-      
+      await expect(provider.deleteAllCollections('1')).rejects.toThrow(
+        'Failed to delete all collections: API Error'
+      );
+
       consoleSpy.mockRestore();
     });
   });

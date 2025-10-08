@@ -1,8 +1,4 @@
-import {
-  generateNearVectorQuery,
-  generateFilterQuery,
-  processTemplate
-} from '../graphqlTemplates';
+import { generateNearVectorQuery, generateFilterQuery, processTemplate } from '../graphqlTemplates';
 
 const COLLECTION = 'Article';
 
@@ -56,8 +52,8 @@ describe('graphqlTemplates helpers', () => {
             { name: 'title', dataType: ['text'] },
             { name: 'likes', dataType: ['int'] },
             { name: 'location', dataType: ['geoCoordinates'] },
-            { name: 'author', dataType: ['Person'] }
-          ]
+            { name: 'author', dataType: ['Person'] },
+          ],
         },
         {
           class: 'Person',
@@ -66,10 +62,10 @@ describe('graphqlTemplates helpers', () => {
             { name: 'email', dataType: ['text'] },
             { name: 'phone', dataType: ['text'] },
             { name: 'gender', dataType: ['text'] },
-            { name: 'age', dataType: ['int'] }
-          ]
-        }
-      ]
+            { name: 'age', dataType: ['int'] },
+          ],
+        },
+      ],
     } as any;
 
     it('includes primitive, geo, and reference properties', () => {
@@ -99,4 +95,4 @@ describe('graphqlTemplates helpers', () => {
       expect(q).toContain('id');
     });
   });
-}); 
+});

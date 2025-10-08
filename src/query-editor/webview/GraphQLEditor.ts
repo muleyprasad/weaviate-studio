@@ -30,7 +30,7 @@ export class GraphQLEditor {
    * Notify all change listeners when content changes
    */
   private notifyChangeListeners(value: string): void {
-    this.changeListeners.forEach(listener => {
+    this.changeListeners.forEach((listener) => {
       try {
         listener(value);
       } catch (error) {
@@ -42,7 +42,7 @@ export class GraphQLEditor {
   constructor(container: HTMLElement, initialValue: string = '') {
     this.container = container;
     this.initializeEditor();
-    
+
     if (initialValue) {
       this.setValue(initialValue);
     }
@@ -55,23 +55,30 @@ export class GraphQLEditor {
         // Check for VS Code theme classes on body or html
         const body = document.body;
         const html = document.documentElement;
-        
+
         if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
           return 'vs-dark';
-        } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
+        } else if (
+          body.classList.contains('vscode-light') ||
+          html.classList.contains('vscode-light')
+        ) {
           return 'vs';
-        } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
+        } else if (
+          body.classList.contains('vscode-high-contrast') ||
+          html.classList.contains('vscode-high-contrast')
+        ) {
           return 'hc-black';
         }
-        
+
         // Check CSS variables with more comprehensive detection
         const styles = getComputedStyle(document.body);
-        const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
-                       styles.getPropertyValue('--vscode-panel-background') ||
-                       styles.backgroundColor;
-        
+        const bgColor =
+          styles.getPropertyValue('--vscode-editor-background') ||
+          styles.getPropertyValue('--vscode-panel-background') ||
+          styles.backgroundColor;
+
         console.log('Monaco theme detection - background color:', bgColor);
-        
+
         // Enhanced background color analysis
         if (bgColor) {
           // Handle hex colors
@@ -83,7 +90,7 @@ export class GraphQLEditor {
             const brightness = (r + g + b) / 3;
             return brightness < 128 ? 'vs-dark' : 'vs';
           }
-          
+
           // Handle RGB colors
           if (bgColor.includes('rgb')) {
             const rgb = bgColor.match(/\d+/g);
@@ -93,24 +100,24 @@ export class GraphQLEditor {
               return brightness < 128 ? 'vs-dark' : 'vs';
             }
           }
-          
+
           // Handle color keywords
           const darkColors = ['black', 'darkgray', 'darkgrey', 'dimgray', 'dimgrey'];
           const lightColors = ['white', 'lightgray', 'lightgrey', 'silver', 'gainsboro'];
-          
-          if (darkColors.some(color => bgColor.toLowerCase().includes(color))) {
+
+          if (darkColors.some((color) => bgColor.toLowerCase().includes(color))) {
             return 'vs-dark';
           }
-          if (lightColors.some(color => bgColor.toLowerCase().includes(color))) {
+          if (lightColors.some((color) => bgColor.toLowerCase().includes(color))) {
             return 'vs';
           }
         }
-        
+
         // Check media query for dark theme preference
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
           return 'vs-dark';
         }
-        
+
         console.log('Monaco theme detection - defaulting to vs-dark');
         // Default to dark theme for VS Code
         return 'vs-dark';
@@ -140,7 +147,8 @@ export class GraphQLEditor {
       readOnly: false,
       cursorStyle: 'line',
       fontSize: 14,
-      fontFamily: 'var(--vscode-editor-font-family, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace)',
+      fontFamily:
+        'var(--vscode-editor-font-family, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace)',
       tabSize: 2,
       insertSpaces: true,
       detectIndentation: true,
@@ -160,12 +168,12 @@ export class GraphQLEditor {
       quickSuggestions: {
         other: true,
         comments: true,
-        strings: true
+        strings: true,
       },
       quickSuggestionsDelay: 100,
       parameterHints: {
         enabled: true,
-        cycle: true
+        cycle: true,
       },
       suggestOnTriggerCharacters: true,
       tabCompletion: 'on',
@@ -178,25 +186,25 @@ export class GraphQLEditor {
       colorDecorators: true,
       comments: {
         insertSpace: true,
-        ignoreEmptyLines: true
+        ignoreEmptyLines: true,
       },
       copyWithSyntaxHighlighting: true,
       emptySelectionClipboard: true,
       find: {
         autoFindInSelection: 'never',
-        seedSearchStringFromSelection: 'always'
+        seedSearchStringFromSelection: 'always',
       },
       gotoLocation: {
         alternativeDefinitionCommand: 'editor.action.goToReferences',
         alternativeTypeDefinitionCommand: 'editor.action.goToReferences',
         alternativeDeclarationCommand: 'editor.action.goToReferences',
         alternativeImplementationCommand: 'editor.action.goToReferences',
-        alternativeReferenceCommand: 'editor.action.goToReferences'
+        alternativeReferenceCommand: 'editor.action.goToReferences',
       },
       hover: {
         enabled: true,
         delay: 300,
-        sticky: true
+        sticky: true,
       },
       matchBrackets: 'always',
       occurrencesHighlight: 'singleFile',
@@ -214,7 +222,7 @@ export class GraphQLEditor {
         horizontalScrollbarSize: 12,
         verticalScrollbarSize: 12,
         verticalSliderSize: 12,
-        horizontalSliderSize: 12
+        horizontalSliderSize: 12,
       },
       smoothScrolling: true,
       snippetSuggestions: 'top',
@@ -226,10 +234,10 @@ export class GraphQLEditor {
         shareSuggestSelections: true,
         showIcons: true,
         showStatusBar: true,
-        snippetsPreventQuickSuggestions: true
+        snippetsPreventQuickSuggestions: true,
       },
       unfoldOnClickAfterEndOfLine: false,
-      useShadowDOM: true
+      useShadowDOM: true,
     });
 
     // Register change event listener
@@ -258,12 +266,15 @@ export class GraphQLEditor {
       const observer = new MutationObserver((mutations) => {
         let themeChanged = false;
         mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && 
-              (mutation.attributeName === 'class' || mutation.attributeName === 'data-vscode-theme-kind')) {
+          if (
+            mutation.type === 'attributes' &&
+            (mutation.attributeName === 'class' ||
+              mutation.attributeName === 'data-vscode-theme-kind')
+          ) {
             themeChanged = true;
           }
         });
-        
+
         if (themeChanged && this.editor) {
           const newTheme = getVSCodeTheme();
           console.log('VS Code theme changed, updating Monaco theme to:', newTheme);
@@ -272,13 +283,13 @@ export class GraphQLEditor {
       });
 
       // Observe changes to body and html classes
-      observer.observe(document.body, { 
-        attributes: true, 
-        attributeFilter: ['class', 'data-vscode-theme-kind'] 
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-vscode-theme-kind'],
       });
-      observer.observe(document.documentElement, { 
-        attributes: true, 
-        attributeFilter: ['class', 'data-vscode-theme-kind'] 
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'data-vscode-theme-kind'],
       });
 
       // Also listen for media query changes
@@ -291,7 +302,7 @@ export class GraphQLEditor {
             monaco.editor.setTheme(newTheme);
           }
         };
-        
+
         // Modern browsers
         if (darkModeQuery.addEventListener) {
           darkModeQuery.addEventListener('change', themeChangeHandler);
@@ -305,7 +316,7 @@ export class GraphQLEditor {
       this.disposables.push({
         dispose: () => {
           observer.disconnect();
-        }
+        },
       });
     } catch (error) {
       console.error('Error setting up theme listener:', error);
@@ -328,22 +339,22 @@ export class GraphQLEditor {
     if (!this.editor) {
       return;
     }
-    
+
     // Process the template with current collection name and schema information
     // Pass the schema config to enable proper relationship field handling
-    const weaviateSchema = this.schemaConfig?.schema as { classes?: any[] } || undefined;
-    
+    const weaviateSchema = (this.schemaConfig?.schema as { classes?: any[] }) || undefined;
+
     const processedTemplate = processTemplate(
-      templateName, 
-      this.currentCollectionName, 
+      templateName,
+      this.currentCollectionName,
       10, // Use default limit
       weaviateSchema // Pass Weaviate schema to handle relationship fields
     );
-    
+
     // Replace editor content with template
     // Editor won't be null here due to the early return check above
     this.editor?.setValue(processedTemplate);
-    
+
     // Focus the editor
     this.editor?.focus();
   }
@@ -355,7 +366,7 @@ export class GraphQLEditor {
   public setCollectionName(collectionName: string): void {
     this.currentCollectionName = collectionName;
   }
-  
+
   /**
    * Check and validate query parameters
    * Provides warnings for large limits and validates certainty values
@@ -364,21 +375,23 @@ export class GraphQLEditor {
     if (!this.editor) {
       return;
     }
-    
+
     const model = this.editor.getModel();
-    if (!model) { return; }
-    
+    if (!model) {
+      return;
+    }
+
     const value = model.getValue();
-    
+
     // Clear existing markers
     monaco.editor.setModelMarkers(model, 'query-validator', []);
-    
+
     const markers: monaco.editor.IMarkerData[] = [];
-    
+
     // Check for high limit values (>100)
     const limitRegex = /limit:\s*(\d+)/gi;
     let match: RegExpExecArray | null;
-    
+
     while ((match = limitRegex.exec(value)) !== null) {
       const limit = parseInt(match[1], 10);
       if (limit > 100) {
@@ -386,21 +399,21 @@ export class GraphQLEditor {
         const startColumn = model.getPositionAt(match.index).column;
         const endLineNumber = model.getPositionAt(match.index + match[0].length).lineNumber;
         const endColumn = model.getPositionAt(match.index + match[0].length).column;
-        
+
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
           message: `High limit value (${limit}). Consider reducing for better performance.`,
           startLineNumber,
           startColumn,
           endLineNumber,
-          endColumn
+          endColumn,
         });
       }
     }
-    
+
     // Check for invalid certainty values (outside 0-1)
     const certaintyRegex = /certainty:\s*([0-9]*\.?[0-9]+)/gi;
-    
+
     while ((match = certaintyRegex.exec(value)) !== null) {
       const certainty = parseFloat(match[1]);
       if (certainty < 0 || certainty > 1) {
@@ -408,18 +421,18 @@ export class GraphQLEditor {
         const startColumn = model.getPositionAt(match.index).column;
         const endLineNumber = model.getPositionAt(match.index + match[0].length).lineNumber;
         const endColumn = model.getPositionAt(match.index + match[0].length).column;
-        
+
         markers.push({
           severity: monaco.MarkerSeverity.Error,
           message: `Invalid certainty value (${certainty}). Must be between 0 and 1.`,
           startLineNumber,
           startColumn,
           endLineNumber,
-          endColumn
+          endColumn,
         });
       }
     }
-    
+
     // Set markers on the model
     monaco.editor.setModelMarkers(model, 'query-validator', markers);
   }
@@ -450,26 +463,26 @@ export class GraphQLEditor {
     if (!this.editor) {
       return;
     }
-    
+
     try {
       const currentValue = this.editor.getValue();
       const formatted = await formatGraphQLQuery(currentValue);
-      
+
       if (formatted && formatted !== currentValue) {
         // Get current selection and cursor position
         const selection = this.editor.getSelection();
         const position = this.editor.getPosition();
-        
+
         // Update the value
         this.editor.setValue(formatted);
-        
+
         // Try to restore cursor position
         if (position) {
           this.editor.setPosition(position);
         } else if (selection) {
           this.editor.setSelection(selection);
         }
-        
+
         console.log('Query formatted successfully');
       }
     } catch (error) {
@@ -483,17 +496,21 @@ export class GraphQLEditor {
    * @param text Text to insert
    */
   public insertTextAtCursor(template: string): void {
-    if (!this.editor) { return; }
-    
+    if (!this.editor) {
+      return;
+    }
+
     const selection = this.editor.getSelection();
     const range = selection || new monaco.Range(1, 1, 1, 1);
-    
-    this.editor.executeEdits('insert-template', [{
-      range: range,
-      text: template,
-      forceMoveMarkers: true
-    }]);
-    
+
+    this.editor.executeEdits('insert-template', [
+      {
+        range: range,
+        text: template,
+        forceMoveMarkers: true,
+      },
+    ]);
+
     // Focus the editor
     this.editor.focus();
   }
@@ -515,11 +532,11 @@ export class GraphQLEditor {
     button.textContent = label;
     button.title = description || label;
     button.className = 'quick-insert-button';
-    
+
     button.addEventListener('click', () => {
       this.insertTextAtCursor(template);
     });
-    
+
     // Apply theme-aware styling
     button.style.backgroundColor = 'var(--vscode-button-secondaryBackground, #3c3c3c)';
     button.style.color = 'var(--vscode-button-secondaryForeground, #cccccc)';
@@ -528,7 +545,7 @@ export class GraphQLEditor {
     button.style.padding = '4px 8px';
     button.style.marginRight = '8px';
     button.style.cursor = 'pointer';
-    
+
     return button;
   }
 
@@ -537,7 +554,7 @@ export class GraphQLEditor {
    */
   public onDidChangeModelContent(listener: (value: string) => void): () => void {
     this.changeListeners.push(listener);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.changeListeners.indexOf(listener);
@@ -554,27 +571,34 @@ export class GraphQLEditor {
     if (!this.editor) {
       return;
     }
-    
+
     try {
       // Determine current VS Code theme
       const getVSCodeTheme = (): string => {
         const body = document.body;
         const html = document.documentElement;
-        
+
         if (body.classList.contains('vscode-dark') || html.classList.contains('vscode-dark')) {
           return 'vs-dark';
-        } else if (body.classList.contains('vscode-light') || html.classList.contains('vscode-light')) {
+        } else if (
+          body.classList.contains('vscode-light') ||
+          html.classList.contains('vscode-light')
+        ) {
           return 'vs';
-        } else if (body.classList.contains('vscode-high-contrast') || html.classList.contains('vscode-high-contrast')) {
+        } else if (
+          body.classList.contains('vscode-high-contrast') ||
+          html.classList.contains('vscode-high-contrast')
+        ) {
           return 'hc-black';
         }
-        
+
         // Check CSS variables
         const styles = getComputedStyle(document.body);
-        const bgColor = styles.getPropertyValue('--vscode-editor-background') || 
-                       styles.getPropertyValue('--vscode-panel-background') ||
-                       styles.backgroundColor;
-        
+        const bgColor =
+          styles.getPropertyValue('--vscode-editor-background') ||
+          styles.getPropertyValue('--vscode-panel-background') ||
+          styles.backgroundColor;
+
         if (bgColor && bgColor.includes('rgb')) {
           const rgb = bgColor.match(/\d+/g);
           if (rgb && rgb.length >= 3) {
@@ -582,10 +606,10 @@ export class GraphQLEditor {
             return brightness < 128 ? 'vs-dark' : 'vs';
           }
         }
-        
+
         return 'vs-dark'; // Default to dark
       };
-      
+
       const newTheme = getVSCodeTheme();
       console.log('Updating Monaco theme to:', newTheme);
       monaco.editor.setTheme(newTheme);
@@ -605,14 +629,14 @@ export class GraphQLEditor {
    * Clean up resources
    */
   public dispose(): void {
-    this.disposables.forEach(disposable => disposable.dispose());
+    this.disposables.forEach((disposable) => disposable.dispose());
     this.disposables = [];
-    
+
     if (this.editor) {
       this.editor.dispose();
       this.editor = null;
     }
-    
+
     this.changeListeners = [];
   }
 }
