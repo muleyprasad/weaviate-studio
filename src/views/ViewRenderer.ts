@@ -948,12 +948,15 @@ client.collections.createFromSchema(schema)`;
     private convertToApiFormat(schema: any): any {
         // Remove internal fields and format for API
         // if tokenization for "none", make undefined
-        const fixed_properties = schema.properties?.map((prop: { dataType: string[]; tokenization?: string, indexInverted?: string }) => ({
-            ...prop,
-            dataType: [prop.dataType],
-            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-            indexSearchable: prop.indexInverted,
-        })) || [];
+        const fixed_properties = schema.properties?.map((prop: { dataType: string | string[]; tokenization?: string, indexInverted?: string }) => {
+            const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
+            return {
+                ...prop,
+                dataType: dt,
+                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+                indexSearchable: prop.indexInverted,
+            };
+        }) || [];
         const apiSchema = { 
             ...schema, 
             class: schema.name, 
