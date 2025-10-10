@@ -968,36 +968,39 @@ const client = await weaviate.connectToLocal({
 schema = ${JSON.stringify(apiEquivalent, null, 2)}
 
 client.collections.createFromSchema(schema)`;
-    }
+  }
 
-    private convertToApiFormat(schema: any): any {
-        // Remove internal fields and format for API
-        // if tokenization for "none", make undefined
-        const fixed_properties = schema.properties?.map((prop: { dataType: string | string[]; tokenization?: string, indexInverted?: string }) => {
-            const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
-            return {
-                ...prop,
-                dataType: dt,
-                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-                indexSearchable: prop.indexInverted,
-            };
-        }) || [];
-        const apiSchema = { 
-            ...schema, 
-            class: schema.name, 
-            invertedIndexConfig: schema.invertedIndex,
-            moduleConfig: schema.generative,
-            multiTenancyConfig: schema.multiTenancyConfig,
-            properties: fixed_properties
-        };
-        delete apiSchema.id;
-        delete apiSchema._additional;
-        // delete all indexInverted for all properties
-        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-            delete prop.indexInverted;
-        });
-        delete apiSchema.indexInverted;
-        delete apiSchema.name;
-        return apiSchema;
-    }
+  private convertToApiFormat(schema: any): any {
+    // Remove internal fields and format for API
+    // if tokenization for "none", make undefined
+    const fixed_properties =
+      schema.properties?.map(
+        (prop: { dataType: string | string[]; tokenization?: string; indexInverted?: string }) => {
+          const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
+          return {
+            ...prop,
+            dataType: dt,
+            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+            indexSearchable: prop.indexInverted,
+          };
+        }
+      ) || [];
+    const apiSchema = {
+      ...schema,
+      class: schema.name,
+      invertedIndexConfig: schema.invertedIndex,
+      moduleConfig: schema.generative,
+      multiTenancyConfig: schema.multiTenancyConfig,
+      properties: fixed_properties,
+    };
+    delete apiSchema.id;
+    delete apiSchema._additional;
+    // delete all indexInverted for all properties
+    apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+      delete prop.indexInverted;
+    });
+    delete apiSchema.indexInverted;
+    delete apiSchema.name;
+    return apiSchema;
+  }
 }
