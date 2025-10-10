@@ -1225,62 +1225,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           ];
         }
 
-    /**
-     * Converts a raw Weaviate schema to a properly formatted API schema
-     * @param schema - The raw schema from Weaviate
-     * @returns The formatted schema ready for API consumption
-     */
-    private convertSchemaToApiFormat(schema: any): any {
-        const fixed_properties = schema.properties?.map((prop: any) => {
-            // Normalize dataType to the v2 string format (not array)
-            let dt = prop?.dataType;
-            if (Array.isArray(dt)) {
-                dt = dt[0];
-            }
-            return {
-                ...prop,
-                dataType: dt,
-                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-                indexSearchable: prop.indexInverted,
-            };
-        }) || [];
-                
-        const fixed_vectorizers = schema.vectorizers ? Object.fromEntries(
-            Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-                const vectorizerName = vec.vectorizer?.name || 'none';
-                const vectorizerConfig = vec.vectorizer?.config || {};
-                const vectorIndexType = vec.vectorIndexType || 'hnsw';
-                const vectorIndexConfig = vec.vectorIndexConfig || {};
-                return [
-                    key,
-                    {
-                        vectorizer: { [vectorizerName]: vectorizerConfig },
-                        vectorIndexType,
-                        vectorIndexConfig
-                    }
-                ];
-            })
-        ) : undefined;
-        
-        // now build the final schema object
-        const apiSchema = { 
-            ...schema, 
-            class: schema.name, 
-            invertedIndexConfig: schema.invertedIndex,
-            moduleConfig: schema.generative,
-            multiTenancyConfig: schema.multiTenancy,
-            properties: fixed_properties,
-            vectorConfig: fixed_vectorizers
-        } as any;
-        
-        // delete all indexInverted for all properties
-        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-            delete prop.indexInverted;
-        });
-        delete apiSchema.vectorizers;
-        
-        return apiSchema;
-    }
+        const moduleItems: WeaviateTreeItem[] = [];
 
         try {
           const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
@@ -2006,12 +1951,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   private convertSchemaToApiFormat(schema: any): any {
     const fixed_properties =
-      schema.properties?.map((prop: any) => ({
-        ...prop,
-        dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType],
-        tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-        indexSearchable: prop.indexInverted,
-      })) || [];
+      schema.properties?.map((prop: any) => {
+        // Normalize dataType to the v2 string format (not array)
+        let dt = prop?.dataType;
+        if (Array.isArray(dt)) {
+          dt = dt[0];
+        }
+        return {
+          ...prop,
+          dataType: dt,
+          tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+          indexSearchable: prop.indexInverted,
+        };
+      }) || [];
 
     const fixed_vectorizers = schema.vectorizers
       ? Object.fromEntries(
@@ -2114,50 +2066,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       throw new Error('Connection must be active to add collections');
     }
 
-        // Basic validation
-        if (!schema.class) {
-            throw new Error('Collection name is required');
-        }
-        
-        // Determine server major version to pick schema format (v1 vs v2)
-        const serverVersion = this.clusterMetadataCache[connectionId]?.version || '';
-        const serverMajor = parseInt((serverVersion.split('.')[0] || '0'), 10);
-        const useV2Types = serverMajor >= 2; // v2 uses string dataType; v1 uses string[]
-
-        // Build schema object
-        const schemaObject = {
-            class: schema.class,
-            description: schema.description || undefined,
-            properties: (schema.properties || []).map((p: any) => {
-                // Normalize incoming dataType to canonical string with [] suffix for arrays
-                let dt: any = p?.dataType;
-                if (Array.isArray(dt)) {
-                    dt = dt[0];
-                }
-                // Ensure string
-                dt = String(dt);
-                // For v1, wrap in array; for v2, keep as string
-                const normalizedDt = useV2Types ? dt : [dt];
-                return { ...p, dataType: normalizedDt };
-            })  // Include properties from the form
-        } as any;
-        
-        // Handle vectorConfig (new multi-vectorizer format)
-        if (schema.vectorConfig) {
-            schemaObject.vectorConfig = schema.vectorConfig;
-        } 
-        // Handle legacy single vectorizer format for backward compatibility
-        else if (schema.vectorizer && schema.vectorizer !== 'none') {
-            schemaObject.vectorizer = schema.vectorizer;
-            if (schema.vectorIndexType) {
-                schemaObject.vectorIndexType = schema.vectorIndexType;
-            }
-            if (schema.vectorIndexConfig) {
-                schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
-            }
-            if (schema.moduleConfig) {
-                schemaObject.moduleConfig = schema.moduleConfig;
-            }
+    try {
+      // Create and show the Add Collection webview panel
+      const panel = vscode.window.createWebviewPanel(
+        'weaviateAddCollection',
+        'Add Collection',
+        vscode.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [],
         }
       );
 
@@ -2335,11 +2253,27 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       throw new Error('Collection name is required');
     }
 
+    // Determine server major version to pick schema format (v1 vs v2)
+    const serverVersion = this.clusterMetadataCache[connectionId]?.version || '';
+    const serverMajor = parseInt(serverVersion.split('.')[0] || '0', 10);
+    const useV2Types = serverMajor >= 2; // v2 uses string dataType; v1 uses string[]
+
     // Build schema object
     const schemaObject = {
       class: schema.class,
       description: schema.description || undefined,
-      properties: schema.properties || [], // Include properties from the form
+      properties: (schema.properties || []).map((p: any) => {
+        // Normalize incoming dataType to canonical string with [] suffix for arrays
+        let dt: any = p?.dataType;
+        if (Array.isArray(dt)) {
+          dt = dt[0];
+        }
+        // Ensure string
+        dt = String(dt);
+        // For v1, wrap in array; for v2, keep as string
+        const normalizedDt = useV2Types ? dt : [dt];
+        return { ...p, dataType: normalizedDt };
+      }), // Include properties from the form
     } as any;
 
     // Handle vectorConfig (new multi-vectorizer format)
