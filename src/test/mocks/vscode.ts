@@ -59,6 +59,16 @@ const vscode = {
     Two: 2,
     Three: 3,
   },
+  Uri: {
+    // Minimal joinPath implementation used by tests
+    joinPath: jest.fn((base: any, ...paths: string[]) => {
+      // If base is a Uri-like object with fsPath, build a simple object
+      const basePath = base && base.fsPath ? base.fsPath : String(base || '');
+      const fullPath = [basePath, ...paths].join('/').replace(/\\/g, '/');
+      return { fsPath: fullPath, toString: () => `file://${fullPath}` };
+    }),
+    file: (path: string) => ({ fsPath: path, toString: () => `file://${path}` }),
+  },
 };
 
 module.exports = vscode;

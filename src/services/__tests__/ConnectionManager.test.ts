@@ -291,14 +291,11 @@ describe('ConnectionManager', () => {
 
     test('connects to cloud connection with proper configuration', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
-      const mockApiKey = jest.fn();
       const mockConnectToWeaviateCloud = jest
         .spyOn(weaviateClient, 'connectToWeaviateCloud')
         .mockResolvedValue({
           isReady: jest.fn().mockResolvedValue(true),
         } as any);
-
-      jest.spyOn(weaviateClient, 'ApiKey').mockImplementation(() => mockApiKey as any);
 
       const conn = await mgr.addConnection({
         name: 'Cloud Test',
@@ -312,14 +309,19 @@ describe('ConnectionManager', () => {
 
       await mgr.connect(conn.id);
 
-      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith('https://test.weaviate.cloud', {
-        authCredentials: mockApiKey,
-        timeout: {
-          init: 45,
-          query: 90,
-          insert: 180,
-        },
-      });
+      // ApiKey is provided by the weaviate client factory; assert the connect call
+      // received authCredentials containing the expected key and the correct timeouts.
+      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith(
+        'https://test.weaviate.cloud',
+        expect.objectContaining({
+          authCredentials: expect.objectContaining({ key: 'cloud-key' }),
+          timeout: {
+            init: 45,
+            query: 90,
+            insert: 180,
+          },
+        })
+      );
     });
   });
 
