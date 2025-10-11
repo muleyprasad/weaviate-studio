@@ -618,14 +618,14 @@ export class QueryEditorPanel {
   }
 
   private static _getOutputChannel(): vscode.OutputChannel | null {
-    const factory = vscode.window?.createOutputChannel;
-    if (!factory) {
+    try {
+      if (!QueryEditorPanel._outputChannel) {
+        QueryEditorPanel._outputChannel = vscode.window.createOutputChannel('Weaviate Studio');
+      }
+      return QueryEditorPanel._outputChannel;
+    } catch {
       return null;
     }
-    if (!QueryEditorPanel._outputChannel) {
-      QueryEditorPanel._outputChannel = factory.call(vscode.window, 'Weaviate Studio', undefined);
-    }
-    return QueryEditorPanel._outputChannel;
   }
 
   private async _getHtmlForWebview(webview: vscode.Webview): Promise<string> {
