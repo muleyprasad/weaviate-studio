@@ -5,21 +5,21 @@ const vscode = {
     createWebviewPanel: jest.fn(() => ({
       webview: {
         postMessage: jest.fn(),
-        onDidReceiveMessage: jest.fn()
+        onDidReceiveMessage: jest.fn(),
       },
       reveal: jest.fn(),
-      dispose: jest.fn()
-    }))
+      dispose: jest.fn(),
+    })),
   },
   commands: {
     registerCommand: jest.fn(),
     executeCommand: jest.fn(),
-    setContext: jest.fn()
+    setContext: jest.fn(),
   },
   EventEmitter: class {
     private listeners: Array<(...args: unknown[]) => void> = [];
     fire(...args: unknown[]) {
-      this.listeners.forEach(fn => fn(...args));
+      this.listeners.forEach((fn) => fn(...args));
     }
     event = (listener: (...args: unknown[]) => void) => {
       this.listeners.push(listener);
@@ -42,7 +42,7 @@ const vscode = {
   TreeItemCollapsibleState: {
     None: 0,
     Collapsed: 1,
-    Expanded: 2
+    Expanded: 2,
   },
   TreeItem: class {
     label: string;
@@ -57,8 +57,18 @@ const vscode = {
     Beside: -2,
     One: 1,
     Two: 2,
-    Three: 3
+    Three: 3,
+  },
+  Uri: {
+    // Minimal joinPath implementation used by tests
+    joinPath: jest.fn((base: any, ...paths: string[]) => {
+      // If base is a Uri-like object with fsPath, build a simple object
+      const basePath = base && base.fsPath ? base.fsPath : String(base || '');
+      const fullPath = [basePath, ...paths].join('/').replace(/\\/g, '/');
+      return { fsPath: fullPath, toString: () => `file://${fullPath}` };
+    }),
+    file: (path: string) => ({ fsPath: path, toString: () => `file://${path}` }),
   },
 };
 
-module.exports = vscode; 
+module.exports = vscode;

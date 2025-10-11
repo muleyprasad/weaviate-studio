@@ -139,8 +139,13 @@
     "languages": [
       {
         "id": "weaviate",
-        "aliases": ["Weaviate Connection", "weaviate"],
-        "extensions": [".weaviate"],
+        "aliases": [
+          "Weaviate Connection",
+          "weaviate"
+        ],
+        "extensions": [
+          ".weaviate"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -282,14 +287,23 @@
     "package": "webpack --mode production --devtool hidden-source-map",
     "build:webview": "webpack --config webpack.webview.config.js --mode development",
     "package:webview": "NODE_ENV=production webpack --config webpack.webview.config.js --mode production",
-    "lint": "eslint src --ext ts",
-    "lint:fix": "eslint src --ext ts --fix",
+    "lint": "eslint src --ext ts,tsx",
+    "lint:fix": "eslint src --ext ts,tsx --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "prepare": "husky install",
-    "format": "prettier --write \"src/**/*.ts\" \"src/**/*.tsx\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"src/**/*.tsx\""
+    "prepare": "husky",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -309,6 +323,7 @@
     "husky": "^9.0.7",
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
+    "lint-staged": "^15.5.2",
     "mini-css-extract-plugin": "^2.9.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "path-browserify": "^1.0.1",

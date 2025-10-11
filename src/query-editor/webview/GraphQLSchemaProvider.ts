@@ -48,7 +48,9 @@ export class SchemaProvider {
   }
 
   private loadCachedSchemas(): void {
-    const cachedData = this.context.workspaceState.get<{ [key: string]: { schema: WeaviateSchema; timestamp: number } }>(SCHEMA_CACHE_KEY);
+    const cachedData = this.context.workspaceState.get<{
+      [key: string]: { schema: WeaviateSchema; timestamp: number };
+    }>(SCHEMA_CACHE_KEY);
     if (cachedData) {
       Object.entries(cachedData).forEach(([key, value]) => {
         this.schemaCache.set(key, value);
@@ -64,7 +66,10 @@ export class SchemaProvider {
     this.context.workspaceState.update(SCHEMA_CACHE_KEY, cacheObject);
   }
 
-  public async getSchemaForConnection(connectionId?: string, client?: WeaviateClient): Promise<WeaviateSchema | null> {
+  public async getSchemaForConnection(
+    connectionId?: string,
+    client?: WeaviateClient
+  ): Promise<WeaviateSchema | null> {
     try {
       // Use provided client or get one from connection manager
       let weaviateClient = client;
@@ -80,7 +85,7 @@ export class SchemaProvider {
           const connections = this.connectionManager.getConnections();
           connection = connections.length > 0 ? connections[0] : undefined;
         }
-        
+
         if (!connection) {
           throw new Error('No active Weaviate connection found');
         }
@@ -95,8 +100,8 @@ export class SchemaProvider {
       // Check cache first
       const cacheKey = connectionUrl;
       const cachedData = this.schemaCache.get(cacheKey);
-      
-      if (cachedData && (Date.now() - cachedData.timestamp) < this.cacheTTL) {
+
+      if (cachedData && Date.now() - cachedData.timestamp < this.cacheTTL) {
         console.log('Using cached schema for', connectionUrl);
         return cachedData.schema;
       }
@@ -109,7 +114,7 @@ export class SchemaProvider {
 
       // get the list of collections
       const collections = await weaviateClient.collections.listAll();
-      
+
       // Cache the result
       const schemaData: WeaviateSchema = {
         classes: (collections || []).map((collection: CollectionConfig) => ({
@@ -118,16 +123,16 @@ export class SchemaProvider {
           properties: (collection.properties || []).map((prop: PropertyConfig) => ({
             name: prop.name || '',
             dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType || 'string'],
-            description: prop.description
-          }))
-        }))
+            description: prop.description,
+          })),
+        })),
       };
-      
+
       this.schemaCache.set(cacheKey, {
         schema: schemaData,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       this.saveCachedSchemas();
       return schemaData;
     } catch (error: any) {
@@ -137,7 +142,10 @@ export class SchemaProvider {
     }
   }
 
-  public async getGraphQLSchemaConfig(connectionId?: string, client?: WeaviateClient): Promise<GraphQLSchema | null> {
+  public async getGraphQLSchemaConfig(
+    connectionId?: string,
+    client?: WeaviateClient
+  ): Promise<GraphQLSchema | null> {
     try {
       // Use provided client or get one from connection manager
       let weaviateClient = client;
@@ -153,11 +161,11 @@ export class SchemaProvider {
           const connections = this.connectionManager.getConnections();
           connection = connections.length > 0 ? connections[0] : undefined;
         }
-        
+
         if (!connection) {
           throw new Error('No active Weaviate connection found');
         }
-        
+
         connectionUrl = connection.httpHost || connection.cloudUrl || 'localhost';
         weaviateClient = this.connectionManager.getClient(connection.id);
       } else {
@@ -166,7 +174,7 @@ export class SchemaProvider {
       }
 
       const schema = await this.getSchemaForConnection(connectionId, weaviateClient);
-      
+
       if (!schema) {
         return null;
       }
@@ -185,27 +193,27 @@ export class SchemaProvider {
         __schema: {
           types: [
             ...types,
-            ...schema.classes.map(cls => ({
+            ...schema.classes.map((cls) => ({
               name: cls.class,
               kind: 'OBJECT',
-              fields: cls.properties.map(prop => ({
+              fields: cls.properties.map((prop) => ({
                 name: prop.name,
                 type: {
                   name: prop.dataType[0],
-                  kind: 'SCALAR'
+                  kind: 'SCALAR',
                 },
-                description: prop.description || null
-              }))
-            }))
-          ]
-        }
+                description: prop.description || null,
+              })),
+            })),
+          ],
+        },
       };
 
       return {
         uri: connectionUrl,
         schema: schema,
         fileMatch: ['*.graphql', '*.gql'],
-        introspectionJSON
+        introspectionJSON,
       };
     } catch (error: any) {
       console.error('Error creating GraphQL schema config:', error);

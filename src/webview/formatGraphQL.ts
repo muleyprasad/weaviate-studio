@@ -14,7 +14,7 @@ export const formatGraphQLQuery = async (query: string): Promise<string> => {
       printWidth: 80,
       tabWidth: 2,
     });
-    
+
     return formattedQuery;
   } catch (error) {
     console.error('Error formatting GraphQL query:', error);

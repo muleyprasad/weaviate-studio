@@ -6,28 +6,32 @@ import { CollectionConfig } from 'weaviate-client';
  * Service responsible for rendering views in webview panels
  */
 export class ViewRenderer {
-    private static instance: ViewRenderer;
-    private context: vscode.ExtensionContext;
+  private static instance: ViewRenderer;
+  private context: vscode.ExtensionContext;
 
-    private constructor(context: vscode.ExtensionContext) {
-        this.context = context;
+  private constructor(context: vscode.ExtensionContext) {
+    this.context = context;
+  }
+
+  /**
+   * Get the singleton instance of ViewRenderer
+   */
+  public static getInstance(context: vscode.ExtensionContext): ViewRenderer {
+    if (!ViewRenderer.instance) {
+      ViewRenderer.instance = new ViewRenderer(context);
     }
+    return ViewRenderer.instance;
+  }
 
-    /**
-     * Get the singleton instance of ViewRenderer
-     */
-    public static getInstance(context: vscode.ExtensionContext): ViewRenderer {
-        if (!ViewRenderer.instance) {
-            ViewRenderer.instance = new ViewRenderer(context);
-        }
-        return ViewRenderer.instance;
-    }
-
-    /**
-     * Renders property details view
-     */
-    public renderPropertyDetails(propertyName: string, property: SchemaProperty, collectionName: string): string {
-        return `
+  /**
+   * Renders property details view
+   */
+  public renderPropertyDetails(
+    propertyName: string,
+    property: SchemaProperty,
+    collectionName: string
+  ): string {
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -86,7 +90,7 @@ export class ViewRenderer {
                 <h1>${this.escapeHtml(propertyName)}</h1>
                 <div class="property-header">
                     <strong>Collection:</strong> ${this.escapeHtml(collectionName)} <br>
-                    <strong>Type:</strong> ${property.dataType?.map(t => this.escapeHtml(t)).join(', ') || 'Unknown'}
+                    <strong>Type:</strong> ${property.dataType?.map((t) => this.escapeHtml(t)).join(', ') || 'Unknown'}
                 </div>
 
                 <div class="property-section">
@@ -96,24 +100,32 @@ export class ViewRenderer {
                         <div>${this.escapeHtml(property.name)}</div>
                         
                         <div><strong>Data Type:</strong></div>
-                        <div>${property.dataType?.map(t => this.escapeHtml(t)).join(', ') || 'Unknown'}</div>
+                        <div>${property.dataType?.map((t) => this.escapeHtml(t)).join(', ') || 'Unknown'}</div>
                         
-                        ${property.description ? `
+                        ${
+                          property.description
+                            ? `
                             <div><strong>Description:</strong></div>
                             <div>${this.escapeHtml(property.description)}</div>
-                        ` : ''}
+                        `
+                            : ''
+                        }
                         
                         <div><strong>Indexed:</strong></div>
                         <div>${property.indexInverted !== false ? 'Yes' : 'No'}</div>
                     </div>
                 </div>
 
-                ${property.moduleConfig ? `
+                ${
+                  property.moduleConfig
+                    ? `
                     <div class="property-section">
                         <h3>Module Configuration</h3>
                         <pre><code>${this.syntaxHighlight(property.moduleConfig)}</code></pre>
                     </div>
-                ` : ''}
+                `
+                    : ''
+                }
 
                 <div class="property-section">
                     <h3>Raw Property Definition</h3>
@@ -122,24 +134,26 @@ export class ViewRenderer {
             </body>
             </html>
         `;
-    }
+  }
 
+  /**
+   * Renders detailed schema view with multiple tabs
+   */
+  public renderDetailedSchema(schema: CollectionConfig): string {
+    const formatDataType = (dataType: string | string[] | undefined): string => {
+      if (!dataType) {
+        return 'Unknown';
+      }
+      if (Array.isArray(dataType)) {
+        return dataType.join(' | ');
+      }
+      return dataType;
+    };
 
-    /**
-     * Renders detailed schema view with multiple tabs
-     */
-    public renderDetailedSchema(schema: CollectionConfig): string {
-        const formatDataType = (dataType: string | string[] | undefined): string => {
-            if (!dataType) {
-                return 'Unknown';
-            }
-            if (Array.isArray(dataType)) {
-                return dataType.join(' | ');
-            }
-            return dataType;
-        };
-
-        const propertiesHtml = schema.properties?.map(prop => `
+    const propertiesHtml =
+      schema.properties
+        ?.map(
+          (prop) => `
             <div class="property-item">
                 <div class="property-header">
                     <span class="property-name">${this.escapeHtml(prop.name)}</span>
@@ -147,51 +161,57 @@ export class ViewRenderer {
                 </div>
                 ${prop.description ? `<div class="property-description">${this.escapeHtml(prop.description)}</div>` : ''}
                 <div class="property-details">
-                    <span class="property-detail">${Object.entries(prop).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('<br /> ')}</span>
+                    <span class="property-detail">${Object.entries(prop)
+                      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+                      .join('<br /> ')}</span>
                 </div>
             </div>
-        `).join('') || '<div>No properties found</div>';
+        `
+        )
+        .join('') || '<div>No properties found</div>';
 
-        // Generate REST API equivalent for collection creation
-        const apiEquivalent = {
-            class: schema.name,
-            description: schema.description,
-            vectorizers: schema.vectorizers,
-            properties: schema.properties,
-            vectorIndexType: (schema as any).vectorIndexType || 'hnsw',
-            vectorIndexConfig: (schema as any).vectorIndexConfig,
-            invertedIndexConfig: (schema as any).invertedIndexConfig,
-            shardingConfig: (schema as any).shardingConfig,
-            replicationConfig: (schema as any).replicationConfig,
-            multiTenancyConfig: (schema as any).multiTenancyConfig
-        };
+    // Generate REST API equivalent for collection creation
+    const apiEquivalent = {
+      class: schema.name,
+      description: schema.description,
+      vectorizers: schema.vectorizers,
+      properties: schema.properties,
+      vectorIndexType: (schema as any).vectorIndexType || 'hnsw',
+      vectorIndexConfig: (schema as any).vectorIndexConfig,
+      invertedIndexConfig: (schema as any).invertedIndexConfig,
+      shardingConfig: (schema as any).shardingConfig,
+      replicationConfig: (schema as any).replicationConfig,
+      multiTenancyConfig: (schema as any).multiTenancyConfig,
+    };
 
-
-        // Build scaling configuration sections dynamically
-        const scalingSections: string[] = [];
-        const formatIfExists = (data: any, label: string): void => {
-            if (data) {
-                scalingSections.push(`
+    // Build scaling configuration sections dynamically
+    const scalingSections: string[] = [];
+    const formatIfExists = (data: any, label: string): void => {
+      if (data) {
+        scalingSections.push(`
                     <div class="config-section">
                         <h3>${label}</h3>
                         <pre><code>${this.formatJsonClean(data)}</code></pre>
                     </div>
                 `);
-            }
-        };
+      }
+    };
 
-        formatIfExists(schema.sharding, 'Sharding');
-        formatIfExists(schema.replication, 'Replication');
-        formatIfExists(schema.multiTenancy, 'Multi-Tenancy');
+    formatIfExists(schema.sharding, 'Sharding');
+    formatIfExists(schema.replication, 'Replication');
+    formatIfExists(schema.multiTenancy, 'Multi-Tenancy');
 
-        const scalingHtml = scalingSections.length > 0 ? `
+    const scalingHtml =
+      scalingSections.length > 0
+        ? `
             <div class="section-header">Scaling Configuration</div>
             <div class="section-content">
                 ${scalingSections.join('')}
             </div>
-        ` : '';
+        `
+        : '';
 
-        return `
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -613,16 +633,15 @@ export class ViewRenderer {
             </body>
             </html>
         `;
-    }
+  }
 
+  /**
+   * Renders a JSON schema viewer
+   */
+  public renderJsonViewer(title: string, json: any): string {
+    const jsonString = typeof json === 'string' ? json : JSON.stringify(json, null, 2);
 
-    /**
-     * Renders a JSON schema viewer
-     */
-    public renderJsonViewer(title: string, json: any): string {
-        const jsonString = typeof json === 'string' ? json : JSON.stringify(json, null, 2);
-        
-        return `
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -695,64 +714,64 @@ export class ViewRenderer {
             </body>
             </html>
         `;
+  }
+
+  /**
+   * Helper to escape HTML special characters
+   */
+  private escapeHtml(unsafe: string): string {
+    if (typeof unsafe !== 'string') {
+      return String(unsafe);
+    }
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Helper to format JSON with syntax highlighting
+   */
+  private syntaxHighlight(json: any): string {
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch (e) {
+        return this.escapeHtml(json);
+      }
     }
 
-    /**
-     * Helper to escape HTML special characters
-     */
-    private escapeHtml(unsafe: string): string {
-        if (typeof unsafe !== 'string') {
-            return String(unsafe);
-        }
-        return unsafe
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+    const jsonString = JSON.stringify(json, null, 2);
+    return this.escapeHtml(jsonString);
+  }
+
+  /**
+   * Helper to format JSON without gray highlighting
+   */
+  private formatJsonClean(json: any): string {
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch (e) {
+        return this.escapeHtml(json);
+      }
     }
 
-    /**
-     * Helper to format JSON with syntax highlighting
-     */
-    private syntaxHighlight(json: any): string {
-        if (typeof json === 'string') {
-            try {
-                json = JSON.parse(json);
-            } catch (e) {
-                return this.escapeHtml(json);
-            }
-        }
-        
-        const jsonString = JSON.stringify(json, null, 2);
-        return this.escapeHtml(jsonString);
-    }
+    const jsonString = JSON.stringify(json, null, 2);
+    return this.escapeHtml(jsonString);
+  }
 
-    /**
-     * Helper to format JSON without gray highlighting
-     */
-    private formatJsonClean(json: any): string {
-        if (typeof json === 'string') {
-            try {
-                json = JSON.parse(json);
-            } catch (e) {
-                return this.escapeHtml(json);
-            }
-        }
-        
-        const jsonString = JSON.stringify(json, null, 2);
-        return this.escapeHtml(jsonString);
-    }
+  /**
+   * Renders raw collection configuration view
+   */
+  public renderRawConfig(schema: CollectionConfig, connectionId: string): string {
+    // Get connection info for context
+    const timestamp = new Date().toLocaleString();
 
-    /**
-     * Renders raw collection configuration view
-     */
-    public renderRawConfig(schema: CollectionConfig, connectionId: string): string {
-        // Get connection info for context
-        const timestamp = new Date().toLocaleString();
-        
-        // Generate creation script
-        const creationScript = `# Weaviate Collection Configuration
+    // Generate creation script
+    const creationScript = `# Weaviate Collection Configuration
 # Generated: ${timestamp}
 # Collection: ${schema.name}
 
@@ -768,7 +787,7 @@ client.schema.create_class(collection_config)
 
 print(f"Collection '{schema.class}' created successfully!")`;
 
-        return `
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -868,13 +887,19 @@ print(f"Collection '{schema.class}' created successfully!")`;
                     
                     <div id="details" class="tab-content">
                         <h3>Property Details</h3>
-                        ${schema.properties?.map(prop => `
+                        ${
+                          schema.properties
+                            ?.map(
+                              (prop) => `
                             <div style="background: var(--vscode-editor-lineHighlightBackground); padding: 10px; margin: 10px 0; border-radius: 4px;">
                                 <strong>${this.escapeHtml(prop.name)}</strong> (${prop.dataType || 'Unknown'})<br>
                                 ${prop.description ? `<em>${this.escapeHtml(prop.description)}</em><br>` : ''}
                                 <small>Indexed: ${prop.indexInverted !== false ? 'Yes' : 'No'}</small>
                             </div>
-                        `).join('') || '<p>No properties defined</p>'}
+                        `
+                            )
+                            .join('') || '<p>No properties defined</p>'
+                        }
                     </div>
                     
                     <div id="json" class="tab-content">
@@ -919,19 +944,19 @@ print(f"Collection '{schema.class}' created successfully!")`;
             </body>
             </html>
         `;
-    }
+  }
 
-    private generateCurlCommand(schema: any): string {
-        const apiEquivalent = this.convertToApiFormat(schema);
-        return `curl http://localhost:8080/v1/schema \\
+  private generateCurlCommand(schema: any): string {
+    const apiEquivalent = this.convertToApiFormat(schema);
+    return `curl http://localhost:8080/v1/schema \\
     -X POST \\
     -H "Content-Type: application/json" \\
     -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
-    }
+  }
 
-    private generatePythonScript(schema: any): string {
-        const apiEquivalent = this.convertToApiFormat(schema);
-        return `import weaviate
+  private generatePythonScript(schema: any): string {
+    const apiEquivalent = this.convertToApiFormat(schema);
+    return `import weaviate
 
 const client = await weaviate.connectToLocal({
     host: process.env.WEAVIATE_HOST || 'localhost',
@@ -943,36 +968,39 @@ const client = await weaviate.connectToLocal({
 schema = ${JSON.stringify(apiEquivalent, null, 2)}
 
 client.collections.createFromSchema(schema)`;
-    }
+  }
 
-    private convertToApiFormat(schema: any): any {
-        // Remove internal fields and format for API
-        // if tokenization for "none", make undefined
-        const fixed_properties = schema.properties?.map((prop: { dataType: string | string[]; tokenization?: string, indexInverted?: string }) => {
-            const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
-            return {
-                ...prop,
-                dataType: dt,
-                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-                indexSearchable: prop.indexInverted,
-            };
-        }) || [];
-        const apiSchema = { 
-            ...schema, 
-            class: schema.name, 
-            invertedIndexConfig: schema.invertedIndex,
-            moduleConfig: schema.generative,
-            multiTenancyConfig: schema.multiTenancyConfig,
-            properties: fixed_properties
-        };
-        delete apiSchema.id;
-        delete apiSchema._additional;
-        // delete all indexInverted for all properties
-        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-            delete prop.indexInverted;
-        });
-        delete apiSchema.indexInverted;
-        delete apiSchema.name;
-        return apiSchema;
-    }
+  private convertToApiFormat(schema: any): any {
+    // Remove internal fields and format for API
+    // if tokenization for "none", make undefined
+    const fixed_properties =
+      schema.properties?.map(
+        (prop: { dataType: string | string[]; tokenization?: string; indexInverted?: string }) => {
+          const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
+          return {
+            ...prop,
+            dataType: dt,
+            tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+            indexSearchable: prop.indexInverted,
+          };
+        }
+      ) || [];
+    const apiSchema = {
+      ...schema,
+      class: schema.name,
+      invertedIndexConfig: schema.invertedIndex,
+      moduleConfig: schema.generative,
+      multiTenancyConfig: schema.multiTenancyConfig,
+      properties: fixed_properties,
+    };
+    delete apiSchema.id;
+    delete apiSchema._additional;
+    // delete all indexInverted for all properties
+    apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+      delete prop.indexInverted;
+    });
+    delete apiSchema.indexInverted;
+    delete apiSchema.name;
+    return apiSchema;
+  }
 }

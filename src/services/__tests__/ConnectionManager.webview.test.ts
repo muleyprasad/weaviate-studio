@@ -34,25 +34,25 @@ describe('ConnectionManager Webview Tests', () => {
       update: jest.fn((key: string, value: any) => {
         globalState.storage[key] = value;
         return Promise.resolve();
-      })
+      }),
     } as unknown as MockGlobalState;
 
     mockContext = {
       globalState,
-      subscriptions: []
+      subscriptions: [],
     };
 
     mockPanel = {
       webview: {
         html: '',
         onDidReceiveMessage: jest.fn(),
-        postMessage: jest.fn()
+        postMessage: jest.fn(),
       },
-      dispose: jest.fn()
+      dispose: jest.fn(),
     };
 
     mockCreateWebviewPanel = jest.fn().mockReturnValue(mockPanel);
-    
+
     // Mock vscode.window.createWebviewPanel
     jest.spyOn(vscode.window, 'createWebviewPanel').mockImplementation(mockCreateWebviewPanel);
   });
@@ -74,7 +74,7 @@ describe('ConnectionManager Webview Tests', () => {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: []
+          localResourceRoots: [],
         }
       );
 
@@ -120,8 +120,8 @@ describe('ConnectionManager Webview Tests', () => {
           apiKey: 'test-key',
           timeoutInit: 30,
           timeoutQuery: 60,
-          timeoutInsert: 120
-        }
+          timeoutInsert: 120,
+        },
       });
 
       const result = await dialogPromise;
@@ -150,8 +150,8 @@ describe('ConnectionManager Webview Tests', () => {
           apiKey: 'cloud-key',
           timeoutInit: 45,
           timeoutQuery: 90,
-          timeoutInsert: 180
-        }
+          timeoutInsert: 180,
+        },
       });
 
       const result = await dialogPromise;
@@ -174,16 +174,16 @@ describe('ConnectionManager Webview Tests', () => {
       messageHandler({
         command: 'save',
         connection: {
-          name: '',  // Missing name
+          name: '', // Missing name
           type: 'custom',
-          httpHost: '',  // Missing httpHost
-          httpPort: 8080
-        }
+          httpHost: '', // Missing httpHost
+          httpPort: 8080,
+        },
       });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'error',
-        message: 'Name and httpHost are required'
+        message: 'Name and httpHost are required',
       });
 
       expect(mockPanel.dispose).not.toHaveBeenCalled();
@@ -206,14 +206,14 @@ describe('ConnectionManager Webview Tests', () => {
         connection: {
           name: 'Test Cloud',
           type: 'cloud',
-          cloudUrl: '',  // Missing cloudUrl
-          apiKey: ''     // Missing apiKey
-        }
+          cloudUrl: '', // Missing cloudUrl
+          apiKey: '', // Missing apiKey
+        },
       });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'error',
-        message: 'Name, cloudUrl and apiKey are required'
+        message: 'Name, cloudUrl and apiKey are required',
       });
 
       // Clean up
@@ -248,7 +248,7 @@ describe('ConnectionManager Webview Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const dialogPromise = mgr.showAddConnectionDialog();
@@ -259,23 +259,23 @@ describe('ConnectionManager Webview Tests', () => {
       messageHandler({
         command: 'save',
         connection: {
-          name: 'Existing',  // Duplicate name
+          name: 'Existing', // Duplicate name
           type: 'custom',
           httpHost: 'different-host',
           httpPort: 8080,
           grpcHost: 'different-host',
           grpcPort: 50051,
           httpSecure: false,
-          grpcSecure: false
-        }
+          grpcSecure: false,
+        },
       });
 
       // Wait a bit for the async operation to complete
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'error',
-        message: expect.stringContaining('A connection with this name already exists')
+        message: expect.stringContaining('A connection with this name already exists'),
       });
 
       // Clean up
@@ -296,7 +296,7 @@ describe('ConnectionManager Webview Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const dialogPromise = mgr.showEditConnectionDialog(connection.id);
@@ -308,7 +308,7 @@ describe('ConnectionManager Webview Tests', () => {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: []
+          localResourceRoots: [],
         }
       );
 
@@ -332,7 +332,7 @@ describe('ConnectionManager Webview Tests', () => {
         apiKey: 'existing-key',
         timeoutInit: 45,
         timeoutQuery: 90,
-        timeoutInsert: 180
+        timeoutInsert: 180,
       });
 
       const dialogPromise = mgr.showEditConnectionDialog(connection.id);
@@ -361,7 +361,7 @@ describe('ConnectionManager Webview Tests', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         httpSecure: false,
-        grpcSecure: false
+        grpcSecure: false,
       });
 
       const dialogPromise = mgr.showEditConnectionDialog(connection.id);
@@ -379,8 +379,8 @@ describe('ConnectionManager Webview Tests', () => {
           grpcPort: 50052,
           httpSecure: true,
           grpcSecure: true,
-          apiKey: 'updated-key'
-        }
+          apiKey: 'updated-key',
+        },
       });
 
       const result = await dialogPromise;
@@ -399,7 +399,7 @@ describe('ConnectionManager Webview Tests', () => {
         name: 'Keep Key',
         type: 'cloud',
         cloudUrl: 'https://keep.weaviate.network',
-        apiKey: 'secret-key'
+        apiKey: 'secret-key',
       });
 
       const dialogPromise = mgr.showEditConnectionDialog(connection.id);
@@ -412,8 +412,8 @@ describe('ConnectionManager Webview Tests', () => {
         connection: {
           name: 'Keep Key',
           type: 'cloud',
-          cloudUrl: 'https://keep.weaviate.network'
-        }
+          cloudUrl: 'https://keep.weaviate.network',
+        },
       });
 
       const result = await dialogPromise;
@@ -425,9 +425,9 @@ describe('ConnectionManager Webview Tests', () => {
     test('throws error for non-existent connection', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
-      await expect(
-        mgr.showEditConnectionDialog('non-existent-id')
-      ).rejects.toThrow('Connection not found');
+      await expect(mgr.showEditConnectionDialog('non-existent-id')).rejects.toThrow(
+        'Connection not found'
+      );
     });
   });
 
@@ -557,7 +557,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           command: 'error',
-          message: expect.any(String)
+          message: expect.any(String),
         })
       );
 

@@ -1,21 +1,27 @@
 import { jest } from '@jest/globals';
 
 // Mock vscode
-jest.mock('vscode', () => {
-  const vscodeMock = require('../../../test/mocks/vscode');
-  // placeholder for overwrite in specific tests
-  return vscodeMock;
-}, { virtual: true });
+jest.mock(
+  'vscode',
+  () => {
+    const vscodeMock = require('../../../test/mocks/vscode');
+    // placeholder for overwrite in specific tests
+    return vscodeMock;
+  },
+  { virtual: true }
+);
 
 import { QueryEditorPanel } from '../QueryEditorPanel';
 
-jest.spyOn(QueryEditorPanel.prototype as any, '_initializeWebview').mockImplementation(() => Promise.resolve());
+jest
+  .spyOn(QueryEditorPanel.prototype as any, '_initializeWebview')
+  .mockImplementation(() => Promise.resolve());
 
 describe('Webview options', () => {
   const dummyContext: any = {
     extensionUri: { fsPath: '/' },
     workspaceState: { get: jest.fn(), update: jest.fn() },
-    globalState: { get: jest.fn(), update: jest.fn() }
+    globalState: { get: jest.fn(), update: jest.fn() },
   };
 
   beforeEach(() => {
@@ -28,7 +34,7 @@ describe('Webview options', () => {
     vscode.ViewColumn = { One: 1 };
     vscode.window.activeTextEditor = undefined;
     vscode.Uri = {
-      joinPath: jest.fn(() => ({}))
+      joinPath: jest.fn(() => ({})),
     };
     const capture = jest.fn((viewType: string, title: string, column: number, options: any) => {
       // return minimal panel stub
@@ -38,7 +44,7 @@ describe('Webview options', () => {
         dispose: jest.fn(),
         onDidChangeViewState: jest.fn(),
         onDidDispose: jest.fn(),
-        visible: true
+        visible: true,
       };
     });
     vscode.window.createWebviewPanel.mockImplementation(capture);
@@ -49,4 +55,4 @@ describe('Webview options', () => {
     const optionsArg = capture.mock.calls[0][3];
     expect(optionsArg.retainContextWhenHidden).toBe(true);
   });
-}); 
+});

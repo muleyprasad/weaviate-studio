@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+coverage/
+*.vsix
+
+# Config files that should keep their formatting
+*.json
+!.prettierrc.json
+!tsconfig.json
+!jsconfig.json
+!package.json
+
+# Webpack configs (may have specific formatting)
+webpack.*.js
+
+# VS Code specific
+.vscode/
+.vscodeignore
+
+# Markdown files (optional - remove if you want to format them)
+# *.md
+
+# Generated files
+syntaxes/

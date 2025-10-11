@@ -9,30 +9,34 @@ const mockConnectionManager = {
   connect: jest.fn(),
   disconnect: jest.fn(),
   getConnections: jest.fn(() => []),
-  onConnectionsChanged: jest.fn()
+  onConnectionsChanged: jest.fn(),
 };
 
 jest.mock('../../services/ConnectionManager', () => ({
   ConnectionManager: {
-    getInstance: () => mockConnectionManager
-  }
+    getInstance: () => mockConnectionManager,
+  },
 }));
 
 // Mock ViewRenderer
 jest.mock('../../views/ViewRenderer', () => ({
   ViewRenderer: {
     getInstance: () => ({
-      renderDetailedSchema: jest.fn(() => '<html></html>')
-    })
-  }
+      renderDetailedSchema: jest.fn(() => '<html></html>'),
+    }),
+  },
 }));
 
 // Mock vscode
-jest.mock('vscode', () => {
-  const vsMock = require('../../test/mocks/vscode');
-  vsMock.ViewColumn = { Active: 1 };
-  return vsMock;
-}, { virtual: true });
+jest.mock(
+  'vscode',
+  () => {
+    const vsMock = require('../../test/mocks/vscode');
+    vsMock.ViewColumn = { Active: 1 };
+    return vsMock;
+  },
+  { virtual: true }
+);
 
 import { WeaviateTreeDataProvider } from '../WeaviateTreeDataProvider';
 
@@ -44,29 +48,29 @@ describe('Add Collection', () => {
   let mockPanel: any;
   const mockCtx = {
     globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
-    subscriptions: []
+    subscriptions: [],
   } as unknown as vscode.ExtensionContext;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock webview panel
     mockPanel = {
       webview: {
         html: '',
         postMessage: jest.fn(),
-        onDidReceiveMessage: jest.fn()
+        onDidReceiveMessage: jest.fn(),
       },
-      dispose: jest.fn()
+      dispose: jest.fn(),
     };
-    
+
     vsMock.window.createWebviewPanel.mockReturnValue(mockPanel);
-    
+
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
-    
+
     // Mock fetchCollections to prevent real network calls
     jest.spyOn(provider, 'fetchCollections').mockResolvedValue();
-    
+
     // Mock connected connection
     mockConnectionManager.getConnection.mockReturnValue({
       id: 'conn1',
@@ -79,7 +83,7 @@ describe('Add Collection', () => {
       grpcHost: 'localhost',
       grpcPort: 50051,
       grpcSecure: false,
-      apiKey: ''
+      apiKey: '',
     });
   });
 
@@ -94,7 +98,7 @@ describe('Add Collection', () => {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: []
+          localResourceRoots: [],
         }
       );
     });
@@ -116,7 +120,7 @@ describe('Add Collection', () => {
         grpcHost: 'localhost',
         grpcPort: 50051,
         grpcSecure: false,
-        apiKey: ''
+        apiKey: '',
       });
 
       await expect(provider.addCollection('conn1')).rejects.toThrow('Connection must be active');
@@ -158,17 +162,14 @@ describe('Add Collection', () => {
     it('handles getCollections message', async () => {
       // Mock collections data
       (provider as any).collections = {
-        'conn1': [
-          { label: 'Collection1' },
-          { label: 'Collection2' }
-        ]
+        conn1: [{ label: 'Collection1' }, { label: 'Collection2' }],
       };
 
       await messageHandler({ command: 'getCollections' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'collections',
-        collections: ['Collection1', 'Collection2']
+        collections: ['Collection1', 'Collection2'],
       });
     });
 
@@ -176,32 +177,33 @@ describe('Add Collection', () => {
       const mockClient = {
         misc: {
           metaGetter: () => ({
-            do: () => Promise.resolve({
-              modules: {
-                'text2vec-openai': {},
-                'text2vec-cohere': {}
-              }
-            })
-          })
-        }
+            do: () =>
+              Promise.resolve({
+                modules: {
+                  'text2vec-openai': {},
+                  'text2vec-cohere': {},
+                },
+              }),
+          }),
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
       // Setup cluster metadata cache to match the mock
       (provider as any).clusterMetadataCache = {
-        'conn1': {
+        conn1: {
           modules: {
             'text2vec-openai': {},
-            'text2vec-cohere': {}
-          }
-        }
+            'text2vec-cohere': {},
+          },
+        },
       };
 
       await messageHandler({ command: 'getVectorizers' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'vectorizers',
-        vectorizers: ['none', 'text2vec-openai', 'text2vec-cohere']
+        vectorizers: ['none', 'text2vec-openai', 'text2vec-cohere'],
       });
     });
 
@@ -217,12 +219,12 @@ describe('Add Collection', () => {
       const mockClient = {
         collections: {
           createFromSchema: mockCreateFromSchema,
-          listAll: mockListAll
+          listAll: mockListAll,
         },
         getMeta: mockGetMeta,
         cluster: {
-          nodes: mockClusterNodes
-        }
+          nodes: mockClusterNodes,
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -230,7 +232,7 @@ describe('Add Collection', () => {
         class: 'TestCollection',
         description: 'Test description',
         vectorizer: 'text2vec-openai',
-        properties: []
+        properties: [],
       };
 
       await messageHandler({ command: 'create', schema });
@@ -253,12 +255,12 @@ describe('Add Collection', () => {
       const mockClient = {
         collections: {
           createFromSchema: mockCreateFromSchema,
-          listAll: mockListAll
+          listAll: mockListAll,
         },
         getMeta: mockGetMeta,
         cluster: {
-          nodes: mockClusterNodes
-        }
+          nodes: mockClusterNodes,
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -268,25 +270,23 @@ describe('Add Collection', () => {
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
         command: 'error',
-        message: 'Schema error'
+        message: 'Schema error',
       });
     });
 
     it('when cloning, should open Add Collection prefilled without creating immediately', async () => {
       // Prepare: collections with schema
       (provider as any).collections = {
-        'conn1': [
+        conn1: [
           {
             label: 'SourceCollection',
             schema: {
               class: 'SourceCollection',
               description: 'desc',
-              properties: [
-                { name: 'title', dataType: ['text'] }
-              ]
-            }
-          }
-        ]
+              properties: [{ name: 'title', dataType: ['text'] }],
+            },
+          },
+        ],
       };
 
       // Re-render clone view and capture clone handlers
@@ -307,7 +307,7 @@ describe('Add Collection', () => {
         command: 'clone',
         sourceCollection: 'SourceCollection',
         newCollectionName: 'ClonedCollection',
-        schema: (provider as any).collections['conn1'][0].schema
+        schema: (provider as any).collections['conn1'][0].schema,
       });
 
       // Should not dispose panel nor call create immediately; instead should update HTML to Add form
@@ -321,53 +321,52 @@ describe('Add Collection', () => {
     it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
       // Prepare: collections with multi-tenant schema
       (provider as any).collections = {
-        'conn1': [
+        conn1: [
           {
             label: 'MultiTenantCollection',
             schema: {
               class: 'MultiTenantCollection',
               description: 'Multi-tenant collection',
-              multiTenancy: {  // Using multiTenancy (not multiTenancyConfig) as shown in user's data
+              multiTenancy: {
+                // Using multiTenancy (not multiTenancyConfig) as shown in user's data
                 enabled: true,
                 autoTenantCreation: true,
-                autoTenantActivation: true
+                autoTenantActivation: true,
               },
-              properties: [
-                { name: 'title', dataType: ['text'] }
-              ]
-            }
-          }
-        ]
+              properties: [{ name: 'title', dataType: ['text'] }],
+            },
+          },
+        ],
       };
 
       // Navigate to clone view and trigger clone
       await (provider as any).addCollectionWithOptions('conn1');
       const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
-      
+
       await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
       const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
-      
+
       await cloneHandler({ command: 'getSchema', collectionName: 'MultiTenantCollection' });
-      
+
       await cloneHandler({
         command: 'clone',
         sourceCollection: 'MultiTenantCollection',
         newCollectionName: 'ClonedMultiTenant',
-        schema: (provider as any).collections['conn1'][0].schema
+        schema: (provider as any).collections['conn1'][0].schema,
       });
 
       // Should populate Add Collection form with multi-tenancy settings
       expect(mockPanel.webview.html).toContain('Create New Collection');
-      
+
       // Check that the initial schema data is properly embedded in the JavaScript
       // The multiTenancyConfig should be passed as initialSchema to the form
       const htmlContent = mockPanel.webview.html;
       expect(htmlContent).toContain('const initialSchema =');
-      
+
       // Extract the initialSchema JSON from the HTML
       const initialSchemaMatch = htmlContent.match(/const initialSchema = ({.*?});/s);
       expect(initialSchemaMatch).toBeTruthy();
-      
+
       if (initialSchemaMatch) {
         const initialSchemaStr = initialSchemaMatch[1];
         expect(initialSchemaStr).toContain('"multiTenancy"');
@@ -383,9 +382,9 @@ describe('Add Collection', () => {
       const mockClient = { schema: { classCreator: jest.fn() } };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
-      await expect(
-        (provider as any).createCollection('conn1', { class: '' })
-      ).rejects.toThrow('Collection name is required');
+      await expect((provider as any).createCollection('conn1', { class: '' })).rejects.toThrow(
+        'Collection name is required'
+      );
     });
 
     it('builds correct schema object', async () => {
@@ -393,8 +392,8 @@ describe('Add Collection', () => {
       mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
         collections: {
-          createFromSchema: mockCreateFromSchema
-        }
+          createFromSchema: mockCreateFromSchema,
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -407,9 +406,9 @@ describe('Add Collection', () => {
           {
             name: 'title',
             dataType: ['text'],
-            description: 'Title field'
-          }
-        ]
+            description: 'Title field',
+          },
+        ],
       };
 
       await (provider as any).createCollection('conn1', inputSchema);
@@ -423,9 +422,9 @@ describe('Add Collection', () => {
           {
             name: 'title',
             dataType: ['text'],
-            description: 'Title field'
-          }
-        ]
+            description: 'Title field',
+          },
+        ],
       });
     });
 
@@ -434,14 +433,14 @@ describe('Add Collection', () => {
       mockCreateFromSchema.mockResolvedValue({});
       const mockClient = {
         collections: {
-          createFromSchema: mockCreateFromSchema
-        }
+          createFromSchema: mockCreateFromSchema,
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
       await (provider as any).createCollection('conn1', {
         class: 'TestCollection',
-        vectorizer: 'none'
+        vectorizer: 'none',
       });
 
       const calledSchema = mockCreateFromSchema.mock.calls[0][0] as any;
@@ -454,9 +453,9 @@ describe('Add Collection', () => {
       const mockClient = {
         misc: {
           metaGetter: () => ({
-            do: () => Promise.resolve({ modules: {} })
-          })
-        }
+            do: () => Promise.resolve({ modules: {} }),
+          }),
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -470,15 +469,16 @@ describe('Add Collection', () => {
       const mockClient = {
         misc: {
           metaGetter: () => ({
-            do: () => Promise.resolve({
-              modules: {
-                'text2vec-openai': {},
-                'text2vec-cohere': {},
-                'multi2vec-clip': {}
-              }
-            })
-          })
-        }
+            do: () =>
+              Promise.resolve({
+                modules: {
+                  'text2vec-openai': {},
+                  'text2vec-cohere': {},
+                  'multi2vec-clip': {},
+                },
+              }),
+          }),
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -494,9 +494,9 @@ describe('Add Collection', () => {
       const mockClient = {
         misc: {
           metaGetter: () => ({
-            do: () => Promise.reject(new Error('Network error'))
-          })
-        }
+            do: () => Promise.reject(new Error('Network error')),
+          }),
+        },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
@@ -541,4 +541,4 @@ describe('Add Collection', () => {
       expect(html).toContain('var(--vscode-panel-border, #E0E0E0)');
     });
   });
-}); 
+});

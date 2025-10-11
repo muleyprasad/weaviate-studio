@@ -1,6 +1,14 @@
 import * as vscode from 'vscode';
 import { ConnectionManager, WeaviateConnection } from '../services/ConnectionManager';
-import { WeaviateTreeItem, ConnectionConfig, CollectionsMap, CollectionWithSchema, ExtendedSchemaClass, SchemaClass, WeaviateMetadata } from '../types';
+import {
+  WeaviateTreeItem,
+  ConnectionConfig,
+  CollectionsMap,
+  CollectionWithSchema,
+  ExtendedSchemaClass,
+  SchemaClass,
+  WeaviateMetadata,
+} from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
@@ -10,2130 +18,2351 @@ import * as http from 'http';
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
  * collections, and their properties in a hierarchical structure.
- * 
+ *
  * This class implements the VS Code TreeDataProvider interface to display
  * Weaviate connections, collections, and their properties in the VS Code
  * Explorer view. It handles the data retrieval, filtering, and display
  * of Weaviate schema information.
  */
 export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<WeaviateTreeItem> {
-    // Event emitter for tree data changes
-    /** Event emitter for tree data changes */
-    private _onDidChangeTreeData: vscode.EventEmitter<WeaviateTreeItem | undefined | null | void> = 
-        new vscode.EventEmitter<WeaviateTreeItem | undefined | null | void>();
-    
-    /** Event that fires when the tree data changes */
-    readonly onDidChangeTreeData: vscode.Event<WeaviateTreeItem | undefined | null | void> = 
-        this._onDidChangeTreeData.event;
+  // Event emitter for tree data changes
+  /** Event emitter for tree data changes */
+  private _onDidChangeTreeData: vscode.EventEmitter<WeaviateTreeItem | undefined | null | void> =
+    new vscode.EventEmitter<WeaviateTreeItem | undefined | null | void>();
 
-    /** List of Weaviate connections */
-    private connections: ConnectionConfig[] = [];
-    
-    /** Map of connection IDs to their collections */
-    private collections: CollectionsMap = {};
+  /** Event that fires when the tree data changes */
+  readonly onDidChangeTreeData: vscode.Event<WeaviateTreeItem | undefined | null | void> =
+    this._onDidChangeTreeData.event;
 
-    /** Cache of cluster nodes per connection */
-    private clusterNodesCache: Record<string, Node<"verbose">[]> = {};
+  /** List of Weaviate connections */
+  private connections: ConnectionConfig[] = [];
 
-    /** Cache of cluster metadata per connection */
-    private clusterMetadataCache: Record<string, WeaviateMetadata> = {};
+  /** Map of connection IDs to their collections */
+  private collections: CollectionsMap = {};
 
-    /** Cache of cluster metadata per connection */
-    private clusterStatisticsCache: Record<string, any> = {};    
-    
-    /** VS Code extension context */
-    private readonly context: vscode.ExtensionContext;
-    
-    /** Manages Weaviate connections */
-    private readonly connectionManager: ConnectionManager;
-    
-    /** Handles view rendering */
-    private readonly viewRenderer: ViewRenderer;
-    
-    /** Reference to the TreeView for programmatic control */
-    private treeView?: vscode.TreeView<WeaviateTreeItem>;
-    
-    private isRefreshing = false;
+  /** Cache of cluster nodes per connection */
+  private clusterNodesCache: Record<string, Node<'verbose'>[]> = {};
 
-    /**
-     * Creates a new instance of the WeaviateTreeDataProvider
-     * @param context - The VS Code extension context
-     * 
-     * @remarks
-     * The constructor initializes the connection manager, loads initial connections,
-     * and sets up event listeners for connection changes. It uses a debounce mechanism
-     * to prevent excessive refreshes when multiple connection changes occur in quick succession.
-     */
-    constructor(context: vscode.ExtensionContext) {
-        this.context = context;
-        this.connectionManager = ConnectionManager.getInstance(context);
-        this.viewRenderer = ViewRenderer.getInstance(context);
-        
-        // Initial load of connections
-        this.connections = this.connectionManager.getConnections();
-        
-        // Set initial empty state
-        this.updateEmptyState();
-        
-        // Listen for connection changes with debounce
-        let refreshTimeout: NodeJS.Timeout;
-        this.connectionManager.onConnectionsChanged(() => {
-            if (this.isRefreshing) {
-                return;
-            }
-            
-            clearTimeout(refreshTimeout);
-            refreshTimeout = setTimeout(async () => {
-                this.isRefreshing = true;
-                try {
-                    this.connections = this.connectionManager.getConnections();
-                    this.updateEmptyState();
-                    this._onDidChangeTreeData.fire();
-                } finally {
-                    this.isRefreshing = false;
-                }
-            }, 100); // 100ms debounce
-        });
-    }
-    
-    /**
-     * Sets the TreeView reference for programmatic control
-     * @param treeView - The TreeView instance
-     */
-    public setTreeView(treeView: vscode.TreeView<WeaviateTreeItem>): void {
-        this.treeView = treeView;
-    }
-    
-    /**
-     * Gets the parent of a tree element (required for TreeView.reveal API)
-     * @param element - The tree element to get the parent for
-     * @returns The parent element or undefined if it's a root element
-     */
-    public getParent(element: WeaviateTreeItem): vscode.ProviderResult<WeaviateTreeItem> {
-        // Root level connections have no parent
-        if (element.itemType === 'connection') {
-            return undefined;
+  /** Cache of cluster metadata per connection */
+  private clusterMetadataCache: Record<string, WeaviateMetadata> = {};
+
+  /** Cache of cluster metadata per connection */
+  private clusterStatisticsCache: Record<string, any> = {};
+
+  /** VS Code extension context */
+  private readonly context: vscode.ExtensionContext;
+
+  /** Manages Weaviate connections */
+  private readonly connectionManager: ConnectionManager;
+
+  /** Handles view rendering */
+  private readonly viewRenderer: ViewRenderer;
+
+  /** Reference to the TreeView for programmatic control */
+  private treeView?: vscode.TreeView<WeaviateTreeItem>;
+
+  private isRefreshing = false;
+
+  /**
+   * Creates a new instance of the WeaviateTreeDataProvider
+   * @param context - The VS Code extension context
+   *
+   * @remarks
+   * The constructor initializes the connection manager, loads initial connections,
+   * and sets up event listeners for connection changes. It uses a debounce mechanism
+   * to prevent excessive refreshes when multiple connection changes occur in quick succession.
+   */
+  constructor(context: vscode.ExtensionContext) {
+    this.context = context;
+    this.connectionManager = ConnectionManager.getInstance(context);
+    this.viewRenderer = ViewRenderer.getInstance(context);
+
+    // Initial load of connections
+    this.connections = this.connectionManager.getConnections();
+
+    // Set initial empty state
+    this.updateEmptyState();
+
+    // Listen for connection changes with debounce
+    let refreshTimeout: NodeJS.Timeout;
+    this.connectionManager.onConnectionsChanged(() => {
+      if (this.isRefreshing) {
+        return;
+      }
+
+      clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(async () => {
+        this.isRefreshing = true;
+        try {
+          this.connections = this.connectionManager.getConnections();
+          this.updateEmptyState();
+          this._onDidChangeTreeData.fire();
+        } finally {
+          this.isRefreshing = false;
         }
-        
-        // For all other items, the parent is the connection
-        if (element.connectionId) {
-            const connection = this.connections.find(conn => conn.id === element.connectionId);
-            if (connection) {
-                return new WeaviateTreeItem(
-                    `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
-                    vscode.TreeItemCollapsibleState.Expanded,
-                    'connection',
-                    connection.id,
-                    undefined, // collectionName
-                    undefined, // itemId
-                    this.getStatusIcon(connection.status),
-                    connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
-                );
-            }
+      }, 100); // 100ms debounce
+    });
+  }
+
+  /**
+   * Sets the TreeView reference for programmatic control
+   * @param treeView - The TreeView instance
+   */
+  public setTreeView(treeView: vscode.TreeView<WeaviateTreeItem>): void {
+    this.treeView = treeView;
+  }
+
+  /**
+   * Gets the parent of a tree element (required for TreeView.reveal API)
+   * @param element - The tree element to get the parent for
+   * @returns The parent element or undefined if it's a root element
+   */
+  public getParent(element: WeaviateTreeItem): vscode.ProviderResult<WeaviateTreeItem> {
+    // Root level connections have no parent
+    if (element.itemType === 'connection') {
+      return undefined;
+    }
+
+    // For all other items, the parent is the connection
+    if (element.connectionId) {
+      const connection = this.connections.find((conn) => conn.id === element.connectionId);
+      if (connection) {
+        return new WeaviateTreeItem(
+          `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+          vscode.TreeItemCollapsibleState.Expanded,
+          'connection',
+          connection.id,
+          undefined, // collectionName
+          undefined, // itemId
+          this.getStatusIcon(connection.status),
+          connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
+        );
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Updates the VS Code context to reflect whether there are any connections
+   *
+   * @remarks
+   * This method sets a VS Code context variable 'weaviateConnectionsEmpty' that can be used
+   * to control the visibility of UI elements based on whether there are any connections.
+   * It's called whenever the connections list changes.
+   */
+  private updateEmptyState(): void {
+    vscode.commands.executeCommand(
+      'setContext',
+      'weaviateConnectionsEmpty',
+      this.connections.length === 0
+    );
+  }
+
+  /**
+   * Refreshes the tree view to reflect any changes in the data
+   *
+   * @remarks
+   * This method triggers a refresh of the tree view by emitting the
+   * `_onDidChangeTreeData` event. It should be called whenever the underlying
+   * data changes and the UI needs to be updated.
+   */
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
+  }
+
+  // #region Command Handlers
+
+  /**
+   * Shows a detailed schema view for a collection in a webview
+   * @param item - The tree item representing the collection
+   */
+  public async handleViewDetailedSchema(item: WeaviateTreeItem): Promise<void> {
+    if (!item.connectionId || !item.label) {
+      vscode.window.showErrorMessage('Cannot view schema: Missing connection or collection name');
+      return;
+    }
+
+    try {
+      const collectionName = item.label.toString();
+      const collection = this.collections[item.connectionId]?.find(
+        (col) => col.label === collectionName
+      ) as CollectionWithSchema | undefined;
+
+      if (!collection?.schema) {
+        vscode.window.showErrorMessage('Could not find schema for collection');
+        return;
+      }
+
+      // Create and show a webview with the detailed schema
+      const panel = vscode.window.createWebviewPanel(
+        'weaviateDetailedSchema',
+        `Collection: ${collectionName}`,
+        vscode.ViewColumn.One,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
         }
-        
-        return undefined;
-    }
-    
-    /**
-     * Updates the VS Code context to reflect whether there are any connections
-     * 
-     * @remarks
-     * This method sets a VS Code context variable 'weaviateConnectionsEmpty' that can be used
-     * to control the visibility of UI elements based on whether there are any connections.
-     * It's called whenever the connections list changes.
-     */
-    private updateEmptyState(): void {
-        vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
-    }
+      );
 
-    /**
-     * Refreshes the tree view to reflect any changes in the data
-     * 
-     * @remarks
-     * This method triggers a refresh of the tree view by emitting the
-     * `_onDidChangeTreeData` event. It should be called whenever the underlying
-     * data changes and the UI needs to be updated.
-     */
-    refresh(): void {
-        this._onDidChangeTreeData.fire();
+      // Format the schema as HTML
+      panel.webview.html = this.getDetailedSchemaHtml(collection.schema);
+    } catch (error) {
+      console.error('Error viewing detailed schema:', error);
+      vscode.window.showErrorMessage(
+        `Failed to view detailed schema: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
+  }
 
-    // #region Command Handlers
+  /**
+   * Generates HTML for displaying detailed schema in a webview
+   * @param schema The schema to display
+   */
+  private getDetailedSchemaHtml(schema: CollectionConfig): string {
+    return this.viewRenderer.renderDetailedSchema(schema);
+  }
 
-    /**
-     * Shows a detailed schema view for a collection in a webview
-     * @param item - The tree item representing the collection
-     */
-    public async handleViewDetailedSchema(item: WeaviateTreeItem): Promise<void> {
-        if (!item.connectionId || !item.label) {
-            vscode.window.showErrorMessage('Cannot view schema: Missing connection or collection name');
-            return;
+  // #endregion Command Handlers
+
+  // Helper to get connected status theme icon
+  getStatusIcon(status: 'connected' | 'disconnected'): vscode.ThemeIcon {
+    if (status === 'connected') {
+      // Green dot for connected
+      return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('testing.iconPassed'));
+    } else {
+      // Gray/hollow dot for disconnected
+      return new vscode.ThemeIcon('circle-outline');
+    }
+  }
+
+  // #region TreeDataProvider Implementation
+
+  /**
+   * Converts a tree item into a VS Code TreeItem for display in the explorer view
+   * @param element - The tree item to convert
+   * @returns A VS Code TreeItem ready for display
+   *
+   * @remarks
+   * This method is called by VS Code to get the UI representation of a tree item.
+   * It sets appropriate icons and tooltips based on the item type and properties.
+   */
+  getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
+    // Set appropriate icons and tooltips based on item type
+    if (element.itemType === 'properties' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('symbol-property');
+      element.tooltip = 'View collection properties';
+    } else if (element.itemType === 'vectorConfig' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('arrow-both');
+      element.tooltip = 'Vector configuration and modules';
+    } else if (element.itemType === 'invertedIndex' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('search');
+      element.tooltip = 'Index configuration';
+    } else if (element.itemType === 'statistics' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('graph');
+      element.tooltip = 'Collection statistics';
+    } else if (element.itemType === 'sharding' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('layout');
+      element.tooltip = 'Sharding and replication configuration';
+    } else if (element.itemType === 'serverInfo' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('server');
+      element.tooltip = 'Server version and information';
+    } else if (element.itemType === 'modules' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('extensions');
+      element.tooltip = 'Available Weaviate modules';
+    } else if (element.itemType === 'collectionsGroup' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('database');
+      element.tooltip = 'Collections in this instance';
+    } else if (element.itemType === 'property') {
+      // Ensure property items have the correct context value
+      if (!element.contextValue) {
+        element.contextValue = 'weaviateProperty';
+      }
+
+      // Set different icons based on property type if no icon is set
+      if (!element.iconPath) {
+        const label = element.label as string;
+        if (label.includes('(text)') || label.includes('(string)')) {
+          element.iconPath = new vscode.ThemeIcon('symbol-text');
+        } else if (
+          label.includes('(number)') ||
+          label.includes('(int)') ||
+          label.includes('(float)')
+        ) {
+          element.iconPath = new vscode.ThemeIcon('symbol-number');
+        } else if (label.includes('(boolean)') || label.includes('(bool)')) {
+          element.iconPath = new vscode.ThemeIcon('symbol-boolean');
+        } else if (label.includes('(date)') || label.includes('(datetime)')) {
+          element.iconPath = new vscode.ThemeIcon('calendar');
+        } else {
+          element.iconPath = new vscode.ThemeIcon('symbol-property');
         }
+      }
+    } else if (element.itemType === 'connectionLink') {
+      // Make connection links clickable
+      if (element.description) {
+        element.tooltip = `Click to open: ${element.description}`;
+        element.command = {
+          command: 'weaviate-studio.openLink',
+          title: 'Open Link',
+          arguments: [element.description],
+        };
+      }
+    }
+
+    return element;
+  }
+
+  /**
+   * Gets the children of a tree item, or the root items if no item is provided
+   * @param element - The parent tree item, or undefined to get root items
+   * @returns A promise that resolves to an array of child tree items
+   *
+   * @remarks
+   * This method is called by VS Code to populate the tree view. It handles:
+   * - Root level: Shows connections or a message if no connections exist
+   * - Connection level: Shows collections for the connection
+   * - Collection level: Shows metadata, properties, and vector configurations
+   */
+  async getChildren(element?: WeaviateTreeItem): Promise<WeaviateTreeItem[]> {
+    // No connections case
+    if (this.connections.length === 0) {
+      return [
+        new WeaviateTreeItem(
+          'No connections found. Click + to add.',
+          vscode.TreeItemCollapsibleState.None,
+          'message'
+        ),
+      ];
+    }
+    if (element && !element.connectionId) {
+      // If no connection ID is present, we are at the root level
+      throw new Error('Invalid tree item: Missing connection ID');
+    }
+
+    if (!element) {
+      // Root level - show connections
+      const connectionItems = this.connections.map((conn) => {
+        const contextValue =
+          conn.status === 'connected' ? 'weaviateConnectionActive' : 'weaviateConnection';
+        const item = new WeaviateTreeItem(
+          `${conn.type === 'cloud' ? '☁️' : '🔗'} ${conn.name}`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'connection',
+          conn.id,
+          undefined, // collectionName
+          undefined, // itemId
+          this.getStatusIcon(conn.status),
+          contextValue
+        );
+        // Tooltip should reflect the connection type
+        const hostInfo =
+          conn.type === 'cloud'
+            ? conn.cloudUrl || 'cloud'
+            : `${conn.httpHost || ''}${conn.httpPort ? `:${conn.httpPort}` : ''}`;
+        item.tooltip = `${conn.name} (${hostInfo})\nStatus: ${conn.status}`;
+
+        // Only expand connected clusters
+        if (conn.status === 'connected') {
+          item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+        }
+
+        return item;
+      });
+
+      return connectionItems;
+    } else if (element.itemType === 'connection' && element.connectionId) {
+      // Connection level - show server info and collections
+      const connection = this.connections.find((conn) => conn.id === element.connectionId);
+
+      if (!connection || connection.status !== 'connected') {
+        const message =
+          connection?.status === 'connected'
+            ? 'Loading...'
+            : 'Not connected. Right-click and select "Connect" to view information.';
+
+        return [
+          new WeaviateTreeItem(
+            message,
+            vscode.TreeItemCollapsibleState.None,
+            'message',
+            element.connectionId
+          ),
+        ];
+      }
+
+      const items: WeaviateTreeItem[] = [];
+
+      // Add server information section
+      items.push(
+        new WeaviateTreeItem(
+          'Server Information',
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'serverInfo',
+          element.connectionId,
+          undefined,
+          'serverInfo',
+          new vscode.ThemeIcon('info'),
+          'weaviateServerInfo'
+        )
+      );
+
+      // Add connection links section
+      const connectionData = this.connectionManager.getConnection(element.connectionId);
+      const links = connectionData?.links || [];
+      if (links.length > 0) {
+        items.push(
+          new WeaviateTreeItem(
+            `Links (${links.length})`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'connectionLinks',
+            element.connectionId,
+            undefined,
+            'connectionLinks',
+            new vscode.ThemeIcon('link'),
+            'weaviateConnectionLinks'
+          )
+        );
+      }
+
+      // Add cluster nodes section
+      const stats = this.clusterStatisticsCache[element.connectionId];
+      let nodes_synchronized = stats?.synchronized ? 'Synchronized' : 'Not Synchronized';
+      let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
+      items.push(
+        new WeaviateTreeItem(
+          `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${nodes_synchronized}`,
+          vscode.TreeItemCollapsibleState.Expanded,
+          'clusterNodes',
+          element.connectionId,
+          undefined,
+          'clusterNodes',
+          new vscode.ThemeIcon('terminal-ubuntu'),
+          'weaviateClusterNodes'
+        )
+      );
+
+      // Add collections section
+      const collections = this.collections[element.connectionId] || [];
+      const collectionsLabel =
+        collections.length > 0 ? `Collections (${collections.length})` : 'Collections';
+
+      items.push(
+        new WeaviateTreeItem(
+          collectionsLabel,
+          vscode.TreeItemCollapsibleState.Expanded,
+          'collectionsGroup',
+          element.connectionId,
+          undefined,
+          'collections',
+          new vscode.ThemeIcon('database'),
+          'weaviateCollectionsGroup'
+        )
+      );
+
+      return items;
+    } else if (element.itemType === 'collectionsGroup' && element.connectionId) {
+      // Collections group - show actual collections
+      const collections = this.collections[element.connectionId] || [];
+
+      if (collections.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No collections found. Right-click parent connection to add a collection.',
+            vscode.TreeItemCollapsibleState.None,
+            'message',
+            element.connectionId
+          ),
+        ];
+      }
+
+      return collections;
+    } else if (element.itemType === 'collection' && element.connectionId) {
+      let collection = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      )?.schema;
+      if (!collection) {
+        throw new Error('Collection data not available!');
+      }
+      let properties = collection?.properties || [];
+      let property_count = properties ? properties.length : 0;
+      // Configured Vectors Count
+      const vectorizers = collection.vectorizers;
+      let configured_vectors_count = vectorizers ? Object.keys(vectorizers).length : 0;
+      const multi_tenancy_enabled = collection?.multiTenancy.enabled;
+      const items = [
+        new WeaviateTreeItem(
+          `Properties (${property_count})`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'properties',
+          element.connectionId,
+          element.label,
+          'properties',
+          new vscode.ThemeIcon('symbol-property')
+        ),
+        new WeaviateTreeItem(
+          `Vectors (${configured_vectors_count})`,
+          configured_vectors_count
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None,
+          'vectorConfig',
+          element.connectionId,
+          element.label,
+          'vectorConfig',
+          new vscode.ThemeIcon('arrow-both')
+        ),
+        new WeaviateTreeItem(
+          'Inverted Index',
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'invertedIndex',
+          element.connectionId,
+          element.label,
+          'invertedIndex',
+          new vscode.ThemeIcon('search')
+        ),
+        new WeaviateTreeItem(
+          `Generative Configuration`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'generativeConfig',
+          element.connectionId,
+          element.label,
+          'generative',
+          new vscode.ThemeIcon('lightbulb-autofix')
+        ),
+        new WeaviateTreeItem(
+          'Replication',
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'collectionReplication',
+          element.connectionId,
+          element.label,
+          'replication',
+          new vscode.ThemeIcon('activate-breakpoints')
+        ),
+        new WeaviateTreeItem(
+          'Sharding',
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'sharding',
+          element.connectionId,
+          element.label,
+          'sharding',
+          new vscode.ThemeIcon('layout')
+        ),
+        new WeaviateTreeItem(
+          multi_tenancy_enabled ? 'Multi Tenancy' : 'Multi Tenancy (Disabled)',
+          multi_tenancy_enabled
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None,
+          'multiTenancy',
+          element.connectionId,
+          element.label,
+          'multiTenancy',
+          new vscode.ThemeIcon('organization')
+        ),
+        new WeaviateTreeItem(
+          'Statistics',
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'statistics',
+          element.connectionId,
+          element.label,
+          'statistics',
+          new vscode.ThemeIcon('graph')
+        ),
+      ];
+      return items;
+    } else if (
+      element.itemType === 'properties' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Find the collection schema
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No properties available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const schema = (collection as any).schema;
+      if (!schema || !schema.properties || !Array.isArray(schema.properties)) {
+        return [
+          new WeaviateTreeItem(
+            'No properties defined',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      // Map property types to icons
+      const getPropertyIcon = (dataType: string[]): vscode.ThemeIcon => {
+        const type = Array.isArray(dataType) ? dataType[0] : dataType;
+        switch (type) {
+          case 'text':
+          case 'string':
+            return new vscode.ThemeIcon('symbol-text');
+          case 'int':
+          case 'number':
+          case 'float':
+          case 'number[]':
+            return new vscode.ThemeIcon('symbol-number');
+          case 'boolean':
+            return new vscode.ThemeIcon('symbol-boolean');
+          case 'date':
+          case 'dateTime':
+            return new vscode.ThemeIcon('calendar');
+          case 'object':
+          case 'object[]':
+            return new vscode.ThemeIcon('symbol-object');
+          case 'geoCoordinates':
+            return new vscode.ThemeIcon('location');
+          case 'phoneNumber':
+            return new vscode.ThemeIcon('device-mobile');
+          case 'blob':
+            return new vscode.ThemeIcon('file-binary');
+          default:
+            return new vscode.ThemeIcon('symbol-property');
+        }
+      };
+
+      const propertyItems = schema.properties.map((prop: any) => {
+        const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
+        const description = prop.description ? ` - ${prop.description}` : '';
+        const icon = getPropertyIcon(prop.dataType);
+
+        return new WeaviateTreeItem(
+          `${prop.name} (${dataType})${description}`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'propertyItem',
+          element.connectionId,
+          element.collectionName,
+          prop.name,
+          icon,
+          'weaviateProperty',
+          description.trim()
+        );
+      });
+
+      return propertyItems;
+    } else if (
+      element.itemType === 'propertyItem' &&
+      element.connectionId &&
+      element.collectionName &&
+      element.itemId
+    ) {
+      const vectorItems: WeaviateTreeItem[] = [];
+      // Find the collection schema
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No properties available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      // Find the property
+      const property = collection.schema?.properties.find(
+        (prop: any) => prop.name === element.itemId
+      );
+
+      if (!property) {
+        return [
+          new WeaviateTreeItem(
+            'Property not found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+      // Show property details
+      for (const [key, value] of Object.entries(await this.flattenObject(property))) {
+        vectorItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'propertyItem',
+            element.connectionId,
+            element.collectionName,
+            property.name,
+            new vscode.ThemeIcon('symbol-property'),
+            'weaviateProperty'
+          )
+        );
+      }
+      return vectorItems;
+    } else if (
+      element.itemType === 'vectorConfig' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Vector configuration section
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No Vectors available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      // const vectorItems: WeaviateTreeItem[] = [];
+      // const schema = collection.schema;
+      // const schema_config = schema.config.get()
+      // // Vectorizer info
+      // if (schema?.vectorizers) {
+      //     schema.vectorizers.forEach((vec: string) => {
+      //         vectorItems.push(new WeaviateTreeItem(
+      //             `Vectorizer: ${vec}`,
+      //             vscode.TreeItemCollapsibleState.None,
+      //             'object',
+      //             element.connectionId,
+      //             element.collectionName,
+      //             'vectorizer',
+      //             new vscode.ThemeIcon('gear'),
+      //             'weaviateVectorConfig'
+      //         ));
+      //     });
+      // }
+
+      // Module config
+      // if (schema?.moduleConfig) {
+      //     const moduleNames = Object.keys(schema.moduleConfig);
+      //     moduleNames.forEach(moduleName => {
+      //         vectorItems.push(new WeaviateTreeItem(
+      //             `Module: ${moduleName}`,
+      //             vscode.TreeItemCollapsibleState.None,
+      //             'object',
+      //             element.connectionId,
+      //             element.collectionName,
+      //             moduleName,
+      //             new vscode.ThemeIcon('extensions'),
+      //             'weaviateVectorConfig'
+      //         ));
+      //     });
+      // }
+
+      // Vectorizers
+      const vectorItems: WeaviateTreeItem[] = [];
+      for (let key in collection.schema?.vectorizers) {
+        let value = collection.schema?.vectorizers[key];
+        vectorItems.push(
+          new WeaviateTreeItem(
+            `${key} - ${value.vectorizer.name}`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'vectorConfigDetail',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('list-tree'),
+            'vectorConfigDetail'
+          )
+        );
+      }
+
+      if (vectorItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No vector configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return vectorItems;
+    } else if (
+      element.itemType === 'generativeConfig' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Generative configuration section
+      const collection = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      );
+      let generativeItems: WeaviateTreeItem[] = [];
+      const data = await this.flattenObject(collection?.schema?.generative || {}, [], '', false);
+      Object.entries(data).forEach(([key, value]) => {
+        generativeItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('lightbulb-autofix'),
+            'generativeConfig'
+          )
+        );
+      });
+      return generativeItems;
+    } else if (
+      element.itemType === 'collectionReplication' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Replication section
+      const replicationItems: WeaviateTreeItem[] = [];
+      const collectionReplication = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      )?.schema?.replication;
+
+      Object.entries(collectionReplication || {}).forEach(([key, value]) => {
+        replicationItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('activate-breakpoints'),
+            'collectionReplication'
+          )
+        );
+      });
+
+      if (replicationItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No replication configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return replicationItems;
+    }
+    if (
+      element.itemType === 'vectorConfigDetail' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Vector configuration detail section
+      const vectorItemDetails: WeaviateTreeItem[] = [];
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No Vectors available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+      const vectorizer = collection.schema?.vectorizers[element.itemId || ''];
+      const flattened_vectorizer = await this.flattenObject(vectorizer || {}, [], '', true);
+      // for each object in vectorizer, create a tree item
+      for (let key in flattened_vectorizer) {
+        const value = flattened_vectorizer[key];
+        vectorItemDetails.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('list-tree'),
+            'vectorConfigDetail'
+          )
+        );
+      }
+      return vectorItemDetails;
+    } else if (
+      element.itemType === 'invertedIndex' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Indexes section
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No index information available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const schema = (collection as any).schema;
+      const indexItems: WeaviateTreeItem[] = [];
+
+      // Inverted index
+      const invertedIndex = await this.flattenObject(schema.invertedIndex || {}, [], '', false);
+      Object.entries(invertedIndex || {}).forEach(([key, value]) => {
+        indexItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('search'),
+            'invertedIndexItem'
+          )
+        );
+      });
+
+      // Vector index
+      if (schema?.vectorIndexConfig) {
+        const vectorIndexType = schema.vectorIndexType || 'hnsw';
+        indexItems.push(
+          new WeaviateTreeItem(
+            `Vector Index: ${vectorIndexType.toUpperCase()}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            'vectorIndex',
+            new vscode.ThemeIcon('arrow-both'),
+            'weaviateIndex'
+          )
+        );
+      }
+
+      // Property-specific indexes
+      if (schema?.properties) {
+        const indexedProps = schema.properties.filter((prop: any) => prop.indexInverted !== false);
+        if (indexedProps.length > 0) {
+          indexItems.push(
+            new WeaviateTreeItem(
+              `Indexed Properties: ${indexedProps.length}`,
+              vscode.TreeItemCollapsibleState.None,
+              'object',
+              element.connectionId,
+              element.collectionName,
+              'indexedProperties',
+              new vscode.ThemeIcon('symbol-property'),
+              'weaviateIndex'
+            )
+          );
+        }
+      }
+
+      if (indexItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No index information found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return indexItems;
+    } else if (
+      element.itemType === 'statistics' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Statistics section - fetch live data
+      try {
+        const client = this.connectionManager.getClient(element.connectionId);
+        if (!client) {
+          return [
+            new WeaviateTreeItem(
+              'Client not available',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
+
+        const statsItems: WeaviateTreeItem[] = [];
+
+        // Get tenant count if multi-tenancy is enabled
+        const collection = this.collections[element.connectionId]?.find(
+          (item) => item.label === element.collectionName
+        );
+        const schema = (collection as any)?.schema;
+        // Get object count
+        if (!schema.multiTenancy?.enabled) {
+          try {
+            const aggregate = await client.collections
+              .get(element.collectionName)
+              .aggregate.overAll();
+            const count = aggregate.totalCount || 0;
+            statsItems.push(
+              new WeaviateTreeItem(
+                `Objects: ${count.toLocaleString()}`,
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                element.collectionName,
+                'objectCount',
+                new vscode.ThemeIcon('database'),
+                'weaviateStatistic'
+              )
+            );
+          } catch (error) {
+            console.warn('Could not fetch object count:', error);
+            statsItems.push(
+              new WeaviateTreeItem(
+                'Objects: Unable to fetch',
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                element.collectionName,
+                'objectCount',
+                new vscode.ThemeIcon('database'),
+                'weaviateStatistic'
+              )
+            );
+          }
+        }
+
+        if ((schema as any)?.multiTenancy?.enabled) {
+          try {
+            const multiCollection = client.collections.use(element.collectionName);
+            const tenants = await multiCollection.tenants.get();
+            const tenantCount = Object.keys(tenants).length;
+            statsItems.push(
+              new WeaviateTreeItem(
+                `Tenants: ${tenantCount}`,
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                element.collectionName,
+                'tenantCount',
+                new vscode.ThemeIcon('organization'),
+                'weaviateStatistic'
+              )
+            );
+          } catch (error) {
+            console.warn('Could not fetch tenant count:', error);
+          }
+        }
+
+        return statsItems;
+      } catch (error) {
+        console.error('Error fetching statistics:', error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching statistics',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'sharding' && element.connectionId && element.collectionName) {
+      // Sharding section
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+
+      if (!collection) {
+        return [
+          new WeaviateTreeItem(
+            'No sharding information available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const schema = (collection as any).schema;
+      const shardingItems: WeaviateTreeItem[] = [];
+
+      // Sharding config
+      if (schema?.sharding) {
+        const config = schema.sharding as ShardingConfig;
+        for (const [key, value] of Object.entries(config)) {
+          shardingItems.push(
+            new WeaviateTreeItem(
+              `${key}: ${value}`,
+              vscode.TreeItemCollapsibleState.None,
+              'object',
+              element.connectionId,
+              element.collectionName,
+              key,
+              new vscode.ThemeIcon('layout'),
+              'weaviateSharding'
+            )
+          );
+        }
+      }
+
+      if (shardingItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No sharding configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return shardingItems;
+    } else if (element.itemType === 'serverInfo' && element.connectionId) {
+      // Server information section
+      try {
+        const serverItems: WeaviateTreeItem[] = [];
+        // Get server meta information
+        try {
+          const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
+          if (!meta) {
+            throw new Error('Meta not available');
+          }
+
+          if (meta.version) {
+            serverItems.push(
+              new WeaviateTreeItem(
+                `Version: ${meta.version}`,
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                undefined,
+                'version',
+                new vscode.ThemeIcon('tag'),
+                'weaviateServerDetail'
+              )
+            );
+          }
+
+          if (meta.grpcMaxMessageSize) {
+            serverItems.push(
+              new WeaviateTreeItem(
+                `gRPC Max Message Size: ${meta.grpcMaxMessageSize}`,
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                undefined,
+                'grpcMaxMessageSize',
+                new vscode.ThemeIcon('git-commit'),
+                'weaviateServerDetail'
+              )
+            );
+          }
+
+          if (meta.hostname) {
+            serverItems.push(
+              new WeaviateTreeItem(
+                `Hostname: ${meta.hostname}`,
+                vscode.TreeItemCollapsibleState.None,
+                'object',
+                element.connectionId,
+                undefined,
+                'hostname',
+                new vscode.ThemeIcon('server'),
+                'weaviateServerDetail'
+              )
+            );
+          }
+
+          // available modules
+          serverItems.push(
+            new WeaviateTreeItem(
+              `Available Modules (${meta.modules ? Object.keys(meta.modules).length : 0})`,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'modules',
+              element.connectionId,
+              undefined,
+              'modules',
+              new vscode.ThemeIcon('extensions'),
+              'weaviateModules'
+            )
+          );
+        } catch (error) {
+          console.warn('Could not fetch server meta:', error);
+          serverItems.push(
+            new WeaviateTreeItem(
+              'Unable to fetch server information',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            )
+          );
+        }
+
+        return serverItems;
+      } catch (error) {
+        console.error('Error fetching server information:', error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching server information',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'modules' && element.connectionId) {
+      // Available modules section
+      try {
+        const client = this.connectionManager.getClient(element.connectionId);
+        if (!client) {
+          return [
+            new WeaviateTreeItem(
+              'Client not available',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
+
+        const moduleItems: WeaviateTreeItem[] = [];
 
         try {
-            const collectionName = item.label.toString();
-            const collection = this.collections[item.connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
+          const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
 
-            if (!collection?.schema) {
-                vscode.window.showErrorMessage('Could not find schema for collection');
-                return;
-            }
+          if (meta.modules) {
+            const modules = Object.keys(meta.modules);
 
-            // Create and show a webview with the detailed schema
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateDetailedSchema',
-                `Collection: ${collectionName}`,
-                vscode.ViewColumn.One,
-                { 
-                    enableScripts: true,
-                    retainContextWhenHidden: true 
-                }
-            );
+            if (modules.length > 0) {
+              modules.forEach((moduleName) => {
+                const moduleInfo = meta.modules?.[moduleName];
+                const version = meta.version || 'unknown';
 
-            // Format the schema as HTML
-            panel.webview.html = this.getDetailedSchemaHtml(collection.schema);
-
-        } catch (error) {
-            console.error('Error viewing detailed schema:', error);
-            vscode.window.showErrorMessage(
-                `Failed to view detailed schema: ${error instanceof Error ? error.message : String(error)}`
-            );
-        }
-    }
-
-    /**
-     * Generates HTML for displaying detailed schema in a webview
-     * @param schema The schema to display
-     */
-    private getDetailedSchemaHtml(schema: CollectionConfig): string {
-        return this.viewRenderer.renderDetailedSchema(schema);
-    }
-
-    // #endregion Command Handlers
-
-    // Helper to get connected status theme icon
-    getStatusIcon(status: 'connected' | 'disconnected'): vscode.ThemeIcon {
-        if (status === 'connected') {
-            // Green dot for connected
-            return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('testing.iconPassed'));
-        } else {
-            // Gray/hollow dot for disconnected
-            return new vscode.ThemeIcon('circle-outline');
-        }
-    }
-
-    // #region TreeDataProvider Implementation
-    
-    /**
-     * Converts a tree item into a VS Code TreeItem for display in the explorer view
-     * @param element - The tree item to convert
-     * @returns A VS Code TreeItem ready for display
-     * 
-     * @remarks
-     * This method is called by VS Code to get the UI representation of a tree item.
-     * It sets appropriate icons and tooltips based on the item type and properties.
-     */
-    getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
-        // Set appropriate icons and tooltips based on item type
-        if (element.itemType === 'properties' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('symbol-property');
-            element.tooltip = 'View collection properties';
-        } else if (element.itemType === 'vectorConfig' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('arrow-both');
-            element.tooltip = 'Vector configuration and modules';
-        } else if (element.itemType === 'invertedIndex' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('search');
-            element.tooltip = 'Index configuration';
-        } else if (element.itemType === 'statistics' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('graph');
-            element.tooltip = 'Collection statistics';
-        } else if (element.itemType === 'sharding' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('layout');
-            element.tooltip = 'Sharding and replication configuration';
-        } else if (element.itemType === 'serverInfo' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('server');
-            element.tooltip = 'Server version and information';
-        } else if (element.itemType === 'modules' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('extensions');
-            element.tooltip = 'Available Weaviate modules';
-        } else if (element.itemType === 'collectionsGroup' && !element.iconPath) {
-            element.iconPath = new vscode.ThemeIcon('database');
-            element.tooltip = 'Collections in this instance';
-        } else if (element.itemType === 'property') {
-            // Ensure property items have the correct context value
-            if (!element.contextValue) {
-                element.contextValue = 'weaviateProperty';
-            }
-            
-            // Set different icons based on property type if no icon is set
-            if (!element.iconPath) {
-                const label = element.label as string;
-                if (label.includes('(text)') || label.includes('(string)')) {
-                    element.iconPath = new vscode.ThemeIcon('symbol-text');
-                } else if (label.includes('(number)') || label.includes('(int)') || label.includes('(float)')) {
-                    element.iconPath = new vscode.ThemeIcon('symbol-number');
-                } else if (label.includes('(boolean)') || label.includes('(bool)')) {
-                    element.iconPath = new vscode.ThemeIcon('symbol-boolean');
-                } else if (label.includes('(date)') || label.includes('(datetime)')) {
-                    element.iconPath = new vscode.ThemeIcon('calendar');
-                } else {
-                    element.iconPath = new vscode.ThemeIcon('symbol-property');
-                }
-            }
-        } else if (element.itemType === 'connectionLink') {
-            // Make connection links clickable
-            if (element.description) {
-                element.tooltip = `Click to open: ${element.description}`;
-                element.command = {
-                    command: 'weaviate-studio.openLink',
-                    title: 'Open Link',
-                    arguments: [element.description]
-                };
-            }
-        }
-        
-        return element;
-    }
-
-    /**
-     * Gets the children of a tree item, or the root items if no item is provided
-     * @param element - The parent tree item, or undefined to get root items
-     * @returns A promise that resolves to an array of child tree items
-     * 
-     * @remarks
-     * This method is called by VS Code to populate the tree view. It handles:
-     * - Root level: Shows connections or a message if no connections exist
-     * - Connection level: Shows collections for the connection
-     * - Collection level: Shows metadata, properties, and vector configurations
-     */
-    async getChildren(element?: WeaviateTreeItem): Promise<WeaviateTreeItem[]> {
-        // No connections case
-        if (this.connections.length === 0) {
-            return [
+                moduleItems.push(
+                  new WeaviateTreeItem(
+                    `${moduleName} (v${version})`,
+                    vscode.TreeItemCollapsibleState.None,
+                    'object',
+                    element.connectionId,
+                    undefined,
+                    moduleName,
+                    new vscode.ThemeIcon('extensions'),
+                    'weaviateModule'
+                  )
+                );
+              });
+            } else {
+              moduleItems.push(
                 new WeaviateTreeItem(
-                    'No connections found. Click + to add.', 
-                    vscode.TreeItemCollapsibleState.None, 
-                    'message'
+                  'No modules available',
+                  vscode.TreeItemCollapsibleState.None,
+                  'message'
                 )
-            ];
-        }
-        if (element && !element.connectionId) {
-            // If no connection ID is present, we are at the root level
-            throw new Error('Invalid tree item: Missing connection ID');
+              );
+            }
+          } else {
+            moduleItems.push(
+              new WeaviateTreeItem(
+                'Module information not available',
+                vscode.TreeItemCollapsibleState.None,
+                'message'
+              )
+            );
+          }
+        } catch (error) {
+          console.warn('Could not fetch modules:', error);
+          moduleItems.push(
+            new WeaviateTreeItem(
+              'Unable to fetch module information',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            )
+          );
         }
 
-        if (!element) {
-            // Root level - show connections
-            const connectionItems = this.connections.map(conn => {
-                const contextValue = conn.status === 'connected' ? 'weaviateConnectionActive' : 'weaviateConnection';
-                const item = new WeaviateTreeItem(
-                    `${conn.type === 'cloud' ? '☁️' : '🔗'} ${conn.name}`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'connection',
-                    conn.id,
-                    undefined, // collectionName
-                    undefined, // itemId
-                    this.getStatusIcon(conn.status),
-                    contextValue
-                );
-                // Tooltip should reflect the connection type
-                const hostInfo = conn.type === 'cloud'
-                    ? (conn.cloudUrl || 'cloud')
-                    : `${conn.httpHost || ''}${conn.httpPort ? `:${conn.httpPort}` : ''}`;
-                item.tooltip = `${conn.name} (${hostInfo})\nStatus: ${conn.status}`;
-                
-                // Only expand connected clusters
-                if (conn.status === 'connected') {
-                    item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-                }
-                
-                return item;
+        return moduleItems;
+      } catch (error) {
+        console.error('Error fetching modules:', error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching modules',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'clusterNodes' && element.connectionId) {
+      try {
+        const client = this.connectionManager.getClient(element.connectionId);
+        if (!client) {
+          return [
+            new WeaviateTreeItem(
+              'Client not available',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
+
+        const clusterNodeItems: WeaviateTreeItem[] = [];
+
+        try {
+          const clusterNodes = this.clusterNodesCache[element.connectionId];
+          if (clusterNodes && clusterNodes.length > 0) {
+            clusterNodes.forEach((node) => {
+              let is_leader = false;
+              if (element.connectionId) {
+                is_leader =
+                  this.clusterStatisticsCache[element.connectionId]?.statistics[0]?.leaderId ===
+                  node.name;
+              }
+              clusterNodeItems.push(
+                new WeaviateTreeItem(
+                  `${is_leader ? '👑' : '🫡'} ${node.status === 'HEALTHY' ? '🟩' : '🟥'} ${node.name} (${node.stats.objectCount} objects and ${node.stats.shardCount} shards)`,
+                  vscode.TreeItemCollapsibleState.Collapsed,
+                  'clusterNode',
+                  element.connectionId,
+                  undefined,
+                  node.name,
+                  new vscode.ThemeIcon('server'),
+                  'weaviateClusterNode'
+                )
+              );
             });
-            
-            return connectionItems;
-        } 
-        else if (element.itemType === 'connection' && element.connectionId) {
-            // Connection level - show server info and collections
-            const connection = this.connections.find(conn => conn.id === element.connectionId);
-            
-            if (!connection || connection.status !== 'connected') {
-                const message = connection?.status === 'connected' 
-                    ? 'Loading...'
-                    : 'Not connected. Right-click and select "Connect" to view information.';
-                
-                return [
-                    new WeaviateTreeItem(
-                        message,
-                        vscode.TreeItemCollapsibleState.None, 
-                        'message',
-                        element.connectionId
-                    )
-                ];
-            }
+          } else {
+            clusterNodeItems.push(
+              new WeaviateTreeItem(
+                'No cluster nodes available',
+                vscode.TreeItemCollapsibleState.None,
+                'message'
+              )
+            );
+          }
+        } catch (error) {
+          console.warn('Could not fetch cluster nodes:', error);
+          clusterNodeItems.push(
+            new WeaviateTreeItem(
+              'Unable to fetch cluster node information',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            )
+          );
+        }
+        return clusterNodeItems;
+      } catch (error) {
+        console.error('Error fetching cluster nodes:', error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching cluster nodes',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'clusterNode' && element.connectionId) {
+      try {
+        const node = this.clusterNodesCache[element.connectionId]?.find(
+          (n) => n.name === element.itemId
+        );
+        if (!node) {
+          return [
+            new WeaviateTreeItem(
+              'No node details to show',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
 
-            const items: WeaviateTreeItem[] = [];
+        const nodeDetails: WeaviateTreeItem[] = [];
+        const flatten_node = await this.flattenObject(node, ['shards'], '', true);
 
-            // Add server information section
-            items.push(new WeaviateTreeItem(
-                'Server Information',
-                vscode.TreeItemCollapsibleState.Collapsed,
-                'serverInfo',
+        nodeDetails.push(
+          new WeaviateTreeItem(
+            `Statistics`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'weaviateClusterNodeStatistics',
+            element.connectionId,
+            undefined,
+            node.name,
+            new vscode.ThemeIcon('graph'),
+            'weaviateClusterNodeStatistics'
+          )
+        );
+
+        // Node status except for shards key
+        Object.keys(flatten_node).forEach((key) => {
+          const value = flatten_node[key];
+
+          nodeDetails.push(
+            new WeaviateTreeItem(
+              `${key}: ${value}`,
+              vscode.TreeItemCollapsibleState.None,
+              'object',
+              element.connectionId,
+              undefined,
+              'status',
+              new vscode.ThemeIcon(
+                node.status === 'HEALTHY' ? 'check' : 'warning',
+                new vscode.ThemeColor(
+                  node.status === 'HEALTHY'
+                    ? 'testing.iconPassed'
+                    : 'problemsWarningIcon.foreground'
+                )
+              ),
+              'weaviateClusterNodeDetail'
+            )
+          );
+        });
+
+        // Optionally, add more node details here if needed
+        return nodeDetails;
+      } catch (error) {
+        console.error(`Error fetching node details for node ${element.label}:`, error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching node details',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'clusterShards' && element.connectionId) {
+      try {
+        const shards =
+          this.clusterNodesCache[element.connectionId]?.find((n) => n.name === element.label)
+            ?.shards || [];
+        if (!shards) {
+          return [
+            new WeaviateTreeItem(
+              'No Shards to show',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
+
+        const shardItems: WeaviateTreeItem[] = [];
+
+        if (shards.length > 0) {
+          shards.forEach((shard) => {
+            shardItems.push(
+              new WeaviateTreeItem(
+                `Shard ${shard.name} - ${shard.class}`,
+                vscode.TreeItemCollapsibleState.None,
+                'clusterShards',
                 element.connectionId,
                 undefined,
-                'serverInfo',
-                new vscode.ThemeIcon('info'),
-                'weaviateServerInfo'
-            ));
-
-            // Add connection links section
-            const connectionData = this.connectionManager.getConnection(element.connectionId);
-            const links = connectionData?.links || [];
-            if (links.length > 0) {
-                items.push(new WeaviateTreeItem(
-                    `Links (${links.length})`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'connectionLinks',
-                    element.connectionId,
-                    undefined,
-                    'connectionLinks',
-                    new vscode.ThemeIcon('link'),
-                    'weaviateConnectionLinks'
-                ));
-            }
-
-            // Add cluster nodes section
-            const stats = this.clusterStatisticsCache[element.connectionId];
-            let nodes_synchronized = stats?.synchronized ? 'Synchronized' : 'Not Synchronized';
-            let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
-            items.push(new WeaviateTreeItem(
-                `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${nodes_synchronized}`,
-                vscode.TreeItemCollapsibleState.Expanded,
-                'clusterNodes',
-                element.connectionId,
-                undefined,
-                'clusterNodes',
-                new vscode.ThemeIcon('terminal-ubuntu'),
-                'weaviateClusterNodes'
-            ));
-
-            // Add collections section
-            const collections = this.collections[element.connectionId] || [];
-            const collectionsLabel = collections.length > 0 
-                ? `Collections (${collections.length})`
-                : 'Collections';
-            
-            items.push(new WeaviateTreeItem(
-                collectionsLabel,
-                vscode.TreeItemCollapsibleState.Expanded,
-                'collectionsGroup',
-                element.connectionId,
-                undefined,
-                'collections',
+                shard.name,
                 new vscode.ThemeIcon('database'),
-                'weaviateCollectionsGroup'
-            ));
-
-            return items;
+                'weaviateClusterShard'
+              )
+            );
+          });
+        } else {
+          shardItems.push(
+            new WeaviateTreeItem(
+              'No shards available',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            )
+          );
         }
-        else if (element.itemType === 'collectionsGroup' && element.connectionId) {
-            // Collections group - show actual collections
-            const collections = this.collections[element.connectionId] || [];
-            
-            if (collections.length === 0) {
-                return [
-                    new WeaviateTreeItem(
-                        'No collections found. Right-click parent connection to add a collection.',
-                        vscode.TreeItemCollapsibleState.None, 
-                        'message',
-                        element.connectionId
-                    )
-                ];
-            }
-            
-            return collections;
-        }
-        else if (element.itemType === 'collection' && element.connectionId) {
-            let collection = this.collections[element.connectionId]?.find(col => col.label === element.collectionName)?.schema;
-            if (!collection){
-                throw new Error('Collection data not available!');
-            }
-            let properties = collection?.properties || [];
-            let property_count = properties ? properties.length : 0;
-            // Configured Vectors Count
-            const vectorizers = collection.vectorizers;
-            let configured_vectors_count = vectorizers ? Object.keys(vectorizers).length : 0;
-            const multi_tenancy_enabled = collection?.multiTenancy.enabled;
-            const items = [
-                new WeaviateTreeItem(
-                    `Properties (${property_count})`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'properties',
-                    element.connectionId,
-                    element.label,
-                    'properties',
-                    new vscode.ThemeIcon('symbol-property')
-                ),
-                new WeaviateTreeItem(
-                    `Vectors (${configured_vectors_count})`,
-                    configured_vectors_count ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
-                    'vectorConfig',
-                    element.connectionId,
-                    element.label,
-                    'vectorConfig',
-                    new vscode.ThemeIcon('arrow-both')
-                ),
-                new WeaviateTreeItem(
-                    'Inverted Index',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'invertedIndex',
-                    element.connectionId,
-                    element.label,
-                    'invertedIndex',
-                    new vscode.ThemeIcon('search')
-                ),                
-                new WeaviateTreeItem(
-                    `Generative Configuration`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'generativeConfig',
-                    element.connectionId,
-                    element.label,
-                    'generative',
-                    new vscode.ThemeIcon('lightbulb-autofix')
-                ),                
-                new WeaviateTreeItem(
-                    'Replication',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'collectionReplication',
-                    element.connectionId,
-                    element.label,
-                    'replication',
-                    new vscode.ThemeIcon('activate-breakpoints'),
-                ),
-                new WeaviateTreeItem(
-                    'Sharding',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'sharding',
-                    element.connectionId,
-                    element.label,
-                    'sharding',
-                    new vscode.ThemeIcon('layout')
-                ),
-                new WeaviateTreeItem(
-                    multi_tenancy_enabled ? 'Multi Tenancy' : 'Multi Tenancy (Disabled)',
-                    multi_tenancy_enabled? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None ,
-                    'multiTenancy',
-                    element.connectionId,
-                    element.label,
-                    'multiTenancy',
-                    new vscode.ThemeIcon('organization')
-                ),
-                new WeaviateTreeItem(
-                    'Statistics',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'statistics',
-                    element.connectionId,
-                    element.label,
-                    'statistics',
-                    new vscode.ThemeIcon('graph')
-                ),                
 
+        return shardItems;
+      } catch (error) {
+        console.error(`Error fetching shards for node ${element.itemId}:`, error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching shard info',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'weaviateClusterNodeStatistics' && element.connectionId) {
+      const nodeStats: WeaviateTreeItem[] = [];
+      const raw_stats = element.itemId
+        ? this.clusterStatisticsCache[element.connectionId]
+        : undefined;
+      const this_node_stats = await this.flattenObject(
+        raw_stats['statistics'].find((n: any) => n.name === element.itemId)
+      );
+      const statistics = await this.flattenObject(this_node_stats);
+      // Node status except for shards key
+      Object.keys(statistics).forEach((key) => {
+        const value = statistics[key];
+
+        nodeStats.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'status',
+            new vscode.ThemeIcon(
+              statistics['status'] === 'HEALTHY' ? 'check' : 'warning',
+              new vscode.ThemeColor(
+                statistics['status'] === 'HEALTHY'
+                  ? 'testing.iconPassed'
+                  : 'problemsWarningIcon.foreground'
+              )
+            ),
+            'weaviateStatusDetail'
+          )
+        );
+      });
+      return nodeStats;
+    } else if (element.itemType === 'multiTenancy' && element.connectionId) {
+      const collection = this.collections[element.connectionId]?.find(
+        (item) => item.label === element.collectionName
+      );
+      const MultiTenancyItems: WeaviateTreeItem[] = [];
+      const schema = collection?.schema;
+      // Multi-tenancy
+      if (schema?.multiTenancy) {
+        for (const [key, value] of Object.entries(schema.multiTenancy)) {
+          MultiTenancyItems.push(
+            new WeaviateTreeItem(
+              `${key}: ${value}`,
+              vscode.TreeItemCollapsibleState.None,
+              'object',
+              element.connectionId,
+              element.collectionName,
+              key,
+              new vscode.ThemeIcon('organization'),
+              'MultiTenancy'
+            )
+          );
+        }
+      }
+      return MultiTenancyItems;
+    } else if (element.itemType === 'connectionLinks' && element.connectionId) {
+      // Show individual connection links
+      const connectionData = this.connectionManager.getConnection(element.connectionId);
+      const links = connectionData?.links || [];
+
+      const linkItems: WeaviateTreeItem[] = [];
+
+      links.forEach((link, index) => {
+        linkItems.push(
+          new WeaviateTreeItem(
+            link.name,
+            vscode.TreeItemCollapsibleState.None,
+            'connectionLink',
+            element.connectionId,
+            undefined,
+            index.toString(),
+            new vscode.ThemeIcon('link-external'),
+            'weaviateConnectionLink',
+            link.url
+          )
+        );
+      });
+
+      if (linkItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No links available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return linkItems;
+    }
+    return [];
+  }
+
+  // --- Connection Management Methods ---
+
+  // Add a new connection
+  async addConnection(connectionDetails?: WeaviateConnection): Promise<WeaviateConnection | null> {
+    try {
+      if (!connectionDetails) {
+        // If no details provided, show the dialog
+        return await this.connectionManager.showAddConnectionDialog();
+      }
+
+      // Validate connection details
+      if (!connectionDetails.name || !connectionDetails.httpHost) {
+        throw new Error('Name and HTTP host are required');
+      }
+      // Add the connection with required fields
+      const connection = await this.connectionManager.addConnection(connectionDetails);
+
+      if (connection) {
+        // Try to connect to the new connection
+        await this.connect(connection.id);
+        // Refresh the tree view to show the new connection
+        this.refresh();
+        vscode.window.showInformationMessage(`Successfully added connection: ${connection.name}`);
+        return connection;
+      }
+
+      return null;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      vscode.window.showErrorMessage(`Failed to add connection: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  // Connect to a Weaviate instance
+  async connect(connectionId: string, silent = false): Promise<boolean> {
+    if (this.isRefreshing && !silent) {
+      return false;
+    }
+
+    try {
+      const connection = await this.connectionManager.connect(connectionId);
+      if (connection) {
+        // Don't show messages during silent connections (like on startup)
+        if (!silent) {
+          vscode.window.showInformationMessage(`Connected to ${connection.name}`);
+        }
+
+        // Update the connection in our local list to update the UI state
+        const connectionIndex = this.connections.findIndex((c) => c.id === connectionId);
+        if (connectionIndex >= 0) {
+          this.connections[connectionIndex].status = 'connected';
+
+          // Fire tree change event to update connection state right away
+          // This makes the connection item rerender with 'connected' status icon
+          this._onDidChangeTreeData.fire();
+
+          // Auto-expand the connection tree item if TreeView is available
+          if (this.treeView) {
+            const connectionItem = new WeaviateTreeItem(
+              `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+              vscode.TreeItemCollapsibleState.Expanded,
+              'connection',
+              connection.id,
+              undefined, // collectionName
+              undefined, // itemId
+              this.getStatusIcon(connection.status),
+              'connectedConnection'
+            );
+
+            // Use setTimeout to ensure the tree has been updated before revealing
+            setTimeout(() => {
+              this.treeView?.reveal(connectionItem, { expand: true });
+            }, 100);
+          }
+        }
+
+        // Only fetch collections if we're not in a refresh loop
+        if (!this.isRefreshing) {
+          await this.fetchCollections(connectionId);
+        }
+
+        // Automatically open the query editor after successful connection (but not during silent connections)
+        if (!silent) {
+          // Open the query editor without a specific collection (general extension page)
+          QueryEditorPanel.createOrShow(this.context, { connectionId });
+        }
+
+        return true;
+      }
+      return false;
+    } catch (error) {
+      if (!silent) {
+        vscode.window.showErrorMessage(`Failed to connect: ${error}`);
+      }
+      return false;
+    }
+  }
+
+  // Disconnect from a Weaviate instance
+  async disconnect(connectionId: string): Promise<void> {
+    const connection = this.connections.find((c) => c.id === connectionId);
+    if (connection) {
+      await this.connectionManager.disconnect(connectionId);
+      // Clear collections for this connection
+      delete this.collections[connectionId];
+      // Refresh connections and update tree view
+      this.connections = this.connectionManager.getConnections();
+      this.refresh();
+      vscode.window.showInformationMessage(`Disconnected from ${connection.name}`);
+    }
+  }
+
+  // Edit a connection
+  async editConnection(
+    connectionId: string,
+    updates?: { name: string; url: string; apiKey?: string }
+  ): Promise<void> {
+    try {
+      if (updates) {
+        // If updates are provided, apply them directly
+        await this.connectionManager.updateConnection(connectionId, updates);
+        this.refresh();
+        vscode.window.showInformationMessage('Connection updated successfully');
+      } else {
+        // Show the edit dialog
+        const updatedConnection =
+          await this.connectionManager.showEditConnectionDialog(connectionId);
+        if (updatedConnection) {
+          this.refresh();
+          vscode.window.showInformationMessage('Connection updated successfully');
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update connection';
+      vscode.window.showErrorMessage(`Failed to update connection: ${errorMessage}`);
+    }
+  }
+
+  // Get the total number of connections
+  getConnectionCount(): number {
+    return this.connections.length;
+  }
+
+  // Get a connection by its ID
+  getConnectionById(connectionId: string): ConnectionConfig | undefined {
+    return this.connections.find((c) => c.id === connectionId);
+  }
+
+  // Get the connection manager (for debugging purposes)
+  getConnectionManager(): ConnectionManager {
+    return this.connectionManager;
+  }
+
+  // --- Collection Management Methods ---
+
+  // Fetch collections from Weaviate
+  async fetchCollections(connectionId: string): Promise<void> {
+    try {
+      const connection = this.connectionManager.getConnection(connectionId);
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      // Get the client for this connection
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Get stats from server
+      // use direct request as the client does not support this endpoint yet
+      const clusterStats = await this.fetchClusterStatistics(
+        {
+          httpSecure: connection.httpSecure ?? false,
+          httpHost: connection.httpHost ?? '',
+          httpPort: connection.httpPort ?? 8080,
+          apiKey: connection.apiKey,
+          cloudUrl: connection.cloudUrl ?? '',
+          type: connection.type ?? 'local',
+        },
+        connectionId
+      );
+      // map the the result per node name
+      let clusterStatsMapped: { [key: string]: any } = {};
+      if (clusterStats) {
+        try {
+          const statsJson = JSON.parse(clusterStats);
+          // Map the stats to the clusterStatsMapped object
+          for (const [nodeName, nodeStats] of Object.entries(statsJson)) {
+            clusterStatsMapped[nodeName] = nodeStats;
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          vscode.window.showErrorMessage(`Failed to parse cluster stats: ${errorMessage}`);
+        }
+      }
+      this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
+
+      // Get collections from Weaviate
+      const collections = await client.collections.listAll();
+      // Store collections with their schema
+      if (collections && Array.isArray(collections)) {
+        // sort collections alphabetically by name
+        this.collections[connectionId] = collections
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(
+            (collection) =>
+              ({
+                label: collection.name,
+                description: collection.description,
+                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                itemType: 'collection',
+                connectionId: connectionId,
+                collectionName: collection.name,
+                iconPath: new vscode.ThemeIcon('database'),
+                contextValue: 'weaviateCollection',
+                tooltip: collection.description,
+                schema: collection,
+              }) as unknown as CollectionWithSchema
+          );
+      } else {
+        this.collections[connectionId] = [];
+      }
+
+      // Get metaData from Weaviate
+      const metaData = await client.getMeta();
+      this.clusterMetadataCache[connectionId] = metaData;
+
+      // Get Nodes from Weaviate
+      const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
+      this.clusterNodesCache[connectionId] = clusterNodes;
+
+      // Refresh the tree view to show updated collections
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchCollections:', error);
+      vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Opens a query editor for the specified collection
+   * @param connectionId - The ID of the connection
+   * @param collectionName - The name of the collection to query
+   */
+  async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
+    try {
+      // Use the registered command that's already wired up in extension.ts
+      // This will open a new tab if this collection isn't already open
+      await vscode.commands.executeCommand(
+        'weaviate.queryCollection',
+        connectionId,
+        collectionName
+      );
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Failed to open query editor: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Deletes a collection from the Weaviate instance
+   * @param connectionId - The ID of the connection
+   * @param collectionName - The name of the collection to delete
+   * @throws Error if deletion fails
+   */
+  async deleteCollection(connectionId: string, collectionName: string): Promise<void> {
+    try {
+      // Get client for this connection
+      const connection = this.connectionManager.getConnection(connectionId);
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Delete the collection using the schema API
+      await client.collections.delete(collectionName);
+
+      // Update local state
+      if (this.collections[connectionId]) {
+        this.collections[connectionId] = this.collections[connectionId].filter(
+          (collection) => collection.collectionName !== collectionName
+        );
+      }
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error in deleteCollection:', error);
+      vscode.window.showErrorMessage(`Failed to delete collection: ${errorMessage}`);
+      throw new Error(`Failed to delete collection: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Deletes all collections from the Weaviate instance
+   * @param connectionId - The ID of the connection
+   * @throws Error if deletion fails
+   */
+  async deleteAllCollections(connectionId: string): Promise<void> {
+    try {
+      // Get client for this connection
+      const connection = this.connectionManager.getConnection(connectionId);
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Delete all collections using the collections API
+      await client.collections.deleteAll();
+
+      // Clear local collections state
+      this.collections[connectionId] = [];
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error in deleteAllCollections:', error);
+      throw new Error(`Failed to delete all collections: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes connection info for a specific connection
+   * @param connectionId - The ID of the connection to refresh
+   */
+  async refreshConnectionInfo(connectionId: string): Promise<void> {
+    try {
+      // Reconnect to refresh the connection info
+      await this.connect(connectionId, true);
+      await this.fetchCollections(connectionId);
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error refreshing connection info:', error);
+      throw new Error(`Failed to refresh connection info: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes statistics for a specific collection
+   * @param connectionId - The ID of the connection
+   * @param collectionName - The name of the collection
+   */
+  async refreshStatistics(connectionId: string, collectionName: string): Promise<void> {
+    try {
+      // Simply refresh the tree view to trigger statistics reload
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error refreshing statistics:', error);
+      throw new Error(`Failed to refresh statistics: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Converts a raw Weaviate schema to a properly formatted API schema
+   * @param schema - The raw schema from Weaviate
+   * @returns The formatted schema ready for API consumption
+   */
+  private convertSchemaToApiFormat(schema: any): any {
+    const fixed_properties =
+      schema.properties?.map((prop: any) => {
+        // Normalize dataType to the v2 string format (not array)
+        let dt = prop?.dataType;
+        if (Array.isArray(dt)) {
+          dt = dt[0];
+        }
+        return {
+          ...prop,
+          dataType: dt,
+          tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
+          indexSearchable: prop.indexInverted,
+        };
+      }) || [];
+
+    const fixed_vectorizers = schema.vectorizers
+      ? Object.fromEntries(
+          Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
+            const vectorizerName = vec.vectorizer?.name || 'none';
+            const vectorizerConfig = vec.vectorizer?.config || {};
+            const vectorIndexType = vec.vectorIndexType || 'hnsw';
+            const vectorIndexConfig = vec.vectorIndexConfig || {};
+            return [
+              key,
+              {
+                vectorizer: { [vectorizerName]: vectorizerConfig },
+                vectorIndexType,
+                vectorIndexConfig,
+              },
             ];
-            return items;
+          })
+        )
+      : undefined;
+
+    // now build the final schema object
+    const apiSchema = {
+      ...schema,
+      class: schema.name,
+      invertedIndexConfig: schema.invertedIndex,
+      moduleConfig: schema.generative,
+      multiTenancyConfig: schema.multiTenancy,
+      properties: fixed_properties,
+      vectorConfig: fixed_vectorizers,
+    } as any;
+
+    // delete all indexInverted for all properties
+    apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
+      delete prop.indexInverted;
+    });
+    delete apiSchema.vectorizers;
+
+    return apiSchema;
+  }
+
+  /**
+   * Exports a collection schema to a file
+   * @param connectionId - The ID of the connection
+   * @param collectionName - The name of the collection to export
+   */
+  async exportSchema(connectionId: string, collectionName: string): Promise<void> {
+    try {
+      const collection = this.collections[connectionId]?.find(
+        (col) => col.label === collectionName
+      ) as CollectionWithSchema | undefined;
+
+      if (!collection?.schema) {
+        throw new Error('Collection schema not found');
+      }
+
+      // Show save dialog
+      const saveUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(`${collectionName}_weaviate_schema.json`),
+        filters: {
+          'JSON Files': ['json'],
+          'All Files': ['*'],
+        },
+      });
+
+      if (!saveUri) {
+        return; // User cancelled
+      }
+
+      // Export schema as formatted JSON using the conversion helper
+      const schema = collection.schema;
+      const apiSchema = this.convertSchemaToApiFormat(schema);
+      const schemaJson = JSON.stringify(apiSchema, null, 2);
+      await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
+
+      vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error exporting schema:', error);
+      throw new Error(`Failed to export schema: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Shows the Add Collection dialog for creating a new collection
+   * @param connectionId - The ID of the connection to add the collection to
+   */
+  /**
+   * Shows the Add Collection dialog for creating a new collection
+   * @param connectionId - The ID of the connection to add the collection to
+   * @param initialSchema - Optional initial schema to pre-populate the form
+   */
+  async addCollection(connectionId: string, initialSchema?: any): Promise<void> {
+    // Validate connection first - these errors should not be caught and re-wrapped
+    const connection = this.connectionManager.getConnection(connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
+    }
+
+    if (connection.status !== 'connected') {
+      throw new Error('Connection must be active to add collections');
+    }
+
+    try {
+      // Create and show the Add Collection webview panel
+      const panel = vscode.window.createWebviewPanel(
+        'weaviateAddCollection',
+        'Add Collection',
+        vscode.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [],
         }
-        else if (element.itemType === 'properties' && element.connectionId && element.collectionName) {
-            // Find the collection schema
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                return [
-                    new WeaviateTreeItem('No properties available', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-            
-            const schema = (collection as any).schema;
-            if (!schema || !schema.properties || !Array.isArray(schema.properties)) {
-                return [
-                    new WeaviateTreeItem('No properties defined', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-            
-            // Map property types to icons
-            const getPropertyIcon = (dataType: string[]): vscode.ThemeIcon => {
-                const type = Array.isArray(dataType) ? dataType[0] : dataType;
-                switch (type) {
-                    case 'text':
-                    case 'string':
-                        return new vscode.ThemeIcon('symbol-text');
-                    case 'int':
-                    case 'number':
-                    case 'float':
-                    case 'number[]':
-                        return new vscode.ThemeIcon('symbol-number');
-                    case 'boolean':
-                        return new vscode.ThemeIcon('symbol-boolean');
-                    case 'date':
-                    case 'dateTime':
-                        return new vscode.ThemeIcon('calendar');
-                    case 'object':
-                    case 'object[]':
-                        return new vscode.ThemeIcon('symbol-object');
-                    case 'geoCoordinates':
-                        return new vscode.ThemeIcon('location');
-                    case 'phoneNumber':
-                        return new vscode.ThemeIcon('device-mobile');
-                    case 'blob':
-                        return new vscode.ThemeIcon('file-binary');
-                    default:
-                        return new vscode.ThemeIcon('symbol-property');
-                }
-            };
-            
-            const propertyItems = schema.properties.map((prop: any) => {
-                const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
-                const description = prop.description ? ` - ${prop.description}` : '';
-                const icon = getPropertyIcon(prop.dataType);
-                
-                return new WeaviateTreeItem(
-                    `${prop.name} (${dataType})${description}`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'propertyItem',
-                    element.connectionId,
-                    element.collectionName,
-                    prop.name,
-                    icon,
-                    'weaviateProperty',
-                    description.trim()
+      );
+
+      // Set the webview content
+      panel.webview.html = this.getAddCollectionHtml(initialSchema);
+
+      // Handle messages from the webview
+      panel.webview.onDidReceiveMessage(
+        async (message) => {
+          switch (message.command) {
+            case 'create':
+              try {
+                await this.createCollection(connectionId, message.schema);
+                panel.dispose();
+                vscode.window.showInformationMessage(
+                  `Collection "${message.schema.class}" created successfully`
                 );
-            });
-            
-            return propertyItems;
-        }
-        else if (element.itemType === 'propertyItem' && element.connectionId && element.collectionName && element.itemId) {
-            const vectorItems: WeaviateTreeItem[] = [];
-            // Find the collection schema
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                return [
-                    new WeaviateTreeItem('No properties available', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
+                await this.fetchCollections(connectionId);
+              } catch (error) {
+                panel.webview.postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+              break;
+            case 'cancel':
+              panel.dispose();
+              break;
+            case 'getVectorizers':
+              try {
+                const client = this.connectionManager.getClient(connectionId);
+                const vectorizers = await this.getAvailableVectorizers(connectionId);
 
-            // Find the property
-            const property = collection.schema?.properties.find(
-                (prop: any) => prop.name === element.itemId
-            );
-
-            if (!property) {
-                return [
-                    new WeaviateTreeItem('Property not found', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-            // Show property details
-            for (const [key, value] of Object.entries(await this.flattenObject(property))) {
-                vectorItems.push(new WeaviateTreeItem(
-                    `${key}: ${value}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'propertyItem',
-                    element.connectionId,
-                    element.collectionName,
-                    property.name,
-                    new vscode.ThemeIcon('symbol-property'),
-                    'weaviateProperty'
-                ));
-            }
-            return vectorItems;
-        }
-        else if (element.itemType === 'vectorConfig' && element.connectionId && element.collectionName) {
-            // Vector configuration section
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                 return [
-                     new WeaviateTreeItem('No Vectors available', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-            
-            // const vectorItems: WeaviateTreeItem[] = [];
-            // const schema = collection.schema;
-            // const schema_config = schema.config.get()
-            // // Vectorizer info
-            // if (schema?.vectorizers) {
-            //     schema.vectorizers.forEach((vec: string) => {
-            //         vectorItems.push(new WeaviateTreeItem(
-            //             `Vectorizer: ${vec}`,
-            //             vscode.TreeItemCollapsibleState.None,
-            //             'object',
-            //             element.connectionId,
-            //             element.collectionName,
-            //             'vectorizer',
-            //             new vscode.ThemeIcon('gear'),
-            //             'weaviateVectorConfig'
-            //         ));
-            //     });
-            // }
-
-            // Module config
-            // if (schema?.moduleConfig) {
-            //     const moduleNames = Object.keys(schema.moduleConfig);
-            //     moduleNames.forEach(moduleName => {
-            //         vectorItems.push(new WeaviateTreeItem(
-            //             `Module: ${moduleName}`,
-            //             vscode.TreeItemCollapsibleState.None,
-            //             'object',
-            //             element.connectionId,
-            //             element.collectionName,
-            //             moduleName,
-            //             new vscode.ThemeIcon('extensions'),
-            //             'weaviateVectorConfig'
-            //         ));
-            //     });
-            // }
-
-            
-            // Vectorizers
-            const vectorItems: WeaviateTreeItem[] = [];
-            for (let key in collection.schema?.vectorizers) {
-               let value = collection.schema?.vectorizers[key];
-                    vectorItems.push(new WeaviateTreeItem(
-                        `${key} - ${value.vectorizer.name}`,
-                        vscode.TreeItemCollapsibleState.Collapsed,
-                        'vectorConfigDetail',
-                        element.connectionId,
-                        element.collectionName,
-                        key,
-                        new vscode.ThemeIcon('list-tree'),
-                        'vectorConfigDetail'
-                    ));
-            }
-
-            if (vectorItems.length === 0) {
-                 return [
-                     new WeaviateTreeItem('No vector configuration found', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-
-            return vectorItems;
-        }
-        else if (element.itemType === 'generativeConfig' && element.connectionId && element.collectionName) {
-            // Generative configuration section
-            const collection = this.collections[element.connectionId]?.find(
-                col => col.label === element.collectionName
-            );
-            let generativeItems: WeaviateTreeItem[] = [];
-            const data = await this.flattenObject(collection?.schema?.generative || {}, [], '', false);
-            Object.entries(data).forEach(([key, value]) => {
-                generativeItems.push(new WeaviateTreeItem(
-                    `${key}: ${value}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    key,
-                    new vscode.ThemeIcon('lightbulb-autofix'),
-                    'generativeConfig'
-                ));
-            });
-            return generativeItems;
-        }
-        else if (element.itemType === 'collectionReplication' && element.connectionId && element.collectionName) {
-            // Replication section
-            const replicationItems: WeaviateTreeItem[] = [];
-            const collectionReplication = this.collections[element.connectionId]?.find(  
-                col => col.label === element.collectionName
-            )?.schema?.replication;
-
-            Object.entries(collectionReplication || {}).forEach(([key, value]) => {
-                replicationItems.push(new WeaviateTreeItem(
-                    `${key}: ${value}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    key,
-                    new vscode.ThemeIcon('activate-breakpoints'),
-                    'collectionReplication'
-                ));
-            });
-
-            if (replicationItems.length === 0) {
-                return [
-                    new WeaviateTreeItem('No replication configuration found', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-
-            return replicationItems;
-        }
-        if (element.itemType === 'vectorConfigDetail' && element.connectionId && element.collectionName) {
-            // Vector configuration detail section
-            const vectorItemDetails: WeaviateTreeItem[] = [];
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                 return [
-                     new WeaviateTreeItem('No Vectors available', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-             const vectorizer = collection.schema?.vectorizers[element.itemId || ''];
-             const flattened_vectorizer = await this.flattenObject(vectorizer || {}, [], '', true);
-             // for each object in vectorizer, create a tree item
-             for (let key in flattened_vectorizer) {
-                 const value = flattened_vectorizer[key];
-                 vectorItemDetails.push(new WeaviateTreeItem(
-                     `${key}: ${value}`,
-                     vscode.TreeItemCollapsibleState.None,
-                     'object',
-                     element.connectionId,
-                     element.collectionName,
-                     key,
-                     new vscode.ThemeIcon('list-tree'),
-                     'vectorConfigDetail'
-                 ));
-             }
-             return vectorItemDetails;
-             
-
-        }
-        else if (element.itemType === 'invertedIndex' && element.connectionId && element.collectionName) {
-            // Indexes section
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-                         if (!collection) {
-                 return [
-                     new WeaviateTreeItem('No index information available', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-            
-            const schema = (collection as any).schema;
-            const indexItems: WeaviateTreeItem[] = [];
-            
-            // Inverted index
-            const invertedIndex = await this.flattenObject(schema.invertedIndex || {}, [], '', false);
-            Object.entries(invertedIndex || {}).forEach(([key, value]) => {
-                indexItems.push(new WeaviateTreeItem(
-                    `${key}: ${value}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    key,
-                    new vscode.ThemeIcon('search'),
-                    'invertedIndexItem'
-                ));
-            });
-
-            // Vector index
-            if (schema?.vectorIndexConfig) {
-                const vectorIndexType = schema.vectorIndexType || 'hnsw';
-                indexItems.push(new WeaviateTreeItem(
-                    `Vector Index: ${vectorIndexType.toUpperCase()}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    element.collectionName,
-                    'vectorIndex',
-                    new vscode.ThemeIcon('arrow-both'),
-                    'weaviateIndex'
-                ));
-            }
-
-            // Property-specific indexes
-            if (schema?.properties) {
-                const indexedProps = schema.properties.filter((prop: any) => prop.indexInverted !== false);
-                if (indexedProps.length > 0) {
-                    indexItems.push(new WeaviateTreeItem(
-                        `Indexed Properties: ${indexedProps.length}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        'indexedProperties',
-                        new vscode.ThemeIcon('symbol-property'),
-                        'weaviateIndex'
-                    ));
-                }
-            }
-
-            if (indexItems.length === 0) {
-                return [
-                    new WeaviateTreeItem('No index information found', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-
-            return indexItems;
-        }
-        else if (element.itemType === 'statistics' && element.connectionId && element.collectionName) {
-            // Statistics section - fetch live data
-            try {
-                const client = this.connectionManager.getClient(element.connectionId);
-                if (!client) {
-                     return [
-                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
-                     ];
-                 }
-
-                const statsItems: WeaviateTreeItem[] = [];
-
-                // Get tenant count if multi-tenancy is enabled
-                const collection = this.collections[element.connectionId]?.find(
-                    item => item.label === element.collectionName
-                );
-                const schema = (collection as any)?.schema;
-                // Get object count
-                if (!schema.multiTenancy?.enabled) {
-                    try {
-                        const aggregate = await client.collections.get(element.collectionName).aggregate.overAll();
-                        const count = aggregate.totalCount || 0;
-                        statsItems.push(new WeaviateTreeItem(
-                            `Objects: ${count.toLocaleString()}`,
-                            vscode.TreeItemCollapsibleState.None,
-                            'object',
-                            element.connectionId,
-                            element.collectionName,
-                            'objectCount',
-                            new vscode.ThemeIcon('database'),
-                            'weaviateStatistic'
-                        ));
-                    } catch (error) {
-                        console.warn('Could not fetch object count:', error);
-                        statsItems.push(new WeaviateTreeItem(
-                            'Objects: Unable to fetch',
-                            vscode.TreeItemCollapsibleState.None,
-                            'object',
-                            element.connectionId,
-                            element.collectionName,
-                            'objectCount',
-                            new vscode.ThemeIcon('database'),
-                            'weaviateStatistic'
-                        ));
-                    }
-                }
-                
-                if ((schema as any)?.multiTenancy?.enabled) {
-                    try {
-                        const multiCollection =  client.collections.use(element.collectionName);
-                        const tenants = await multiCollection.tenants.get();
-                        const tenantCount = Object.keys(tenants).length;
-                        statsItems.push(new WeaviateTreeItem(
-                            `Tenants: ${tenantCount}`,
-                            vscode.TreeItemCollapsibleState.None,
-                            'object',
-                            element.connectionId,
-                            element.collectionName,
-                            'tenantCount',
-                            new vscode.ThemeIcon('organization'),
-                            'weaviateStatistic'
-                        ));
-                    } catch (error) {
-                        console.warn('Could not fetch tenant count:', error);
-                    }
-                }
-
-                                 return statsItems;
-            } catch (error) {
-                console.error('Error fetching statistics:', error);
-                                 return [
-                     new WeaviateTreeItem('Error fetching statistics', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-            }
-        }
-        else if (element.itemType === 'sharding' && element.connectionId && element.collectionName) {
-            // Sharding section
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            
-            if (!collection) {
-                 return [
-                     new WeaviateTreeItem('No sharding information available', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-            
-            const schema = (collection as any).schema;
-            const shardingItems: WeaviateTreeItem[] = [];
-            
-            // Sharding config
-            if (schema?.sharding) {
-                const config = schema.sharding as ShardingConfig;
-                for (const [key, value] of Object.entries(config)) {
-                    shardingItems.push(new WeaviateTreeItem(
-                        `${key}: ${value}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        key,
-                        new vscode.ThemeIcon('layout'),
-                        'weaviateSharding'
-                    ));
-                }
-            }
-
-
-            if (shardingItems.length === 0) {
-                 return [
-                     new WeaviateTreeItem('No sharding configuration found', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-
-            return shardingItems;
-        }
-         else if (element.itemType === 'serverInfo' && element.connectionId) {
-             // Server information section
-             try {
-                 const serverItems: WeaviateTreeItem[] = [];
-                 // Get server meta information
-                 try {
-                     const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
-                     if (!meta) {
-                         throw new Error('Meta not available');
-                     }
-                     
-                     if (meta.version) {
-                         serverItems.push(new WeaviateTreeItem(
-                             `Version: ${meta.version}`,
-                             vscode.TreeItemCollapsibleState.None,
-                             'object',
-                             element.connectionId,
-                             undefined,
-                             'version',
-                             new vscode.ThemeIcon('tag'),
-                             'weaviateServerDetail'
-                         ));
-                     }
-
-                     if (meta.grpcMaxMessageSize) {
-                         serverItems.push(new WeaviateTreeItem(
-                             `gRPC Max Message Size: ${meta.grpcMaxMessageSize}`,
-                             vscode.TreeItemCollapsibleState.None,
-                             'object',
-                             element.connectionId,
-                             undefined,
-                             'grpcMaxMessageSize',
-                             new vscode.ThemeIcon('git-commit'),
-                             'weaviateServerDetail'
-                         ));
-                     }
-
-                     if (meta.hostname) {
-                         serverItems.push(new WeaviateTreeItem(
-                             `Hostname: ${meta.hostname}`,
-                             vscode.TreeItemCollapsibleState.None,
-                             'object',
-                             element.connectionId,
-                             undefined,
-                             'hostname',
-                             new vscode.ThemeIcon('server'),
-                             'weaviateServerDetail'
-                         ));
-                     }
-
-                    // available modules
-                    serverItems.push(new WeaviateTreeItem(
-                        `Available Modules (${meta.modules ? Object.keys(meta.modules).length : 0})`,
-                        vscode.TreeItemCollapsibleState.Collapsed,
-                        'modules',
-                        element.connectionId,
-                        undefined,
-                        'modules',
-                        new vscode.ThemeIcon('extensions'),
-                        'weaviateModules'
-                    ));                     
-
-                 } catch (error) {
-                     console.warn('Could not fetch server meta:', error);
-                     serverItems.push(new WeaviateTreeItem(
-                         'Unable to fetch server information',
-                         vscode.TreeItemCollapsibleState.None,
-                         'message'
-                     ));
-                 }
-
-                 return serverItems;
-             } catch (error) {
-                 console.error('Error fetching server information:', error);
-                 return [
-                     new WeaviateTreeItem('Error fetching server information', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-        }
-         else if (element.itemType === 'modules' && element.connectionId) {
-             // Available modules section
-             try {
-                 const client = this.connectionManager.getClient(element.connectionId);
-                 if (!client) {
-                     return [
-                         new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
-                     ];
-                 }
-
-                 const moduleItems: WeaviateTreeItem[] = [];
-
-                 try {
-                     const meta = this.clusterMetadataCache[element.connectionId] as WeaviateMetadata;
-                     
-                     if (meta.modules) {
-                         const modules = Object.keys(meta.modules);
-                         
-                         if (modules.length > 0) {
-                             modules.forEach(moduleName => {
-                                 const moduleInfo = meta.modules?.[moduleName];
-                                 const version = meta.version || 'unknown';
-                                 
-                                 moduleItems.push(new WeaviateTreeItem(
-                                     `${moduleName} (v${version})`,
-                                     vscode.TreeItemCollapsibleState.None,
-                                     'object',
-                                     element.connectionId,
-                                     undefined,
-                                     moduleName,
-                                     new vscode.ThemeIcon('extensions'),
-                                     'weaviateModule'
-                                 ));
-                             });
-                         } else {
-                             moduleItems.push(new WeaviateTreeItem(
-                                 'No modules available',
-                                 vscode.TreeItemCollapsibleState.None,
-                                 'message'
-                             ));
-                         }
-                     } else {
-                         moduleItems.push(new WeaviateTreeItem(
-                             'Module information not available',
-                             vscode.TreeItemCollapsibleState.None,
-                             'message'
-                         ));
-                     }
-
-                 } catch (error) {
-                     console.warn('Could not fetch modules:', error);
-                     moduleItems.push(new WeaviateTreeItem(
-                         'Unable to fetch module information',
-                         vscode.TreeItemCollapsibleState.None,
-                         'message'
-                     ));
-                 }
-
-                 return moduleItems;
-             } catch (error) {
-                 console.error('Error fetching modules:', error);
-                 return [
-                     new WeaviateTreeItem('Error fetching modules', vscode.TreeItemCollapsibleState.None, 'message')
-                 ];
-             }
-        }
-         else if (element.itemType === 'clusterNodes' && element.connectionId) {
-            try {
-                const client = this.connectionManager.getClient(element.connectionId);
-                if (!client) {
-                    return [
-                        new WeaviateTreeItem('Client not available', vscode.TreeItemCollapsibleState.None, 'message')
-                    ];
-                }
-
-                const clusterNodeItems: WeaviateTreeItem[] = [];
-
-                try {
-                    const clusterNodes = this.clusterNodesCache[element.connectionId];
-                    if (clusterNodes && clusterNodes.length > 0) {
-                        clusterNodes.forEach(node => {
-                            let is_leader = false;
-                            if(element.connectionId){
-                                is_leader = this.clusterStatisticsCache[element.connectionId]?.statistics[0]?.leaderId === node.name;
-                            }
-                            clusterNodeItems.push(new WeaviateTreeItem(
-                                `${is_leader ? '👑' : '🫡'} ${node.status === "HEALTHY" ? '🟩' : '🟥'} ${node.name} (${node.stats.objectCount} objects and ${node.stats.shardCount} shards)`,
-                                vscode.TreeItemCollapsibleState.Collapsed,
-                                'clusterNode',
-                                element.connectionId,
-                                undefined,
-                                node.name,
-                                new vscode.ThemeIcon('server'),
-                                'weaviateClusterNode'
-                            ));
-                        });
-                    } else {
-                        clusterNodeItems.push(new WeaviateTreeItem(
-                            'No cluster nodes available',
-                            vscode.TreeItemCollapsibleState.None,
-                            'message'
-                        ));
-                    }
-                } catch (error) {
-                    console.warn('Could not fetch cluster nodes:', error);
-                    clusterNodeItems.push(new WeaviateTreeItem(
-                        'Unable to fetch cluster node information',
-                        vscode.TreeItemCollapsibleState.None,
-                        'message'
-                    ));
-                }
-                return clusterNodeItems;
-            } catch (error) {
-                console.error('Error fetching cluster nodes:', error);
-                return [
-                    new WeaviateTreeItem('Error fetching cluster nodes', vscode.TreeItemCollapsibleState.None, 'message')
-                ];
-            }
-        }
-        else if (element.itemType === 'clusterNode' && element.connectionId ) {
-            try {
-                const node = this.clusterNodesCache[element.connectionId]?.find(n => n.name === element.itemId);
-                if (!node) {
-                    return [ new WeaviateTreeItem('No node details to show', vscode.TreeItemCollapsibleState.None, 'message') ];
-                }
-
-                const nodeDetails: WeaviateTreeItem[] = [];
-                const flatten_node = await this.flattenObject(node, ["shards"], '', true);
-
-                nodeDetails.push(new WeaviateTreeItem(
-                    `Statistics`,
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    'weaviateClusterNodeStatistics',
-                    element.connectionId,
-                    undefined,
-                    node.name,
-                    new vscode.ThemeIcon('graph'),
-                    'weaviateClusterNodeStatistics',
-                ));
-
-                // Node status except for shards key
-                Object.keys(flatten_node).forEach(key => {
-                    const value = flatten_node[key]; 
-
-                    nodeDetails.push(new WeaviateTreeItem(
-                        `${key}: ${value}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        undefined,
-                        'status',
-                        new vscode.ThemeIcon(
-                            node.status === 'HEALTHY' ? 'check' : 'warning',
-                            new vscode.ThemeColor(node.status === 'HEALTHY' ? 'testing.iconPassed' : 'problemsWarningIcon.foreground')
-                        ),
-                        'weaviateClusterNodeDetail'
-                    ));
+                // Send vectorizers
+                panel.webview.postMessage({
+                  command: 'vectorizers',
+                  vectorizers: vectorizers,
                 });
 
-                // Optionally, add more node details here if needed
-                return nodeDetails;
-            } catch (error) {
-                console.error(`Error fetching node details for node ${element.label}:`, error);
-                return [ new WeaviateTreeItem('Error fetching node details', vscode.TreeItemCollapsibleState.None, 'message') ];
-            }
-        }
-        else if (element.itemType === 'clusterShards' && element.connectionId) {
-            try {
-                const shards = this.clusterNodesCache[element.connectionId]?.find(n => n.name === element.label)?.shards || [];
-                if (!shards) {
-                    return [ new WeaviateTreeItem('No Shards to show', vscode.TreeItemCollapsibleState.None, 'message') ];
-                }
-
-                const shardItems: WeaviateTreeItem[] = [];
-
-                if (shards.length > 0) {
-                    shards.forEach(shard => {
-                        shardItems.push(new WeaviateTreeItem(
-                            `Shard ${shard.name} - ${shard.class}`,
-                            vscode.TreeItemCollapsibleState.None,
-                            'clusterShards',
-                            element.connectionId,
-                            undefined,
-                            shard.name,
-                            new vscode.ThemeIcon('database'),
-                            'weaviateClusterShard'
-                        ));
-                    });
-                } else {
-                    shardItems.push(new WeaviateTreeItem(
-                        'No shards available',
-                        vscode.TreeItemCollapsibleState.None,
-                        'message'
-                    ));
-                }
-
-                return shardItems;
-            } catch (error) {
-                console.error(`Error fetching shards for node ${element.itemId}:`, error);
-                return [ new WeaviateTreeItem('Error fetching shard info', vscode.TreeItemCollapsibleState.None, 'message') ];
-            }        
-        }
-        else if (element.itemType === 'weaviateClusterNodeStatistics' && element.connectionId) {
-            const nodeStats: WeaviateTreeItem[] = [];
-            const raw_stats = element.itemId ? this.clusterStatisticsCache[element.connectionId] : undefined;
-            const this_node_stats = await this.flattenObject(raw_stats["statistics"].find((n: any) => n.name === element.itemId));
-            const statistics = await this.flattenObject(this_node_stats);
-            // Node status except for shards key
-            Object.keys(statistics).forEach(key => {
-                const value = statistics[key];
-
-                nodeStats.push(new WeaviateTreeItem(
-                    `${key}: ${value}`,
-                    vscode.TreeItemCollapsibleState.None,
-                    'object',
-                    element.connectionId,
-                    undefined,
-                    'status',
-                    new vscode.ThemeIcon(
-                        statistics["status"] === 'HEALTHY' ? 'check' : 'warning',
-                        new vscode.ThemeColor(statistics["status"] === 'HEALTHY' ? 'testing.iconPassed' : 'problemsWarningIcon.foreground')
-                    ),
-                    'weaviateStatusDetail'
-                ));
-            });            
-            return nodeStats;
-        }
-        else if (element.itemType === 'multiTenancy' && element.connectionId){
-            const collection = this.collections[element.connectionId]?.find(
-                item => item.label === element.collectionName
-            );
-            const MultiTenancyItems: WeaviateTreeItem[] = [];
-            const schema = collection?.schema;
-            // Multi-tenancy
-            if (schema?.multiTenancy) {
-                for (const [key, value] of Object.entries(schema.multiTenancy)) {
-                    MultiTenancyItems.push(new WeaviateTreeItem(
-                        `${key}: ${value}`,
-                        vscode.TreeItemCollapsibleState.None,
-                        'object',
-                        element.connectionId,
-                        element.collectionName,
-                        key,
-                        new vscode.ThemeIcon('organization'),
-                        'MultiTenancy'
-                    ));                    
-                }
-            }
-            return MultiTenancyItems;
-        }
-        else if (element.itemType === 'connectionLinks' && element.connectionId) {
-            // Show individual connection links
-            const connectionData = this.connectionManager.getConnection(element.connectionId);
-            const links = connectionData?.links || [];
-            
-            const linkItems: WeaviateTreeItem[] = [];
-            
-            links.forEach((link, index) => {
-                linkItems.push(new WeaviateTreeItem(
-                    link.name,
-                    vscode.TreeItemCollapsibleState.None,
-                    'connectionLink',
-                    element.connectionId,
-                    undefined,
-                    index.toString(),
-                    new vscode.ThemeIcon('link-external'),
-                    'weaviateConnectionLink',
-                    link.url
-                ));
-            });
-            
-            if (linkItems.length === 0) {
-                return [
-                    new WeaviateTreeItem(
-                        'No links available',
-                        vscode.TreeItemCollapsibleState.None,
-                        'message'
-                    )
-                ];
-            }
-            
-            return linkItems;
-        }
-         return [];
-    }
-
-    // --- Connection Management Methods ---
-    
-    // Add a new connection
-    async addConnection(connectionDetails?: WeaviateConnection): Promise<WeaviateConnection | null> {
-        try {
-            if (!connectionDetails) {
-                // If no details provided, show the dialog
-                return await this.connectionManager.showAddConnectionDialog();
-            }
-
-            // Validate connection details
-            if (!connectionDetails.name || !connectionDetails.httpHost) {
-                throw new Error('Name and HTTP host are required');
-            }
-            // Add the connection with required fields
-            const connection = await this.connectionManager.addConnection(connectionDetails);
-
-            if (connection) {
-                // Try to connect to the new connection
-                await this.connect(connection.id);
-                // Refresh the tree view to show the new connection
-                this.refresh();
-                vscode.window.showInformationMessage(`Successfully added connection: ${connection.name}`);
-                return connection;
-            }
-            
-            return null;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-            vscode.window.showErrorMessage(`Failed to add connection: ${errorMessage}`);
-            return null;
-        }
-    }
-
-    // Connect to a Weaviate instance
-    async connect(connectionId: string, silent = false): Promise<boolean> {
-        if (this.isRefreshing && !silent) {
-            return false;
-        }
-        
-        try {
-            const connection = await this.connectionManager.connect(connectionId);
-            if (connection) {
-                // Don't show messages during silent connections (like on startup)
-                if (!silent) {
-                    vscode.window.showInformationMessage(`Connected to ${connection.name}`);
-                }
-                
-                // Update the connection in our local list to update the UI state
-                const connectionIndex = this.connections.findIndex(c => c.id === connectionId);
-                if (connectionIndex >= 0) {
-                    this.connections[connectionIndex].status = 'connected';
-                    
-                    // Fire tree change event to update connection state right away
-                    // This makes the connection item rerender with 'connected' status icon
-                    this._onDidChangeTreeData.fire();
-                    
-                    // Auto-expand the connection tree item if TreeView is available
-                    if (this.treeView) {
-                        const connectionItem = new WeaviateTreeItem(
-                            `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
-                            vscode.TreeItemCollapsibleState.Expanded,
-                            'connection',
-                            connection.id,
-                            undefined, // collectionName
-                            undefined, // itemId
-                            this.getStatusIcon(connection.status),
-                            'connectedConnection'
-                        );
-                        
-                        // Use setTimeout to ensure the tree has been updated before revealing
-                        setTimeout(() => {
-                            this.treeView?.reveal(connectionItem, { expand: true });
-                        }, 100);
-                    }
-                }
-                
-                // Only fetch collections if we're not in a refresh loop
-                if (!this.isRefreshing) {
-                    await this.fetchCollections(connectionId);
-                }
-                
-                // Automatically open the query editor after successful connection (but not during silent connections)
-                if (!silent) {
-                    // Open the query editor without a specific collection (general extension page)
-                    QueryEditorPanel.createOrShow(this.context, { connectionId });
-                }
-                
-                return true;
-            }
-            return false;
-        } catch (error) {
-            if (!silent) {
-                vscode.window.showErrorMessage(`Failed to connect: ${error}`);
-            }
-            return false;
-        }
-    }
-
-    // Disconnect from a Weaviate instance
-    async disconnect(connectionId: string): Promise<void> {
-        const connection = this.connections.find(c => c.id === connectionId);
-        if (connection) {
-            await this.connectionManager.disconnect(connectionId);
-            // Clear collections for this connection
-            delete this.collections[connectionId];
-            // Refresh connections and update tree view
-            this.connections = this.connectionManager.getConnections();
-            this.refresh();
-            vscode.window.showInformationMessage(`Disconnected from ${connection.name}`);
-        }
-    }
-
-    // Edit a connection
-    async editConnection(connectionId: string, updates?: { name: string; url: string; apiKey?: string }): Promise<void> {
-        try {
-            if (updates) {
-                // If updates are provided, apply them directly
-                await this.connectionManager.updateConnection(connectionId, updates);
-                this.refresh();
-                vscode.window.showInformationMessage('Connection updated successfully');
-            } else {
-                // Show the edit dialog
-                const updatedConnection = await this.connectionManager.showEditConnectionDialog(connectionId);
-                if (updatedConnection) {
-                    this.refresh();
-                    vscode.window.showInformationMessage('Connection updated successfully');
-                }
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to update connection';
-            vscode.window.showErrorMessage(`Failed to update connection: ${errorMessage}`);
-        }
-    }
-    
-    // Get the total number of connections
-    getConnectionCount(): number {
-        return this.connections.length;
-    }
-    
-    // Get a connection by its ID
-    getConnectionById(connectionId: string): ConnectionConfig | undefined {
-        return this.connections.find(c => c.id === connectionId);
-    }
-
-    // Get the connection manager (for debugging purposes)
-    getConnectionManager(): ConnectionManager {
-        return this.connectionManager;
-    }
-
-    // --- Collection Management Methods ---
-    
-    // Fetch collections from Weaviate
-    async fetchCollections(connectionId: string): Promise<void> {
-
-        try {
-            const connection = this.connectionManager.getConnection(connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
-
-            // Get the client for this connection
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Client not initialized');
-            }
-
-            // Get stats from server
-            // use direct request as the client does not support this endpoint yet
-            const clusterStats = await this.fetchClusterStatistics({
-                httpSecure: connection.httpSecure ?? false,
-                httpHost: connection.httpHost ?? '',
-                httpPort: connection.httpPort ?? 8080,
-                apiKey: connection.apiKey,
-                cloudUrl: connection.cloudUrl ?? '',
-                type: connection.type ?? 'local'
-            }, connectionId);
-            // map the the result per node name
-            let clusterStatsMapped: { [key: string]: any } = {};
-            if (clusterStats) {
+                // Also send server version information
                 try {
-                    const statsJson = JSON.parse(clusterStats);
-                    // Map the stats to the clusterStatsMapped object
-                    for (const [nodeName, nodeStats] of Object.entries(statsJson)) {
-                        clusterStatsMapped[nodeName] = nodeStats;
-                    }
-                } catch (error: unknown) {
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    vscode.window.showErrorMessage(`Failed to parse cluster stats: ${errorMessage}`);
+                  if (client) {
+                    const version = this.clusterMetadataCache[connectionId]?.version;
+                    panel.webview.postMessage({
+                      command: 'serverVersion',
+                      version: version || 'unknown',
+                    });
+                  }
+                } catch (_) {
+                  // ignore version errors
                 }
-            }
-            this.clusterStatisticsCache[connectionId] = clusterStatsMapped;            
+              } catch (error) {
+                panel.webview.postMessage({
+                  command: 'error',
+                  message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`,
+                });
+              }
+              break;
+            case 'getCollections':
+              try {
+                const collections = this.collections[connectionId] || [];
+                panel.webview.postMessage({
+                  command: 'collections',
+                  collections: collections.map((col) => col.label),
+                });
+              } catch (error) {
+                panel.webview.postMessage({
+                  command: 'error',
+                  message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`,
+                });
+              }
+              break;
+            case 'serverVersion':
+              // serverVersion handled in webview only
+              break;
+          }
+        },
+        undefined,
+        this.context.subscriptions
+      );
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error showing add collection dialog:', error);
+      throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
+    }
+  }
 
-            // Get collections from Weaviate
-            const collections = await client.collections.listAll();
-            // Store collections with their schema
-            if (collections && Array.isArray(collections)) {
-                // sort collections alphabetically by name
-                this.collections[connectionId] = collections.slice().sort((a, b) => a.name.localeCompare(b.name)).map((collection) => ({
-                    label: collection.name,
-                    description: collection.description,
-                    collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-                    itemType: 'collection',
-                    connectionId: connectionId,
-                    collectionName: collection.name,
-                    iconPath: new vscode.ThemeIcon('database'),
-                    contextValue: 'weaviateCollection',
-                    tooltip: collection.description,
-                    schema: collection
-                } as unknown as CollectionWithSchema));
-            } else {
-                this.collections[connectionId] = [];
-            }
-
-            // Get metaData from Weaviate
-            const metaData = await client.getMeta();
-            this.clusterMetadataCache[connectionId] = metaData;
-
-            // Get Nodes from Weaviate
-            const clusterNodes = await client.cluster.nodes({output: 'verbose'});
-            this.clusterNodesCache[connectionId] = clusterNodes;
-
-
-
-            // Refresh the tree view to show updated collections
-            this.refresh();
-            
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Error in fetchCollections:', error);
-            vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
-        }
+  /**
+   * Shows the Add Collection with Options dialog for creating a new collection
+   * @param connectionId - The ID of the connection to add the collection to
+   */
+  async addCollectionWithOptions(connectionId: string): Promise<void> {
+    // Validate connection first - these errors should not be caught and re-wrapped
+    const connection = this.connectionManager.getConnection(connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
     }
 
-    /**
-     * Opens a query editor for the specified collection
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection to query
-     */
-    async openQueryEditor(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            // Use the registered command that's already wired up in extension.ts
-            // This will open a new tab if this collection isn't already open
-            await vscode.commands.executeCommand(
-                'weaviate.queryCollection', 
-                connectionId, 
-                collectionName
-            );
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to open query editor: ${errorMessage}`);
-        }
-    }
-    
-    /**
-     * Deletes a collection from the Weaviate instance
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection to delete
-     * @throws Error if deletion fails
-     */
-    async deleteCollection(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            // Get client for this connection
-            const connection = this.connectionManager.getConnection(connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
-            
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Client not initialized');
-            }
-            
-            // Delete the collection using the schema API
-            await client.collections.delete(collectionName);
-            
-            // Update local state
-            if (this.collections[connectionId]) {
-                this.collections[connectionId] = this.collections[connectionId].filter(
-                    collection => collection.collectionName !== collectionName
-                );
-            }
-            
-            // Refresh the tree view
-            this.refresh();
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error in deleteCollection:', error);
-            vscode.window.showErrorMessage(`Failed to delete collection: ${errorMessage}`);
-            throw new Error(`Failed to delete collection: ${errorMessage}`);
-        }
+    if (connection.status !== 'connected') {
+      throw new Error('Connection must be active to add collections');
     }
 
-    /**
-     * Deletes all collections from the Weaviate instance
-     * @param connectionId - The ID of the connection
-     * @throws Error if deletion fails
-     */
-    async deleteAllCollections(connectionId: string): Promise<void> {
-        try {
-            // Get client for this connection
-            const connection = this.connectionManager.getConnection(connectionId);
-            if (!connection) {
-                throw new Error('Connection not found');
-            }
-            
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Client not initialized');
-            }
-            
-            // Delete all collections using the collections API
-            await client.collections.deleteAll();
-            
-            // Clear local collections state
-            this.collections[connectionId] = [];
-            
-            // Refresh the tree view
-            this.refresh();
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error in deleteAllCollections:', error);
-            throw new Error(`Failed to delete all collections: ${errorMessage}`);
+    try {
+      // Create and show the Collection Options webview panel
+      const panel = vscode.window.createWebviewPanel(
+        'weaviateAddCollectionOptions',
+        'Create Collection',
+        vscode.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [],
         }
+      );
+
+      // Set the webview content
+      panel.webview.html = this.getCollectionOptionsHtml(connectionId);
+
+      // Handle messages from the webview
+      panel.webview.onDidReceiveMessage(
+        async (message) => {
+          switch (message.command) {
+            case 'selectOption':
+              // Handle option selection
+              switch (message.option) {
+                case 'fromScratch':
+                  // Switch to the existing add collection form
+                  panel.webview.html = this.getAddCollectionHtml();
+                  this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                  break;
+                case 'cloneExisting':
+                  // Show clone collection selection first
+                  panel.webview.html = await this.getCloneCollectionHtml(connectionId);
+                  this.setupCloneCollectionMessageHandlers(panel, connectionId);
+                  break;
+                case 'importFromFile':
+                  // Show import file selection first
+                  panel.webview.html = this.getImportCollectionHtml();
+                  this.setupImportCollectionMessageHandlers(panel, connectionId);
+                  break;
+              }
+              break;
+            case 'back':
+              // Return to options selection
+              panel.webview.html = this.getCollectionOptionsHtml(connectionId);
+              break;
+            case 'cancel':
+              panel.dispose();
+              break;
+          }
+        },
+        undefined,
+        this.context.subscriptions
+      );
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error showing add collection options dialog:', error);
+      throw new Error(`Failed to show add collection options dialog: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Creates a new collection using the Weaviate API
+   * @param connectionId - The ID of the connection
+   * @param schema - The collection schema to create
+   */
+  private async createCollection(connectionId: string, schema: any): Promise<void> {
+    const client = this.connectionManager.getClient(connectionId);
+    if (!client) {
+      throw new Error('Client not initialized');
     }
 
-    /**
-     * Refreshes connection info for a specific connection
-     * @param connectionId - The ID of the connection to refresh
-     */
-    async refreshConnectionInfo(connectionId: string): Promise<void> {
-        try {
-            // Reconnect to refresh the connection info
-            await this.connect(connectionId, true);
-            await this.fetchCollections(connectionId);
-            this.refresh();
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error refreshing connection info:', error);
-            throw new Error(`Failed to refresh connection info: ${errorMessage}`);
-        }
+    // Basic validation
+    if (!schema.class) {
+      throw new Error('Collection name is required');
     }
 
-    /**
-     * Refreshes statistics for a specific collection
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection
-     */
-    async refreshStatistics(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            // Simply refresh the tree view to trigger statistics reload
-            this.refresh();
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error refreshing statistics:', error);
-            throw new Error(`Failed to refresh statistics: ${errorMessage}`);
+    // Determine server major version to pick schema format (v1 vs v2)
+    const serverVersion = this.clusterMetadataCache[connectionId]?.version || '';
+    const serverMajor = parseInt(serverVersion.split('.')[0] || '0', 10);
+    const useV2Types = serverMajor >= 2; // v2 uses string dataType; v1 uses string[]
+
+    // Build schema object
+    const schemaObject = {
+      class: schema.class,
+      description: schema.description || undefined,
+      properties: (schema.properties || []).map((p: any) => {
+        // Normalize incoming dataType to canonical string with [] suffix for arrays
+        let dt: any = p?.dataType;
+        if (Array.isArray(dt)) {
+          dt = dt[0];
         }
+        // Ensure string
+        dt = String(dt);
+        // For v1, wrap in array; for v2, keep as string
+        const normalizedDt = useV2Types ? dt : [dt];
+        return { ...p, dataType: normalizedDt };
+      }), // Include properties from the form
+    } as any;
+
+    // Handle vectorConfig (new multi-vectorizer format)
+    if (schema.vectorConfig) {
+      schemaObject.vectorConfig = schema.vectorConfig;
+    }
+    // Handle legacy single vectorizer format for backward compatibility
+    else if (schema.vectorizer && schema.vectorizer !== 'none') {
+      schemaObject.vectorizer = schema.vectorizer;
+      if (schema.vectorIndexType) {
+        schemaObject.vectorIndexType = schema.vectorIndexType;
+      }
+      if (schema.vectorIndexConfig) {
+        schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
+      }
+      if (schema.moduleConfig) {
+        schemaObject.moduleConfig = schema.moduleConfig;
+      }
     }
 
-    /**
-     * Converts a raw Weaviate schema to a properly formatted API schema
-     * @param schema - The raw schema from Weaviate
-     * @returns The formatted schema ready for API consumption
-     */
-    private convertSchemaToApiFormat(schema: any): any {
-        const fixed_properties = schema.properties?.map((prop: any) => {
-            // Normalize dataType to the v2 string format (not array)
-            let dt = prop?.dataType;
-            if (Array.isArray(dt)) {
-                dt = dt[0];
-            }
-            return {
-                ...prop,
-                dataType: dt,
-                tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-                indexSearchable: prop.indexInverted,
-            };
-        }) || [];
-                
-        const fixed_vectorizers = schema.vectorizers ? Object.fromEntries(
-            Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-                const vectorizerName = vec.vectorizer?.name || 'none';
-                const vectorizerConfig = vec.vectorizer?.config || {};
-                const vectorIndexType = vec.vectorIndexType || 'hnsw';
-                const vectorIndexConfig = vec.vectorIndexConfig || {};
-                return [
-                    key,
-                    {
-                        vectorizer: { [vectorizerName]: vectorizerConfig },
-                        vectorIndexType,
-                        vectorIndexConfig
-                    }
-                ];
-            })
-        ) : undefined;
-        
-        // now build the final schema object
-        const apiSchema = { 
-            ...schema, 
-            class: schema.name, 
-            invertedIndexConfig: schema.invertedIndex,
-            moduleConfig: schema.generative,
-            multiTenancyConfig: schema.multiTenancy,
-            properties: fixed_properties,
-            vectorConfig: fixed_vectorizers
-        } as any;
-        
-        // delete all indexInverted for all properties
-        apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-            delete prop.indexInverted;
-        });
-        delete apiSchema.vectorizers;
-        
-        return apiSchema;
+    // Handle multiTenancyConfig
+    if (schema.multiTenancyConfig) {
+      schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
     }
 
-    /**
-     * Exports a collection schema to a file
-     * @param connectionId - The ID of the connection
-     * @param collectionName - The name of the collection to export
-     */
-    async exportSchema(connectionId: string, collectionName: string): Promise<void> {
-        try {
-            const collection = this.collections[connectionId]?.find(
-                col => col.label === collectionName
-            ) as CollectionWithSchema | undefined;
+    // Create the collection using the schema API
+    await client.collections.createFromSchema(schemaObject);
+  }
 
-            if (!collection?.schema) {
-                throw new Error('Collection schema not found');
-            }
+  /**
+   * Gets available vectorizers from the Weaviate instance
+   * @param connectionId - The ID of the connection
+   * @returns Array of available vectorizers
+   */
+  private async getAvailableVectorizers(connectionId: string): Promise<string[]> {
+    // Define all possible vectorizers
+    const allVectorizers = [
+      'none', // Manual vectors
+      'text2vec-openai', // OpenAI
+      'text2vec-cohere', // Cohere
+      'text2vec-huggingface', // Hugging Face
+      'text2vec-transformers', // Local transformers
+      'text2vec-contextionary', // Contextionary
+      'multi2vec-clip', // CLIP
+      'multi2vec-bind', // BIND
+      'img2vec-neural', // Neural image vectorizer
+      'ref2vec-centroid', // Reference centroid
+    ];
 
-            // Show save dialog
-            const saveUri = await vscode.window.showSaveDialog({
-                defaultUri: vscode.Uri.file(`${collectionName}_weaviate_schema.json`),
-                filters: {
-                    'JSON Files': ['json'],
-                    'All Files': ['*']
-                }
-            });
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
 
-            if (!saveUri) {
-                return; // User cancelled
-            }
+      const meta = this.clusterMetadataCache[connectionId];
 
-            // Export schema as formatted JSON using the conversion helper
-            const schema = collection.schema;
-            const apiSchema = this.convertSchemaToApiFormat(schema);
-            const schemaJson = JSON.stringify(apiSchema, null, 2);
-            await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
-            
-            vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error exporting schema:', error);
-            throw new Error(`Failed to export schema: ${errorMessage}`);
+      // If no modules info available, return all vectorizers
+      if (!meta?.modules) {
+        return allVectorizers;
+      }
+
+      // Filter vectorizers based on available modules
+      const availableVectorizers = ['none']; // Always include manual vectors
+      const moduleNames = Object.keys(meta.modules);
+
+      // Only include vectorizers whose names exactly match a module name
+      allVectorizers.slice(1).forEach((vectorizer) => {
+        if (moduleNames.includes(vectorizer)) {
+          availableVectorizers.push(vectorizer);
         }
+      });
+
+      return availableVectorizers;
+    } catch (error) {
+      // Log error for debugging but don't expose to user
+      console.error('Error fetching vectorizers:', error);
+      // Return all possible vectorizers as fallback
+      return allVectorizers;
     }
+  }
 
-
-
-    /**
-     * Shows the Add Collection dialog for creating a new collection
-     * @param connectionId - The ID of the connection to add the collection to
-     */
-    /**
-     * Shows the Add Collection dialog for creating a new collection
-     * @param connectionId - The ID of the connection to add the collection to
-     * @param initialSchema - Optional initial schema to pre-populate the form
-     */
-    async addCollection(connectionId: string, initialSchema?: any): Promise<void> {
-        // Validate connection first - these errors should not be caught and re-wrapped
-        const connection = this.connectionManager.getConnection(connectionId);
-        if (!connection) {
-            throw new Error('Connection not found');
-        }
-
-        if (connection.status !== 'connected') {
-            throw new Error('Connection must be active to add collections');
-        }
-
-        try {
-
-            // Create and show the Add Collection webview panel
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateAddCollection',
-                'Add Collection',
-                vscode.ViewColumn.Active,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true,
-                    localResourceRoots: []
-                }
-            );
-
-            // Set the webview content
-            panel.webview.html = this.getAddCollectionHtml(initialSchema);
-
-            // Handle messages from the webview
-            panel.webview.onDidReceiveMessage(
-                async (message) => {
-                    switch (message.command) {
-                        case 'create':
-                            try {
-                                await this.createCollection(connectionId, message.schema);
-                                panel.dispose();
-                                vscode.window.showInformationMessage(`Collection "${message.schema.class}" created successfully`);
-                                await this.fetchCollections(connectionId);
-                            } catch (error) {
-                                panel.webview.postMessage({
-                                    command: 'error',
-                                    message: error instanceof Error ? error.message : String(error)
-                                });
-                            }
-                            break;
-                        case 'cancel':
-                            panel.dispose();
-                            break;
-                        case 'getVectorizers':
-                            try {
-                                const client = this.connectionManager.getClient(connectionId);
-                                const vectorizers = await this.getAvailableVectorizers(connectionId);
-
-                                // Send vectorizers
-                                panel.webview.postMessage({
-                                    command: 'vectorizers',
-                                    vectorizers: vectorizers
-                                });
-
-                                // Also send server version information
-                                try {
-                                    if (client) {
-                                        const version = this.clusterMetadataCache[connectionId]?.version;
-                                        panel.webview.postMessage({
-                                            command: 'serverVersion',
-                                            version: version || 'unknown'
-                                        });
-                                    }
-                                } catch (_) {
-                                    // ignore version errors
-                                }
-                            } catch (error) {
-                                panel.webview.postMessage({
-                                    command: 'error',
-                                    message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`
-                                });
-                            }
-                            break;
-                        case 'getCollections':
-                            try {
-                                const collections = this.collections[connectionId] || [];
-                                panel.webview.postMessage({
-                                    command: 'collections',
-                                    collections: collections.map(col => col.label)
-                                });
-                            } catch (error) {
-                                panel.webview.postMessage({
-                                    command: 'error',
-                                    message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`
-                                });
-                            }
-                            break;
-                        case 'serverVersion':
-                            // serverVersion handled in webview only
-                            break;
-                    }
-                },
-                undefined,
-                this.context.subscriptions
-            );
-
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error showing add collection dialog:', error);
-            throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
-        }
-    }
-
-    /**
-     * Shows the Add Collection with Options dialog for creating a new collection
-     * @param connectionId - The ID of the connection to add the collection to
-     */
-    async addCollectionWithOptions(connectionId: string): Promise<void> {
-        // Validate connection first - these errors should not be caught and re-wrapped
-        const connection = this.connectionManager.getConnection(connectionId);
-        if (!connection) {
-            throw new Error('Connection not found');
-        }
-
-        if (connection.status !== 'connected') {
-            throw new Error('Connection must be active to add collections');
-        }
-
-        try {
-            // Create and show the Collection Options webview panel
-            const panel = vscode.window.createWebviewPanel(
-                'weaviateAddCollectionOptions',
-                'Create Collection',
-                vscode.ViewColumn.Active,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true,
-                    localResourceRoots: []
-                }
-            );
-
-            // Set the webview content
-            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
-
-            // Handle messages from the webview
-            panel.webview.onDidReceiveMessage(
-                async (message) => {
-                    switch (message.command) {
-                        case 'selectOption':
-                            // Handle option selection
-                            switch (message.option) {
-                                case 'fromScratch':
-                                    // Switch to the existing add collection form
-                                    panel.webview.html = this.getAddCollectionHtml();
-                                    this.setupAddCollectionMessageHandlers(panel, connectionId, true);
-                                    break;
-                                case 'cloneExisting':
-                                    // Show clone collection selection first
-                                    panel.webview.html = await this.getCloneCollectionHtml(connectionId);
-                                    this.setupCloneCollectionMessageHandlers(panel, connectionId);
-                                    break;
-                                case 'importFromFile':
-                                    // Show import file selection first
-                                    panel.webview.html = this.getImportCollectionHtml();
-                                    this.setupImportCollectionMessageHandlers(panel, connectionId);
-                                    break;
-                            }
-                            break;
-                        case 'back':
-                            // Return to options selection
-                            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
-                            break;
-                        case 'cancel':
-                            panel.dispose();
-                            break;
-                    }
-                },
-                undefined,
-                this.context.subscriptions
-            );
-
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Error showing add collection options dialog:', error);
-            throw new Error(`Failed to show add collection options dialog: ${errorMessage}`);
-        }
-    }
-
-    /**
-     * Creates a new collection using the Weaviate API
-     * @param connectionId - The ID of the connection
-     * @param schema - The collection schema to create
-     */
-    private async createCollection(connectionId: string, schema: any): Promise<void> {
-        const client = this.connectionManager.getClient(connectionId);
-        if (!client) {
-            throw new Error('Client not initialized');
-        }
-
-        // Basic validation
-        if (!schema.class) {
-            throw new Error('Collection name is required');
-        }
-        
-        // Determine server major version to pick schema format (v1 vs v2)
-        const serverVersion = this.clusterMetadataCache[connectionId]?.version || '';
-        const serverMajor = parseInt((serverVersion.split('.')[0] || '0'), 10);
-        const useV2Types = serverMajor >= 2; // v2 uses string dataType; v1 uses string[]
-
-        // Build schema object
-        const schemaObject = {
-            class: schema.class,
-            description: schema.description || undefined,
-            properties: (schema.properties || []).map((p: any) => {
-                // Normalize incoming dataType to canonical string with [] suffix for arrays
-                let dt: any = p?.dataType;
-                if (Array.isArray(dt)) {
-                    dt = dt[0];
-                }
-                // Ensure string
-                dt = String(dt);
-                // For v1, wrap in array; for v2, keep as string
-                const normalizedDt = useV2Types ? dt : [dt];
-                return { ...p, dataType: normalizedDt };
-            })  // Include properties from the form
-        } as any;
-        
-        // Handle vectorConfig (new multi-vectorizer format)
-        if (schema.vectorConfig) {
-            schemaObject.vectorConfig = schema.vectorConfig;
-        } 
-        // Handle legacy single vectorizer format for backward compatibility
-        else if (schema.vectorizer && schema.vectorizer !== 'none') {
-            schemaObject.vectorizer = schema.vectorizer;
-            if (schema.vectorIndexType) {
-                schemaObject.vectorIndexType = schema.vectorIndexType;
-            }
-            if (schema.vectorIndexConfig) {
-                schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
-            }
-            if (schema.moduleConfig) {
-                schemaObject.moduleConfig = schema.moduleConfig;
-            }
-        }
-        
-        // Handle multiTenancyConfig
-        if (schema.multiTenancyConfig) {
-            schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
-        }
-        
-        // Create the collection using the schema API
-        await client.collections.createFromSchema(schemaObject);
-    }
-
-    /**
-     * Gets available vectorizers from the Weaviate instance
-     * @param connectionId - The ID of the connection
-     * @returns Array of available vectorizers
-     */
-    private async getAvailableVectorizers(connectionId: string): Promise<string[]> {
-        // Define all possible vectorizers
-        const allVectorizers = [
-            'none',                     // Manual vectors
-            'text2vec-openai',          // OpenAI
-            'text2vec-cohere',          // Cohere
-            'text2vec-huggingface',     // Hugging Face
-            'text2vec-transformers',    // Local transformers
-            'text2vec-contextionary',   // Contextionary
-            'multi2vec-clip',           // CLIP
-            'multi2vec-bind',           // BIND
-            'img2vec-neural',           // Neural image vectorizer
-            'ref2vec-centroid'          // Reference centroid
-        ];
-
-        try {
-            const client = this.connectionManager.getClient(connectionId);
-            if (!client) {
-                throw new Error('Client not initialized');
-            }
-
-            const meta = this.clusterMetadataCache[connectionId];
-            
-            // If no modules info available, return all vectorizers
-            if (!meta?.modules) {
-                return allVectorizers;
-            }
-
-            // Filter vectorizers based on available modules
-            const availableVectorizers = ['none']; // Always include manual vectors
-            const moduleNames = Object.keys(meta.modules);
-            
-            // Only include vectorizers whose names exactly match a module name
-            allVectorizers.slice(1).forEach(vectorizer => {
-                if (moduleNames.includes(vectorizer)) {
-                    availableVectorizers.push(vectorizer);
-                }
-            });
-
-            return availableVectorizers;
-        } catch (error) {
-            // Log error for debugging but don't expose to user
-            console.error('Error fetching vectorizers:', error);
-            // Return all possible vectorizers as fallback
-            return allVectorizers;
-        }
-    }
-
-    /**
-     * Generates HTML for the Add Collection webview
-     * @param initialSchema - Optional initial schema to pre-populate the form
-     * @returns The HTML content for the webview
-     */
-    private getAddCollectionHtml(initialSchema?: any): string {
-        return `
+  /**
+   * Generates HTML for the Add Collection webview
+   * @param initialSchema - Optional initial schema to pre-populate the form
+   * @returns The HTML content for the webview
+   */
+  private getAddCollectionHtml(initialSchema?: any): string {
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -3993,144 +4222,152 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             </body>
             </html>
         `;
+  }
+
+  /**
+   * Deletes a connection without showing any confirmation dialogs.
+   * Callers are responsible for showing confirmation dialogs if needed.
+   * @param connectionId The ID of the connection to delete
+   * @returns The name of the deleted connection
+   * @throws Error if the connection doesn't exist or deletion fails
+   */
+  async deleteConnection(connectionId: string): Promise<string> {
+    const connection = this.connections.find((c: WeaviateConnection) => c.id === connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
     }
 
-    /**
-     * Deletes a connection without showing any confirmation dialogs.
-     * Callers are responsible for showing confirmation dialogs if needed.
-     * @param connectionId The ID of the connection to delete
-     * @returns The name of the deleted connection
-     * @throws Error if the connection doesn't exist or deletion fails
-     */
-    async deleteConnection(connectionId: string): Promise<string> {
-        const connection = this.connections.find((c: WeaviateConnection) => c.id === connectionId);
-        if (!connection) {
-            throw new Error('Connection not found');
-        }
-        
-        try {
-            await this.connectionManager.deleteConnection(connectionId);
-            
-            // Clean up related data
-            delete this.collections[connectionId];
-            
-            // Update empty state context
-            await vscode.commands.executeCommand('setContext', 'weaviateConnectionsEmpty', this.connections.length === 0);
-            
-            this._onDidChangeTreeData.fire(undefined);
-            return connection.name;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(`Failed to delete connection: ${errorMessage}`);
-        }
+    try {
+      await this.connectionManager.deleteConnection(connectionId);
+
+      // Clean up related data
+      delete this.collections[connectionId];
+
+      // Update empty state context
+      await vscode.commands.executeCommand(
+        'setContext',
+        'weaviateConnectionsEmpty',
+        this.connections.length === 0
+      );
+
+      this._onDidChangeTreeData.fire(undefined);
+      return connection.name;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete connection: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches cluster statistics from the Weaviate instance.
+   * Callers are responsible for showing confirmation dialogs if needed.
+   * @param connectionId The ID of the connection to fetch statistics for
+   * @returns The cluster statistics
+   * @throws Error if the connection doesn't exist or fetching fails
+   */
+  async fetchClusterStatistics(
+    connection: {
+      httpSecure: boolean;
+      httpHost: string;
+      httpPort: number;
+      apiKey?: string;
+      cloudUrl?: string;
+      type: string;
+    },
+    connectionId: string
+  ) {
+    var protocol = connection.httpSecure ? https : http;
+    let url: string = '';
+    if (connection.type === 'cloud') {
+      // remove https or http if couldUrl has it
+      if (connection.cloudUrl) {
+        connection.cloudUrl = connection.cloudUrl.replace(/^https?:\/\//, '');
+      }
+      url = `https://${connection.cloudUrl}/v1/cluster/statistics`;
+      protocol = https;
+    } else {
+      url = `${connection.httpSecure ? 'https' : 'http'}://${connection.httpHost}:${connection.httpPort}/v1/cluster/statistics`;
     }
 
-    /**
-     * Fetches cluster statistics from the Weaviate instance.
-     * Callers are responsible for showing confirmation dialogs if needed.
-     * @param connectionId The ID of the connection to fetch statistics for
-     * @returns The cluster statistics
-     * @throws Error if the connection doesn't exist or fetching fails
-     */
-    async fetchClusterStatistics(
-        connection: {
-            httpSecure: boolean;
-            httpHost: string;
-            httpPort:number;
-            apiKey?: string;
-            cloudUrl?: string;
-            type: string
-            }, 
-        connectionId: string
-        ) {
-        var protocol = connection.httpSecure ? https : http;
-        let url: string = '';
-        if (connection.type === 'cloud'){
-            // remove https or http if couldUrl has it
-            if (connection.cloudUrl) {
-                connection.cloudUrl = connection.cloudUrl.replace(/^https?:\/\//, '');
-            }
-            url = `https://${connection.cloudUrl}/v1/cluster/statistics`;
-            protocol = https;
-        } else {
-            url = `${connection.httpSecure ? 'https' : 'http'}://${connection.httpHost}:${connection.httpPort}/v1/cluster/statistics`;
-        }
+    return new Promise<any>((resolve, reject) => {
+      protocol
+        .get(
+          url,
+          {
+            headers: {
+              ...(connection.apiKey && { Authorization: `Bearer ${connection.apiKey}` }),
+            },
+          },
+          (res) => {
+            let data = '';
+            res.on('data', (chunk) => (data += chunk));
+            res.on('end', () => {
+              try {
+                resolve(data);
+              } catch (err) {
+                reject(err);
+              }
+            });
+          }
+        )
+        .on('error', reject);
+    });
+  }
 
-        return new Promise<any>((resolve, reject) => {
-            protocol.get(url, {
-                headers: {
-                    ...(connection.apiKey && { Authorization: `Bearer ${connection.apiKey}` }),
-                },
-            }, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => {
-                    try {
-                        resolve(data);
-                    } catch (err) {
-                        reject(err);
-                    }
-                });
-            }).on('error', reject);
-        });
-    }
+  async flattenObject(
+    node: Record<string, unknown>,
+    exclude_keys: string[] = [],
+    parentKey = '',
+    sorted?: boolean
+  ): Promise<Record<string, unknown>> {
+    const result: Record<string, unknown> = {};
 
-    async  flattenObject(
-        node: Record<string, unknown>,
-        exclude_keys: string[] = [],
-        parentKey = '',
-        sorted?: boolean
-    ): Promise<Record<string, unknown>> {
-        const result: Record<string, unknown> = {};
+    const filteredNode = Object.fromEntries(
+      Object.entries(node).filter(([key]) => !exclude_keys.includes(key))
+    );
 
-        const filteredNode = Object.fromEntries(
-            Object.entries(node).filter(([key]) => !exclude_keys.includes(key))
+    for (const [key, value] of Object.entries(filteredNode)) {
+      const newKey = parentKey ? `${parentKey} ${key}` : key;
+
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // recurse into nested object
+        const flattenedChild = await this.flattenObject(
+          value as Record<string, unknown>,
+          exclude_keys,
+          newKey
         );
-
-        for (const [key, value] of Object.entries(filteredNode)) {
-            const newKey = parentKey ? `${parentKey} ${key}` : key;
-
-            if (
-            value &&
-            typeof value === 'object' &&
-            !Array.isArray(value)
-            ) {
-            // recurse into nested object
-            const flattenedChild = await this.flattenObject(
-                value as Record<string, unknown>,
-                exclude_keys,
-                newKey
-            );
-            Object.assign(result, flattenedChild);
-            } else {
-            result[newKey] = value;
-            }
-        }
-        if (sorted) {
-            return Object.fromEntries(Object.entries(result).sort());
-        }
-        return result;
+        Object.assign(result, flattenedChild);
+      } else {
+        result[newKey] = value;
+      }
     }
+    if (sorted) {
+      return Object.fromEntries(Object.entries(result).sort());
+    }
+    return result;
+  }
 
-    /**
-     * Generates HTML for the Collection Options selection webview
-     * @param connectionId - The ID of the connection to check for existing collections
-     * @returns The HTML content for the webview
-     */
-    private getCollectionOptionsHtml(connectionId: string): string {
-        // Check if there are existing collections to determine if clone option should be shown
-        const collections = this.collections[connectionId] || [];
-        const hasCollections = collections.length > 0;
-        
-        // Generate clone option HTML conditionally
-        const cloneOptionHtml = hasCollections ? `
+  /**
+   * Generates HTML for the Collection Options selection webview
+   * @param connectionId - The ID of the connection to check for existing collections
+   * @returns The HTML content for the webview
+   */
+  private getCollectionOptionsHtml(connectionId: string): string {
+    // Check if there are existing collections to determine if clone option should be shown
+    const collections = this.collections[connectionId] || [];
+    const hasCollections = collections.length > 0;
+
+    // Generate clone option HTML conditionally
+    const cloneOptionHtml = hasCollections
+      ? `
                         <div class="option-card" onclick="selectOption('cloneExisting')">
                             <span class="option-icon">📋</span>
                             <div class="option-title">Clone Existing Collection</div>
                             <div class="option-description">Create a new collection based on an existing collection's schema and configuration. Perfect for creating similar collections.</div>
-                        </div>` : '';
-        
-        return `
+                        </div>`
+      : '';
+
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -4286,18 +4523,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             </body>
             </html>
         `;
-    }
+  }
 
-    /**
-     * Generates HTML for the Clone Collection webview
-     * @param connectionId - The ID of the connection
-     * @returns The HTML content for the webview
-     */
-    private async getCloneCollectionHtml(connectionId: string): Promise<string> {
-        const collections = this.collections[connectionId] || [];
-        const collectionsJson = JSON.stringify(collections.map(col => col.label));
+  /**
+   * Generates HTML for the Clone Collection webview
+   * @param connectionId - The ID of the connection
+   * @returns The HTML content for the webview
+   */
+  private async getCloneCollectionHtml(connectionId: string): Promise<string> {
+    const collections = this.collections[connectionId] || [];
+    const collectionsJson = JSON.stringify(collections.map((col) => col.label));
 
-        return `
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -4630,14 +4867,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             </body>
             </html>
         `;
-    }
+  }
 
-    /**
-     * Generates HTML for the Import Collection webview
-     * @returns The HTML content for the webview
-     */
-    private getImportCollectionHtml(): string {
-        return `
+  /**
+   * Generates HTML for the Import Collection webview
+   * @returns The HTML content for the webview
+   */
+  private getImportCollectionHtml(): string {
+    return `
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -5027,205 +5264,223 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             </body>
             </html>
         `;
-    }
+  }
 
-    /**
-     * Sets up message handlers for the Add Collection webview
-     * @param panel - The webview panel
-     * @param connectionId - The connection ID
-     * @param showOptionsOnBack - Whether to show options on back (for multi-step flow)
-     */
-    private setupAddCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string, showOptionsOnBack: boolean = false): void {
-        panel.webview.onDidReceiveMessage(
-            async (message) => {
-                switch (message.command) {
-                    case 'create':
-                        try {
-                            await this.createCollection(connectionId, message.schema);
-                            panel.dispose();
-                            vscode.window.showInformationMessage(`Collection "${message.schema.class}" created successfully`);
-                            await this.fetchCollections(connectionId);
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: error instanceof Error ? error.message : String(error)
-                            });
-                        }
-                        break;
-                    case 'cancel':
-                        panel.dispose();
-                        break;
-                    case 'back':
-                        if (showOptionsOnBack) {
-                            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
-                        } else {
-                            panel.dispose();
-                        }
-                        break;
-                    case 'getVectorizers':
-                        try {
-                            const client = this.connectionManager.getClient(connectionId);
-                            const vectorizers = await this.getAvailableVectorizers(connectionId);
+  /**
+   * Sets up message handlers for the Add Collection webview
+   * @param panel - The webview panel
+   * @param connectionId - The connection ID
+   * @param showOptionsOnBack - Whether to show options on back (for multi-step flow)
+   */
+  private setupAddCollectionMessageHandlers(
+    panel: vscode.WebviewPanel,
+    connectionId: string,
+    showOptionsOnBack: boolean = false
+  ): void {
+    panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case 'create':
+            try {
+              await this.createCollection(connectionId, message.schema);
+              panel.dispose();
+              vscode.window.showInformationMessage(
+                `Collection "${message.schema.class}" created successfully`
+              );
+              await this.fetchCollections(connectionId);
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+            break;
+          case 'cancel':
+            panel.dispose();
+            break;
+          case 'back':
+            if (showOptionsOnBack) {
+              panel.webview.html = this.getCollectionOptionsHtml(connectionId);
+            } else {
+              panel.dispose();
+            }
+            break;
+          case 'getVectorizers':
+            try {
+              const client = this.connectionManager.getClient(connectionId);
+              const vectorizers = await this.getAvailableVectorizers(connectionId);
 
-                            panel.webview.postMessage({
-                                command: 'vectorizers',
-                                vectorizers: vectorizers
-                            });
+              panel.webview.postMessage({
+                command: 'vectorizers',
+                vectorizers: vectorizers,
+              });
 
-                            try {
-                                if (client) {
-                                    const version = this.clusterMetadataCache[connectionId]?.version;
-                                    panel.webview.postMessage({
-                                        command: 'serverVersion',
-                                        version: version || 'unknown'
-                                    });
-                                }
-                            } catch (_) {
-                                // ignore version errors
-                            }
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`
-                            });
-                        }
-                        break;
-                    case 'getCollections':
-                        try {
-                            const collections = this.collections[connectionId] || [];
-                            panel.webview.postMessage({
-                                command: 'collections',
-                                collections: collections.map(col => col.label)
-                            });
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`
-                            });
-                        }
-                        break;
+              try {
+                if (client) {
+                  const version = this.clusterMetadataCache[connectionId]?.version;
+                  panel.webview.postMessage({
+                    command: 'serverVersion',
+                    version: version || 'unknown',
+                  });
                 }
-            },
-            undefined,
-            this.context.subscriptions
-        );
-    }
+              } catch (_) {
+                // ignore version errors
+              }
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            }
+            break;
+          case 'getCollections':
+            try {
+              const collections = this.collections[connectionId] || [];
+              panel.webview.postMessage({
+                command: 'collections',
+                collections: collections.map((col) => col.label),
+              });
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            }
+            break;
+        }
+      },
+      undefined,
+      this.context.subscriptions
+    );
+  }
 
-    /**
-     * Sets up message handlers for the Clone Collection webview
-     */
-    private setupCloneCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string): void {
-        panel.webview.onDidReceiveMessage(
-            async (message) => {
-                switch (message.command) {
-                    case 'getSchema':
-                        try {
-                            const collections = this.collections[connectionId] || [];
-                            const targetCollection = collections.find((col: any) => col.label === message.collectionName);
-                            
-                            if (!targetCollection) {
-                                throw new Error(`Collection "${message.collectionName}" not found`);
-                            }
-                            
-                            // Convert the raw schema to API format for preview
-                            const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
-                            
-                            panel.webview.postMessage({
-                                command: 'schema',
-                                schema: convertedSchema
-                            });
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: `Failed to fetch schema: ${error instanceof Error ? error.message : String(error)}`
-                            });
-                        }
-                        break;
-                    case 'clone':
-                        try {
-                            // Get the original schema from the collection, not from the message
-                            const collections = this.collections[connectionId] || [];
-                            const targetCollection = collections.find((col: any) => col.label === message.sourceCollection);
-                            
-                            if (!targetCollection) {
-                                throw new Error(`Collection "${message.sourceCollection}" not found`);
-                            }
-                            
-                            // Convert the raw schema to API format first using the same logic as exportSchema
-                            const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
-                            
-                            // Create a new schema based on the converted schema with new name
-                            const clonedSchema = {
-                                ...convertedSchema,
-                                class: message.newCollectionName
-                            };
-                            
-                            // Instead of creating immediately, open the Add Collection form
-                            // pre-filled with the cloned schema so the user can review/edit
-                            panel.webview.html = this.getAddCollectionHtml(clonedSchema);
-                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: error instanceof Error ? error.message : String(error)
-                            });
-                        }
-                        break;
-                    case 'back':
-                        panel.webview.html = this.getCollectionOptionsHtml(connectionId);
-                        break;
-                    case 'cancel':
-                        panel.dispose();
-                        break;
-                }
-            },
-            undefined,
-            this.context.subscriptions
-        );
-    }
+  /**
+   * Sets up message handlers for the Clone Collection webview
+   */
+  private setupCloneCollectionMessageHandlers(
+    panel: vscode.WebviewPanel,
+    connectionId: string
+  ): void {
+    panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case 'getSchema':
+            try {
+              const collections = this.collections[connectionId] || [];
+              const targetCollection = collections.find(
+                (col: any) => col.label === message.collectionName
+              );
 
-    /**
-     * Sets up message handlers for the Import Collection webview
-     */
-    private setupImportCollectionMessageHandlers(panel: vscode.WebviewPanel, connectionId: string): void {
-        panel.webview.onDidReceiveMessage(
-            async (message) => {
-                switch (message.command) {
-                    case 'import':
-                        try {
-                            await this.createCollection(connectionId, message.schema);
-                            panel.dispose();
-                            vscode.window.showInformationMessage(`Collection "${message.schema.class}" imported successfully`);
-                            await this.fetchCollections(connectionId);
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: error instanceof Error ? error.message : String(error)
-                            });
-                        }
-                        break;
-                    case 'editBefore':
-                        try {
-                            // Open the Add Collection form pre-filled with the imported schema
-                            panel.webview.html = this.getAddCollectionHtml(message.schema);
-                            this.setupAddCollectionMessageHandlers(panel, connectionId, true);
-                        } catch (error) {
-                            panel.webview.postMessage({
-                                command: 'error',
-                                message: error instanceof Error ? error.message : String(error)
-                            });
-                        }
-                        break;
-                    case 'back':
-                        panel.webview.html = this.getCollectionOptionsHtml(connectionId);
-                        break;
-                    case 'cancel':
-                        panel.dispose();
-                        break;
-                }
-            },
-            undefined,
-            this.context.subscriptions
-        );
-    }
+              if (!targetCollection) {
+                throw new Error(`Collection "${message.collectionName}" not found`);
+              }
+
+              // Convert the raw schema to API format for preview
+              const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
+
+              panel.webview.postMessage({
+                command: 'schema',
+                schema: convertedSchema,
+              });
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: `Failed to fetch schema: ${error instanceof Error ? error.message : String(error)}`,
+              });
+            }
+            break;
+          case 'clone':
+            try {
+              // Get the original schema from the collection, not from the message
+              const collections = this.collections[connectionId] || [];
+              const targetCollection = collections.find(
+                (col: any) => col.label === message.sourceCollection
+              );
+
+              if (!targetCollection) {
+                throw new Error(`Collection "${message.sourceCollection}" not found`);
+              }
+
+              // Convert the raw schema to API format first using the same logic as exportSchema
+              const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
+
+              // Create a new schema based on the converted schema with new name
+              const clonedSchema = {
+                ...convertedSchema,
+                class: message.newCollectionName,
+              };
+
+              // Instead of creating immediately, open the Add Collection form
+              // pre-filled with the cloned schema so the user can review/edit
+              panel.webview.html = this.getAddCollectionHtml(clonedSchema);
+              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+            break;
+          case 'back':
+            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
+            break;
+          case 'cancel':
+            panel.dispose();
+            break;
+        }
+      },
+      undefined,
+      this.context.subscriptions
+    );
+  }
+
+  /**
+   * Sets up message handlers for the Import Collection webview
+   */
+  private setupImportCollectionMessageHandlers(
+    panel: vscode.WebviewPanel,
+    connectionId: string
+  ): void {
+    panel.webview.onDidReceiveMessage(
+      async (message) => {
+        switch (message.command) {
+          case 'import':
+            try {
+              await this.createCollection(connectionId, message.schema);
+              panel.dispose();
+              vscode.window.showInformationMessage(
+                `Collection "${message.schema.class}" imported successfully`
+              );
+              await this.fetchCollections(connectionId);
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+            break;
+          case 'editBefore':
+            try {
+              // Open the Add Collection form pre-filled with the imported schema
+              panel.webview.html = this.getAddCollectionHtml(message.schema);
+              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+            } catch (error) {
+              panel.webview.postMessage({
+                command: 'error',
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+            break;
+          case 'back':
+            panel.webview.html = this.getCollectionOptionsHtml(connectionId);
+            break;
+          case 'cancel':
+            panel.dispose();
+            break;
+        }
+      },
+      undefined,
+      this.context.subscriptions
+    );
+  }
 }

@@ -16,7 +16,7 @@ interface State {
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -31,35 +31,40 @@ class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       // You can render any custom fallback UI
-      return this.props.fallback || (
-        <div className="error-boundary-fallback" style={{
-          padding: '16px',
-          margin: '8px',
-          backgroundColor: 'rgba(231, 76, 60, 0.1)',
-          border: '1px solid rgba(231, 76, 60, 0.3)',
-          borderRadius: '4px',
-          color: '#e74c3c'
-        }}>
-          <h3>Something went wrong</h3>
-          <details>
-            <summary>View error details</summary>
-            <pre>{this.state.error?.toString()}</pre>
-          </details>
-          <button 
-            onClick={() => this.setState({ hasError: false, error: null })}
+      return (
+        this.props.fallback || (
+          <div
+            className="error-boundary-fallback"
             style={{
-              backgroundColor: '#3c3c3c',
-              color: '#cccccc',
-              border: '1px solid #555',
+              padding: '16px',
+              margin: '8px',
+              backgroundColor: 'rgba(231, 76, 60, 0.1)',
+              border: '1px solid rgba(231, 76, 60, 0.3)',
               borderRadius: '4px',
-              padding: '4px 8px',
-              marginTop: '8px',
-              cursor: 'pointer'
+              color: '#e74c3c',
             }}
           >
-            Try Again
-          </button>
-        </div>
+            <h3>Something went wrong</h3>
+            <details>
+              <summary>View error details</summary>
+              <pre>{this.state.error?.toString()}</pre>
+            </details>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                backgroundColor: '#3c3c3c',
+                color: '#cccccc',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                marginTop: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Try Again
+            </button>
+          </div>
+        )
       );
     }
 
