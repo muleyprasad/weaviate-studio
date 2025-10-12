@@ -49,6 +49,7 @@ export class QueryEditorPanel {
   public static readonly viewType = 'weaviate.queryEditor';
   // Map to store all open panels by collection name
   private static readonly panels = new Map<string, QueryEditorPanel>();
+  private static _outputChannel: vscode.OutputChannel | null = null;
   private _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _options: QueryEditorOptions;
@@ -56,6 +57,7 @@ export class QueryEditorPanel {
   // Use definite assignment assertion to fix TypeScript error
   private _context!: vscode.ExtensionContext;
   private _connectionManager: any;
+  private _errorDetailsStore: Map<string, { text: string; ts: number }> = new Map();
 
   // Minimal schema types for webview compatibility
   private async _fetchSchema(): Promise<{
@@ -154,9 +156,14 @@ export class QueryEditorPanel {
           if ((res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300) {
             resolve(text);
           } else {
-            reject(
-              new Error(`HTTP ${res.statusCode} ${res.statusMessage}${text ? ` - ${text}` : ''}`)
-            );
+            // Build a concise error message without dumping entire response bodies
+            const summary = this._summarizeHttpError(res.statusCode, res.statusMessage, text);
+            const err: any = new Error(summary);
+            // Attach raw response text for optional diagnostics
+            err.details = text;
+            err.statusCode = res.statusCode;
+            err.statusMessage = res.statusMessage;
+            reject(err);
           }
         });
       });
@@ -177,9 +184,59 @@ export class QueryEditorPanel {
         .map((e: any) => e.message)
         .filter(Boolean)
         .join('; ');
-      throw new Error(msg || 'GraphQL returned errors');
+      const graphQLError: any = new Error(msg || 'GraphQL returned errors');
+      // Preserve the full payload so the UI can show complete details on demand
+      graphQLError.details = responseBody;
+      graphQLError.graphqlErrors = json.errors;
+      graphQLError.graphqlResponse = json;
+      graphQLError.graphqlRequest = { query };
+      throw graphQLError;
     }
     return json.data ?? json;
+  }
+
+  // Create a concise, user-friendly message from HTTP error responses
+  private _summarizeHttpError(
+    statusCode?: number,
+    statusMessage?: string,
+    bodyText?: string
+  ): string {
+    const code = statusCode ?? 'unknown';
+
+    // Try to parse JSON bodies produced by Weaviate and similar services
+    if (bodyText) {
+      try {
+        const parsed: any = JSON.parse(bodyText);
+
+        // Prefer explicit GraphQL error arrays
+        if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
+          const messages = parsed.errors
+            .map((e: any) => e?.message)
+            .filter(Boolean)
+            .slice(0, 3)
+            .join('; ');
+          return `GraphQL Error (Code: ${code}): ${messages || 'Unknown error'}`;
+        }
+
+        // Weaviate often returns { response: { code, message }, request: { ... } }
+        const response = parsed?.response;
+        if (response?.message) {
+          const respCode = response?.code ?? code;
+          return `GraphQL Error (Code: ${respCode}): ${response.message}`;
+        }
+
+        // Fallback to top-level message if present
+        if (parsed?.message) {
+          return `GraphQL Error (Code: ${code}): ${parsed.message}`;
+        }
+      } catch {
+        // Ignore JSON parse errors and fall through to a generic summary
+      }
+    }
+
+    // Generic concise message without attaching the full body
+    const statusText = `${statusMessage ?? ''}`.trim();
+    return statusText ? `HTTP ${code} ${statusText}` : `HTTP ${code}: Request failed`;
   }
 
   /**
@@ -312,6 +369,55 @@ export class QueryEditorPanel {
             });
           }
           break;
+
+        case 'openOutput':
+          // Reveal the output channel with error details if available
+          QueryEditorPanel._getOutputChannel()?.show(true);
+          break;
+
+        case 'copyToClipboard':
+          try {
+            await vscode.env.clipboard.writeText(message.text || '');
+          } catch (e) {
+            console.warn('Failed to copy to clipboard:', e);
+          }
+          break;
+
+        case 'requestErrorDetails': {
+          const id = message.errorId as string | undefined;
+          if (!id) {
+            return;
+          }
+          const entry = this._errorDetailsStore.get(id);
+          if (!entry) {
+            this._panel.webview.postMessage({
+              type: 'errorDetailsEnd',
+              errorId: id,
+              error: 'Error details not found',
+            });
+            return;
+          }
+
+          const text = entry.text;
+          const CHUNK = 32_768; // 32 KB chunks to keep UI responsive
+          let index = 0;
+          for (let i = 0; i < text.length; i += CHUNK) {
+            const chunk = text.slice(i, i + CHUNK);
+            this._panel.webview.postMessage({
+              type: 'errorDetailsChunk',
+              errorId: id,
+              index,
+              chunk,
+            });
+            index++;
+          }
+          this._panel.webview.postMessage({
+            type: 'errorDetailsEnd',
+            errorId: id,
+            total: index,
+          });
+          break;
+        }
       }
     });
   }
@@ -381,8 +487,9 @@ export class QueryEditorPanel {
       const result = await this._performGraphQLQuery(query);
       this._sendResultToWebview(result);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      this._sendErrorToWebview(errorMsg);
+      const errAny: any = error;
+      const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
+      this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
     }
   }
 
@@ -425,7 +532,13 @@ export class QueryEditorPanel {
       }
       return result;
     } catch (apiError: any) {
-      throw new Error(`GraphQL query failed: ${apiError.message || 'Unknown API error'}`);
+      const err: any = new Error(
+        `GraphQL query failed: ${apiError?.message || 'Unknown API error'}`
+      );
+      if (apiError?.details) {
+        err.details = apiError.details;
+      }
+      throw err;
     }
   }
 
@@ -446,12 +559,73 @@ export class QueryEditorPanel {
     });
   }
 
-  private _sendErrorToWebview(errorMessage: string): void {
+  private _sendErrorToWebview(errorMessage: string, details?: string): void {
+    // Ensure excessively large messages do not overwhelm the UI
+    const MAX_LEN = 1200;
+    let display = errorMessage || 'Unknown error';
+    if (display.length > MAX_LEN) {
+      display = display.slice(0, MAX_LEN) + '… [truncated]';
+    }
+    let errorId: string | undefined;
+    if (details) {
+      errorId = this._saveErrorDetails(details);
+    }
+
+    // Log full context to the Output channel
+    const ts = new Date().toISOString();
+    const channel = QueryEditorPanel._getOutputChannel();
+    channel?.appendLine(`[${ts}] GraphQL query error`);
+    channel?.appendLine(display);
+    if (details && channel) {
+      channel.appendLine('Details:');
+      const MAX_OUTPUT = 200000; // 200k chars to keep channel usable
+      const outText =
+        details.length > MAX_OUTPUT
+          ? details.slice(0, MAX_OUTPUT) + '\n… [details truncated]'
+          : details;
+      channel.appendLine(outText);
+      channel.appendLine('');
+    } else if (channel) {
+      channel.appendLine('');
+    }
+
     this._panel.webview.postMessage({
       type: 'queryError',
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
+      error: display,
+      // Do not inline huge details; provide an id to fetch on demand
+      errorId,
+      timestamp: ts,
     });
+  }
+
+  // Save error details and return a short-lived id for retrieval from the webview
+  private _saveErrorDetails(text: string): string {
+    const id = `err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const ts = Date.now();
+    this._errorDetailsStore.set(id, { text, ts });
+
+    // Simple cleanup: keep most recent 10 entries
+    if (this._errorDetailsStore.size > 10) {
+      const entries = Array.from(this._errorDetailsStore.entries()).sort(
+        (a, b) => a[1].ts - b[1].ts
+      );
+      while (entries.length > 10) {
+        const [oldId] = entries.shift()!;
+        this._errorDetailsStore.delete(oldId);
+      }
+    }
+    return id;
+  }
+
+  private static _getOutputChannel(): vscode.OutputChannel | null {
+    try {
+      if (!QueryEditorPanel._outputChannel) {
+        QueryEditorPanel._outputChannel = vscode.window.createOutputChannel('Weaviate Studio');
+      }
+      return QueryEditorPanel._outputChannel;
+    } catch {
+      return null;
+    }
   }
 
   private async _getHtmlForWebview(webview: vscode.Webview): Promise<string> {

@@ -308,6 +308,10 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '6px',
     border: '1px solid var(--vscode-inputValidation-errorBorder, rgba(231, 76, 60, 0.3))',
+    maxHeight: '160px',
+    overflowY: 'auto' as 'auto',
+    wordBreak: 'break-word' as 'break-word',
+    whiteSpace: 'pre-wrap' as 'pre-wrap',
   },
   loading: {
     color: 'var(--vscode-progressBar-background, #3498db)',
@@ -331,6 +335,11 @@ const App = () => {
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
   const [splitRatio, setSplitRatio] = useState<number>(50);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+  const [errorId, setErrorId] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
+  const errorBufferRef = useRef<string>('');
 
   // Save current state to backend for persistence across tab switches
   const saveCurrentState = () => {
@@ -616,8 +625,32 @@ const App = () => {
           // Display error message from failed query
           console.error(`${message.type}:`, message.error);
           setError(message.error || 'Unknown query error');
+          setErrorDetails(message.details || null);
+          setErrorId(message.errorId || null);
+          errorBufferRef.current = '';
+          setShowErrorDetails(false);
           setIsLoading(false);
           break;
+
+        case 'errorDetailsChunk': {
+          if (message.errorId && message.chunk !== null && message.chunk !== undefined) {
+            errorBufferRef.current += String(message.chunk);
+          }
+          break;
+        }
+
+        case 'errorDetailsEnd': {
+          if (message.errorId) {
+            // If there was an error retrieving details, surface that
+            if (message.error) {
+              setErrorDetails(`Failed to load details: ${message.error}`);
+            } else {
+              setErrorDetails(errorBufferRef.current);
+            }
+            setLoadingDetails(false);
+          }
+          break;
+        }
 
         case 'explainResult':
           // Handle explain plan results
@@ -764,7 +797,88 @@ const App = () => {
       {/* Display error messages if present */}
       {error && (
         <div style={styles.error}>
-          <strong>Error:</strong> {error}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div>
+              <strong>Error:</strong> {error}
+            </div>
+            {(errorDetails || errorId) && (
+              <>
+                <button
+                  style={{
+                    ...styles.button,
+                    padding: '2px 8px',
+                    height: '24px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                    color: 'var(--vscode-input-foreground, #E0E0E0)',
+                    border: '1px solid var(--vscode-input-border, #444)',
+                  }}
+                  onClick={() => {
+                    const next = !showErrorDetails;
+                    setShowErrorDetails(next);
+                    if (next && !errorDetails && errorId && vscode) {
+                      setLoadingDetails(true);
+                      vscode.postMessage({ type: 'requestErrorDetails', errorId });
+                    }
+                  }}
+                >
+                  {showErrorDetails ? 'Hide details' : 'Show details'}
+                </button>
+                <button
+                  style={{
+                    ...styles.button,
+                    padding: '2px 8px',
+                    height: '24px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                    color: 'var(--vscode-input-foreground, #E0E0E0)',
+                    border: '1px solid var(--vscode-input-border, #444)',
+                  }}
+                  onClick={() => {
+                    if (vscode) {
+                      const textToCopy = errorDetails || error || '';
+                      vscode.postMessage({ type: 'copyToClipboard', text: textToCopy });
+                    }
+                  }}
+                >
+                  Copy
+                </button>
+                <button
+                  style={{
+                    ...styles.button,
+                    padding: '2px 8px',
+                    height: '24px',
+                    fontSize: '12px',
+                    backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                    color: 'var(--vscode-input-foreground, #E0E0E0)',
+                    border: '1px solid var(--vscode-input-border, #444)',
+                  }}
+                  onClick={() => {
+                    if (vscode) {
+                      vscode.postMessage({ type: 'openOutput' });
+                    }
+                  }}
+                >
+                  Open Output
+                </button>
+              </>
+            )}
+          </div>
+          {showErrorDetails && (
+            <pre
+              style={{
+                marginTop: 8,
+                maxHeight: 200,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {loadingDetails
+                ? 'Loading full error details…'
+                : errorDetails || 'No additional details available.'}
+            </pre>
+          )}
         </div>
       )}
 
