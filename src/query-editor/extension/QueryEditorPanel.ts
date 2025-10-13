@@ -58,6 +58,8 @@ export class QueryEditorPanel {
   private _context!: vscode.ExtensionContext;
   private _connectionManager: any;
   private _errorDetailsStore: Map<string, { text: string; ts: number }> = new Map();
+  private _abortController: AbortController | null = null;
+  private _inflightRequest: http.ClientRequest | null = null;
 
   // Standard GraphQL introspection query
   private static readonly INTROSPECTION_QUERY = `
@@ -197,7 +199,7 @@ export class QueryEditorPanel {
     return `${protocol}://${host}:${port}/v1/graphql`;
   }
 
-  private async _performGraphQLHttp(query: string): Promise<any> {
+  private async _performGraphQLHttp(query: string, signal?: AbortSignal): Promise<any> {
     const urlStr = this._buildGraphQLEndpoint();
     const conn = this._getActiveConnection();
 
@@ -224,7 +226,7 @@ export class QueryEditorPanel {
     const body = JSON.stringify({ query });
 
     const responseBody: string = await new Promise((resolve, reject) => {
-      const req = (isHttps ? https : http).request(options, (res) => {
+      const req = (isHttps ? https : http).request({ ...options, signal: signal as any }, (res) => {
         const chunks: Buffer[] = [];
         res.on('data', (chunk: Buffer) => chunks.push(chunk));
         res.on('end', () => {
@@ -243,10 +245,25 @@ export class QueryEditorPanel {
           }
         });
       });
+      this._inflightRequest = req;
+      // If Node's request does not support signal, fallback to destroying on abort
+      if (signal) {
+        const onAbort = () => {
+          try {
+            req.destroy(new Error('aborted'));
+          } catch {}
+        };
+        if ((signal as any).aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
       req.on('error', reject);
       req.write(body);
       req.end();
     });
+    this._inflightRequest = null;
 
     let json: any;
     try {
@@ -406,7 +423,22 @@ export class QueryEditorPanel {
             limit: message.limit || 10,
             certainty: message.certainty || 0.7,
           };
-          this._executeQuery(query, queryOptions);
+          // Abort any previous request
+          try {
+            this._abortController?.abort();
+          } catch {}
+          this._abortController = new AbortController();
+          this._executeQuery(query, queryOptions, this._abortController.signal);
+          break;
+
+        case 'cancelQuery':
+          try {
+            this._abortController?.abort();
+            this._inflightRequest?.destroy(new Error('aborted'));
+          } catch {}
+          this._abortController = null;
+          this._inflightRequest = null;
+          this._panel.webview.postMessage({ type: 'queryCancelled' });
           break;
 
         case 'explainPlan':
@@ -544,7 +576,11 @@ export class QueryEditorPanel {
     }
   }
 
-  private async _executeQuery(query: string, options: QueryRunOptions): Promise<void> {
+  private async _executeQuery(
+    query: string,
+    options: QueryRunOptions,
+    signal?: AbortSignal
+  ): Promise<void> {
     // Early validation
     if (!this._weaviateClient) {
       const errorMsg = 'Not connected to Weaviate';
@@ -560,16 +596,22 @@ export class QueryEditorPanel {
     }
 
     try {
-      const result = await this._performGraphQLQuery(query);
+      const result = await this._performGraphQLQuery(query, signal);
       this._sendResultToWebview(result);
     } catch (error) {
       const errAny: any = error;
-      const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
-      this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
+      const msg = errAny?.message || '';
+      const isAbort = errAny?.name === 'AbortError' || /aborted|abort/i.test(msg);
+      if (isAbort) {
+        this._panel.webview.postMessage({ type: 'queryCancelled' });
+      } else {
+        const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
+        this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
+      }
     }
   }
 
-  private async _performGraphQLQuery(query: string): Promise<any> {
+  private async _performGraphQLQuery(query: string, signal?: AbortSignal): Promise<any> {
     const client = this._weaviateClient as any;
 
     // Try client-provided GraphQL interfaces first (for older clients)
@@ -602,7 +644,7 @@ export class QueryEditorPanel {
 
     // Fallback to direct HTTP
     try {
-      const result = await this._performGraphQLHttp(query);
+      const result = await this._performGraphQLHttp(query, signal);
       if (this._isEmptyResult(result)) {
         throw new Error('Query returned empty or invalid result');
       }

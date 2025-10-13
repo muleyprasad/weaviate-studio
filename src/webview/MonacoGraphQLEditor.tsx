@@ -14,6 +14,7 @@ interface MonacoGraphQLEditorProps {
   showTemplateDropdown?: boolean;
   onToggleTemplateDropdown?: () => void;
   onTemplateSelect?: (templateName: string) => void;
+  onLanguageReady?: (ready: boolean) => void;
 }
 
 /**
@@ -28,6 +29,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
   showTemplateDropdown,
   onToggleTemplateDropdown,
   onTemplateSelect,
+  onLanguageReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<GraphQLEditor | null>(null);
@@ -94,6 +96,7 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
     if (isEditorReady && editorRef.current && schemaConfig) {
       setIsLoading(true);
       setLoadingMessage('Configuring GraphQL language features...');
+      onLanguageReady?.(false);
 
       editorRef.current
         .configureGraphQLLanguage(schemaConfig)
@@ -101,10 +104,12 @@ export const MonacoGraphQLEditor: React.FC<MonacoGraphQLEditorProps> = ({
           // Update theme after configuration
           editorRef.current?.updateTheme();
           setIsLoading(false);
+          onLanguageReady?.(true);
         })
         .catch((error) => {
           console.error('Error configuring GraphQL language:', error);
           setIsLoading(false);
+          onLanguageReady?.(false);
         });
     }
   }, [isEditorReady, schemaConfig]);

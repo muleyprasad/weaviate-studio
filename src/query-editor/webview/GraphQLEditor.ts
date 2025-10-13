@@ -184,7 +184,7 @@ export class GraphQLEditor {
         comments: true,
         strings: true,
       },
-      quickSuggestionsDelay: 100,
+      quickSuggestionsDelay: 50,
       parameterHints: {
         enabled: true,
         cycle: true,

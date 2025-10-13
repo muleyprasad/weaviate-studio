@@ -1658,11 +1658,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           await this.fetchCollections(connectionId);
         }
 
-        // Automatically open the query editor after successful connection (but not during silent connections)
-        if (!silent) {
-          // Open the query editor without a specific collection (general extension page)
-          QueryEditorPanel.createOrShow(this.context, { connectionId });
-        }
+        // Do not auto-open the query editor on connect. Let the user open it
+        // explicitly from a collection to ensure a valid context/connection.
 
         return true;
       }

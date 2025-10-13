@@ -409,6 +409,8 @@ const App = () => {
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
+  const [schemaReady, setSchemaReady] = useState<boolean>(false);
+  const [isStopping, setIsStopping] = useState<boolean>(false);
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
   const [splitRatio, setSplitRatio] = useState<number>(50);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
@@ -478,6 +480,13 @@ const App = () => {
         query: queryText,
         collection: collection,
       });
+    }
+  };
+
+  const handleCancelQuery = () => {
+    if (vscode) {
+      setIsStopping(true);
+      vscode.postMessage({ type: 'cancelQuery' });
     }
   };
 
@@ -681,6 +690,7 @@ const App = () => {
 
           // Always stop loading when we get results
           setIsLoading(false);
+          setIsStopping(false);
 
           try {
             const extractedData = extractWeaviateData(message.data, message.collection);
@@ -695,6 +705,13 @@ const App = () => {
             setTitle(`Weaviate Collection: ${message.collection}`);
           }
           setError(null); // Clear any previous errors
+          break;
+
+        case 'queryCancelled':
+          console.log('Query cancelled');
+          setIsStopping(false);
+          setIsLoading(false);
+          setError(null);
           break;
 
         case 'sampleQuery':
@@ -1002,6 +1019,45 @@ const App = () => {
                 GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
 
+              {/* Schema readiness indicator */}
+              {schemaConfig && (
+                <span
+                  title={
+                    schemaReady
+                      ? 'Schema-based language features active'
+                      : 'Applying schema to language service…'
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                    color: schemaReady
+                      ? 'var(--vscode-testing-iconPassed, #89d185)'
+                      : 'var(--vscode-descriptionForeground, #bbb)',
+                    backgroundColor: schemaReady
+                      ? 'color-mix(in srgb, var(--vscode-testing-iconPassed, #89d185) 15%, transparent)'
+                      : 'color-mix(in srgb, var(--vscode-descriptionForeground, #bbb) 10%, transparent)',
+                    border: '1px solid var(--vscode-widget-border, #3a3a3a)',
+                    marginRight: '8px',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: schemaReady
+                        ? 'var(--vscode-testing-iconPassed, #89d185)'
+                        : 'var(--vscode-descriptionForeground, #bbb)',
+                    }}
+                  />
+                  {schemaReady ? 'Schema loaded' : 'Loading schema…'}
+                </span>
+              )}
+
               {/* Template and Run buttons */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {/* Template Dropdown */}
@@ -1152,45 +1208,71 @@ const App = () => {
                   )}
                 </div>
 
-                <button
-                  onClick={handleRunQuery}
-                  disabled={!collection}
-                  title={collection ? 'Execute the GraphQL query' : 'Select a collection first'}
-                  style={{
-                    backgroundColor: collection
-                      ? 'var(--vscode-button-background, #0E639C)'
-                      : 'var(--vscode-input-background, #2D2D2D)',
-                    color: collection
-                      ? 'var(--vscode-button-foreground, white)'
-                      : 'var(--vscode-descriptionForeground, #888)',
-                    border: 'none',
-                    borderRadius: '3px',
-                    padding: '4px 10px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    height: '28px',
-                    minWidth: '42px',
-                    cursor: collection ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'background-color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (collection) {
-                      e.currentTarget.style.backgroundColor =
-                        'var(--vscode-button-hoverBackground, #1177bb)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (collection) {
-                      e.currentTarget.style.backgroundColor =
-                        'var(--vscode-button-background, #0E639C)';
-                    }
-                  }}
-                >
-                  ▶ Run
-                </button>
+                {isLoading ? (
+                  <button
+                    onClick={handleCancelQuery}
+                    disabled={!collection || isStopping}
+                    title={isStopping ? 'Stopping…' : 'Stop the running query'}
+                    style={{
+                      backgroundColor: 'var(--vscode-inputValidation-errorBackground, #5a1d1d)',
+                      color: 'var(--vscode-button-foreground, white)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      height: '28px',
+                      minWidth: '42px',
+                      cursor: isStopping ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'background-color 0.2s ease',
+                    }}
+                  >
+                    ■ {isStopping ? 'Stopping…' : 'Stop'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleRunQuery}
+                    disabled={!collection}
+                    title={collection ? 'Execute the GraphQL query' : 'Select a collection first'}
+                    style={{
+                      backgroundColor: collection
+                        ? 'var(--vscode-button-background, #0E639C)'
+                        : 'var(--vscode-input-background, #2D2D2D)',
+                      color: collection
+                        ? 'var(--vscode-button-foreground, white)'
+                        : 'var(--vscode-descriptionForeground, #888)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      height: '28px',
+                      minWidth: '42px',
+                      cursor: collection ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'background-color 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor =
+                          'var(--vscode-button-hoverBackground, #1177bb)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor =
+                          'var(--vscode-button-background, #0E639C)';
+                      }
+                    }}
+                  >
+                    ▶ Run
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1204,6 +1286,7 @@ const App = () => {
                 showTemplateDropdown={showTemplateDropdown}
                 onToggleTemplateDropdown={handleToggleTemplateDropdown}
                 onTemplateSelect={handleTemplateSelect}
+                onLanguageReady={(ready) => setSchemaReady(ready)}
               />
             </div>
           </div>
