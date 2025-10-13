@@ -49,6 +49,7 @@ export class QueryEditorPanel {
   public static readonly viewType = 'weaviate.queryEditor';
   // Map to store all open panels by collection name
   private static readonly panels = new Map<string, QueryEditorPanel>();
+  private static activePanel: QueryEditorPanel | null = null;
   private static _outputChannel: vscode.OutputChannel | null = null;
   private _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -366,7 +367,21 @@ export class QueryEditorPanel {
 
     // Create new editor instance and store in our map
     const newEditor = new QueryEditorPanel(panel, context, { ...options, tabId });
+    QueryEditorPanel.activePanel = newEditor;
     QueryEditorPanel.panels.set(panelKey, newEditor);
+  }
+
+  public static sendCommandToActive(type: 'cmdRun' | 'cmdStop' | 'cmdClear'): boolean {
+    const active = QueryEditorPanel.activePanel;
+    if (!active) {
+      return false;
+    }
+    try {
+      active._panel.webview.postMessage({ type });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private constructor(
@@ -386,6 +401,7 @@ export class QueryEditorPanel {
         if (this._panel.visible) {
           // Webview became visible, restore state if needed
           this._restoreWebviewState();
+          QueryEditorPanel.activePanel = this;
         }
       },
       null,
@@ -393,6 +409,7 @@ export class QueryEditorPanel {
     );
 
     this._initializeWebview();
+    QueryEditorPanel.activePanel = this;
   }
 
   private async _initializeWebview() {
@@ -403,6 +420,15 @@ export class QueryEditorPanel {
   private _setupMessageHandlers() {
     this._panel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
+        case 'cmdRun':
+          this._panel.webview.postMessage({ type: 'runQueryShortcut' });
+          return;
+        case 'cmdStop':
+          this._panel.webview.postMessage({ type: 'stopQueryShortcut' });
+          return;
+        case 'cmdClear':
+          this._panel.webview.postMessage({ type: 'clearQueryShortcut' });
+          return;
         case 'ready':
           if (this._options.collectionName) {
             await this._sendInitialData();
@@ -804,12 +830,27 @@ export class QueryEditorPanel {
       // Get any saved state for this panel
       const savedState = this._getSavedWebviewState();
 
+      // Build connection info for display in the webview header
+      const activeConn = this._getActiveConnection();
+      let connectionInfo: any = undefined;
+      try {
+        if (activeConn) {
+          connectionInfo = {
+            id: activeConn.id,
+            name: activeConn.name,
+            type: activeConn.type,
+            endpoint: this._buildGraphQLEndpoint(),
+          };
+        }
+      } catch {}
+
       this._panel.webview.postMessage({
         type: 'initialData',
         schema,
         collection: this._options.collectionName,
         savedState: savedState,
         introspection,
+        connection: connectionInfo,
       });
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
@@ -1024,6 +1065,9 @@ export class QueryEditorPanel {
     }
 
     this._panel.dispose();
+    if (QueryEditorPanel.activePanel === this) {
+      QueryEditorPanel.activePanel = null;
+    }
 
     while (this._disposables.length) {
       const disposable = this._disposables.pop();

@@ -115,6 +115,21 @@
         "title": "Open New Query Tab"
       },
       {
+        "command": "weaviate.queryEditor.run",
+        "title": "Weaviate: Run Query",
+        "category": "Weaviate"
+      },
+      {
+        "command": "weaviate.queryEditor.stop",
+        "title": "Weaviate: Stop Query",
+        "category": "Weaviate"
+      },
+      {
+        "command": "weaviate.queryEditor.clear",
+        "title": "Weaviate: Clear Query",
+        "category": "Weaviate"
+      },
+      {
         "command": "weaviate.deleteAllCollections",
         "title": "Delete All Collections"
       },

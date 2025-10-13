@@ -411,6 +411,9 @@ const App = () => {
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
   const [schemaReady, setSchemaReady] = useState<boolean>(false);
   const [isStopping, setIsStopping] = useState<boolean>(false);
+  const [connectionInfo, setConnectionInfo] = useState<{ name?: string; endpoint?: string } | null>(
+    null
+  );
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
   const [splitRatio, setSplitRatio] = useState<number>(50);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
@@ -419,6 +422,41 @@ const App = () => {
   const [errorId, setErrorId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const errorBufferRef = useRef<string>('');
+
+  // Keyboard shortcuts within the webview
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const hasMod = e.metaKey || e.ctrlKey;
+      // Run: Cmd/Ctrl + Enter
+      if (hasMod && e.key === 'Enter') {
+        e.preventDefault();
+        if (!isLoading) {
+          handleRunQuery();
+        }
+        return;
+      }
+      // Clear: Cmd/Ctrl + K
+      if (hasMod && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (!isLoading && !isStopping) {
+          setQueryText('');
+          setJsonData(null);
+          setError(null);
+        }
+        return;
+      }
+      // Stop: Escape
+      if (e.key === 'Escape') {
+        if (isLoading && !isStopping) {
+          e.preventDefault();
+          handleCancelQuery();
+        }
+      }
+    };
+    // Capture phase to ensure we see it even if Monaco handles it
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isLoading, isStopping, queryText]);
 
   // Save current state to backend for persistence across tab switches
   const saveCurrentState = () => {
@@ -472,7 +510,9 @@ const App = () => {
     }
 
     setIsLoading(true);
+    setIsStopping(false);
     setError(null);
+    setJsonData(null); // clear previous results
 
     if (vscode) {
       vscode.postMessage({
@@ -608,6 +648,12 @@ const App = () => {
           console.log('Received schema for collection:', message.collection);
           setCollection(message.collection);
           setTitle(`Weaviate Collection: ${message.collection}`);
+          if (message.connection) {
+            setConnectionInfo({
+              name: message.connection.name,
+              endpoint: message.connection.endpoint,
+            });
+          }
 
           // Restore saved state if available
           if (message.savedState) {
@@ -860,6 +906,22 @@ const App = () => {
           setIsLoading(false);
           break;
 
+        case 'runQueryShortcut':
+          handleRunQuery();
+          break;
+
+        case 'stopQueryShortcut':
+          handleCancelQuery();
+          break;
+
+        case 'clearQueryShortcut':
+          if (!isLoading && !isStopping) {
+            setQueryText('');
+            setJsonData(null);
+            setError(null);
+          }
+          break;
+
         case 'ping':
           // Respond to backend ping to indicate webview is alive
           if (vscode) {
@@ -1020,46 +1082,40 @@ const App = () => {
               </span>
 
               {/* Schema readiness indicator */}
-              {schemaConfig && (
-                <span
-                  title={
-                    schemaReady
-                      ? 'Schema-based language features active'
-                      : 'Applying schema to language service…'
-                  }
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '2px 8px',
-                    borderRadius: '999px',
-                    fontSize: '12px',
-                    color: schemaReady
-                      ? 'var(--vscode-testing-iconPassed, #89d185)'
-                      : 'var(--vscode-descriptionForeground, #bbb)',
-                    backgroundColor: schemaReady
-                      ? 'color-mix(in srgb, var(--vscode-testing-iconPassed, #89d185) 15%, transparent)'
-                      : 'color-mix(in srgb, var(--vscode-descriptionForeground, #bbb) 10%, transparent)',
-                    border: '1px solid var(--vscode-widget-border, #3a3a3a)',
-                    marginRight: '8px',
-                  }}
-                >
+              {/* Status items will be shown inside toolbar on the right */}
+
+              {/* Template and Run buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Connection and schema status (compact) */}
+                {connectionInfo && (
                   <span
+                    title={connectionInfo.endpoint ? `Endpoint: ${connectionInfo.endpoint}` : ''}
                     style={{
+                      fontSize: '12px',
+                      color: 'var(--vscode-descriptionForeground, #999)',
+                      marginRight: 6,
+                    }}
+                  >
+                    {connectionInfo.name}
+                  </span>
+                )}
+                {schemaConfig && (
+                  <span
+                    title={
+                      schemaReady ? 'Schema-based language features active' : 'Applying schema…'
+                    }
+                    style={{
+                      display: 'inline-block',
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
                       backgroundColor: schemaReady
                         ? 'var(--vscode-testing-iconPassed, #89d185)'
                         : 'var(--vscode-descriptionForeground, #bbb)',
+                      marginRight: 8,
                     }}
                   />
-                  {schemaReady ? 'Schema loaded' : 'Loading schema…'}
-                </span>
-              )}
-
-              {/* Template and Run buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                )}
                 {/* Template Dropdown */}
                 <div className="template-dropdown-container" style={{ position: 'relative' }}>
                   <button
@@ -1211,8 +1267,8 @@ const App = () => {
                 {isLoading ? (
                   <button
                     onClick={handleCancelQuery}
-                    disabled={!collection || isStopping}
-                    title={isStopping ? 'Stopping…' : 'Stop the running query'}
+                    disabled={isStopping}
+                    title={isStopping ? 'Stopping…' : 'Stop the running query (Esc)'}
                     style={{
                       backgroundColor: 'var(--vscode-inputValidation-errorBackground, #5a1d1d)',
                       color: 'var(--vscode-button-foreground, white)',
@@ -1236,7 +1292,11 @@ const App = () => {
                   <button
                     onClick={handleRunQuery}
                     disabled={!collection}
-                    title={collection ? 'Execute the GraphQL query' : 'Select a collection first'}
+                    title={
+                      collection
+                        ? 'Execute the GraphQL query (Ctrl/Cmd+Enter)'
+                        : 'Select a collection first'
+                    }
                     style={{
                       backgroundColor: collection
                         ? 'var(--vscode-button-background, #0E639C)'
@@ -1273,6 +1333,48 @@ const App = () => {
                     ▶ Run
                   </button>
                 )}
+
+                {/* Clear Button */}
+                <button
+                  onClick={() => {
+                    setQueryText('');
+                    setJsonData(null);
+                    setError(null);
+                  }}
+                  disabled={isLoading || isStopping}
+                  title={
+                    isLoading || isStopping
+                      ? 'Unavailable while running'
+                      : 'Clear query (Ctrl/Cmd+K)'
+                  }
+                  style={{
+                    backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                    color: 'var(--vscode-input-foreground, #E0E0E0)',
+                    border: '1px solid var(--vscode-input-border, #444)',
+                    borderRadius: '3px',
+                    padding: '4px 10px',
+                    fontSize: '13px',
+                    height: '28px',
+                    cursor: isLoading || isStopping ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  🧹 Clear
+                </button>
+
+                {/* Shortcuts legend (tooltip only) */}
+                <span
+                  title={'Shortcuts:\n• Run: Ctrl/Cmd+Enter\n• Stop: Esc\n• Clear: Ctrl/Cmd+K'}
+                  style={{
+                    color: 'var(--vscode-descriptionForeground, #999)',
+                    fontSize: '14px',
+                    padding: '0 6px',
+                    userSelect: 'none',
+                    cursor: 'default',
+                  }}
+                  aria-label="Keyboard shortcuts"
+                >
+                  ⓘ
+                </span>
               </div>
             </div>
 
