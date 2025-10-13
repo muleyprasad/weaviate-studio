@@ -530,6 +530,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           new vscode.ThemeIcon('lightbulb-autofix')
         ),
         new WeaviateTreeItem(
+          `Reranker Configuration`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'rerankerConfig',
+          element.connectionId,
+          element.label,
+          'reranker',
+          new vscode.ThemeIcon('filter')
+        ),
+        new WeaviateTreeItem(
           'Replication',
           vscode.TreeItemCollapsibleState.Collapsed,
           'collectionReplication',
@@ -823,6 +832,42 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
 
       return generativeItems;
+    } else if (
+      element.itemType === 'rerankerConfig' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Reranker configuration section (mirror of generative)
+      const collection = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      );
+      let rerankerItems: WeaviateTreeItem[] = [];
+      const data = await this.flattenObject(collection?.schema?.reranker || {}, [], '', false);
+      Object.entries(data).forEach(([key, value]) => {
+        rerankerItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('filter'),
+            'rerankerConfig'
+          )
+        );
+      });
+      if (rerankerItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No reranker configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return rerankerItems;
     } else if (
       element.itemType === 'collectionReplication' &&
       element.connectionId &&
