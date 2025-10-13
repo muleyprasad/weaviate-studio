@@ -41,22 +41,99 @@ try {
   console.error('Failed to acquire VS Code API', error);
 }
 
-// Configure Monaco environment for web workers
-try {
-  // Only set up the Monaco environment if it hasn't been configured yet
-  if (!window.MonacoEnvironment) {
-    window.MonacoEnvironment = {
-      getWorkerUrl: function (moduleId, label) {
-        if (label === 'graphql') {
-          return './graphql.worker.js';
-        }
-        return './editor.worker.js';
-      },
-    };
+// VS Code webviews run on the vscode-webview:// origin which can’t load file+
+// worker URLs directly. Patch Monaco so it creates classic workers from blob
+// URLs that proxy to the emitted worker code via importScripts.
+const patchMonacoWorkerLoading = () => {
+  const env: any = (window as any).MonacoEnvironment;
+  if (!env || env.__vsCodePatched) {
+    return;
   }
-} catch (error) {
-  console.error('Failed to configure Monaco environment:', error);
-}
+
+  const originalGetWorkerUrl =
+    typeof env.getWorkerUrl === 'function' ? env.getWorkerUrl.bind(env) : null;
+  if (!originalGetWorkerUrl) {
+    return;
+  }
+
+  const workerUrlCache = new Map<string, string>();
+
+  const resolveAbsoluteUrl = (url: string): string => {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    // Prefer document.baseURI so resolution respects the <base href> injected for VS Code webview
+    const base =
+      (typeof document !== 'undefined' && (document.baseURI || '')) || window.location.href;
+    return new URL(url, base).toString();
+  };
+
+  const ensureBlobClassicUrl = (moduleId: string, label: string): string | undefined => {
+    const rawUrl = originalGetWorkerUrl(moduleId, label);
+    if (typeof rawUrl !== 'string') {
+      return undefined;
+    }
+    if (!workerUrlCache.has(rawUrl)) {
+      const absoluteUrl = resolveAbsoluteUrl(rawUrl);
+      // Use classic workers; the emitted Monaco workers are bundled as classic scripts.
+      const script =
+        `/* Monaco worker bootstrap (classic) */\n` +
+        `try {\n` +
+        `  // Log target for diagnostics within the worker context\n` +
+        `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(absoluteUrl)});\n` +
+        `  importScripts(${JSON.stringify(absoluteUrl)});\n` +
+        `} catch (e) {\n` +
+        `  // Surface errors to the devtools console in the webview\n` +
+        `  console.error('Failed to import worker script:', ${JSON.stringify(absoluteUrl)}, e);\n` +
+        `  throw e;\n` +
+        `}`;
+      const blob = new Blob([script], { type: 'text/javascript' });
+      workerUrlCache.set(rawUrl, URL.createObjectURL(blob));
+    }
+    return workerUrlCache.get(rawUrl);
+  };
+
+  env.getWorker = (moduleId: string, label: string) => {
+    console.log('Monaco getWorker invoked for label:', label, 'module:', moduleId);
+    const blobUrl = ensureBlobClassicUrl(moduleId, label);
+    if (blobUrl) {
+      const worker = new Worker(blobUrl /* classic by default */);
+      // Extra diagnostics for hard-to-debug worker startup issues
+      worker.addEventListener('error', (e) => {
+        console.error('[MonacoWorker:error]', label, e);
+      });
+      worker.addEventListener('messageerror', (e) => {
+        console.error('[MonacoWorker:messageerror]', label, e);
+      });
+      return worker;
+    }
+
+    const fallback = originalGetWorkerUrl(moduleId, label);
+    if (fallback instanceof Worker) {
+      return fallback;
+    }
+
+    if (typeof fallback === 'string') {
+      const url = resolveAbsoluteUrl(fallback);
+      const worker = new Worker(url);
+      worker.addEventListener('error', (e) => {
+        console.error('[MonacoWorker:error:fallback]', label, e);
+      });
+      worker.addEventListener('messageerror', (e) => {
+        console.error('[MonacoWorker:messageerror:fallback]', label, e);
+      });
+      return worker;
+    }
+
+    throw new Error('Unable to create Monaco worker for label ' + label);
+  };
+
+  env.__vsCodePatched = true;
+};
+
+// Patch immediately if MonacoEnvironment is already set, and retry shortly after in case it initializes later.
+patchMonacoWorkerLoading();
+window.setTimeout(patchMonacoWorkerLoading, 0);
 
 // Resizable Splitter Component
 const ResizableSplitter: React.FC<{
@@ -494,11 +571,15 @@ const App = () => {
 
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
-      const message = event.data;
+      const message = event.data as any;
+      // Filter VS Code internal scheduling pings to avoid noise
+      if (message && typeof message === 'object' && 'vscodeScheduleAsyncWork' in message) {
+        return;
+      }
       console.log('Received message:', message);
 
       // Process different message types from the backend
-      switch (message.type) {
+      switch (message?.type) {
         case 'update':
           setJsonData(message.data);
           setIsLoading(false);
@@ -563,6 +644,17 @@ const App = () => {
             try {
               // Store schema for future use
               setSchema(message.schema);
+
+              // If GraphQL introspection was provided by backend, configure monaco-graphql now
+              if (message.introspection && message.introspection.__schema) {
+                const introspectionJSON = message.introspection;
+                setSchemaConfig({
+                  uri: 'weaviate://graphql',
+                  schema: message.schema,
+                  fileMatch: ['weaviate://graphql/**', '**/*.graphql', '**/*.gql'],
+                  introspectionJSON,
+                });
+              }
 
               // We'll get the query from backend
               if (message.collection && !initialQuerySent) {
@@ -759,7 +851,7 @@ const App = () => {
           break;
 
         default:
-          console.log('Unknown message type:', message.type);
+          console.log('Unknown message type:', message?.type);
           break;
       }
     };

@@ -1,4 +1,7 @@
 import * as monaco from 'monaco-editor';
+// Register GraphQL language features (completion, hover, diagnostics)
+// via monaco-graphql when the language is activated
+import 'monaco-graphql/esm/monaco.contribution.js';
 import { SchemaProvider, GraphQLSchema } from './GraphQLSchemaProvider';
 import { queryTemplates, processTemplate } from './graphqlTemplates';
 import { formatGraphQLQuery } from '../../webview/formatGraphQL';
@@ -18,10 +21,12 @@ export interface TemplateOption {
  */
 export class GraphQLEditor {
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  private model: monaco.editor.ITextModel | null = null;
   private container: HTMLElement;
   private schemaConfig: GraphQLSchema | null = null;
   private disposables: monaco.IDisposable[] = [];
   private currentCollectionName: string = 'Article';
+  private schemaConfigRetryHandle: number | null = null;
 
   // Event listener management
   private changeListeners: Array<(value: string) => void> = [];
@@ -127,9 +132,18 @@ export class GraphQLEditor {
       }
     };
 
-    // Create Monaco editor with enhanced options
+    // Create a GraphQL model with a stable URI so schema fileMatch can target it
+    try {
+      const modelUri = monaco.Uri.parse('weaviate://graphql/operation.graphql');
+      this.model = monaco.editor.createModel('', 'graphql', modelUri);
+    } catch (err) {
+      console.error('Failed to create Monaco model for GraphQL:', err);
+    }
+
+    // Create Monaco editor with enhanced options and attach our model
     this.editor = monaco.editor.create(this.container, {
       value: '',
+      // language is implied by the model; keep options for safety
       language: 'graphql',
       theme: getVSCodeTheme(),
       automaticLayout: true,
@@ -238,6 +252,7 @@ export class GraphQLEditor {
       },
       unfoldOnClickAfterEndOfLine: false,
       useShadowDOM: true,
+      model: this.model ?? undefined,
     });
 
     // Register change event listener
@@ -328,7 +343,44 @@ export class GraphQLEditor {
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
     this.schemaConfig = schemaConfig;
-    console.log('GraphQL language features configured with schema');
+    try {
+      const api = (monaco.languages as any).graphql?.api;
+      if (!api || typeof api.setSchemaConfig !== 'function') {
+        if (this.schemaConfigRetryHandle) {
+          window.clearTimeout(this.schemaConfigRetryHandle);
+        }
+        console.warn('GraphQL language service not ready; retrying schema configuration...');
+        this.schemaConfigRetryHandle = window.setTimeout(() => {
+          this.schemaConfigRetryHandle = null;
+          if (this.schemaConfig) {
+            this.configureGraphQLLanguage(this.schemaConfig);
+          }
+        }, 100);
+        return;
+      }
+
+      if (schemaConfig?.introspectionJSON) {
+        // Associate the schema to the model via fileMatch and uri
+        const uri = schemaConfig.uri || 'weaviate://graphql';
+        const modelUri = this.model?.uri?.toString();
+        const fileMatch = schemaConfig.fileMatch || [modelUri || '*', '**/*.graphql', '**/*.gql'];
+        api.setSchemaConfig([
+          {
+            uri,
+            fileMatch,
+            introspectionJSON: schemaConfig.introspectionJSON,
+          },
+        ]);
+
+        // Friendlier completion behavior
+        if (api.setCompletionSettings) {
+          api.setCompletionSettings({ __experimental__fillLeafsOnComplete: true });
+        }
+      }
+      console.log('GraphQL language features configured with schema');
+    } catch (error) {
+      console.error('Error configuring monaco-graphql:', error);
+    }
   }
 
   /**

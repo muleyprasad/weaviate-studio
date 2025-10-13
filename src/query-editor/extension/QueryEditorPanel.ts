@@ -59,6 +59,82 @@ export class QueryEditorPanel {
   private _connectionManager: any;
   private _errorDetailsStore: Map<string, { text: string; ts: number }> = new Map();
 
+  // Standard GraphQL introspection query
+  private static readonly INTROSPECTION_QUERY = `
+    query IntrospectionQuery {
+      __schema {
+        queryType { name }
+        mutationType { name }
+        subscriptionType { name }
+        types {
+          ...FullType
+        }
+        directives {
+          name
+          description
+          locations
+          args { ...InputValue }
+        }
+      }
+    }
+    fragment FullType on __Type {
+      kind
+      name
+      description
+      fields(includeDeprecated: true) {
+        name
+        description
+        args { ...InputValue }
+        type { ...TypeRef }
+        isDeprecated
+        deprecationReason
+      }
+      inputFields { ...InputValue }
+      interfaces { ...TypeRef }
+      enumValues(includeDeprecated: true) {
+        name
+        description
+        isDeprecated
+        deprecationReason
+      }
+      possibleTypes { ...TypeRef }
+    }
+    fragment InputValue on __InputValue {
+      name
+      description
+      type { ...TypeRef }
+      defaultValue
+    }
+    fragment TypeRef on __Type {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
   // Minimal schema types for webview compatibility
   private async _fetchSchema(): Promise<{
     classes: Array<{
@@ -666,6 +742,22 @@ export class QueryEditorPanel {
         throw new Error('Not connected to Weaviate');
       }
       const schema = await this._fetchSchema();
+      // Try to fetch real GraphQL introspection for schema-aware editor features
+      let introspection: any | null = null;
+      try {
+        const resp = await this._performGraphQLHttp(QueryEditorPanel.INTROSPECTION_QUERY);
+        if (resp && resp.__schema) {
+          introspection = resp;
+        } else if (resp && resp.data && resp.data.__schema) {
+          // In case of nested data shape
+          introspection = resp.data;
+        }
+      } catch (e) {
+        console.warn(
+          'GraphQL introspection failed or unsupported:',
+          e instanceof Error ? e.message : e
+        );
+      }
 
       // Get any saved state for this panel
       const savedState = this._getSavedWebviewState();
@@ -675,6 +767,7 @@ export class QueryEditorPanel {
         schema,
         collection: this._options.collectionName,
         savedState: savedState,
+        introspection,
       });
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
