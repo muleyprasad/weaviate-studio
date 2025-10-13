@@ -646,7 +646,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         const icon = getPropertyIcon(prop.dataType);
 
         return new WeaviateTreeItem(
-          `${prop.name} (${dataType})${description}`,
+          `${prop.name} (${dataType})`,
           vscode.TreeItemCollapsibleState.Collapsed,
           'propertyItem',
           element.connectionId,
