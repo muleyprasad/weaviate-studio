@@ -812,6 +812,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           )
         );
       });
+      if (generativeItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No generative configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
       return generativeItems;
     } else if (
       element.itemType === 'collectionReplication' &&
