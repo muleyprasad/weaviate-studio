@@ -168,7 +168,7 @@ export class GraphQLEditor {
       detectIndentation: true,
       trimAutoWhitespace: true,
       acceptSuggestionOnCommitCharacter: true,
-      acceptSuggestionOnEnter: 'on',
+      acceptSuggestionOnEnter: 'off',
       accessibilitySupport: 'auto',
       autoIndent: 'full',
       contextmenu: true,
@@ -190,10 +190,10 @@ export class GraphQLEditor {
         cycle: true,
       },
       suggestOnTriggerCharacters: true,
-      tabCompletion: 'on',
-      wordBasedSuggestions: 'matchingDocuments',
+      tabCompletion: 'off',
+      wordBasedSuggestions: 'off',
       formatOnPaste: true,
-      formatOnType: true,
+      formatOnType: false,
       autoClosingBrackets: 'always',
       autoClosingQuotes: 'always',
       autoSurround: 'languageDefined',
@@ -239,7 +239,7 @@ export class GraphQLEditor {
         horizontalSliderSize: 12,
       },
       smoothScrolling: true,
-      snippetSuggestions: 'top',
+      snippetSuggestions: 'inline',
       suggest: {
         filterGraceful: true,
         insertMode: 'insert',
@@ -248,12 +248,30 @@ export class GraphQLEditor {
         shareSuggestSelections: true,
         showIcons: true,
         showStatusBar: true,
+        // Show ghost-text preview of the currently selected suggestion
+        preview: true,
+        previewMode: 'subwordSmart',
         snippetsPreventQuickSuggestions: true,
       },
       unfoldOnClickAfterEndOfLine: false,
-      useShadowDOM: true,
+      useShadowDOM: false,
       model: this.model ?? undefined,
     });
+
+    // Ensure Enter always inserts a newline; close suggest if visible
+    // if (this.editor) {
+    //   this.editor.addCommand(
+    //     monaco.KeyCode.Enter,
+    //     () => {
+    //       // Close the suggestion widget if open, then insert a newline
+    //       // Using 'type' preserves Monaco's indentation logic and caret movement
+    //       this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined);
+    //       this.editor?.trigger('keyboard', 'type', { text: '\n' });
+    //     },
+    //     'editorTextFocus && !inSnippetMode'
+    //   );
+    //   // No explicit removal API for commands; cleaned up on editor.dispose()
+    // }
 
     // Register change event listener
     if (this.editor) {
