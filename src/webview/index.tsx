@@ -72,18 +72,16 @@ const patchMonacoWorkerLoading = () => {
       return undefined;
     }
     const absoluteUrl = resolveAbsoluteUrl(rawUrl);
-    const bust = (absoluteUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
-    const urlWithBust = absoluteUrl + bust;
     // Use classic workers; the emitted Monaco workers are bundled as classic scripts.
     const script =
       `/* Monaco worker bootstrap (classic) */\n` +
       `try {\n` +
       `  // Log target for diagnostics within the worker context\n` +
-      `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(urlWithBust)});\n` +
-      `  importScripts(${JSON.stringify(urlWithBust)});\n` +
+      `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(absoluteUrl)});\n` +
+      `  importScripts(${JSON.stringify(absoluteUrl)});\n` +
       `} catch (e) {\n` +
       `  // Surface errors to the devtools console in the webview\n` +
-      `  console.error('Failed to import worker script:', ${JSON.stringify(urlWithBust)}, e);\n` +
+      `  console.error('Failed to import worker script:', ${JSON.stringify(absoluteUrl)}, e);\n` +
       `  throw e;\n` +
       `}`;
     const blob = new Blob([script], { type: 'text/javascript' });
