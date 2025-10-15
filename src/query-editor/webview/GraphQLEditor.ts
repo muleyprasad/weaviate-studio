@@ -168,7 +168,7 @@ export class GraphQLEditor {
       detectIndentation: true,
       trimAutoWhitespace: true,
       acceptSuggestionOnCommitCharacter: true,
-      acceptSuggestionOnEnter: 'off',
+      acceptSuggestionOnEnter: 'smart',
       accessibilitySupport: 'auto',
       autoIndent: 'full',
       contextmenu: true,
@@ -258,20 +258,31 @@ export class GraphQLEditor {
       model: this.model ?? undefined,
     });
 
-    // Ensure Enter always inserts a newline; close suggest if visible
-    // if (this.editor) {
-    //   this.editor.addCommand(
-    //     monaco.KeyCode.Enter,
-    //     () => {
-    //       // Close the suggestion widget if open, then insert a newline
-    //       // Using 'type' preserves Monaco's indentation logic and caret movement
-    //       this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined);
-    //       this.editor?.trigger('keyboard', 'type', { text: '\n' });
-    //     },
-    //     'editorTextFocus && !inSnippetMode'
-    //   );
-    //   // No explicit removal API for commands; cleaned up on editor.dispose()
-    // }
+    // Ensure Enter behaves naturally: accept when suggest is open, otherwise newline
+    if (this.editor) {
+      // Accept selected suggestion on Enter and hide the widget to prevent it from lingering
+      this.editor.addCommand(
+        monaco.KeyCode.Enter,
+        () => {
+          this.editor?.trigger('keyboard', 'acceptSelectedSuggestion', undefined);
+          setTimeout(() => this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined), 0);
+        },
+        'editorTextFocus && suggestWidgetVisible && !inSnippetMode'
+      );
+
+      this.editor.addCommand(
+        monaco.KeyCode.Enter,
+        () => {
+          // Close the suggestion widget if open, then insert a newline
+          // Using 'type' preserves Monaco's indentation logic and caret movement
+          this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined);
+          this.editor?.trigger('keyboard', 'type', { text: '\n' });
+        },
+        'editorTextFocus && !inSnippetMode && !suggestWidgetVisible'
+      );
+      // Let Monaco handle TAB acceptance normally so providers can retrigger
+      // No explicit removal API for commands; cleaned up on editor.dispose()
+    }
 
     // Register change event listener
     if (this.editor) {
@@ -390,9 +401,9 @@ export class GraphQLEditor {
           },
         ]);
 
-        // Friendlier completion behavior
+        // Avoid multi-line placeholder selection and sticky suggest by not auto-filling leaf fields
         if (api.setCompletionSettings) {
-          api.setCompletionSettings({ __experimental__fillLeafsOnComplete: true });
+          api.setCompletionSettings({ __experimental__fillLeafsOnComplete: false });
         }
       }
       console.log('GraphQL language features configured with schema');

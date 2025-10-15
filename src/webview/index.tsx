@@ -56,8 +56,6 @@ const patchMonacoWorkerLoading = () => {
     return;
   }
 
-  const workerUrlCache = new Map<string, string>();
-
   const resolveAbsoluteUrl = (url: string): string => {
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
       return url;
@@ -73,24 +71,23 @@ const patchMonacoWorkerLoading = () => {
     if (typeof rawUrl !== 'string') {
       return undefined;
     }
-    if (!workerUrlCache.has(rawUrl)) {
-      const absoluteUrl = resolveAbsoluteUrl(rawUrl);
-      // Use classic workers; the emitted Monaco workers are bundled as classic scripts.
-      const script =
-        `/* Monaco worker bootstrap (classic) */\n` +
-        `try {\n` +
-        `  // Log target for diagnostics within the worker context\n` +
-        `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(absoluteUrl)});\n` +
-        `  importScripts(${JSON.stringify(absoluteUrl)});\n` +
-        `} catch (e) {\n` +
-        `  // Surface errors to the devtools console in the webview\n` +
-        `  console.error('Failed to import worker script:', ${JSON.stringify(absoluteUrl)}, e);\n` +
-        `  throw e;\n` +
-        `}`;
-      const blob = new Blob([script], { type: 'text/javascript' });
-      workerUrlCache.set(rawUrl, URL.createObjectURL(blob));
-    }
-    return workerUrlCache.get(rawUrl);
+    const absoluteUrl = resolveAbsoluteUrl(rawUrl);
+    const bust = (absoluteUrl.includes('?') ? '&' : '?') + 'v=' + Date.now();
+    const urlWithBust = absoluteUrl + bust;
+    // Use classic workers; the emitted Monaco workers are bundled as classic scripts.
+    const script =
+      `/* Monaco worker bootstrap (classic) */\n` +
+      `try {\n` +
+      `  // Log target for diagnostics within the worker context\n` +
+      `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(urlWithBust)});\n` +
+      `  importScripts(${JSON.stringify(urlWithBust)});\n` +
+      `} catch (e) {\n` +
+      `  // Surface errors to the devtools console in the webview\n` +
+      `  console.error('Failed to import worker script:', ${JSON.stringify(urlWithBust)}, e);\n` +
+      `  throw e;\n` +
+      `}`;
+    const blob = new Blob([script], { type: 'text/javascript' });
+    return URL.createObjectURL(blob);
   };
 
   env.getWorker = (moduleId: string, label: string) => {
