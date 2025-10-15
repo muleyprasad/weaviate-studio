@@ -298,6 +298,54 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           element.iconPath = new vscode.ThemeIcon('symbol-property');
         }
       }
+      // Use the property's description as the tooltip when available
+      if (!element.tooltip && element.description) {
+        // Tooltip accepts string | MarkdownString | undefined. Normalize description which
+        // may be boolean `true` to a string fallback (use label or empty string).
+        const desc =
+          typeof element.description === 'string'
+            ? element.description
+            : typeof element.label === 'string'
+              ? element.label
+              : '';
+        element.tooltip = desc;
+      }
+    } else if (element.itemType === 'propertyItem') {
+      // propertyItem is used for individual properties in the list. Mirror the same
+      // treatment as 'property' so the description is available as tooltip and icons
+      // are set based on the label when missing.
+      if (!element.contextValue) {
+        element.contextValue = 'weaviateProperty';
+      }
+
+      if (!element.iconPath) {
+        const label = element.label as string;
+        if (label.includes('(text)') || label.includes('(string)')) {
+          element.iconPath = new vscode.ThemeIcon('symbol-text');
+        } else if (
+          label.includes('(number)') ||
+          label.includes('(int)') ||
+          label.includes('(float)')
+        ) {
+          element.iconPath = new vscode.ThemeIcon('symbol-number');
+        } else if (label.includes('(boolean)') || label.includes('(bool)')) {
+          element.iconPath = new vscode.ThemeIcon('symbol-boolean');
+        } else if (label.includes('(date)') || label.includes('(datetime)')) {
+          element.iconPath = new vscode.ThemeIcon('calendar');
+        } else {
+          element.iconPath = new vscode.ThemeIcon('symbol-property');
+        }
+      }
+
+      if (!element.tooltip && element.description) {
+        const desc =
+          typeof element.description === 'string'
+            ? element.description
+            : typeof element.label === 'string'
+              ? element.label
+              : '';
+        element.tooltip = desc;
+      }
     } else if (element.itemType === 'connectionLink') {
       // Make connection links clickable
       if (element.description) {
@@ -530,6 +578,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           new vscode.ThemeIcon('lightbulb-autofix')
         ),
         new WeaviateTreeItem(
+          `Reranker Configuration`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'rerankerConfig',
+          element.connectionId,
+          element.label,
+          'reranker',
+          new vscode.ThemeIcon('filter')
+        ),
+        new WeaviateTreeItem(
           'Replication',
           vscode.TreeItemCollapsibleState.Collapsed,
           'collectionReplication',
@@ -633,11 +690,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       const propertyItems = schema.properties.map((prop: any) => {
         const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
-        const description = prop.description ? ` - ${prop.description}` : '';
+        const description = prop.description ?? undefined;
         const icon = getPropertyIcon(prop.dataType);
 
         return new WeaviateTreeItem(
-          `${prop.name} (${dataType})${description}`,
+          `${prop.name} (${dataType})`,
           vscode.TreeItemCollapsibleState.Collapsed,
           'propertyItem',
           element.connectionId,
@@ -812,7 +869,53 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           )
         );
       });
+      if (generativeItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No generative configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
       return generativeItems;
+    } else if (
+      element.itemType === 'rerankerConfig' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Reranker configuration section (mirror of generative)
+      const collection = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      );
+      let rerankerItems: WeaviateTreeItem[] = [];
+      const data = await this.flattenObject(collection?.schema?.reranker || {}, [], '', false);
+      Object.entries(data).forEach(([key, value]) => {
+        rerankerItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('filter'),
+            'rerankerConfig'
+          )
+        );
+      });
+      if (rerankerItems.length === 0) {
+        return [
+          new WeaviateTreeItem(
+            'No reranker configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      return rerankerItems;
     } else if (
       element.itemType === 'collectionReplication' &&
       element.connectionId &&
