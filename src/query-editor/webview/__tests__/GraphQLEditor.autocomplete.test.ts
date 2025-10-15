@@ -23,6 +23,8 @@ const editorCreateMock = jest.fn(() => ({
   getPosition: jest.fn(),
   setSelection: jest.fn(),
   setPosition: jest.fn(),
+  addCommand: jest.fn(),
+  trigger: jest.fn(),
 }));
 
 jest.mock('monaco-editor', () => ({
@@ -42,6 +44,7 @@ jest.mock('monaco-editor', () => ({
   Uri: {
     parse: (s: string) => ({ toString: () => s }),
   },
+  KeyCode: { Enter: 3 },
   MarkerSeverity: { Warning: 1, Error: 8 },
   Range: class Range {},
 }));
@@ -88,7 +91,7 @@ describe('GraphQLEditor monaco-graphql integration', () => {
     expect(configArg.introspectionJSON).toEqual({ __schema: { types: [] } });
 
     expect(setCompletionSettingsMock).toHaveBeenCalledWith({
-      __experimental__fillLeafsOnComplete: true,
+      __experimental__fillLeafsOnComplete: false,
     });
   });
 });
