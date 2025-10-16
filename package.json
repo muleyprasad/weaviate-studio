@@ -79,7 +79,8 @@
       },
       {
         "command": "weaviate.queryCollection",
-        "title": "Open Query Editor"
+        "title": "Open Query Editor",
+        "icon": "$(table)"
       },
       {
         "command": "weaviate.deleteCollection",
@@ -257,6 +258,12 @@
           "command": "weaviate.queryCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "1_actions@3"
+        },
+        {
+          "command": "weaviate.queryCollection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "inline@1",
+          "icon": "$(edit)"
         },
         {
           "command": "weaviate.addCollection",
