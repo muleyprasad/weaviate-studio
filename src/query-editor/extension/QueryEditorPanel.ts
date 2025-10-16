@@ -532,6 +532,25 @@ export class QueryEditorPanel {
           }
           break;
 
+        case 'showHelpInfo': {
+          const text = [
+            'Weaviate Query Editor — Tips',
+            '',
+            'Shortcuts:',
+            '• Run: Ctrl/Cmd+Enter',
+            '• Stop: Esc',
+            '• Clear: Ctrl/Cmd+K',
+            '',
+            'Features:',
+            '• Templates: quickly insert common queries',
+            '• Schema-aware autocomplete when available',
+            '• Field/type suggestions and validation',
+            '• Sample query generation based on your collection',
+          ].join('\n');
+          vscode.window.showInformationMessage(text, { modal: true }, 'OK');
+          break;
+        }
+
         case 'requestErrorDetails': {
           const id = message.errorId as string | undefined;
           if (!id) {

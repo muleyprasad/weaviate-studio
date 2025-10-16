@@ -1265,8 +1265,8 @@ const App = () => {
                     disabled={isStopping}
                     title={isStopping ? 'Stopping…' : 'Stop the running query (Esc)'}
                     style={{
-                      backgroundColor: 'var(--vscode-inputValidation-errorBackground, #5a1d1d)',
-                      color: 'var(--vscode-button-foreground, white)',
+                      backgroundColor: 'var(--vscode-statusBarItem-errorBackground, #c72e0f)',
+                      color: 'var(--vscode-button-foreground, #ffffff)',
                       border: 'none',
                       borderRadius: '3px',
                       padding: '4px 10px',
@@ -1279,6 +1279,14 @@ const App = () => {
                       alignItems: 'center',
                       gap: '4px',
                       transition: 'background-color 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--vscode-statusBarItem-errorBackground, #a1260d)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--vscode-statusBarItem-errorBackground, #c72e0f)';
                     }}
                   >
                     ■ {isStopping ? 'Stopping…' : 'Stop'}
@@ -1358,7 +1366,17 @@ const App = () => {
 
                 {/* Shortcuts legend (tooltip only) */}
                 <span
-                  title={'Shortcuts:\n• Run: Ctrl/Cmd+Enter\n• Stop: Esc\n• Clear: Ctrl/Cmd+K'}
+                  title={
+                    'Shortcuts:\n' +
+                    '• Run: Ctrl/Cmd+Enter\n' +
+                    '• Stop: Esc\n' +
+                    '• Clear: Ctrl/Cmd+K\n\n' +
+                    'Features:\n' +
+                    '• Templates menu: quickly insert common queries\n' +
+                    '• Schema-aware autocomplete (monaco-graphql) when schema is available\n' +
+                    '• Field/type suggestions, validation, and inline errors\n' +
+                    '• Sample query generation based on your collection'
+                  }
                   style={{
                     color: 'var(--vscode-descriptionForeground, #999)',
                     fontSize: '14px',
@@ -1366,7 +1384,7 @@ const App = () => {
                     userSelect: 'none',
                     cursor: 'default',
                   }}
-                  aria-label="Keyboard shortcuts"
+                  aria-label="Keyboard shortcuts and features"
                 >
                   ⓘ
                 </span>
