@@ -216,6 +216,17 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
 
+    // Query Editor: Run/Stop/Clear from Command Palette
+    vscode.commands.registerCommand('weaviate.queryEditor.run', () => {
+      QueryEditorPanel.sendCommandToActive('cmdRun');
+    }),
+    vscode.commands.registerCommand('weaviate.queryEditor.stop', () => {
+      QueryEditorPanel.sendCommandToActive('cmdStop');
+    }),
+    vscode.commands.registerCommand('weaviate.queryEditor.clear', () => {
+      QueryEditorPanel.sendCommandToActive('cmdClear');
+    }),
+
     // Open link command
     vscode.commands.registerCommand('weaviate-studio.openLink', (url: string) => {
       vscode.env.openExternal(vscode.Uri.parse(url));
