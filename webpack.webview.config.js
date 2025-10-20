@@ -104,7 +104,17 @@ module.exports = {
       filename: '[name].[contenthash].css',
     })] : []),
     new MonacoWebpackPlugin({
-      languages: ['graphql', 'json'], // Only include needed languages
+      languages: ['json'], // Rely on custom monaco-graphql language bundle
+      customLanguages: [
+        {
+          label: 'graphql',
+          entry: 'monaco-graphql/esm/monaco.contribution.js',
+          worker: {
+            id: 'graphql',
+            entry: 'monaco-graphql/esm/graphql.worker.js',
+          },
+        },
+      ],
       features: [
         // Essential features only to reduce bundle size
         'bracketMatching',

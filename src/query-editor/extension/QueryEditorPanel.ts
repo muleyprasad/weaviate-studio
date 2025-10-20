@@ -49,6 +49,7 @@ export class QueryEditorPanel {
   public static readonly viewType = 'weaviate.queryEditor';
   // Map to store all open panels by collection name
   private static readonly panels = new Map<string, QueryEditorPanel>();
+  private static activePanel: QueryEditorPanel | null = null;
   private static _outputChannel: vscode.OutputChannel | null = null;
   private _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -58,6 +59,84 @@ export class QueryEditorPanel {
   private _context!: vscode.ExtensionContext;
   private _connectionManager: any;
   private _errorDetailsStore: Map<string, { text: string; ts: number }> = new Map();
+  private _abortController: AbortController | null = null;
+  private _inflightRequest: http.ClientRequest | null = null;
+
+  // Standard GraphQL introspection query
+  private static readonly INTROSPECTION_QUERY = `
+    query IntrospectionQuery {
+      __schema {
+        queryType { name }
+        mutationType { name }
+        subscriptionType { name }
+        types {
+          ...FullType
+        }
+        directives {
+          name
+          description
+          locations
+          args { ...InputValue }
+        }
+      }
+    }
+    fragment FullType on __Type {
+      kind
+      name
+      description
+      fields(includeDeprecated: true) {
+        name
+        description
+        args { ...InputValue }
+        type { ...TypeRef }
+        isDeprecated
+        deprecationReason
+      }
+      inputFields { ...InputValue }
+      interfaces { ...TypeRef }
+      enumValues(includeDeprecated: true) {
+        name
+        description
+        isDeprecated
+        deprecationReason
+      }
+      possibleTypes { ...TypeRef }
+    }
+    fragment InputValue on __InputValue {
+      name
+      description
+      type { ...TypeRef }
+      defaultValue
+    }
+    fragment TypeRef on __Type {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
 
   // Minimal schema types for webview compatibility
   private async _fetchSchema(): Promise<{
@@ -121,7 +200,7 @@ export class QueryEditorPanel {
     return `${protocol}://${host}:${port}/v1/graphql`;
   }
 
-  private async _performGraphQLHttp(query: string): Promise<any> {
+  private async _performGraphQLHttp(query: string, signal?: AbortSignal): Promise<any> {
     const urlStr = this._buildGraphQLEndpoint();
     const conn = this._getActiveConnection();
 
@@ -148,7 +227,7 @@ export class QueryEditorPanel {
     const body = JSON.stringify({ query });
 
     const responseBody: string = await new Promise((resolve, reject) => {
-      const req = (isHttps ? https : http).request(options, (res) => {
+      const req = (isHttps ? https : http).request({ ...options, signal: signal as any }, (res) => {
         const chunks: Buffer[] = [];
         res.on('data', (chunk: Buffer) => chunks.push(chunk));
         res.on('end', () => {
@@ -167,10 +246,25 @@ export class QueryEditorPanel {
           }
         });
       });
+      this._inflightRequest = req;
+      // If Node's request does not support signal, fallback to destroying on abort
+      if (signal) {
+        const onAbort = () => {
+          try {
+            req.destroy(new Error('aborted'));
+          } catch {}
+        };
+        if ((signal as any).aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
       req.on('error', reject);
       req.write(body);
       req.end();
     });
+    this._inflightRequest = null;
 
     let json: any;
     try {
@@ -273,7 +367,21 @@ export class QueryEditorPanel {
 
     // Create new editor instance and store in our map
     const newEditor = new QueryEditorPanel(panel, context, { ...options, tabId });
+    QueryEditorPanel.activePanel = newEditor;
     QueryEditorPanel.panels.set(panelKey, newEditor);
+  }
+
+  public static sendCommandToActive(type: 'cmdRun' | 'cmdStop' | 'cmdClear'): boolean {
+    const active = QueryEditorPanel.activePanel;
+    if (!active) {
+      return false;
+    }
+    try {
+      active._panel.webview.postMessage({ type });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private constructor(
@@ -303,33 +411,20 @@ export class QueryEditorPanel {
     }
 
     // Handle webview state changes to preserve content when switching tabs
-    try {
-      if (typeof (this._panel as any).onDidChangeViewState === 'function') {
-        (this._panel as any).onDidChangeViewState(
-          (e: any) => {
-            if (this._panel.visible) {
-              // Webview became visible, restore state if needed
-              this._restoreWebviewState();
-            }
-          },
-          null,
-          this._disposables
-        );
-      } else if (
-        (this._panel as any).onDidChangeViewState &&
-        typeof (this._panel as any).onDidChangeViewState.event === 'function'
-      ) {
-        (this._panel as any).onDidChangeViewState.event((e: any) => {
-          if (this._panel.visible) {
-            this._restoreWebviewState();
-          }
-        });
-      }
-    } catch (e) {
-      console.warn('onDidChangeViewState not available on webview panel mock', e);
-    }
+    this._panel.onDidChangeViewState(
+      (e) => {
+        if (this._panel.visible) {
+          // Webview became visible, restore state if needed
+          this._restoreWebviewState();
+          QueryEditorPanel.activePanel = this;
+        }
+      },
+      null,
+      this._disposables
+    );
 
     this._initializeWebview();
+    QueryEditorPanel.activePanel = this;
   }
 
   private async _initializeWebview() {
@@ -340,6 +435,15 @@ export class QueryEditorPanel {
   private _setupMessageHandlers() {
     this._panel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
+        case 'cmdRun':
+          this._panel.webview.postMessage({ type: 'runQueryShortcut' });
+          return;
+        case 'cmdStop':
+          this._panel.webview.postMessage({ type: 'stopQueryShortcut' });
+          return;
+        case 'cmdClear':
+          this._panel.webview.postMessage({ type: 'clearQueryShortcut' });
+          return;
         case 'ready':
           if (this._options.collectionName) {
             await this._sendInitialData();
@@ -360,7 +464,22 @@ export class QueryEditorPanel {
             limit: message.limit || 10,
             certainty: message.certainty || 0.7,
           };
-          this._executeQuery(query, queryOptions);
+          // Abort any previous request
+          try {
+            this._abortController?.abort();
+          } catch {}
+          this._abortController = new AbortController();
+          this._executeQuery(query, queryOptions, this._abortController.signal);
+          break;
+
+        case 'cancelQuery':
+          try {
+            this._abortController?.abort();
+            this._inflightRequest?.destroy(new Error('aborted'));
+          } catch {}
+          this._abortController = null;
+          this._inflightRequest = null;
+          this._panel.webview.postMessage({ type: 'queryCancelled' });
           break;
 
         case 'explainPlan':
@@ -412,6 +531,25 @@ export class QueryEditorPanel {
             console.warn('Failed to copy to clipboard:', e);
           }
           break;
+
+        case 'showHelpInfo': {
+          const text = [
+            'Weaviate Query Editor — Tips',
+            '',
+            'Shortcuts:',
+            '• Run: Ctrl/Cmd+Enter',
+            '• Stop: Esc',
+            '• Clear: Ctrl/Cmd+K',
+            '',
+            'Features:',
+            '• Templates: quickly insert common queries',
+            '• Schema-aware autocomplete when available',
+            '• Field/type suggestions and validation',
+            '• Sample query generation based on your collection',
+          ].join('\n');
+          vscode.window.showInformationMessage(text, { modal: true }, 'OK');
+          break;
+        }
 
         case 'requestErrorDetails': {
           const id = message.errorId as string | undefined;
@@ -498,7 +636,11 @@ export class QueryEditorPanel {
     }
   }
 
-  private async _executeQuery(query: string, options: QueryRunOptions): Promise<void> {
+  private async _executeQuery(
+    query: string,
+    options: QueryRunOptions,
+    signal?: AbortSignal
+  ): Promise<void> {
     // Early validation
     if (!this._weaviateClient) {
       const errorMsg = 'Not connected to Weaviate';
@@ -514,16 +656,22 @@ export class QueryEditorPanel {
     }
 
     try {
-      const result = await this._performGraphQLQuery(query);
+      const result = await this._performGraphQLQuery(query, signal);
       this._sendResultToWebview(result);
     } catch (error) {
       const errAny: any = error;
-      const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
-      this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
+      const msg = errAny?.message || '';
+      const isAbort = errAny?.name === 'AbortError' || /aborted|abort/i.test(msg);
+      if (isAbort) {
+        this._panel.webview.postMessage({ type: 'queryCancelled' });
+      } else {
+        const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
+        this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
+      }
     }
   }
 
-  private async _performGraphQLQuery(query: string): Promise<any> {
+  private async _performGraphQLQuery(query: string, signal?: AbortSignal): Promise<any> {
     const client = this._weaviateClient as any;
 
     // Try client-provided GraphQL interfaces first (for older clients)
@@ -556,7 +704,7 @@ export class QueryEditorPanel {
 
     // Fallback to direct HTTP
     try {
-      const result = await this._performGraphQLHttp(query);
+      const result = await this._performGraphQLHttp(query, signal);
       if (this._isEmptyResult(result)) {
         throw new Error('Query returned empty or invalid result');
       }
@@ -696,15 +844,47 @@ export class QueryEditorPanel {
         throw new Error('Not connected to Weaviate');
       }
       const schema = await this._fetchSchema();
+      // Try to fetch real GraphQL introspection for schema-aware editor features
+      let introspection: any | null = null;
+      try {
+        const resp = await this._performGraphQLHttp(QueryEditorPanel.INTROSPECTION_QUERY);
+        if (resp && resp.__schema) {
+          introspection = resp;
+        } else if (resp && resp.data && resp.data.__schema) {
+          // In case of nested data shape
+          introspection = resp.data;
+        }
+      } catch (e) {
+        console.warn(
+          'GraphQL introspection failed or unsupported:',
+          e instanceof Error ? e.message : e
+        );
+      }
 
       // Get any saved state for this panel
       const savedState = this._getSavedWebviewState();
+
+      // Build connection info for display in the webview header
+      const activeConn = this._getActiveConnection();
+      let connectionInfo: any = undefined;
+      try {
+        if (activeConn) {
+          connectionInfo = {
+            id: activeConn.id,
+            name: activeConn.name,
+            type: activeConn.type,
+            endpoint: this._buildGraphQLEndpoint(),
+          };
+        }
+      } catch {}
 
       this._panel.webview.postMessage({
         type: 'initialData',
         schema,
         collection: this._options.collectionName,
         savedState: savedState,
+        introspection,
+        connection: connectionInfo,
       });
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to fetch schema: ${error.message}`);
@@ -919,6 +1099,9 @@ export class QueryEditorPanel {
     }
 
     this._panel.dispose();
+    if (QueryEditorPanel.activePanel === this) {
+      QueryEditorPanel.activePanel = null;
+    }
 
     while (this._disposables.length) {
       const disposable = this._disposables.pop();

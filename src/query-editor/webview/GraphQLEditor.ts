@@ -1,4 +1,7 @@
 import * as monaco from 'monaco-editor';
+// Register GraphQL language features (completion, hover, diagnostics)
+// via monaco-graphql when the language is activated
+import 'monaco-graphql/esm/monaco.contribution.js';
 import { SchemaProvider, GraphQLSchema } from './GraphQLSchemaProvider';
 import { queryTemplates, processTemplate } from './graphqlTemplates';
 import { formatGraphQLQuery } from '../../webview/formatGraphQL';
@@ -18,10 +21,12 @@ export interface TemplateOption {
  */
 export class GraphQLEditor {
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  private model: monaco.editor.ITextModel | null = null;
   private container: HTMLElement;
   private schemaConfig: GraphQLSchema | null = null;
   private disposables: monaco.IDisposable[] = [];
   private currentCollectionName: string = 'Article';
+  private schemaConfigRetryHandle: number | null = null;
 
   // Event listener management
   private changeListeners: Array<(value: string) => void> = [];
@@ -127,9 +132,18 @@ export class GraphQLEditor {
       }
     };
 
-    // Create Monaco editor with enhanced options
+    // Create a GraphQL model with a stable URI so schema fileMatch can target it
+    try {
+      const modelUri = monaco.Uri.parse('weaviate://graphql/operation.graphql');
+      this.model = monaco.editor.createModel('', 'graphql', modelUri);
+    } catch (err) {
+      console.error('Failed to create Monaco model for GraphQL:', err);
+    }
+
+    // Create Monaco editor with enhanced options and attach our model
     this.editor = monaco.editor.create(this.container, {
       value: '',
+      // language is implied by the model; keep options for safety
       language: 'graphql',
       theme: getVSCodeTheme(),
       automaticLayout: true,
@@ -154,7 +168,7 @@ export class GraphQLEditor {
       detectIndentation: true,
       trimAutoWhitespace: true,
       acceptSuggestionOnCommitCharacter: true,
-      acceptSuggestionOnEnter: 'on',
+      acceptSuggestionOnEnter: 'smart',
       accessibilitySupport: 'auto',
       autoIndent: 'full',
       contextmenu: true,
@@ -170,16 +184,16 @@ export class GraphQLEditor {
         comments: true,
         strings: true,
       },
-      quickSuggestionsDelay: 100,
+      quickSuggestionsDelay: 50,
       parameterHints: {
         enabled: true,
         cycle: true,
       },
       suggestOnTriggerCharacters: true,
-      tabCompletion: 'on',
-      wordBasedSuggestions: 'matchingDocuments',
+      tabCompletion: 'off',
+      wordBasedSuggestions: 'off',
       formatOnPaste: true,
-      formatOnType: true,
+      formatOnType: false,
       autoClosingBrackets: 'always',
       autoClosingQuotes: 'always',
       autoSurround: 'languageDefined',
@@ -225,7 +239,7 @@ export class GraphQLEditor {
         horizontalSliderSize: 12,
       },
       smoothScrolling: true,
-      snippetSuggestions: 'top',
+      snippetSuggestions: 'inline',
       suggest: {
         filterGraceful: true,
         insertMode: 'insert',
@@ -234,11 +248,41 @@ export class GraphQLEditor {
         shareSuggestSelections: true,
         showIcons: true,
         showStatusBar: true,
+        // Show ghost-text preview of the currently selected suggestion
+        preview: true,
+        previewMode: 'subwordSmart',
         snippetsPreventQuickSuggestions: true,
       },
       unfoldOnClickAfterEndOfLine: false,
-      useShadowDOM: true,
+      useShadowDOM: false,
+      model: this.model ?? undefined,
     });
+
+    // Ensure Enter behaves naturally: accept when suggest is open, otherwise newline
+    if (this.editor) {
+      // Accept selected suggestion on Enter and hide the widget to prevent it from lingering
+      this.editor.addCommand(
+        monaco.KeyCode.Enter,
+        () => {
+          this.editor?.trigger('keyboard', 'acceptSelectedSuggestion', undefined);
+          setTimeout(() => this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined), 0);
+        },
+        'editorTextFocus && suggestWidgetVisible && !inSnippetMode'
+      );
+
+      this.editor.addCommand(
+        monaco.KeyCode.Enter,
+        () => {
+          // Close the suggestion widget if open, then insert a newline
+          // Using 'type' preserves Monaco's indentation logic and caret movement
+          this.editor?.trigger('keyboard', 'hideSuggestWidget', undefined);
+          this.editor?.trigger('keyboard', 'type', { text: '\n' });
+        },
+        'editorTextFocus && !inSnippetMode && !suggestWidgetVisible'
+      );
+      // Let Monaco handle TAB acceptance normally so providers can retrigger
+      // No explicit removal API for commands; cleaned up on editor.dispose()
+    }
 
     // Register change event listener
     if (this.editor) {
@@ -328,7 +372,44 @@ export class GraphQLEditor {
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
     this.schemaConfig = schemaConfig;
-    console.log('GraphQL language features configured with schema');
+    try {
+      const api = (monaco.languages as any).graphql?.api;
+      if (!api || typeof api.setSchemaConfig !== 'function') {
+        if (this.schemaConfigRetryHandle) {
+          window.clearTimeout(this.schemaConfigRetryHandle);
+        }
+        console.warn('GraphQL language service not ready; retrying schema configuration...');
+        this.schemaConfigRetryHandle = window.setTimeout(() => {
+          this.schemaConfigRetryHandle = null;
+          if (this.schemaConfig) {
+            this.configureGraphQLLanguage(this.schemaConfig);
+          }
+        }, 100);
+        return;
+      }
+
+      if (schemaConfig?.introspectionJSON) {
+        // Associate the schema to the model via fileMatch and uri
+        const uri = schemaConfig.uri || 'weaviate://graphql';
+        const modelUri = this.model?.uri?.toString();
+        const fileMatch = schemaConfig.fileMatch || [modelUri || '*', '**/*.graphql', '**/*.gql'];
+        api.setSchemaConfig([
+          {
+            uri,
+            fileMatch,
+            introspectionJSON: schemaConfig.introspectionJSON,
+          },
+        ]);
+
+        // Avoid multi-line placeholder selection and sticky suggest by not auto-filling leaf fields
+        if (api.setCompletionSettings) {
+          api.setCompletionSettings({ __experimental__fillLeafsOnComplete: false });
+        }
+      }
+      console.log('GraphQL language features configured with schema');
+    } catch (error) {
+      console.error('Error configuring monaco-graphql:', error);
+    }
   }
 
   /**

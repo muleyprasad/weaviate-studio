@@ -41,22 +41,94 @@ try {
   console.error('Failed to acquire VS Code API', error);
 }
 
-// Configure Monaco environment for web workers
-try {
-  // Only set up the Monaco environment if it hasn't been configured yet
-  if (!window.MonacoEnvironment) {
-    window.MonacoEnvironment = {
-      getWorkerUrl: function (moduleId, label) {
-        if (label === 'graphql') {
-          return './graphql.worker.js';
-        }
-        return './editor.worker.js';
-      },
-    };
+// VS Code webviews run on the vscode-webview:// origin which can’t load file+
+// worker URLs directly. Patch Monaco so it creates classic workers from blob
+// URLs that proxy to the emitted worker code via importScripts.
+const patchMonacoWorkerLoading = () => {
+  const env: any = (window as any).MonacoEnvironment;
+  if (!env || env.__vsCodePatched) {
+    return;
   }
-} catch (error) {
-  console.error('Failed to configure Monaco environment:', error);
-}
+
+  const originalGetWorkerUrl =
+    typeof env.getWorkerUrl === 'function' ? env.getWorkerUrl.bind(env) : null;
+  if (!originalGetWorkerUrl) {
+    return;
+  }
+
+  const resolveAbsoluteUrl = (url: string): string => {
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+    // Prefer document.baseURI so resolution respects the <base href> injected for VS Code webview
+    const base =
+      (typeof document !== 'undefined' && (document.baseURI || '')) || window.location.href;
+    return new URL(url, base).toString();
+  };
+
+  const ensureBlobClassicUrl = (moduleId: string, label: string): string | undefined => {
+    const rawUrl = originalGetWorkerUrl(moduleId, label);
+    if (typeof rawUrl !== 'string') {
+      return undefined;
+    }
+    const absoluteUrl = resolveAbsoluteUrl(rawUrl);
+    // Use classic workers; the emitted Monaco workers are bundled as classic scripts.
+    const script =
+      `/* Monaco worker bootstrap (classic) */\n` +
+      `try {\n` +
+      `  // Log target for diagnostics within the worker context\n` +
+      `  console.log('[MonacoWorker:bootstrap] importScripts ->', ${JSON.stringify(absoluteUrl)});\n` +
+      `  importScripts(${JSON.stringify(absoluteUrl)});\n` +
+      `} catch (e) {\n` +
+      `  // Surface errors to the devtools console in the webview\n` +
+      `  console.error('Failed to import worker script:', ${JSON.stringify(absoluteUrl)}, e);\n` +
+      `  throw e;\n` +
+      `}`;
+    const blob = new Blob([script], { type: 'text/javascript' });
+    return URL.createObjectURL(blob);
+  };
+
+  env.getWorker = (moduleId: string, label: string) => {
+    console.log('Monaco getWorker invoked for label:', label, 'module:', moduleId);
+    const blobUrl = ensureBlobClassicUrl(moduleId, label);
+    if (blobUrl) {
+      const worker = new Worker(blobUrl /* classic by default */);
+      // Extra diagnostics for hard-to-debug worker startup issues
+      worker.addEventListener('error', (e) => {
+        console.error('[MonacoWorker:error]', label, e);
+      });
+      worker.addEventListener('messageerror', (e) => {
+        console.error('[MonacoWorker:messageerror]', label, e);
+      });
+      return worker;
+    }
+
+    const fallback = originalGetWorkerUrl(moduleId, label);
+    if (fallback instanceof Worker) {
+      return fallback;
+    }
+
+    if (typeof fallback === 'string') {
+      const url = resolveAbsoluteUrl(fallback);
+      const worker = new Worker(url);
+      worker.addEventListener('error', (e) => {
+        console.error('[MonacoWorker:error:fallback]', label, e);
+      });
+      worker.addEventListener('messageerror', (e) => {
+        console.error('[MonacoWorker:messageerror:fallback]', label, e);
+      });
+      return worker;
+    }
+
+    throw new Error('Unable to create Monaco worker for label ' + label);
+  };
+
+  env.__vsCodePatched = true;
+};
+
+// Patch immediately if MonacoEnvironment is already set, and retry shortly after in case it initializes later.
+patchMonacoWorkerLoading();
+window.setTimeout(patchMonacoWorkerLoading, 0);
 
 // Resizable Splitter Component
 const ResizableSplitter: React.FC<{
@@ -332,6 +404,11 @@ const App = () => {
   const [initialQuerySent, setInitialQuerySent] = useState<boolean>(false);
   const [schema, setSchema] = useState<any>(null);
   const [schemaConfig, setSchemaConfig] = useState<any>(null);
+  const [schemaReady, setSchemaReady] = useState<boolean>(false);
+  const [isStopping, setIsStopping] = useState<boolean>(false);
+  const [connectionInfo, setConnectionInfo] = useState<{ name?: string; endpoint?: string } | null>(
+    null
+  );
   const [viewType, setViewType] = useState<'json' | 'table'>('table');
   const [splitRatio, setSplitRatio] = useState<number>(50);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState<boolean>(false);
@@ -340,6 +417,41 @@ const App = () => {
   const [errorId, setErrorId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const errorBufferRef = useRef<string>('');
+
+  // Keyboard shortcuts within the webview
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const hasMod = e.metaKey || e.ctrlKey;
+      // Run: Cmd/Ctrl + Enter
+      if (hasMod && e.key === 'Enter') {
+        e.preventDefault();
+        if (!isLoading) {
+          handleRunQuery();
+        }
+        return;
+      }
+      // Clear: Cmd/Ctrl + K
+      if (hasMod && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (!isLoading && !isStopping) {
+          setQueryText('');
+          setJsonData(null);
+          setError(null);
+        }
+        return;
+      }
+      // Stop: Escape
+      if (e.key === 'Escape') {
+        if (isLoading && !isStopping) {
+          e.preventDefault();
+          handleCancelQuery();
+        }
+      }
+    };
+    // Capture phase to ensure we see it even if Monaco handles it
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isLoading, isStopping, queryText]);
 
   // Save current state to backend for persistence across tab switches
   const saveCurrentState = () => {
@@ -393,7 +505,9 @@ const App = () => {
     }
 
     setIsLoading(true);
+    setIsStopping(false);
     setError(null);
+    setJsonData(null); // clear previous results
 
     if (vscode) {
       vscode.postMessage({
@@ -401,6 +515,13 @@ const App = () => {
         query: queryText,
         collection: collection,
       });
+    }
+  };
+
+  const handleCancelQuery = () => {
+    if (vscode) {
+      setIsStopping(true);
+      vscode.postMessage({ type: 'cancelQuery' });
     }
   };
 
@@ -494,11 +615,15 @@ const App = () => {
 
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
-      const message = event.data;
+      const message = event.data as any;
+      // Filter VS Code internal scheduling pings to avoid noise
+      if (message && typeof message === 'object' && 'vscodeScheduleAsyncWork' in message) {
+        return;
+      }
       console.log('Received message:', message);
 
       // Process different message types from the backend
-      switch (message.type) {
+      switch (message?.type) {
         case 'update':
           setJsonData(message.data);
           setIsLoading(false);
@@ -518,6 +643,12 @@ const App = () => {
           console.log('Received schema for collection:', message.collection);
           setCollection(message.collection);
           setTitle(`Weaviate Collection: ${message.collection}`);
+          if (message.connection) {
+            setConnectionInfo({
+              name: message.connection.name,
+              endpoint: message.connection.endpoint,
+            });
+          }
 
           // Restore saved state if available
           if (message.savedState) {
@@ -564,6 +695,17 @@ const App = () => {
               // Store schema for future use
               setSchema(message.schema);
 
+              // If GraphQL introspection was provided by backend, configure monaco-graphql now
+              if (message.introspection && message.introspection.__schema) {
+                const introspectionJSON = message.introspection;
+                setSchemaConfig({
+                  uri: 'weaviate://graphql',
+                  schema: message.schema,
+                  fileMatch: ['weaviate://graphql/**', '**/*.graphql', '**/*.gql'],
+                  introspectionJSON,
+                });
+              }
+
               // We'll get the query from backend
               if (message.collection && !initialQuerySent) {
                 // Request a sample query if one wasn't sent already
@@ -589,6 +731,7 @@ const App = () => {
 
           // Always stop loading when we get results
           setIsLoading(false);
+          setIsStopping(false);
 
           try {
             const extractedData = extractWeaviateData(message.data, message.collection);
@@ -603,6 +746,13 @@ const App = () => {
             setTitle(`Weaviate Collection: ${message.collection}`);
           }
           setError(null); // Clear any previous errors
+          break;
+
+        case 'queryCancelled':
+          console.log('Query cancelled');
+          setIsStopping(false);
+          setIsLoading(false);
+          setError(null);
           break;
 
         case 'sampleQuery':
@@ -751,6 +901,22 @@ const App = () => {
           setIsLoading(false);
           break;
 
+        case 'runQueryShortcut':
+          handleRunQuery();
+          break;
+
+        case 'stopQueryShortcut':
+          handleCancelQuery();
+          break;
+
+        case 'clearQueryShortcut':
+          if (!isLoading && !isStopping) {
+            setQueryText('');
+            setJsonData(null);
+            setError(null);
+          }
+          break;
+
         case 'ping':
           // Respond to backend ping to indicate webview is alive
           if (vscode) {
@@ -759,7 +925,7 @@ const App = () => {
           break;
 
         default:
-          console.log('Unknown message type:', message.type);
+          console.log('Unknown message type:', message?.type);
           break;
       }
     };
@@ -910,8 +1076,41 @@ const App = () => {
                 GraphQL Query{collection ? ` (${collection})` : ''}
               </span>
 
+              {/* Schema readiness indicator */}
+              {/* Status items will be shown inside toolbar on the right */}
+
               {/* Template and Run buttons */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Connection and schema status (compact) */}
+                {connectionInfo && (
+                  <span
+                    title={connectionInfo.endpoint ? `Endpoint: ${connectionInfo.endpoint}` : ''}
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--vscode-descriptionForeground, #999)',
+                      marginRight: 6,
+                    }}
+                  >
+                    {connectionInfo.name}
+                  </span>
+                )}
+                {schemaConfig && (
+                  <span
+                    title={
+                      schemaReady ? 'Schema-based language features active' : 'Applying schema…'
+                    }
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: schemaReady
+                        ? 'var(--vscode-testing-iconPassed, #89d185)'
+                        : 'var(--vscode-descriptionForeground, #bbb)',
+                      marginRight: 8,
+                    }}
+                  />
+                )}
                 {/* Template Dropdown */}
                 <div className="template-dropdown-container" style={{ position: 'relative' }}>
                   <button
@@ -1060,45 +1259,135 @@ const App = () => {
                   )}
                 </div>
 
+                {isLoading ? (
+                  <button
+                    onClick={handleCancelQuery}
+                    disabled={isStopping}
+                    title={isStopping ? 'Stopping…' : 'Stop the running query (Esc)'}
+                    style={{
+                      backgroundColor: 'var(--vscode-statusBarItem-errorBackground, #c72e0f)',
+                      color: 'var(--vscode-button-foreground, #ffffff)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      height: '28px',
+                      minWidth: '42px',
+                      cursor: isStopping ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'background-color 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--vscode-statusBarItem-errorBackground, #a1260d)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--vscode-statusBarItem-errorBackground, #c72e0f)';
+                    }}
+                  >
+                    ■ {isStopping ? 'Stopping…' : 'Stop'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleRunQuery}
+                    disabled={!collection}
+                    title={
+                      collection
+                        ? 'Execute the GraphQL query (Ctrl/Cmd+Enter)'
+                        : 'Select a collection first'
+                    }
+                    style={{
+                      backgroundColor: collection
+                        ? 'var(--vscode-button-background, #0E639C)'
+                        : 'var(--vscode-input-background, #2D2D2D)',
+                      color: collection
+                        ? 'var(--vscode-button-foreground, white)'
+                        : 'var(--vscode-descriptionForeground, #888)',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '4px 10px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      height: '28px',
+                      minWidth: '42px',
+                      cursor: collection ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'background-color 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor =
+                          'var(--vscode-button-hoverBackground, #1177bb)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (collection) {
+                        e.currentTarget.style.backgroundColor =
+                          'var(--vscode-button-background, #0E639C)';
+                      }
+                    }}
+                  >
+                    ▶ Run
+                  </button>
+                )}
+
+                {/* Clear Button */}
                 <button
-                  onClick={handleRunQuery}
-                  disabled={!collection}
-                  title={collection ? 'Execute the GraphQL query' : 'Select a collection first'}
+                  onClick={() => {
+                    setQueryText('');
+                    setJsonData(null);
+                    setError(null);
+                  }}
+                  disabled={isLoading || isStopping}
+                  title={
+                    isLoading || isStopping
+                      ? 'Unavailable while running'
+                      : 'Clear query (Ctrl/Cmd+K)'
+                  }
                   style={{
-                    backgroundColor: collection
-                      ? 'var(--vscode-button-background, #0E639C)'
-                      : 'var(--vscode-input-background, #2D2D2D)',
-                    color: collection
-                      ? 'var(--vscode-button-foreground, white)'
-                      : 'var(--vscode-descriptionForeground, #888)',
-                    border: 'none',
+                    backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
+                    color: 'var(--vscode-input-foreground, #E0E0E0)',
+                    border: '1px solid var(--vscode-input-border, #444)',
                     borderRadius: '3px',
                     padding: '4px 10px',
                     fontSize: '13px',
-                    fontWeight: 500,
                     height: '28px',
-                    minWidth: '42px',
-                    cursor: collection ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'background-color 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (collection) {
-                      e.currentTarget.style.backgroundColor =
-                        'var(--vscode-button-hoverBackground, #1177bb)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (collection) {
-                      e.currentTarget.style.backgroundColor =
-                        'var(--vscode-button-background, #0E639C)';
-                    }
+                    cursor: isLoading || isStopping ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  ▶ Run
+                  🧹 Clear
                 </button>
+
+                {/* Shortcuts legend (tooltip only) */}
+                <span
+                  title={
+                    'Shortcuts:\n' +
+                    '• Run: Ctrl/Cmd+Enter\n' +
+                    '• Stop: Esc\n' +
+                    '• Clear: Ctrl/Cmd+K\n\n' +
+                    'Features:\n' +
+                    '• Templates menu: quickly insert common queries\n' +
+                    '• Schema-aware autocomplete (monaco-graphql) when schema is available\n' +
+                    '• Field/type suggestions, validation, and inline errors\n' +
+                    '• Sample query generation based on your collection'
+                  }
+                  style={{
+                    color: 'var(--vscode-descriptionForeground, #999)',
+                    fontSize: '14px',
+                    padding: '0 6px',
+                    userSelect: 'none',
+                    cursor: 'default',
+                  }}
+                  aria-label="Keyboard shortcuts and features"
+                >
+                  ⓘ
+                </span>
               </div>
             </div>
 
@@ -1112,6 +1401,7 @@ const App = () => {
                 showTemplateDropdown={showTemplateDropdown}
                 onToggleTemplateDropdown={handleToggleTemplateDropdown}
                 onTemplateSelect={handleTemplateSelect}
+                onLanguageReady={(ready) => setSchemaReady(ready)}
               />
             </div>
           </div>
