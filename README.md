@@ -11,6 +11,8 @@
 **A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL
 interface. Supports self-hosted and cloud Weaviate instances.**
 
+![Extension Demo](docs/images/extension-demo.gif)
+
 ---
 
 ## Key Benefits
@@ -48,21 +50,6 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Weaviate client upgrade to `weaviate-client@^3` and move to the Collections API. This requires a Weaviate server that supports the Collections API; legacy class/schema‑only servers are not supported by this version.
 - Webview CSP hardened. Scripts are now nonce‑protected; if you previously saw CSP errors, please upgrade.
 - Command rename for refresh: `weaviate.refreshConnections` → `weaviate.refresh` (update custom keybindings if any).
-
----
-
-## Screenshots
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/images/query-editor.png" alt="Query Editor" width="350"/><br/>Query Editor</td>
-    <td align="center"><img src="docs/images/connections.png" alt="Connection Management" width="350"/><br/>Connection Management</td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/images/add-collection.png" alt="Add Collection" width="350"/><br/>Add Collection</td>
-    <td align="center"><img src="docs/images/detailed-schema.png" alt="Detailed Schema" width="350"/><br/>Detailed Schema</td>
-  </tr>
-</table>
 
 ---
 
