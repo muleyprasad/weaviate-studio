@@ -45,14 +45,6 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ---
 
-## Breaking Changes
-
-- Weaviate client upgrade to `weaviate-client@^3` and move to the Collections API. This requires a Weaviate server that supports the Collections API; legacy class/schema‑only servers are not supported by this version.
-- Webview CSP hardened. Scripts are now nonce‑protected; if you previously saw CSP errors, please upgrade.
-- Command rename for refresh: `weaviate.refreshConnections` → `weaviate.refresh` (update custom keybindings if any).
-
----
-
 ## Getting Started
 
 1. **Install** Weaviate Studio from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) or [Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio).
