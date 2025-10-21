@@ -131,6 +131,57 @@ describe('WeaviateTreeDataProvider', () => {
     expect(connected.contextValue).toBe('weaviateConnectionActive');
   });
 
+  describe('getChildren for properties', () => {
+    it('should handle null, undefined, and valid descriptions for properties', async () => {
+      // 1. Setup mock data
+      const connectionId = '2'; // 'Prod' connection is 'connected'
+      const collectionName = 'TestCollection';
+      const mockCollection = {
+        label: collectionName,
+        itemType: 'collection',
+        connectionId: connectionId,
+        collectionName: collectionName,
+        schema: {
+          class: collectionName,
+          properties: [
+            { name: 'propWithDesc', dataType: ['string'], description: 'This is a description.' },
+            { name: 'propWithNullDesc', dataType: ['int'], description: null },
+            { name: 'propWithUndefinedDesc', dataType: ['boolean'] },
+            { name: 'propToTrim', dataType: ['text'], description: '  needs trimming  ' },
+          ],
+        },
+      };
+
+      (provider as any).collections[connectionId] = [mockCollection];
+
+      // 2. Define the parent element for which we want children
+      const propertiesElement = {
+        itemType: 'properties',
+        connectionId: connectionId,
+        collectionName: collectionName,
+        label: 'Properties (4)',
+      };
+
+      // 3. Call getChildren
+      const propertyItems = await provider.getChildren(propertiesElement as any);
+
+      // 4. Assertions
+      expect(propertyItems).toHaveLength(4);
+
+      const desc1 = propertyItems.find((p: any) => p.itemId === 'propWithDesc')?.description;
+      const desc2 = propertyItems.find((p: any) => p.itemId === 'propWithNullDesc')?.description;
+      const desc3 = propertyItems.find(
+        (p: any) => p.itemId === 'propWithUndefinedDesc'
+      )?.description;
+      const desc4 = propertyItems.find((p: any) => p.itemId === 'propToTrim')?.description;
+
+      expect(desc1).toBe('This is a description.');
+      expect(desc2).toBe('');
+      expect(desc3).toBe('');
+      expect(desc4).toBe('needs trimming');
+    });
+  });
+
   describe('deleteAllCollections', () => {
     let provider: WeaviateTreeDataProvider;
 

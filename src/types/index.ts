@@ -175,7 +175,7 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       }
     }
 
-    if (description) {
+    if (description !== null && description !== undefined) {
       // @ts-ignore - We're setting a read-only property here
       this.description = description;
     }
