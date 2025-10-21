@@ -8,7 +8,7 @@
 
 ---
 
-**A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL 
+**A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL
 interface. Supports self-hosted and cloud Weaviate instances.**
 
 ---
@@ -25,8 +25,8 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ## Quick Install
 
-| **VS Code** | **Cursor** | **Windsurf** | **Manual Install** |
-|-------------|------------|--------------|-------------------|
+| **VS Code**                                                                                    | **Cursor**                                                             | **Windsurf**                                                           | **Manual Install**                                                       |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) | [Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio) | [Download VSIX](https://github.com/muleyprasad/weaviate-studio/releases) |
 
 ---
@@ -74,10 +74,12 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 4. **Explore your schema, run queries, and manage your data—all within VS Code!**
 
 ---
+
 <details>
 <summary><strong>Full Feature List</strong></summary>
 
 ### Connection Management
+
 - Connect to multiple Weaviate instances simultaneously
 - Secure credential storage with VS Code's built-in secret storage
 - Connection health monitoring and automatic reconnection
@@ -87,12 +89,14 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Optional connect‑on‑expand prompt for disconnected connections
 
 ### Data Visualization
+
 - Table view: Flattened, readable tables for nested JSON
 - JSON view: Syntax-highlighted, collapsible JSON viewer
 - Schema explorer: Interactive browsing of your Weaviate schema
 - Real-time results: Live query execution with instant feedback
 
 ### GraphQL Editor
+
 - Monaco Editor with full GraphQL syntax support
 - Auto-completion and context-aware suggestions
 - Schema-aware query generation
@@ -101,6 +105,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Reference field support and type-safe generation
 
 ### Schema Management
+
 - Browse collections and their properties
 - View detailed schema information, data types, and relationships
 - Support for cross-references and nested object structures
@@ -108,23 +113,28 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Create collections via three paths: From scratch, Copy from existing, or Import from JSON schema
 
 ### Tree View
+
 - Connection-level: Server info, cluster health, modules, collections overview
 - Collection-level: Properties, vectors (with count), inverted index, generative config, statistics, sharding, replication, multi‑tenancy
 
 ### Schema Analysis
+
 - Enhanced schema viewer with overview, properties, raw JSON, API equivalents, and creation scripts
 
 ### Developer Experience
+
 - Hot reload for instant updates
 - Full TypeScript support
 - Modern, responsive UI
 
 ### Query Templates
+
 - Core: Basic Get, Vector Search, Semantic Search, Hybrid Search
 - Advanced: Filter, Aggregation, Relationship, Sort, Explore
 - Schema-aware, type-safe, and educational templates
 
 ### Bulk Operations
+
 - Delete All Collections (destructive) with double confirmation
 
 </details>
@@ -134,6 +144,8 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ## Development & Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, development, and pull request guidelines.
+
+Need a quick Weaviate instance for development or learning? Check out our [local sandbox environment](sandbox/readme.md) with pre-configured Docker setup and test data.
 
 ---
 
