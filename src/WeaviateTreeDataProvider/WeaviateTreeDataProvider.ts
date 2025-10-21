@@ -702,7 +702,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           prop.name,
           icon,
           'weaviateProperty',
-          description.trim()
+          description?.trim() ?? ''
         );
       });
 
