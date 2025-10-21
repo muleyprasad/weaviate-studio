@@ -56,6 +56,12 @@ Compress the GIF to make it lightweight for GitHub:
 gifsicle -O3 extension-demo.gif -o extension-demo-optimized.gif
 ```
 
+Trim gif
+
+```bash
+ffmpeg -ss 1 -to 15 -i extension-demo.gif -filter_complex "[0:v] fps=15,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" extension-demo-trimmed.gif
+```
+
 ### 5. Add to Your GitHub Repo
 
 Move the GIF into your repository, commit, and push:
