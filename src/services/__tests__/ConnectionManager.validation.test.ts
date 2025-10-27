@@ -184,7 +184,6 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         httpSecure: true,
         grpcSecure: true,
         authCredentials: { key: 'mock-key' },
-        type: 'custom',
         timeout: {
           init: 25,
           query: 55,

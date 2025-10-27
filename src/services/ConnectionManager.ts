@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import weaviate, { WeaviateClient } from 'weaviate-client';
+import weaviate, { ConnectToCustomOptions, WeaviateClient } from 'weaviate-client';
 
 export interface ConnectionLink {
   name: string;
@@ -334,22 +334,24 @@ export class ConnectionManager {
         });
       } else {
         // Extract only the fields needed for connectToCustom
-        client = await weaviate.connectToCustom({
+        const customOptions: ConnectToCustomOptions = {
           httpHost: connection.httpHost,
           httpPort: connection.httpPort,
           grpcHost: connection.grpcHost,
           grpcPort: connection.grpcPort,
           httpSecure: connection.httpSecure,
           grpcSecure: connection.grpcSecure,
-          authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
-          type: connection.type,
           skipInitChecks: connection.skipInitChecks,
           timeout: {
             init: connection.timeoutInit,
             query: connection.timeoutQuery,
             insert: connection.timeoutInsert,
           },
-        } as any);
+        };
+        if (connection.apiKey) {
+          customOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
+        }
+        client = await weaviate.connectToCustom(customOptions);
       }
       if (!client) {
         throw new Error('Failed to create Weaviate client');
