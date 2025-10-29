@@ -2061,7 +2061,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           ...prop,
           dataType: dt,
           tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-          indexSearchable: prop.indexInverted,
+          indexSearchable:
+            prop.indexSearchable !== undefined ? prop.indexSearchable : prop.indexInverted,
         };
       }) || [];
 
