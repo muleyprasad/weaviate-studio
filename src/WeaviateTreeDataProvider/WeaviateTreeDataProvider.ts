@@ -2401,7 +2401,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     // Create the collection using the schema API
-    await client.collections.createFromSchema(schemaObject);
+    // return if any error here
+    try {
+      await client.collections.createFromSchema(schemaObject);
+    } catch (error) {
+      // on error, show dialog with error message
+      console.error('Error creating collection:', error);
+      throw error;
+    }
   }
 
   /**
@@ -4620,6 +4627,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             command: 'cancel'
                         });
                     }
+
+          // Handle messages from the extension (e.g., error reporting)
+          window.addEventListener('message', (event) => {
+            const message = event.data;
+            if (!message || !message.command) return;
+            switch (message.command) {
+              case 'error':
+                // Display errors coming from the extension (e.g., import/creation failures)
+                showError(message.message || 'An unknown error occurred');
+                break;
+              default:
+                // No-op for other commands (reserved for future use)
+                break;
+            }
+          });
                 </script>
             </body>
             </html>
@@ -5212,9 +5234,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     </div>
                 </div>
                 
-                <script>
-                    const vscode = acquireVsCodeApi();
-                    let selectedSchema = null;
+        <script>
+          const vscode = acquireVsCodeApi();
+          let selectedSchema = null;
+          let creating = false;
                     
                     function selectFile() {
                         document.getElementById('fileInput').click();
@@ -5310,12 +5333,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                     }
                     
-                    function createCollection() {
-                        if (!selectedSchema) {
+          function createCollection() {
+            if (creating) return;
+            if (!selectedSchema) {
                             showError('Please select a valid JSON file');
                             return;
                         }
-                        
+            // Set busy state to prevent duplicate submissions
+            const createBtn = document.getElementById('createButton');
+            const editBtn = document.getElementById('editBeforeButton');
+            creating = true;
+            if (createBtn) {
+              createBtn.disabled = true;
+              createBtn.textContent = 'Creating…';
+            }
+            if (editBtn) {
+              editBtn.disabled = true;
+            }
+
                         vscode.postMessage({
                             command: 'import',
                             schema: selectedSchema
@@ -5356,11 +5391,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         });
                     }
                     
-                    function cancel() {
+          function cancel() {
                         vscode.postMessage({
                             command: 'cancel'
                         });
                     }
+
+          // Receive messages from extension (e.g., error feedback)
+          window.addEventListener('message', (event) => {
+            const message = event.data || {};
+            if (message.command === 'error') {
+              showError(message.message || 'An unknown error occurred');
+              // reset busy state so user can retry
+              const createBtn = document.getElementById('createButton');
+              const editBtn = document.getElementById('editBeforeButton');
+              creating = false;
+              if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create';
+              }
+              if (editBtn) {
+                editBtn.disabled = false;
+              }
+            }
+          });
                 </script>
             </body>
             </html>
