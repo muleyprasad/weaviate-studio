@@ -2050,33 +2050,118 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @returns The formatted schema ready for API consumption
    */
   private convertSchemaToApiFormat(schema: any): any {
-    const fixed_properties =
-      schema.properties?.map((prop: any) => {
-        // Normalize dataType to the v2 string format (not array)
-        let dt = prop?.dataType;
-        if (Array.isArray(dt)) {
-          dt = dt[0];
-        }
-        return {
-          ...prop,
-          dataType: dt,
-          tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-          indexSearchable:
-            prop.indexSearchable !== undefined ? prop.indexSearchable : prop.indexInverted,
-        };
-      }) || [];
+    // Convert properties to request format: ensure dataType is array, move vectorizerConfig -> moduleConfig, drop indexInverted
+    const fixed_properties = (schema.properties || []).map((prop: any) => {
+      const dataType = Array.isArray(prop?.dataType)
+        ? prop.dataType
+        : [prop?.dataType].filter(Boolean);
 
-    const fixed_vectorizers = schema.vectorizers
+      const { vectorizerConfig, indexInverted, ...rest } = prop || {};
+      const converted: any = {
+        ...rest,
+        dataType,
+      };
+
+      if (vectorizerConfig) {
+        converted.moduleConfig = vectorizerConfig;
+      }
+
+      // If tokenization explicitly 'none', omit it
+      if (converted.tokenization === 'none') {
+        delete converted.tokenization;
+      }
+
+      return converted;
+    });
+
+    // Convert vectorizers -> vectorConfig with proper index mapping
+    const fixed_vectorConfig = schema.vectorizers
       ? Object.fromEntries(
           Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-            const vectorizerName = vec.vectorizer?.name || 'none';
-            const vectorizerConfig = vec.vectorizer?.config || {};
-            const vectorIndexType = vec.vectorIndexType || 'hnsw';
-            const vectorIndexConfig = vec.vectorIndexConfig || {};
+            // vectorizer
+            const vectorizerName = vec?.vectorizer?.name || 'none';
+            const vCfg: any = { ...(vec?.vectorizer?.config || {}) };
+            // rename vectorizeCollectionName -> vectorizeClassName if present
+            if (vCfg.vectorizeCollectionName !== undefined) {
+              vCfg.vectorizeClassName = vCfg.vectorizeCollectionName;
+              delete vCfg.vectorizeCollectionName;
+            }
+            // attach properties if present at this level
+            if (Array.isArray(vec?.properties) && vec.properties.length > 0) {
+              vCfg.properties = vec.properties;
+            }
+
+            // index type and config
+            const vectorIndexType = vec?.indexType || vec?.indexConfig?.type || 'hnsw';
+            const vectorIndexConfig: any = {};
+            const srcIdx = vec?.indexConfig || {};
+
+            // top-level distance
+            if (srcIdx.distance) {
+              vectorIndexConfig.distanceMetric = srcIdx.distance;
+            }
+            if (srcIdx.threshold !== undefined) {
+              vectorIndexConfig.threshold = srcIdx.threshold;
+            }
+            if (srcIdx.skip !== undefined) {
+              vectorIndexConfig.skip = srcIdx.skip;
+            }
+
+            // hnsw
+            if (srcIdx.hnsw) {
+              const h: any = { ...srcIdx.hnsw };
+              if (h.distance) {
+                h.distanceMetric = h.distance;
+                delete h.distance;
+              }
+              if (h.quantizer) {
+                const q = h.quantizer;
+                if (q.type === 'pq') {
+                  h.pq = {
+                    enabled: true,
+                    internalBitCompression: q.bitCompression || false,
+                    segments: q.segments,
+                    centroids: q.centroids,
+                    trainingLimit: q.trainingLimit,
+                    encoder: q.encoder,
+                  };
+                }
+                delete h.quantizer;
+              }
+              if (h.type) {
+                delete h.type;
+              }
+              vectorIndexConfig.hnsw = h;
+            }
+
+            // flat
+            if (srcIdx.flat) {
+              const f: any = { ...srcIdx.flat };
+              if (f.distance) {
+                f.distanceMetric = f.distance;
+                delete f.distance;
+              }
+              if (f.quantizer) {
+                const q = f.quantizer;
+                if (q.type === 'bq') {
+                  f.bq = {
+                    enabled: true,
+                    cache: q.cache || false,
+                    rescoreLimit: q.rescoreLimit ?? -1,
+                  };
+                }
+                delete f.quantizer;
+              }
+              if (f.type) {
+                delete f.type;
+              }
+              vectorIndexConfig.flat = f;
+            }
+
             return [
               key,
               {
-                vectorizer: { [vectorizerName]: vectorizerConfig },
+                vectorizer: { [vectorizerName]: vCfg },
                 vectorIndexType,
                 vectorIndexConfig,
               },
@@ -2085,22 +2170,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         )
       : undefined;
 
-    // now build the final schema object
-    const apiSchema = {
-      ...schema,
+    // Build final API schema from scratch (no spread) to avoid server-only fields
+    const apiSchema: any = {
       class: schema.name,
-      invertedIndexConfig: schema.invertedIndex,
-      moduleConfig: schema.generative,
-      multiTenancyConfig: schema.multiTenancy,
       properties: fixed_properties,
-      vectorConfig: fixed_vectorizers,
-    } as any;
+    };
 
-    // delete all indexInverted for all properties
-    apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-      delete prop.indexInverted;
-    });
-    delete apiSchema.vectorizers;
+    if (schema.invertedIndex) {
+      apiSchema.invertedIndexConfig = schema.invertedIndex;
+    }
+    if (schema.multiTenancy) {
+      apiSchema.multiTenancyConfig = schema.multiTenancy;
+    }
+    if (schema.replication) {
+      apiSchema.replicationConfig = schema.replication;
+    }
+    if (schema.sharding) {
+      const { actualCount, actualVirtualCount, ...shardingConfig } = schema.sharding;
+      apiSchema.shardingConfig = shardingConfig;
+    }
+    if (fixed_vectorConfig) {
+      apiSchema.vectorConfig = fixed_vectorConfig;
+    }
+    if (schema.generative) {
+      apiSchema.moduleConfig = schema.generative;
+    }
 
     return apiSchema;
   }
@@ -2112,12 +2206,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   async exportSchema(connectionId: string, collectionName: string): Promise<void> {
     try {
-      const collection = this.collections[connectionId]?.find(
-        (col) => col.label === collectionName
-      ) as CollectionWithSchema | undefined;
-
-      if (!collection?.schema) {
-        throw new Error('Collection schema not found');
+      // Get the Weaviate client
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not found');
       }
 
       // Show save dialog
@@ -2133,12 +2225,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return; // User cancelled
       }
 
-      // Export schema as formatted JSON using the conversion helper
-      const schema = collection.schema;
-      const apiSchema = this.convertSchemaToApiFormat(schema);
+      // Export collection using client.collections.export() and convert to API format
+      const exportedSchema = await client.collections.export(collectionName);
+      const apiSchema = this.convertSchemaToApiFormat(exportedSchema);
       const schemaJson = JSON.stringify(apiSchema, null, 2);
       await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
 
+      console.log(`Collection "${collectionName}" exported successfully to ${saveUri.fsPath}`);
       vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
