@@ -246,6 +246,11 @@
         },
         {
           "command": "weaviate.refreshConnection",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.refreshConnection",
           "when": "view == weaviateConnectionsView && (viewItem == weaviateConnectionActive || viewItem == weaviateServerInfo || viewItem == weaviateClusterHealth)",
           "group": "navigation@1"
         },
