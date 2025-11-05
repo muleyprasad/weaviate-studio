@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
+import { AddCollectionPanel } from '../views/AddCollectionPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -2261,68 +2262,33 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     try {
-      // Create and show the Add Collection webview panel
-      const panel = vscode.window.createWebviewPanel(
-        'weaviateAddCollection',
-        'Add Collection',
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [],
-        }
-      );
-
-      // Set the webview content
-      panel.webview.html = this.getAddCollectionHtml(initialSchema);
-
-      // Handle messages from the webview
-      panel.webview.onDidReceiveMessage(
-        async (message) => {
+      // Create the panel with callbacks
+      const panel = AddCollectionPanel.createOrShow(
+        this.context.extensionUri,
+        async (schema: any) => {
+          // On create callback
+          await this.createCollection(connectionId, schema);
+          await this.fetchCollections(connectionId);
+        },
+        async (message: any, postMessage: (msg: any) => void) => {
+          // On message callback for handling webview requests
           switch (message.command) {
-            case 'create':
-              try {
-                await this.createCollection(connectionId, message.schema);
-                panel.dispose();
-                vscode.window.showInformationMessage(
-                  `Collection "${message.schema.class}" created successfully`
-                );
-                await this.fetchCollections(connectionId);
-              } catch (error) {
-                panel.webview.postMessage({
-                  command: 'error',
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              }
-              break;
-            case 'cancel':
-              panel.dispose();
-              break;
             case 'getVectorizers':
               try {
-                const client = this.connectionManager.getClient(connectionId);
                 const vectorizers = await this.getAvailableVectorizers(connectionId);
-
-                // Send vectorizers
-                panel.webview.postMessage({
+                postMessage({
                   command: 'vectorizers',
                   vectorizers: vectorizers,
                 });
 
-                // Also send server version information
-                try {
-                  if (client) {
-                    const version = this.clusterMetadataCache[connectionId]?.version;
-                    panel.webview.postMessage({
-                      command: 'serverVersion',
-                      version: version || 'unknown',
-                    });
-                  }
-                } catch (_) {
-                  // ignore version errors
-                }
+                // Also send server version
+                const version = this.clusterMetadataCache[connectionId]?.version;
+                postMessage({
+                  command: 'serverVersion',
+                  version: version || 'unknown',
+                });
               } catch (error) {
-                panel.webview.postMessage({
+                postMessage({
                   command: 'error',
                   message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`,
                 });
@@ -2331,24 +2297,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             case 'getCollections':
               try {
                 const collections = this.collections[connectionId] || [];
-                panel.webview.postMessage({
+                postMessage({
                   command: 'collections',
                   collections: collections.map((col) => col.label),
                 });
               } catch (error) {
-                panel.webview.postMessage({
+                postMessage({
                   command: 'error',
                   message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`,
                 });
               }
               break;
-            case 'serverVersion':
-              // serverVersion handled in webview only
-              break;
           }
         },
-        undefined,
-        this.context.subscriptions
+        initialSchema
       );
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2396,9 +2358,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               // Handle option selection
               switch (message.option) {
                 case 'fromScratch':
-                  // Switch to the existing add collection form
-                  panel.webview.html = this.getAddCollectionHtml();
-                  this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                  // Close the options panel and open the new Add Collection panel
+                  panel.dispose();
+                  await this.addCollection(connectionId);
                   break;
                 case 'cloneExisting':
                   // Show clone collection selection first
@@ -5658,10 +5620,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 class: message.newCollectionName,
               };
 
-              // Instead of creating immediately, open the Add Collection form
-              // pre-filled with the cloned schema so the user can review/edit
-              panel.webview.html = this.getAddCollectionHtml(clonedSchema);
-              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+              // Close the clone panel and open the new Add Collection panel with cloned schema
+              panel.dispose();
+              await this.addCollection(connectionId, clonedSchema);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',
@@ -5709,9 +5670,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             break;
           case 'editBefore':
             try {
-              // Open the Add Collection form pre-filled with the imported schema
-              panel.webview.html = this.getAddCollectionHtml(message.schema);
-              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+              // Close the import panel and open the new Add Collection panel with imported schema
+              panel.dispose();
+              await this.addCollection(connectionId, message.schema);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',

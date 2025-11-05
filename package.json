@@ -300,15 +300,18 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package && npm run package:webview",
+    "vscode:prepublish": "npm run package && npm run package:webview && npm run package:add-collection",
     "compile": "webpack",
     "watch": "webpack --watch",
     "watch:extension": "tsc -p . --watch",
     "watch:webview": "webpack --config webpack.webview.config.js --mode development --watch",
-    "dev": "concurrently \"npm:watch:extension\" \"npm:watch:webview\"",
+    "watch:add-collection": "webpack --config webpack.add-collection.config.js --mode development --watch",
+    "dev": "concurrently \"npm:watch:extension\" \"npm:watch:webview\" \"npm:watch:add-collection\"",
     "package": "webpack --mode production --devtool hidden-source-map",
     "build:webview": "webpack --config webpack.webview.config.js --mode development",
+    "build:add-collection": "webpack --config webpack.add-collection.config.js --mode development",
     "package:webview": "NODE_ENV=production webpack --config webpack.webview.config.js --mode production",
+    "package:add-collection": "NODE_ENV=production webpack --config webpack.add-collection.config.js --mode production",
     "lint": "eslint src --ext ts,tsx",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "test": "jest",
@@ -328,6 +331,9 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.25.9",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@types/jest": "^30.0.0",
@@ -337,6 +343,7 @@
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "babel-loader": "^9.2.1",
     "concurrently": "^9.1.2",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.2",
@@ -366,6 +373,7 @@
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",
     "react-json-view-lite": "^2.4.1",
+    "weaviate-add-collection": "github:dudanogueira/weaviate-add-collection",
     "weaviate-client": "^3.8.0"
   }
 }
