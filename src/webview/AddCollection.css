@@ -1,4 +1,7 @@
 /* Add Collection Webview Styles */
+/* Custom layout and action buttons specific to the VS Code webview */
+/* Theme integration is handled by theme.css and AddCollection.override.css */
+
 .add-collection-container {
   width: 100%;
   min-height: 100vh;
@@ -65,6 +68,3 @@
 .action-button-secondary:hover {
   background-color: var(--vscode-button-secondaryHoverBackground);
 }
-
-/* Import styles from weaviate-add-collection (resolved via node_modules) */
-@import 'weaviate-add-collection/src/styles.css';

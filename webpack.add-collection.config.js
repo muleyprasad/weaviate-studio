@@ -1,6 +1,7 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const fs = require('fs');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -26,6 +27,53 @@ class WebviewNoncePlugin {
 
           data.headTags.forEach(addNonce);
           data.bodyTags.forEach(addNonce);
+        }
+      );
+    });
+  }
+}
+
+// Plugin to inject CSS styles inline into the HTML for better VS Code webview compatibility
+class InjectCssPlugin {
+  apply(compiler) {
+    compiler.hooks.compilation.tap('InjectCssPlugin', (compilation) => {
+      const HtmlWebpackPlugin = require('html-webpack-plugin');
+      
+      HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
+        'InjectCssPlugin',
+        (data, cb) => {
+          try {
+            // Read all CSS files
+            const themeCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/theme.css'), 'utf8');
+            const componentCss = fs.readFileSync(path.resolve(__dirname, 'node_modules/weaviate-add-collection/src/styles.css'), 'utf8');
+            const overrideCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/AddCollection.override.css'), 'utf8');
+            const customCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/AddCollection.css'), 'utf8');
+            
+            // Combine all CSS
+            const allCss = `
+              /* VS Code Theme Base */
+              ${themeCss}
+              
+              /* Component Library Styles */
+              ${componentCss}
+              
+              /* VS Code Theme Overrides */
+              ${overrideCss}
+              
+              /* Custom Webview Styles */
+              ${customCss}
+            `;
+            
+            // Inject CSS into HTML
+            data.html = data.html.replace(
+              '</head>',
+              `<style id="injected-styles">${allCss}</style></head>`
+            );
+          } catch (error) {
+            console.error('Error injecting CSS:', error);
+          }
+          
+          cb(null, data);
         }
       );
     });
@@ -89,11 +137,10 @@ module.exports = {
           },
         },
       },
+      // CSS is now injected inline, so we skip the loaders
       {
         test: /\.css$/,
-        use: isProduction
-          ? [MiniCssExtractPlugin.loader, 'css-loader']
-          : ['style-loader', 'css-loader'],
+        use: 'null-loader',
       },
     ],
   },
@@ -105,6 +152,7 @@ module.exports = {
       scriptLoading: 'defer',
       minify: isProduction,
     }),
+    new InjectCssPlugin(),
     new WebviewNoncePlugin(),
     ...(isProduction
       ? [new MiniCssExtractPlugin({
@@ -115,3 +163,4 @@ module.exports = {
   ],
   devtool: isProduction ? 'hidden-source-map' : 'inline-source-map',
 };
+

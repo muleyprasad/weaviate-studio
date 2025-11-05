@@ -355,6 +355,7 @@
     "lint-staged": "^15.5.2",
     "mini-css-extract-plugin": "^2.9.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
+    "null-loader": "^4.0.1",
     "path-browserify": "^1.0.1",
     "prettier": "^3.5.3",
     "style-loader": "^4.0.0",

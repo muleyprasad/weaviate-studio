@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 // @ts-ignore - JSX component without type declarations
 import Collection from 'weaviate-add-collection/src/components/Collection';
-// @ts-ignore - CSS import
-import './AddCollection.css';
 
 // Setup VS Code API for message passing with the extension host
 declare global {
