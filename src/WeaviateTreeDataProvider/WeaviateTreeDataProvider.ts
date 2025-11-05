@@ -2276,9 +2276,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             case 'getVectorizers':
               try {
                 const vectorizers = await this.getAvailableVectorizers(connectionId);
+                const modules = this.clusterMetadataCache[connectionId]?.modules || {};
                 postMessage({
                   command: 'vectorizers',
                   vectorizers: vectorizers,
+                  modules: modules,
                 });
 
                 // Also send server version

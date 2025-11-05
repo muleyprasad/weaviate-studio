@@ -52,18 +52,11 @@ function AddCollectionWebview() {
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
 
-      console.log('[AddCollection] Received message:', message.command, message);
-
       switch (message.command) {
         case 'vectorizers':
           setVectorizers(message.vectorizers || []);
-          // Build availableModules object
-          const modules: any = {};
-          if (message.vectorizers && Array.isArray(message.vectorizers)) {
-            message.vectorizers.forEach((v: string) => {
-              modules[v] = { available: true };
-            });
-          }
+          // Use the modules object directly from the server metadata
+          const modules = message.modules || {};
           setAvailableModules(modules);
           break;
         case 'serverVersion':
@@ -73,7 +66,6 @@ function AddCollectionWebview() {
           setCollections(message.collections || []);
           break;
         case 'initialSchema':
-          console.log('[AddCollection] Setting initialSchema:', message.schema);
           setInitialSchema(message.schema);
           break;
         case 'error':
@@ -85,11 +77,6 @@ function AddCollectionWebview() {
     window.addEventListener('message', messageHandler);
     return () => window.removeEventListener('message', messageHandler);
   }, []);
-
-  // Debug: log when initialSchema changes
-  useEffect(() => {
-    console.log('[AddCollection] initialSchema changed:', initialSchema);
-  }, [initialSchema]);
 
   const handleCreate = () => {
     // Get the generated JSON from the Collection component
