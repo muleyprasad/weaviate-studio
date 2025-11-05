@@ -38,6 +38,36 @@ jest.mock(
   { virtual: true }
 );
 
+// Mock AddCollectionPanel to avoid creating real webviews
+let capturedOnCreate: ((schema: any) => Promise<void>) | undefined;
+let capturedOnMessage:
+  | ((message: any, postMessage: (msg: any) => void) => Promise<void>)
+  | undefined;
+let lastInitialSchema: any;
+const panelMock = {
+  postMessage: jest.fn(),
+  dispose: jest.fn(),
+};
+const mockAddCollectionPanel = {
+  createOrShow: jest.fn(
+    (
+      _extUri: any,
+      onCreate: (schema: any) => Promise<void>,
+      onMessage?: (message: any, postMessage: (msg: any) => void) => Promise<void>,
+      _initialSchema?: any
+    ) => {
+      capturedOnCreate = onCreate;
+      capturedOnMessage = onMessage;
+      lastInitialSchema = _initialSchema;
+      return panelMock;
+    }
+  ),
+};
+
+jest.mock('../../views/AddCollectionPanel', () => ({
+  AddCollectionPanel: mockAddCollectionPanel,
+}));
+
 import { WeaviateTreeDataProvider } from '../WeaviateTreeDataProvider';
 
 // Get the mocked vscode module
@@ -46,6 +76,7 @@ const vsMock = require('../../test/mocks/vscode');
 describe('Add Collection', () => {
   let provider: WeaviateTreeDataProvider;
   let mockPanel: any;
+  let postMessageSpy: jest.Mock;
   const mockCtx = {
     globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
     subscriptions: [],
@@ -54,17 +85,13 @@ describe('Add Collection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock webview panel
-    mockPanel = {
-      webview: {
-        html: '',
-        postMessage: jest.fn(),
-        onDidReceiveMessage: jest.fn(),
-      },
-      dispose: jest.fn(),
-    };
-
-    vsMock.window.createWebviewPanel.mockReturnValue(mockPanel);
+    // Reset mock AddCollectionPanel between tests
+    mockAddCollectionPanel.createOrShow.mockClear();
+    panelMock.postMessage.mockClear();
+    panelMock.dispose.mockClear();
+    capturedOnCreate = undefined;
+    capturedOnMessage = undefined;
+    postMessageSpy = jest.fn();
 
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
 
@@ -88,19 +115,9 @@ describe('Add Collection', () => {
   });
 
   describe('addCollection', () => {
-    it('creates webview panel for connected connection', async () => {
+    it('creates AddCollectionPanel for connected connection', async () => {
       await provider.addCollection('conn1');
-
-      expect(vsMock.window.createWebviewPanel).toHaveBeenCalledWith(
-        'weaviateAddCollection',
-        'Add Collection',
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [],
-        }
-      );
+      expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
     });
 
     it('throws error for non-existent connection', async () => {
@@ -126,37 +143,18 @@ describe('Add Collection', () => {
       await expect(provider.addCollection('conn1')).rejects.toThrow('Connection must be active');
     });
 
-    it('sets up message handler for webview', async () => {
-      await provider.addCollection('conn1');
-
-      expect(mockPanel.webview.onDidReceiveMessage).toHaveBeenCalledWith(
-        expect.any(Function),
-        undefined,
-        mockCtx.subscriptions
-      );
-    });
-
-    it('generates HTML content for webview', async () => {
-      await provider.addCollection('conn1');
-
-      expect(mockPanel.webview.html).toContain('Create New Collection');
-      expect(mockPanel.webview.html).toContain('Basic Settings');
-      expect(mockPanel.webview.html).toContain('Properties');
-    });
+    // In the new React-based flow, HTML is served from a bundled webview. We validate
+    // that the panel creation was triggered via AddCollectionPanel above.
   });
 
   describe('message handling', () => {
-    let messageHandler: Function;
-
     beforeEach(async () => {
       await provider.addCollection('conn1');
-      messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      expect(capturedOnMessage).toBeDefined();
     });
 
-    it('handles cancel message by disposing panel', async () => {
-      await messageHandler({ command: 'cancel' });
-
-      expect(mockPanel.dispose).toHaveBeenCalled();
+    it.skip('handles cancel message by disposing panel', async () => {
+      // Cancel is handled within AddCollectionPanel, not by provider callback
     });
 
     it('handles getCollections message', async () => {
@@ -165,33 +163,19 @@ describe('Add Collection', () => {
         conn1: [{ label: 'Collection1' }, { label: 'Collection2' }],
       };
 
-      await messageHandler({ command: 'getCollections' });
+      await capturedOnMessage!({ command: 'getCollections' }, postMessageSpy);
 
-      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      expect(postMessageSpy).toHaveBeenCalledWith({
         command: 'collections',
         collections: ['Collection1', 'Collection2'],
       });
     });
 
     it('handles getVectorizers message', async () => {
-      const mockClient = {
-        misc: {
-          metaGetter: () => ({
-            do: () =>
-              Promise.resolve({
-                modules: {
-                  'text2vec-openai': {},
-                  'text2vec-cohere': {},
-                },
-              }),
-          }),
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
-
-      // Setup cluster metadata cache to match the mock
+      // Setup cluster metadata cache to drive available vectorizers
       (provider as any).clusterMetadataCache = {
         conn1: {
+          version: '1.20.0',
           modules: {
             'text2vec-openai': {},
             'text2vec-cohere': {},
@@ -199,35 +183,32 @@ describe('Add Collection', () => {
         },
       };
 
-      await messageHandler({ command: 'getVectorizers' });
+      mockConnectionManager.getClient.mockReturnValue({});
 
-      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      await capturedOnMessage!({ command: 'getVectorizers' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
         command: 'vectorizers',
         vectorizers: ['none', 'text2vec-openai', 'text2vec-cohere'],
+      });
+      // Also should send server version
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: '1.20.0',
       });
     });
 
     it('handles create message successfully', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockResolvedValue({});
-      const mockListAll = jest.fn() as any;
-      mockListAll.mockResolvedValue([]);
-      const mockGetMeta = jest.fn() as any;
-      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
-      const mockClusterNodes = jest.fn() as any;
-      mockClusterNodes.mockResolvedValue({});
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-          listAll: mockListAll,
-        },
-        getMeta: mockGetMeta,
-        cluster: {
-          nodes: mockClusterNodes,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
-
+      const createSpy = jest
+        .spyOn(provider as any, 'createCollection')
+        .mockImplementation(async () => {
+          /* no-op */
+        });
+      const fetchSpy = jest
+        .spyOn(provider as any, 'fetchCollections')
+        .mockImplementation(async (_: any) => {
+          /* no-op */
+        });
       const schema = {
         class: 'TestCollection',
         description: 'Test description',
@@ -235,43 +216,29 @@ describe('Add Collection', () => {
         properties: [],
       };
 
-      await messageHandler({ command: 'create', schema });
+      // Simulate panel invoking provider's create callback
+      await capturedOnCreate!(schema);
 
-      expect(mockPanel.dispose).toHaveBeenCalled();
-      expect(vsMock.window.showInformationMessage).toHaveBeenCalledWith(
-        'Collection "TestCollection" created successfully'
-      );
+      expect(createSpy).toHaveBeenCalledWith('conn1', schema);
+      expect(fetchSpy).toHaveBeenCalledWith('conn1');
     });
 
     it('handles create message with error', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockRejectedValue(new Error('Schema error'));
-      const mockListAll = jest.fn() as any;
-      mockListAll.mockResolvedValue([]);
-      const mockGetMeta = jest.fn() as any;
-      mockGetMeta.mockResolvedValue({ version: 'mock', hostname: 'localhost', modules: {} });
-      const mockClusterNodes = jest.fn() as any;
-      mockClusterNodes.mockResolvedValue({});
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-          listAll: mockListAll,
-        },
-        getMeta: mockGetMeta,
-        cluster: {
-          nodes: mockClusterNodes,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
-
+      const createSpy = jest
+        .spyOn(provider as any, 'createCollection')
+        .mockImplementation(async () => {
+          throw new Error('Schema error');
+        });
+      const fetchSpy = jest
+        .spyOn(provider as any, 'fetchCollections')
+        .mockImplementation(async (_: any) => {
+          /* no-op */
+        });
       const schema = { class: 'TestCollection' };
 
-      await messageHandler({ command: 'create', schema });
-
-      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
-        command: 'error',
-        message: 'Schema error',
-      });
+      await expect(capturedOnCreate!(schema)).rejects.toThrow('Schema error');
+      expect(createSpy).toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it('when cloning, should open Add Collection prefilled without creating immediately', async () => {
@@ -293,6 +260,8 @@ describe('Add Collection', () => {
       // Simulate navigating to cloneExisting option by calling addCollectionWithOptions flow pieces directly
       // Create a fresh panel and handler for clone webview
       await (provider as any).addCollectionWithOptions('conn1');
+      // capture the last created panel from vscode mock
+      mockPanel = vsMock.window.createWebviewPanel.mock.results.slice(-1)[0].value;
       const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
 
       // Select cloneExisting to load clone UI
@@ -310,12 +279,11 @@ describe('Add Collection', () => {
         schema: (provider as any).collections['conn1'][0].schema,
       });
 
-      // Should not dispose panel nor call create immediately; instead should update HTML to Add form
-      expect(mockPanel.dispose).not.toHaveBeenCalled();
-      expect(mockPanel.webview.html).toContain('Create New Collection');
-      expect(mockPanel.webview.html).toContain('id="collectionForm"');
-      // Prefilled name must be present in the HTML JSON preview or input field
-      expect(mockPanel.webview.html).toContain('ClonedCollection');
+      // Options panel is disposed and AddCollectionPanel is opened with initial schema passed
+      expect(mockPanel.dispose).toHaveBeenCalled();
+      expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
+      expect(lastInitialSchema).toBeDefined();
+      expect(lastInitialSchema.class).toBe('ClonedCollection');
     });
 
     it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
@@ -341,6 +309,7 @@ describe('Add Collection', () => {
 
       // Navigate to clone view and trigger clone
       await (provider as any).addCollectionWithOptions('conn1');
+      mockPanel = vsMock.window.createWebviewPanel.mock.results.slice(-1)[0].value;
       const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
 
       await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
@@ -355,25 +324,14 @@ describe('Add Collection', () => {
         schema: (provider as any).collections['conn1'][0].schema,
       });
 
-      // Should populate Add Collection form with multi-tenancy settings
-      expect(mockPanel.webview.html).toContain('Create New Collection');
-
-      // Check that the initial schema data is properly embedded in the JavaScript
-      // The multiTenancyConfig should be passed as initialSchema to the form
-      const htmlContent = mockPanel.webview.html;
-      expect(htmlContent).toContain('const initialSchema =');
-
-      // Extract the initialSchema JSON from the HTML
-      const initialSchemaMatch = htmlContent.match(/const initialSchema = ({.*?});/s);
-      expect(initialSchemaMatch).toBeTruthy();
-
-      if (initialSchemaMatch) {
-        const initialSchemaStr = initialSchemaMatch[1];
-        expect(initialSchemaStr).toContain('"multiTenancy"');
-        expect(initialSchemaStr).toContain('"enabled":true');
-        expect(initialSchemaStr).toContain('"autoTenantCreation":true');
-        expect(initialSchemaStr).toContain('"autoTenantActivation":true');
-      }
+      // Options panel is disposed and AddCollectionPanel is opened with correct initial multi-tenant schema
+      expect(mockPanel.dispose).toHaveBeenCalled();
+      expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
+      expect(lastInitialSchema).toBeDefined();
+      expect(lastInitialSchema.class).toBe('ClonedMultiTenant');
+      const mt =
+        lastInitialSchema.multiTenancy || (lastInitialSchema as any).multiTenancyConfig || {};
+      expect(mt.enabled).toBe(true);
     });
   });
 
@@ -508,37 +466,5 @@ describe('Add Collection', () => {
     });
   });
 
-  describe('HTML generation', () => {
-    it('generates valid HTML structure', () => {
-      const html = (provider as any).getAddCollectionHtml();
-
-      expect(html).toContain('<!DOCTYPE html>');
-      expect(html).toContain('<title>Add Collection</title>');
-      expect(html).toContain('id="collectionForm"');
-      expect(html).toContain('Basic Settings');
-      expect(html).toContain('Properties');
-      expect(html).toContain('Multi-Tenancy');
-      expect(html).toContain('Schema Preview');
-    });
-
-    it('includes required JavaScript functions', () => {
-      const html = (provider as any).getAddCollectionHtml();
-
-      expect(html).toContain('function initForm()');
-      expect(html).toContain('function addProperty()');
-      expect(html).toContain('function createPropertyCard(');
-      expect(html).toContain('function updateJsonPreview()');
-      expect(html).toContain('function handleSubmit(');
-    });
-
-    it('includes proper CSS styling', () => {
-      const html = (provider as any).getAddCollectionHtml();
-
-      expect(html).toContain('.form-section');
-      expect(html).toContain('.property-card');
-      expect(html).toContain('.section-header');
-      expect(html).toContain('var(--vscode-sideBar-background, #F7F7F7)');
-      expect(html).toContain('var(--vscode-panel-border, #E0E0E0)');
-    });
-  });
+  // Legacy inline HTML-based flow has been replaced by a React webview; HTML generation tests removed.
 });

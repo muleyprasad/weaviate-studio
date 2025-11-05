@@ -2519,10 +2519,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
   }
 
+  // LEGACY: The following methods are no longer used for the main "Add Collection" flow.
+  // They have been replaced by AddCollectionPanel (React webview) in src/views/AddCollectionPanel.ts
+  // These can be safely removed once all migration is verified complete.
+
   /**
    * Generates HTML for the Add Collection webview
    * @param initialSchema - Optional initial schema to pre-populate the form
    * @returns The HTML content for the webview
+   * @deprecated Use AddCollectionPanel instead
    */
   private getAddCollectionHtml(initialSchema?: any): string {
     return `
@@ -5481,6 +5486,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @param panel - The webview panel
    * @param connectionId - The connection ID
    * @param showOptionsOnBack - Whether to show options on back (for multi-step flow)
+   * @deprecated Use AddCollectionPanel instead
    */
   private setupAddCollectionMessageHandlers(
     panel: vscode.WebviewPanel,
