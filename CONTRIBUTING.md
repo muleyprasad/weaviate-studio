@@ -103,7 +103,7 @@ The Add Collection UI is provided by an external React component package: [`weav
 1. **Update the dependency**
 
    ```bash
-   npm install github:dudanogueira/weaviate-add-collection@latest
+   npm install github:dudanogueira/weaviate-add-collection
    ```
 
 2. **Or to a specific commit/branch/tag:**

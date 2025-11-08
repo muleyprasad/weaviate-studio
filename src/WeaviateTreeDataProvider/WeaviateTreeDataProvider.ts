@@ -2289,6 +2289,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                   command: 'serverVersion',
                   version: version || 'unknown',
                 });
+
+                // Send the number of nodes
+                const nodesNumber = this.clusterNodesCache[connectionId]?.length || 1;
+                postMessage({
+                  command: 'nodesNumber',
+                  nodesNumber: nodesNumber,
+                });
               } catch (error) {
                 postMessage({
                   command: 'error',
@@ -2419,7 +2426,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // Build schema object
     const schemaObject = {
       class: schema.class,
-      description: schema.description || undefined,
       properties: (schema.properties || []).map((p: any) => {
         // Normalize incoming dataType to canonical string with [] suffix for arrays
         let dt: any = p?.dataType;
@@ -2433,6 +2439,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return { ...p, dataType: normalizedDt };
       }), // Include properties from the form
     } as any;
+
+    // Add description if provided (don't include if empty to avoid sending empty strings)
+    if (schema.description && schema.description.trim()) {
+      schemaObject.description = schema.description;
+    }
 
     // Handle vectorConfig (new multi-vectorizer format)
     if (schema.vectorConfig) {
@@ -2455,6 +2466,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // Handle multiTenancyConfig
     if (schema.multiTenancyConfig) {
       schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
+    }
+
+    // Handle replicationConfig
+    if (schema.replicationConfig) {
+      schemaObject.replicationConfig = schema.replicationConfig;
     }
 
     // Create the collection using the schema API

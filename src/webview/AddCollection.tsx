@@ -34,6 +34,7 @@ function AddCollectionWebview() {
   const [vectorizers, setVectorizers] = useState<string[]>([]);
   const [serverVersion, setServerVersion] = useState<string>('unknown');
   const [collections, setCollections] = useState<string[]>([]);
+  const [nodesNumber, setNodesNumber] = useState<number>(1);
 
   useEffect(() => {
     // Request initial data from extension
@@ -67,6 +68,9 @@ function AddCollectionWebview() {
           break;
         case 'initialSchema':
           setInitialSchema(message.schema);
+          break;
+        case 'nodesNumber':
+          setNodesNumber(message.nodesNumber || 1);
           break;
         case 'error':
           alert(`Error: ${message.message}`);
@@ -118,6 +122,7 @@ function AddCollectionWebview() {
           key={initialSchema ? JSON.stringify(initialSchema) : 'empty'}
           initialJson={initialSchema}
           availableModules={availableModules}
+          nodesNumber={nodesNumber}
         />
       </div>
 
