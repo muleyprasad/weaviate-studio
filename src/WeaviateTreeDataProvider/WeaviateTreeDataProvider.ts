@@ -2177,6 +2177,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       properties: fixed_properties,
     };
 
+    // Add description if it exists
+    if (schema.description) {
+      apiSchema.description = schema.description;
+    }
+
     if (schema.invertedIndex) {
       apiSchema.invertedIndexConfig = schema.invertedIndex;
     }
