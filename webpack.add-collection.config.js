@@ -138,6 +138,8 @@ module.exports = {
       'react': path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
+    // Allow resolving modules without explicit extensions even in ESM context
+    fullySpecified: false,
   },
   module: {
     rules: [
@@ -157,6 +159,10 @@ module.exports = {
               ['@babel/preset-env', { targets: { node: 'current' } }]
             ],
           },
+        },
+        // Disable fullySpecified for weaviate-add-collection to allow imports without extensions
+        resolve: {
+          fullySpecified: false,
         },
       },
       // CSS is now injected inline, so we skip the loaders
