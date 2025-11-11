@@ -42,38 +42,60 @@ class InjectCssPlugin {
       HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
         'InjectCssPlugin',
         (data, cb) => {
+          const cssFiles = [
+            { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base', required: true },
+            { path: path.resolve(__dirname, 'node_modules/weaviate-add-collection/src/styles.css'), name: 'Component Library Styles', required: true },
+            { path: path.resolve(__dirname, 'src/webview/AddCollection.override.css'), name: 'VS Code Theme Overrides', required: true },
+            { path: path.resolve(__dirname, 'src/webview/AddCollection.css'), name: 'Custom Webview Styles', required: true },
+          ];
+
           try {
+            // Validate all CSS files exist before reading
+            const missingFiles = cssFiles.filter(file => !fs.existsSync(file.path));
+            if (missingFiles.length > 0) {
+              const errorMsg = `InjectCssPlugin: Missing required CSS files:\n${missingFiles.map(f => `  - ${f.name}: ${f.path}`).join('\n')}`;
+              compilation.errors.push(new Error(errorMsg));
+              return cb(new Error(errorMsg));
+            }
+
             // Read all CSS files
-            const themeCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/theme.css'), 'utf8');
-            const componentCss = fs.readFileSync(path.resolve(__dirname, 'node_modules/weaviate-add-collection/src/styles.css'), 'utf8');
-            const overrideCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/AddCollection.override.css'), 'utf8');
-            const customCss = fs.readFileSync(path.resolve(__dirname, 'src/webview/AddCollection.css'), 'utf8');
+            const cssContents = cssFiles.map(file => {
+              try {
+                const content = fs.readFileSync(file.path, 'utf8');
+                return { ...file, content };
+              } catch (error) {
+                const errorMsg = `InjectCssPlugin: Failed to read ${file.name} (${file.path}): ${error.message}`;
+                throw new Error(errorMsg);
+              }
+            });
             
             // Combine all CSS
-            const allCss = `
-              /* VS Code Theme Base */
-              ${themeCss}
-              
-              /* Component Library Styles */
-              ${componentCss}
-              
-              /* VS Code Theme Overrides */
-              ${overrideCss}
-              
-              /* Custom Webview Styles */
-              ${customCss}
-            `;
+            const allCss = cssContents.map(({ name, content }) => 
+              `/* ${name} */\n${content}`
+            ).join('\n\n');
             
             // Inject CSS into HTML
-            data.html = data.html.replace(
+            const injectedHtml = data.html.replace(
               '</head>',
               `<style id="injected-styles">${allCss}</style></head>`
             );
+
+            // Verify injection succeeded
+            if (injectedHtml === data.html) {
+              const errorMsg = 'InjectCssPlugin: Failed to inject CSS - </head> tag not found in HTML template';
+              compilation.errors.push(new Error(errorMsg));
+              return cb(new Error(errorMsg));
+            }
+
+            data.html = injectedHtml;
+            cb(null, data);
           } catch (error) {
-            console.error('Error injecting CSS:', error);
+            // Log to console for immediate visibility
+            console.error('\x1b[31m%s\x1b[0m', `❌ ${error.message}`);
+            // Add to compilation errors to fail the build
+            compilation.errors.push(error);
+            cb(error);
           }
-          
-          cb(null, data);
         }
       );
     });
