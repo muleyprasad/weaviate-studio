@@ -514,6 +514,30 @@ export class GraphQLEditor {
       }
     }
 
+    // Soft warn for distance thresholds (metric-dependent)
+    const distanceRegex = /distance:\s*([0-9]*\.?[0-9]+)/gi;
+    while ((match = distanceRegex.exec(value)) !== null) {
+      const distance = parseFloat(match[1]);
+      const startLineNumber = model.getPositionAt(match.index).lineNumber;
+      const startColumn = model.getPositionAt(match.index).column;
+      const endLineNumber = model.getPositionAt(match.index + match[0].length).lineNumber;
+      const endColumn = model.getPositionAt(match.index + match[0].length).column;
+
+      // Do not hard error; ranges depend on the distance metric (cosine, dot, euclidean).
+      // Warn on obviously invalid negatives and unusually high thresholds.
+      if (distance < 0 || distance > 10) {
+        markers.push({
+          severity: monaco.MarkerSeverity.Warning,
+          message:
+            'Distance thresholds are metric-dependent (e.g., cosine typically ~0-2). Lower values are stricter. Verify the metric and tune accordingly.',
+          startLineNumber,
+          startColumn,
+          endLineNumber,
+          endColumn,
+        });
+      }
+    }
+
     // Set markers on the model
     monaco.editor.setModelMarkers(model, 'query-validator', markers);
   }

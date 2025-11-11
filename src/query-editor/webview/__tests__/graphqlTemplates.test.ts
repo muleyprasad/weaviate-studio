@@ -96,3 +96,40 @@ describe('graphqlTemplates helpers', () => {
     });
   });
 });
+
+describe('nearText validity and templates', () => {
+  it('dynamic nearText does not include properties field', () => {
+    const { generateDynamicNearTextQuery } = require('../graphqlTemplates');
+    const classSchema = {
+      class: COLLECTION,
+      properties: [{ name: 'title', dataType: ['text'] }],
+    } as any;
+
+    const q: string = generateDynamicNearTextQuery(COLLECTION, classSchema, 10, {});
+    expect(q).not.toContain('properties:');
+    expect(q).toContain('nearText');
+  });
+
+  it('includes nearObject template and processes it', () => {
+    const { queryTemplates, processTemplate } = require('../graphqlTemplates');
+    const names: string[] = queryTemplates.map((t: any) => t.name);
+    expect(names).toContain('Vector Search (nearObject)');
+
+    const q: string = processTemplate('Vector Search (nearObject)', COLLECTION, 5);
+    expect(q).toContain('nearObject');
+    expect(q).toContain(COLLECTION);
+  });
+
+  it('does not expose mutation templates', () => {
+    const { queryTemplates } = require('../graphqlTemplates');
+    const names: string[] = queryTemplates.map((t: any) => t.name);
+
+    expect(names).not.toContain('Insert Mutation');
+    expect(names).not.toContain('Update Mutation');
+    expect(names).not.toContain('Delete Mutation');
+    expect(names).not.toContain('Batch Insert Mutation');
+    expect(names).not.toContain('Batch Update Mutation');
+    expect(names).not.toContain('Batch Delete Mutation');
+    expect(names).not.toContain('Tenant Update Mutation');
+  });
+});
