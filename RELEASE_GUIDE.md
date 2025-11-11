@@ -8,7 +8,7 @@ This guide covers the complete process for releasing the Weaviate Studio extensi
 
 - [ ] All tests passing (`npm test`)
 - [ ] Linting passes (`npm run lint`)
-- [ ] Extension builds successfully (`npm run compile && npm run build:webview`)
+- [ ] Extension builds successfully (`npm run compile && npm run build:webview && npm run build:add-collection`)
 - [ ] Manual testing completed across supported VS Code versions
 - [ ] All features working as expected
 
@@ -66,6 +66,7 @@ This guide covers the complete process for releasing the Weaviate Studio extensi
 # 1. Build the extension
 npm run compile
 npm run build:webview
+npm run build:add-collection
 
 # 2. Package the extension
 vsce package
@@ -196,6 +197,7 @@ npm test
 # Build extension
 npm run compile
 npm run build:webview
+npm run build:add-collection
 
 # Package for testing
 vsce package

@@ -975,13 +975,19 @@ client.collections.createFromSchema(schema)`;
     // if tokenization for "none", make undefined
     const fixed_properties =
       schema.properties?.map(
-        (prop: { dataType: string | string[]; tokenization?: string; indexInverted?: string }) => {
+        (prop: {
+          dataType: string | string[];
+          tokenization?: string;
+          indexInverted?: boolean;
+          indexSearchable?: boolean;
+        }) => {
           const dt = Array.isArray(prop.dataType) ? prop.dataType[0] : prop.dataType;
           return {
             ...prop,
             dataType: dt,
             tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-            indexSearchable: prop.indexInverted,
+            indexSearchable:
+              prop.indexSearchable !== undefined ? prop.indexSearchable : prop.indexInverted,
           };
         }
       ) || [];

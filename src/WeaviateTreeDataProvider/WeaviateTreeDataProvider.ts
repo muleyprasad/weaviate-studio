@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
+import { AddCollectionPanel } from '../views/AddCollectionPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -2050,32 +2051,118 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @returns The formatted schema ready for API consumption
    */
   private convertSchemaToApiFormat(schema: any): any {
-    const fixed_properties =
-      schema.properties?.map((prop: any) => {
-        // Normalize dataType to the v2 string format (not array)
-        let dt = prop?.dataType;
-        if (Array.isArray(dt)) {
-          dt = dt[0];
-        }
-        return {
-          ...prop,
-          dataType: dt,
-          tokenization: prop.tokenization === 'none' ? undefined : prop.tokenization,
-          indexSearchable: prop.indexInverted,
-        };
-      }) || [];
+    // Convert properties to request format: ensure dataType is array, move vectorizerConfig -> moduleConfig, drop indexInverted
+    const fixed_properties = (schema.properties || []).map((prop: any) => {
+      const dataType = Array.isArray(prop?.dataType)
+        ? prop.dataType
+        : [prop?.dataType].filter(Boolean);
 
-    const fixed_vectorizers = schema.vectorizers
+      const { vectorizerConfig, indexInverted, ...rest } = prop || {};
+      const converted: any = {
+        ...rest,
+        dataType,
+      };
+
+      if (vectorizerConfig) {
+        converted.moduleConfig = vectorizerConfig;
+      }
+
+      // If tokenization explicitly 'none', omit it
+      if (converted.tokenization === 'none') {
+        delete converted.tokenization;
+      }
+
+      return converted;
+    });
+
+    // Convert vectorizers -> vectorConfig with proper index mapping
+    const fixed_vectorConfig = schema.vectorizers
       ? Object.fromEntries(
           Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-            const vectorizerName = vec.vectorizer?.name || 'none';
-            const vectorizerConfig = vec.vectorizer?.config || {};
-            const vectorIndexType = vec.vectorIndexType || 'hnsw';
-            const vectorIndexConfig = vec.vectorIndexConfig || {};
+            // vectorizer
+            const vectorizerName = vec?.vectorizer?.name || 'none';
+            const vCfg: any = { ...(vec?.vectorizer?.config || {}) };
+            // rename vectorizeCollectionName -> vectorizeClassName if present
+            if (vCfg.vectorizeCollectionName !== undefined) {
+              vCfg.vectorizeClassName = vCfg.vectorizeCollectionName;
+              delete vCfg.vectorizeCollectionName;
+            }
+            // attach properties if present at this level
+            if (Array.isArray(vec?.properties) && vec.properties.length > 0) {
+              vCfg.properties = vec.properties;
+            }
+
+            // index type and config
+            const vectorIndexType = vec?.indexType || vec?.indexConfig?.type || 'hnsw';
+            const vectorIndexConfig: any = {};
+            const srcIdx = vec?.indexConfig || {};
+
+            // top-level distance
+            if (srcIdx.distance) {
+              vectorIndexConfig.distanceMetric = srcIdx.distance;
+            }
+            if (srcIdx.threshold !== undefined) {
+              vectorIndexConfig.threshold = srcIdx.threshold;
+            }
+            if (srcIdx.skip !== undefined) {
+              vectorIndexConfig.skip = srcIdx.skip;
+            }
+
+            // hnsw
+            if (srcIdx.hnsw) {
+              const h: any = { ...srcIdx.hnsw };
+              if (h.distance) {
+                h.distanceMetric = h.distance;
+                delete h.distance;
+              }
+              if (h.quantizer) {
+                const q = h.quantizer;
+                if (q.type === 'pq') {
+                  h.pq = {
+                    enabled: true,
+                    internalBitCompression: q.bitCompression || false,
+                    segments: q.segments,
+                    centroids: q.centroids,
+                    trainingLimit: q.trainingLimit,
+                    encoder: q.encoder,
+                  };
+                }
+                delete h.quantizer;
+              }
+              if (h.type) {
+                delete h.type;
+              }
+              vectorIndexConfig.hnsw = h;
+            }
+
+            // flat
+            if (srcIdx.flat) {
+              const f: any = { ...srcIdx.flat };
+              if (f.distance) {
+                f.distanceMetric = f.distance;
+                delete f.distance;
+              }
+              if (f.quantizer) {
+                const q = f.quantizer;
+                if (q.type === 'bq') {
+                  f.bq = {
+                    enabled: true,
+                    cache: q.cache || false,
+                    rescoreLimit: q.rescoreLimit ?? -1,
+                  };
+                }
+                delete f.quantizer;
+              }
+              if (f.type) {
+                delete f.type;
+              }
+              vectorIndexConfig.flat = f;
+            }
+
             return [
               key,
               {
-                vectorizer: { [vectorizerName]: vectorizerConfig },
+                vectorizer: { [vectorizerName]: vCfg },
                 vectorIndexType,
                 vectorIndexConfig,
               },
@@ -2084,22 +2171,36 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         )
       : undefined;
 
-    // now build the final schema object
-    const apiSchema = {
-      ...schema,
+    // Build final API schema from scratch (no spread) to avoid server-only fields
+    const apiSchema: any = {
       class: schema.name,
-      invertedIndexConfig: schema.invertedIndex,
-      moduleConfig: schema.generative,
-      multiTenancyConfig: schema.multiTenancy,
       properties: fixed_properties,
-      vectorConfig: fixed_vectorizers,
-    } as any;
+    };
 
-    // delete all indexInverted for all properties
-    apiSchema.properties?.forEach((prop: { indexInverted?: string }) => {
-      delete prop.indexInverted;
-    });
-    delete apiSchema.vectorizers;
+    // Add description if it exists
+    if (schema.description) {
+      apiSchema.description = schema.description;
+    }
+
+    if (schema.invertedIndex) {
+      apiSchema.invertedIndexConfig = schema.invertedIndex;
+    }
+    if (schema.multiTenancy) {
+      apiSchema.multiTenancyConfig = schema.multiTenancy;
+    }
+    if (schema.replication) {
+      apiSchema.replicationConfig = schema.replication;
+    }
+    if (schema.sharding) {
+      const { actualCount, actualVirtualCount, ...shardingConfig } = schema.sharding;
+      apiSchema.shardingConfig = shardingConfig;
+    }
+    if (fixed_vectorConfig) {
+      apiSchema.vectorConfig = fixed_vectorConfig;
+    }
+    if (schema.generative) {
+      apiSchema.moduleConfig = schema.generative;
+    }
 
     return apiSchema;
   }
@@ -2111,12 +2212,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   async exportSchema(connectionId: string, collectionName: string): Promise<void> {
     try {
-      const collection = this.collections[connectionId]?.find(
-        (col) => col.label === collectionName
-      ) as CollectionWithSchema | undefined;
-
-      if (!collection?.schema) {
-        throw new Error('Collection schema not found');
+      // Get the Weaviate client
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not found');
       }
 
       // Show save dialog
@@ -2132,12 +2231,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return; // User cancelled
       }
 
-      // Export schema as formatted JSON using the conversion helper
-      const schema = collection.schema;
-      const apiSchema = this.convertSchemaToApiFormat(schema);
+      // Export collection using client.collections.export() and convert to API format
+      const exportedSchema = await client.collections.export(collectionName);
+      const apiSchema = this.convertSchemaToApiFormat(exportedSchema);
       const schemaJson = JSON.stringify(apiSchema, null, 2);
       await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
 
+      console.log(`Collection "${collectionName}" exported successfully to ${saveUri.fsPath}`);
       vscode.window.showInformationMessage(`Schema exported to ${saveUri.fsPath}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2167,68 +2267,42 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     try {
-      // Create and show the Add Collection webview panel
-      const panel = vscode.window.createWebviewPanel(
-        'weaviateAddCollection',
-        'Add Collection',
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [],
-        }
-      );
-
-      // Set the webview content
-      panel.webview.html = this.getAddCollectionHtml(initialSchema);
-
-      // Handle messages from the webview
-      panel.webview.onDidReceiveMessage(
-        async (message) => {
+      // Create the panel with callbacks
+      const panel = AddCollectionPanel.createOrShow(
+        this.context.extensionUri,
+        async (schema: any) => {
+          // On create callback
+          await this.createCollection(connectionId, schema);
+          await this.fetchCollections(connectionId);
+        },
+        async (message: any, postMessage: (msg: any) => void) => {
+          // On message callback for handling webview requests
           switch (message.command) {
-            case 'create':
-              try {
-                await this.createCollection(connectionId, message.schema);
-                panel.dispose();
-                vscode.window.showInformationMessage(
-                  `Collection "${message.schema.class}" created successfully`
-                );
-                await this.fetchCollections(connectionId);
-              } catch (error) {
-                panel.webview.postMessage({
-                  command: 'error',
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              }
-              break;
-            case 'cancel':
-              panel.dispose();
-              break;
             case 'getVectorizers':
               try {
-                const client = this.connectionManager.getClient(connectionId);
                 const vectorizers = await this.getAvailableVectorizers(connectionId);
-
-                // Send vectorizers
-                panel.webview.postMessage({
+                const modules = this.clusterMetadataCache[connectionId]?.modules || {};
+                postMessage({
                   command: 'vectorizers',
                   vectorizers: vectorizers,
+                  modules: modules,
                 });
 
-                // Also send server version information
-                try {
-                  if (client) {
-                    const version = this.clusterMetadataCache[connectionId]?.version;
-                    panel.webview.postMessage({
-                      command: 'serverVersion',
-                      version: version || 'unknown',
-                    });
-                  }
-                } catch (_) {
-                  // ignore version errors
-                }
+                // Also send server version
+                const version = this.clusterMetadataCache[connectionId]?.version;
+                postMessage({
+                  command: 'serverVersion',
+                  version: version || 'unknown',
+                });
+
+                // Send the number of nodes
+                const nodesNumber = this.clusterNodesCache[connectionId]?.length || 1;
+                postMessage({
+                  command: 'nodesNumber',
+                  nodesNumber: nodesNumber,
+                });
               } catch (error) {
-                panel.webview.postMessage({
+                postMessage({
                   command: 'error',
                   message: `Failed to fetch vectorizers: ${error instanceof Error ? error.message : String(error)}`,
                 });
@@ -2237,24 +2311,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             case 'getCollections':
               try {
                 const collections = this.collections[connectionId] || [];
-                panel.webview.postMessage({
+                postMessage({
                   command: 'collections',
                   collections: collections.map((col) => col.label),
                 });
               } catch (error) {
-                panel.webview.postMessage({
+                postMessage({
                   command: 'error',
                   message: `Failed to fetch collections: ${error instanceof Error ? error.message : String(error)}`,
                 });
               }
               break;
-            case 'serverVersion':
-              // serverVersion handled in webview only
-              break;
           }
         },
-        undefined,
-        this.context.subscriptions
+        initialSchema
       );
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2302,9 +2372,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               // Handle option selection
               switch (message.option) {
                 case 'fromScratch':
-                  // Switch to the existing add collection form
-                  panel.webview.html = this.getAddCollectionHtml();
-                  this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+                  // Close the options panel and open the new Add Collection panel
+                  panel.dispose();
+                  await this.addCollection(connectionId);
                   break;
                 case 'cloneExisting':
                   // Show clone collection selection first
@@ -2361,7 +2431,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // Build schema object
     const schemaObject = {
       class: schema.class,
-      description: schema.description || undefined,
       properties: (schema.properties || []).map((p: any) => {
         // Normalize incoming dataType to canonical string with [] suffix for arrays
         let dt: any = p?.dataType;
@@ -2375,6 +2444,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return { ...p, dataType: normalizedDt };
       }), // Include properties from the form
     } as any;
+
+    // Add description if provided (don't include if empty to avoid sending empty strings)
+    if (schema.description && schema.description.trim()) {
+      schemaObject.description = schema.description;
+    }
 
     // Handle vectorConfig (new multi-vectorizer format)
     if (schema.vectorConfig) {
@@ -2399,8 +2473,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
     }
 
+    // Handle replicationConfig
+    if (schema.replicationConfig) {
+      schemaObject.replicationConfig = schema.replicationConfig;
+    }
+
     // Create the collection using the schema API
-    await client.collections.createFromSchema(schemaObject);
+    // return if any error here
+    try {
+      await client.collections.createFromSchema(schemaObject);
+    } catch (error) {
+      // on error, show dialog with error message
+      console.error('Error creating collection:', error);
+      throw error;
+    }
   }
 
   /**
@@ -2456,10 +2542,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
   }
 
+  // LEGACY: The following methods are no longer used for the main "Add Collection" flow.
+  // They have been replaced by AddCollectionPanel (React webview) in src/views/AddCollectionPanel.ts
+  // These can be safely removed once all migration is verified complete.
+
   /**
    * Generates HTML for the Add Collection webview
    * @param initialSchema - Optional initial schema to pre-populate the form
    * @returns The HTML content for the webview
+   * @deprecated Use AddCollectionPanel instead
    */
   private getAddCollectionHtml(initialSchema?: any): string {
     return `
@@ -4619,6 +4710,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                             command: 'cancel'
                         });
                     }
+
+          // Handle messages from the extension (e.g., error reporting)
+          window.addEventListener('message', (event) => {
+            const message = event.data;
+            if (!message || !message.command) return;
+            switch (message.command) {
+              case 'error':
+                // Display errors coming from the extension (e.g., import/creation failures)
+                showError(message.message || 'An unknown error occurred');
+                break;
+              default:
+                // No-op for other commands (reserved for future use)
+                break;
+            }
+          });
                 </script>
             </body>
             </html>
@@ -5211,9 +5317,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     </div>
                 </div>
                 
-                <script>
-                    const vscode = acquireVsCodeApi();
-                    let selectedSchema = null;
+        <script>
+          const vscode = acquireVsCodeApi();
+          let selectedSchema = null;
+          let creating = false;
                     
                     function selectFile() {
                         document.getElementById('fileInput').click();
@@ -5309,12 +5416,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                     }
                     
-                    function createCollection() {
-                        if (!selectedSchema) {
+          function createCollection() {
+            if (creating) return;
+            if (!selectedSchema) {
                             showError('Please select a valid JSON file');
                             return;
                         }
-                        
+            // Set busy state to prevent duplicate submissions
+            const createBtn = document.getElementById('createButton');
+            const editBtn = document.getElementById('editBeforeButton');
+            creating = true;
+            if (createBtn) {
+              createBtn.disabled = true;
+              createBtn.textContent = 'Creating…';
+            }
+            if (editBtn) {
+              editBtn.disabled = true;
+            }
+
                         vscode.postMessage({
                             command: 'import',
                             schema: selectedSchema
@@ -5355,11 +5474,30 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                         });
                     }
                     
-                    function cancel() {
+          function cancel() {
                         vscode.postMessage({
                             command: 'cancel'
                         });
                     }
+
+          // Receive messages from extension (e.g., error feedback)
+          window.addEventListener('message', (event) => {
+            const message = event.data || {};
+            if (message.command === 'error') {
+              showError(message.message || 'An unknown error occurred');
+              // reset busy state so user can retry
+              const createBtn = document.getElementById('createButton');
+              const editBtn = document.getElementById('editBeforeButton');
+              creating = false;
+              if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create';
+              }
+              if (editBtn) {
+                editBtn.disabled = false;
+              }
+            }
+          });
                 </script>
             </body>
             </html>
@@ -5371,6 +5509,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @param panel - The webview panel
    * @param connectionId - The connection ID
    * @param showOptionsOnBack - Whether to show options on back (for multi-step flow)
+   * @deprecated Use AddCollectionPanel instead
    */
   private setupAddCollectionMessageHandlers(
     panel: vscode.WebviewPanel,
@@ -5510,10 +5649,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 class: message.newCollectionName,
               };
 
-              // Instead of creating immediately, open the Add Collection form
-              // pre-filled with the cloned schema so the user can review/edit
-              panel.webview.html = this.getAddCollectionHtml(clonedSchema);
-              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+              // Close the clone panel and open the new Add Collection panel with cloned schema
+              panel.dispose();
+              await this.addCollection(connectionId, clonedSchema);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',
@@ -5561,9 +5699,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             break;
           case 'editBefore':
             try {
-              // Open the Add Collection form pre-filled with the imported schema
-              panel.webview.html = this.getAddCollectionHtml(message.schema);
-              this.setupAddCollectionMessageHandlers(panel, connectionId, true);
+              // Close the import panel and open the new Add Collection panel with imported schema
+              panel.dispose();
+              await this.addCollection(connectionId, message.schema);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',

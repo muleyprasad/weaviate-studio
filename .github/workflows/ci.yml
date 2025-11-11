@@ -57,6 +57,9 @@ jobs:
     
     - name: Build webview
       run: npm run build:webview
+    
+    - name: Build add-collection webview
+      run: npm run build:add-collection
 
   build:
     needs: [lint, test]
@@ -83,6 +86,9 @@ jobs:
     
     - name: Build webview
       run: npm run build:webview
+    
+    - name: Build add-collection webview
+      run: npm run build:add-collection
     
     - name: Package extension
       run: vsce package
@@ -119,6 +125,9 @@ jobs:
     
     - name: Build webview
       run: npm run build:webview
+    
+    - name: Build add-collection webview
+      run: npm run build:add-collection
     
     - name: Publish to VS Code Marketplace
       run: vsce publish
@@ -165,6 +174,9 @@ jobs:
     
     - name: Build webview
       run: npm run build:webview
+    
+    - name: Build add-collection webview
+      run: npm run build:add-collection
     
     - name: Package extension
       run: vsce package
