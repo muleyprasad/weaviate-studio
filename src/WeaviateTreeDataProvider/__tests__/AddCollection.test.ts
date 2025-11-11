@@ -190,6 +190,10 @@ describe('Add Collection', () => {
       expect(postMessageSpy).toHaveBeenCalledWith({
         command: 'vectorizers',
         vectorizers: ['none', 'text2vec-openai', 'text2vec-cohere'],
+        modules: {
+          'text2vec-openai': {},
+          'text2vec-cohere': {},
+        },
       });
       // Also should send server version
       expect(postMessageSpy).toHaveBeenCalledWith({
