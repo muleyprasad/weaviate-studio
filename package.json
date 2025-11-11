@@ -379,7 +379,7 @@
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",
     "react-json-view-lite": "^2.4.1",
-    "weaviate-add-collection": "github:dudanogueira/weaviate-add-collection",
+    "weaviate-add-collection": "https://github.com/dudanogueira/weaviate-add-collection.git",
     "weaviate-client": "^3.8.0"
   }
 }
