@@ -35,6 +35,7 @@ function AddCollectionWebview() {
   const [serverVersion, setServerVersion] = useState<string>('unknown');
   const [collections, setCollections] = useState<string[]>([]);
   const [nodesNumber, setNodesNumber] = useState<number>(1);
+  const [currentSchema, setCurrentSchema] = useState<any>(null);
 
   useEffect(() => {
     // Request initial data from extension
@@ -83,25 +84,31 @@ function AddCollectionWebview() {
   }, []);
 
   const handleCreate = () => {
-    // Get the generated JSON from the Collection component
-    // We need to extract it from the component's state
-    // For now, we'll try to parse it from the DOM
-    const jsonElement = document.querySelector('.json-block');
-    if (jsonElement && jsonElement.textContent) {
-      try {
-        const schema = JSON.parse(jsonElement.textContent);
-        if (vscode) {
-          vscode.postMessage({
-            command: 'create',
-            schema: schema,
-          });
-        }
-      } catch (error) {
-        alert('Failed to parse collection schema. Please check your input.');
-        console.error('Parse error:', error);
+    // Use the schema from the onChange/onSubmit callback
+    if (currentSchema) {
+      if (vscode) {
+        vscode.postMessage({
+          command: 'create',
+          schema: currentSchema,
+        });
       }
     } else {
       alert('No schema found. Please fill in the collection details.');
+    }
+  };
+
+  const handleSchemaChange = (schema: any) => {
+    // Store the schema whenever it changes
+    setCurrentSchema(schema);
+  };
+
+  const handleSchemaSubmit = (schema: any) => {
+    // Handle submission directly from the component
+    if (vscode) {
+      vscode.postMessage({
+        command: 'create',
+        schema: schema,
+      });
     }
   };
 
@@ -123,6 +130,8 @@ function AddCollectionWebview() {
           initialJson={initialSchema}
           availableModules={availableModules}
           nodesNumber={nodesNumber}
+          onChange={handleSchemaChange}
+          onSubmit={handleSchemaSubmit}
         />
       </div>
 
