@@ -31,9 +31,6 @@ interface AddCollectionProps {
 function AddCollectionWebview() {
   const [initialSchema, setInitialSchema] = useState<any>(null);
   const [availableModules, setAvailableModules] = useState<any>(null);
-  const [vectorizers, setVectorizers] = useState<string[]>([]);
-  const [serverVersion, setServerVersion] = useState<string>('unknown');
-  const [collections, setCollections] = useState<string[]>([]);
   const [nodesNumber, setNodesNumber] = useState<number>(1);
   const [currentSchema, setCurrentSchema] = useState<any>(null);
 
@@ -46,8 +43,6 @@ function AddCollectionWebview() {
       } catch (e) {
         console.error('[AddCollection] Failed to post ready message', e);
       }
-      vscode.postMessage({ command: 'getVectorizers' });
-      vscode.postMessage({ command: 'getCollections' });
     }
 
     // Handle messages from the extension
@@ -55,17 +50,10 @@ function AddCollectionWebview() {
       const message = event.data;
 
       switch (message.command) {
-        case 'vectorizers':
-          setVectorizers(message.vectorizers || []);
+        case 'availableModules':
           // Use the modules object directly from the server metadata
           const modules = message.modules || {};
           setAvailableModules(modules);
-          break;
-        case 'serverVersion':
-          setServerVersion(message.version || 'unknown');
-          break;
-        case 'collections':
-          setCollections(message.collections || []);
           break;
         case 'initialSchema':
           setInitialSchema(message.schema);
@@ -132,6 +120,7 @@ function AddCollectionWebview() {
           nodesNumber={nodesNumber}
           onChange={handleSchemaChange}
           onSubmit={handleSchemaSubmit}
+          hideCreateButton={true}
         />
       </div>
 

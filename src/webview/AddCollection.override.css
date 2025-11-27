@@ -14,17 +14,23 @@
 /* Override CSS Variables to use VS Code theme */
 :root {
   /* Main theme colors - override package defaults */
-  --bg: var(--vscode-editor-background, #1E1E1E);
-  --card: var(--vscode-sideBar-background, #252526);
-  --muted: var(--vscode-descriptionForeground, #999999);
-  --accent: var(--vscode-button-background, #0E639C);
+  --bg: var(--vscode-editor-background, #1E1E1E) !important;
+  --card: var(--vscode-sideBar-background, #252526) !important;
+  --muted: var(--vscode-descriptionForeground, #999999) !important;
+  --accent: var(--vscode-button-background, #0E639C) !important;
+  --border: var(--vscode-panel-border, #333) !important;
+  --text-primary: var(--vscode-foreground, #D4D4D4) !important;
+  --text-secondary: var(--vscode-descriptionForeground, #999) !important;
+  --error: var(--vscode-errorForeground, #f14c4c) !important;
+  --section-bg: var(--vscode-editor-background, #1E1E1E) !important;
+  --card-shadow: none !important;
 }
 
 /* Body overrides */
 body {
-  font-family: var(--vscode-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
-  background: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif) !important;
+  background: var(--vscode-editor-background) !important;
+  color: var(--vscode-editor-foreground) !important;
 }
 
 /* Container - adapt to webview full-width layout */
@@ -36,48 +42,77 @@ body {
 
 /* Card - use VS Code panel styling */
 .card {
-  background: var(--vscode-sideBar-background);
-  border: 1px solid var(--vscode-panel-border);
-  box-shadow: none;
-  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background) !important;
+  border: 1px solid var(--vscode-panel-border) !important;
+  box-shadow: none !important;
+  color: var(--vscode-foreground) !important;
+}
+
+.card-header {
+  border-bottom-color: var(--vscode-panel-border) !important;
+}
+
+.card-header h1,
+.card-header h2 {
+  color: var(--vscode-foreground) !important;
+}
+
+.card-section-header {
+  border-bottom-color: var(--vscode-panel-border) !important;
+}
+
+.card-section-header h3 {
+  color: var(--vscode-foreground) !important;
+}
+
+.card-section-header h3 span {
+  color: var(--vscode-descriptionForeground) !important;
 }
 
 /* Form Fields - VS Code input styling */
 .field input,
 .field textarea,
 .field select {
-  background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background) !important;
+  color: var(--vscode-input-foreground) !important;
+  border: 1px solid var(--vscode-input-border) !important;
 }
 
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
-  border-color: var(--vscode-focusBorder);
+  outline: 1px solid var(--vscode-focusBorder) !important;
+  outline-offset: -1px !important;
+  border-color: var(--vscode-focusBorder) !important;
+  box-shadow: none !important;
+  background: var(--vscode-input-background) !important;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: var(--vscode-input-placeholderForeground);
+  color: var(--vscode-input-placeholderForeground) !important;
 }
 
 /* Error states */
 .field input.input-error {
-  border-color: var(--vscode-inputValidation-errorBorder);
-  background: var(--vscode-inputValidation-errorBackground);
+  border-color: var(--vscode-inputValidation-errorBorder) !important;
+  background: var(--vscode-inputValidation-errorBackground) !important;
+  box-shadow: none !important;
 }
 
 .field input.input-error:focus {
-  outline: 1px solid var(--vscode-inputValidation-errorBorder);
-  border-color: var(--vscode-inputValidation-errorBorder);
+  outline: 1px solid var(--vscode-inputValidation-errorBorder) !important;
+  border-color: var(--vscode-inputValidation-errorBorder) !important;
+  box-shadow: none !important;
 }
 
 /* Labels */
 .field label {
-  color: var(--vscode-foreground);
+  color: var(--vscode-foreground) !important;
+}
+
+.field label .label-hint {
+  color: var(--vscode-descriptionForeground) !important;
 }
 
 /* JSON Preview Block */
@@ -106,23 +141,27 @@ body {
 
 /* Collapsible Components */
 .collapsible-toggle {
-  background: var(--vscode-sideBar-background);
-  border: 1px solid var(--vscode-panel-border);
-  color: var(--vscode-foreground);
-  box-shadow: none;
+  background: var(--vscode-sideBar-background) !important;
+  border: 1px solid var(--vscode-panel-border) !important;
+  color: var(--vscode-foreground) !important;
+  box-shadow: none !important;
 }
 
 .collapsible-toggle:hover {
-  background: var(--vscode-list-hoverBackground);
+  background: var(--vscode-list-hoverBackground) !important;
 }
 
 .collapsible-toggle:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
+  outline: 1px solid var(--vscode-focusBorder) !important;
+  outline-offset: -1px !important;
+}
+
+.collapsible-toggle:active {
+  background: var(--vscode-list-activeSelectionBackground) !important;
 }
 
 .collapsible-toggle .chev {
-  color: var(--vscode-foreground);
+  color: var(--vscode-foreground) !important;
 }
 
 .collapsible-panel {
@@ -149,39 +188,39 @@ body {
 
 /* Buttons - VS Code button styling */
 .btn {
-  border: 1px solid var(--vscode-button-border, transparent);
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border, transparent) !important;
+  background: var(--vscode-button-secondaryBackground) !important;
+  color: var(--vscode-button-secondaryForeground) !important;
 }
 
 .btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--vscode-button-secondaryHoverBackground) !important;
 }
 
 .btn:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
+  outline: 1px solid var(--vscode-focusBorder) !important;
+  outline-offset: -1px !important;
 }
 
 .btn-primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border-color: transparent;
+  background: var(--vscode-button-background) !important;
+  color: var(--vscode-button-foreground) !important;
+  border-color: transparent !important;
 }
 
 .btn-primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--vscode-button-hoverBackground) !important;
 }
 
 .btn-danger {
-  background: var(--vscode-inputValidation-errorBackground);
-  color: var(--vscode-errorForeground);
-  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  background: var(--vscode-inputValidation-errorBackground) !important;
+  color: var(--vscode-errorForeground) !important;
+  border: 1px solid var(--vscode-inputValidation-errorBorder) !important;
 }
 
 .btn-danger:hover {
-  background: var(--vscode-inputValidation-errorBorder);
-  color: var(--vscode-editor-foreground);
+  background: var(--vscode-inputValidation-errorBorder) !important;
+  color: var(--vscode-editor-foreground) !important;
 }
 
 /* Links */

@@ -1,6 +1,5 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const fs = require('fs');
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -180,14 +179,11 @@ module.exports = {
       scriptLoading: 'defer',
       minify: isProduction,
     }),
+    // InjectCssPlugin injects all CSS inline to avoid CSP issues and FOUC
+    // Order: theme.css → component styles → overrides → custom styles
     new InjectCssPlugin(),
+    // WebviewNoncePlugin adds nonce to all script tags for CSP compliance
     new WebviewNoncePlugin(),
-    ...(isProduction
-      ? [new MiniCssExtractPlugin({
-          filename: '[name].[contenthash].css',
-          chunkFilename: '[id].[contenthash].css',
-        })]
-      : []),
   ],
   devtool: isProduction ? 'hidden-source-map' : 'inline-source-map',
 };
