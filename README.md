@@ -126,6 +126,16 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for setu
 
 Need a quick Weaviate instance for development or learning? Check out our [local sandbox environment](sandbox/readme.md) with pre-configured Docker setup and test data.
 
+### Architecture
+
+Weaviate Studio uses a modular architecture with external React components for enhanced UI:
+
+- **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection) ([Live Demo](https://dudanogueira.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
+- **Extension Core**: TypeScript-based VS Code extension
+- **Webviews**: React-based UIs with Monaco editor integration
+
+For details on updating external dependencies, see the [Working with Dependencies](CONTRIBUTING.md#working-with-dependencies) section in CONTRIBUTING.md.
+
 ---
 
 ## Testing & Quality
