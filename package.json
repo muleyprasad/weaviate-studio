@@ -117,6 +117,16 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "weaviate.refreshNodes",
+        "title": "Refresh Nodes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "weaviate.refreshMetadata",
+        "title": "Refresh Metadata",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "weaviate.exportSchema",
         "title": "Export Collection Schema",
         "category": "Weaviate"
@@ -288,6 +298,26 @@
           "command": "weaviate.refreshCollections",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "inline@2"
+        },
+        {
+          "command": "weaviate.refreshNodes",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateClusterNodes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.refreshNodes",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateClusterNodes",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.refreshMetadata",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateServerInfo",
+          "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.refreshMetadata",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateServerInfo",
+          "group": "inline@1"
         },
         {
           "command": "weaviate.queryCollection",

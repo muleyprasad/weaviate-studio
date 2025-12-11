@@ -2431,6 +2431,36 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
+   * Refreshes cluster nodes for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshNodes(connectionId: string): Promise<void> {
+    try {
+      await this.fetchNodes(connectionId);
+      vscode.window.showInformationMessage('Nodes refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing nodes:', error);
+      throw new Error(`Failed to refresh nodes: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes metadata for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshMetadata(connectionId: string): Promise<void> {
+    try {
+      await this.fetchMetadata(connectionId);
+      vscode.window.showInformationMessage('Metadata refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing metadata:', error);
+      throw new Error(`Failed to refresh metadata: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Opens a query editor for the specified collection
    * @param connectionId - The ID of the connection
    * @param collectionName - The name of the collection to query

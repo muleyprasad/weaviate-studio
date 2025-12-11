@@ -639,6 +639,40 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
 
+    // Refresh nodes command
+    vscode.commands.registerCommand('weaviate.refreshNodes', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshNodes(item.connectionId);
+        vscode.window.showInformationMessage('Nodes refreshed');
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh nodes: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Refresh metadata command
+    vscode.commands.registerCommand('weaviate.refreshMetadata', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshMetadata(item.connectionId);
+        vscode.window.showInformationMessage('Metadata refreshed');
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh metadata: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
     // Export schema command
     vscode.commands.registerCommand('weaviate.exportSchema', async (item) => {
       if (!item?.connectionId || !item?.label) {
