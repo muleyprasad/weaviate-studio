@@ -131,6 +131,8 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       | 'replication'
       | 'multiTenancy'
       | 'backup'
+      | 'backups'
+      | 'backupItem'
       | 'serverInfo'
       | 'clusterHealth'
       | 'modules'
