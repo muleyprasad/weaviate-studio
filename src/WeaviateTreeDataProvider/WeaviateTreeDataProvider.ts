@@ -2416,6 +2416,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
+   * Refreshes collections for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshCollections(connectionId: string): Promise<void> {
+    try {
+      await this.fetchCollectionsData(connectionId);
+      vscode.window.showInformationMessage('Collections refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing collections:', error);
+      throw new Error(`Failed to refresh collections: ${errorMessage}`);
+    }
+  }
+
+  /**
    * Opens a query editor for the specified collection
    * @param connectionId - The ID of the connection
    * @param collectionName - The name of the collection to query

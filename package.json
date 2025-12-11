@@ -112,6 +112,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "weaviate.refreshCollections",
+        "title": "Refresh Collections",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "weaviate.exportSchema",
         "title": "Export Collection Schema",
         "category": "Weaviate"
@@ -273,6 +278,16 @@
           "command": "weaviate.refreshBackups",
           "when": "view == weaviateConnectionsView && viewItem == weaviateBackups",
           "group": "inline@1"
+        },
+        {
+          "command": "weaviate.refreshCollections",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.refreshCollections",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "group": "inline@2"
         },
         {
           "command": "weaviate.queryCollection",
