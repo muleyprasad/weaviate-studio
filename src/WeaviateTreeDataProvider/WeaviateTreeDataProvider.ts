@@ -2074,7 +2074,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
         // Only fetch collections if we're not in a refresh loop
         if (!this.isRefreshing) {
-          await this.fetchCollections(connectionId);
+          await this.fetchData(connectionId);
         }
 
         // Do not auto-open the query editor on connect. Let the user open it
@@ -2146,20 +2146,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     return this.connectionManager;
   }
 
-  // --- Collection Management Methods ---
+  // --- Data Fetch Methods ---
 
-  // Fetch collections from Weaviate
-  async fetchCollections(connectionId: string): Promise<void> {
+  /**
+   * Fetches server statistics for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchServerStatistics(connectionId: string): Promise<void> {
     try {
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
         throw new Error('Connection not found');
-      }
-
-      // Get the client for this connection
-      const client = this.connectionManager.getClient(connectionId);
-      if (!client) {
-        throw new Error('Client not initialized');
       }
 
       // Get stats from server
@@ -2191,6 +2188,74 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
       this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
 
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchServerStatistics:', error);
+      vscode.window.showErrorMessage(`Failed to fetch server statistics: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches metadata for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchMetadata(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Get metaData from Weaviate
+      const metaData = await client.getMeta();
+      this.clusterMetadataCache[connectionId] = metaData;
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchMetadata:', error);
+      vscode.window.showErrorMessage(`Failed to fetch metadata: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches cluster nodes for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchNodes(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Get Nodes from Weaviate
+      const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
+      this.clusterNodesCache[connectionId] = clusterNodes;
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchNodes:', error);
+      vscode.window.showErrorMessage(`Failed to fetch cluster nodes: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches collections for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchCollectionsData(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
       // Get collections from Weaviate
       const collections = await client.collections.listAll();
       // Store collections with their schema
@@ -2218,25 +2283,51 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this.collections[connectionId] = [];
       }
 
-      // Get metaData from Weaviate
-      const metaData = await client.getMeta();
-      this.clusterMetadataCache[connectionId] = metaData;
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchCollectionsData:', error);
+      vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
+    }
+  }
 
-      // Get Nodes from Weaviate
-      const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
-      this.clusterNodesCache[connectionId] = clusterNodes;
+  /**
+   * Fetches all data (collections, stats, metadata, nodes, and backups) for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchData(connectionId: string): Promise<void> {
+    try {
+      const connection = this.connectionManager.getConnection(connectionId);
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      // Get the client for this connection
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Fetch all data in parallel for better performance
+      await Promise.all([
+        this.fetchServerStatistics(connectionId),
+        this.fetchMetadata(connectionId),
+        this.fetchNodes(connectionId),
+        this.fetchCollectionsData(connectionId),
+      ]);
 
       // Fetch backups in the background to populate cache for count display
       this.fetchBackups(connectionId).catch((error: unknown) => {
         console.warn('Error fetching backups (non-critical):', error);
       });
 
-      // Refresh the tree view to show updated collections
+      // Refresh the tree view to show updated data
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error in fetchCollections:', error);
-      vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
+      console.error('Error in fetchData:', error);
+      vscode.window.showErrorMessage(`Failed to fetch data: ${errorMessage}`);
     }
   }
 
@@ -2306,6 +2397,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     } catch (error) {
       console.error('Error fetching backups:', error);
       // Don't throw - this is non-critical
+    }
+  }
+
+  /**
+   * Refreshes backups for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshBackups(connectionId: string): Promise<void> {
+    try {
+      await this.fetchBackups(connectionId);
+      vscode.window.showInformationMessage('Backups refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing backups:', error);
+      throw new Error(`Failed to refresh backups: ${errorMessage}`);
     }
   }
 
@@ -2409,7 +2515,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       // Reconnect to refresh the connection info
       await this.connect(connectionId, true);
-      await this.fetchCollections(connectionId);
+      await this.fetchData(connectionId);
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2662,7 +2768,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         async (schema: any) => {
           // On create callback
           await this.createCollection(connectionId, schema);
-          await this.fetchCollections(connectionId);
+          await this.fetchData(connectionId);
         },
         async (message: any, postMessage: (msg: any) => void) => {
           // On message callback for handling webview requests
@@ -5958,7 +6064,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vscode.window.showInformationMessage(
                 `Collection "${message.schema.class}" created successfully`
               );
-              await this.fetchCollections(connectionId);
+              await this.fetchData(connectionId);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',
@@ -6121,7 +6227,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vscode.window.showInformationMessage(
                 `Collection "${message.schema.class}" imported successfully`
               );
-              await this.fetchCollections(connectionId);
+              await this.fetchData(connectionId);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',

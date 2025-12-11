@@ -605,6 +605,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
 
+    // Refresh backups command
+    vscode.commands.registerCommand('weaviate.refreshBackups', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+        vscode.window.showInformationMessage('Backups refreshed');
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh backups: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
     // Export schema command
     vscode.commands.registerCommand('weaviate.exportSchema', async (item) => {
       if (!item?.connectionId || !item?.label) {
