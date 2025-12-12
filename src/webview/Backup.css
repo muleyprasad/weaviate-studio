@@ -140,6 +140,28 @@ select:disabled {
   margin-top: 30px;
 }
 
+.backups-status-section.expanded {
+  margin-top: 0;
+}
+
+.backups-status-section.expanded .status-title {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.backups-status-section.expanded .theme-table {
+  font-size: 16px;
+}
+
+.backups-status-section.expanded .theme-table-cell {
+  padding: 16px;
+}
+
+.backups-status-section.expanded .status-badge {
+  font-size: 1.1em;
+  padding: 6px 12px;
+}
+
 .status-header {
   display: flex;
   justify-content: space-between;

@@ -63,9 +63,11 @@ export class BackupPanel {
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // If we already have a panel, show it.
+    // If we already have a panel, show it and reset the form.
     if (BackupPanel.currentPanel) {
       BackupPanel.currentPanel._panel.reveal(column);
+      // Send reset command to the webview to clear the form
+      BackupPanel.currentPanel.postMessage({ command: 'resetForm' });
       return BackupPanel.currentPanel;
     }
 
