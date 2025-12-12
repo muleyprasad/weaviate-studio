@@ -95,8 +95,8 @@ describe('Add Collection', () => {
 
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
 
-    // Mock fetchCollections to prevent real network calls
-    jest.spyOn(provider, 'fetchCollections').mockResolvedValue();
+    // Mock fetchCollectionsData to prevent real network calls
+    jest.spyOn(provider, 'fetchCollectionsData').mockResolvedValue();
 
     // Mock connected connection
     mockConnectionManager.getConnection.mockReturnValue({
@@ -209,7 +209,7 @@ describe('Add Collection', () => {
           /* no-op */
         });
       const fetchSpy = jest
-        .spyOn(provider as any, 'fetchCollections')
+        .spyOn(provider as any, 'fetchCollectionsData')
         .mockImplementation(async (_: any) => {
           /* no-op */
         });
@@ -234,7 +234,7 @@ describe('Add Collection', () => {
           throw new Error('Schema error');
         });
       const fetchSpy = jest
-        .spyOn(provider as any, 'fetchCollections')
+        .spyOn(provider as any, 'fetchCollectionsData')
         .mockImplementation(async (_: any) => {
           /* no-op */
         });

@@ -2,6 +2,7 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const fs = require('fs');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -33,10 +34,60 @@ class WebviewNoncePlugin {
   }
 }
 
+// Plugin to inject CSS styles inline into the HTML for backup webview
+class InjectBackupCssPlugin {
+  apply(compiler) {
+    compiler.hooks.compilation.tap('InjectBackupCssPlugin', (compilation) => {
+      const HtmlWebpackPlugin = require('html-webpack-plugin');
+      
+      HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
+        'InjectBackupCssPlugin',
+        (data, cb) => {
+          // Only inject CSS for backup.html
+          if (!data.outputName.includes('backup')) {
+            cb(null, data);
+            return;
+          }
+
+          const cssFiles = [
+            { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
+            { path: path.resolve(__dirname, 'src/webview/Backup.css'), name: 'Custom Backup Styles' },
+          ];
+
+          try {
+            let cssContent = '';
+            cssFiles.forEach(({ path: filePath, name }) => {
+              if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf8');
+                cssContent += `\n/* ${name} */\n${content}\n`;
+              }
+            });
+
+            if (cssContent) {
+              data.html = data.html.replace(
+                '</head>',
+                `<style nonce="{{nonce}}">${cssContent}</style></head>`
+              );
+            }
+
+            cb(null, data);
+          } catch (err) {
+            console.error('Error injecting CSS:', err);
+            cb(err);
+          }
+        }
+      );
+    });
+  }
+}
+
 module.exports = {
   target: 'web',
   mode: isProduction ? 'production' : 'development',
-  entry: './src/webview/index.tsx',
+  entry: {
+    main: './src/webview/index.tsx',
+    backup: './src/webview/Backup.tsx',
+  },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
     filename: isProduction ? '[name].[contenthash].bundle.js' : '[name].bundle.js',
@@ -94,12 +145,23 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/webview/index.html',
       filename: 'index.html',
+      chunks: ['main'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/backup.html',
+      filename: 'backup.html',
+      chunks: ['backup'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,
     }),
     // Attach the nonce placeholder to every injected script tag.
     new WebviewNoncePlugin(),
+    // Inject CSS for backup webview
+    new InjectBackupCssPlugin(),
     ...(isProduction ? [new MiniCssExtractPlugin({
       filename: '[name].[contenthash].css',
     })] : []),

@@ -170,6 +170,11 @@
       {
         "command": "weaviate-studio.openLink",
         "title": "Open Link"
+      },
+      {
+        "command": "weaviate.createBackup",
+        "title": "Create Backup",
+        "icon": "$(add)"
       }
     ],
     "languages": [
@@ -285,9 +290,19 @@
           "group": "navigation@1"
         },
         {
+          "command": "weaviate.createBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackups",
+          "group": "navigation@2"
+        },
+        {
           "command": "weaviate.refreshBackups",
           "when": "view == weaviateConnectionsView && viewItem == weaviateBackups",
           "group": "inline@1"
+        },
+        {
+          "command": "weaviate.createBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackups",
+          "group": "inline@2"
         },
         {
           "command": "weaviate.refreshCollections",

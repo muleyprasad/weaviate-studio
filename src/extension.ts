@@ -3,6 +3,7 @@ import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTre
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
+import { BackupPanel } from './views/BackupPanel';
 
 /**
  * Handles opening of .weaviate files
@@ -618,6 +619,101 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh backups: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Create backup command
+    vscode.commands.registerCommand('weaviate.createBackup', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Get available modules
+        const meta = await client.getMeta();
+        const availableModules = meta.modules || {};
+
+        // Open backup panel
+        const panel = BackupPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          collectionNames,
+          availableModules,
+          async (backupData) => {
+            // Create backup with waitForCompletion: false
+            await client.backup.create({
+              backupId: backupData.backupId,
+              backend: backupData.backend,
+              waitForCompletion: false,
+              includeCollections: backupData.includeCollections,
+              excludeCollections: backupData.excludeCollections,
+            });
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchBackups') {
+              try {
+                // Fetch all backups from all backends
+                const backupModules = Object.keys(availableModules).filter((key) =>
+                  key.startsWith('backup-')
+                );
+
+                const allBackups: any[] = [];
+
+                for (const moduleName of backupModules) {
+                  const backend = moduleName.replace('backup-', '') as any;
+                  try {
+                    const backupsResponse = await client.backup.list(backend);
+
+                    if (backupsResponse && Array.isArray(backupsResponse)) {
+                      const backupsWithBackend = backupsResponse.map((b: any) => ({
+                        id: b.id,
+                        backend: backend,
+                        status: b.status,
+                        error: b.error,
+                      }));
+                      allBackups.push(...backupsWithBackend);
+                    }
+                  } catch (err) {
+                    console.error(`Failed to fetch backups from ${backend}:`, err);
+                  }
+                }
+
+                postMessage({
+                  command: 'backupsList',
+                  backups: allBackups,
+                });
+
+                // Refresh the tree view backups
+                await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to open backup panel: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }),
