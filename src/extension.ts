@@ -657,13 +657,29 @@ export function activate(context: vscode.ExtensionContext) {
           availableModules,
           async (backupData) => {
             // Create backup with waitForCompletion: false
-            await client.backup.create({
+            const backupConfig: any = {
               backupId: backupData.backupId,
               backend: backupData.backend,
               waitForCompletion: false,
               includeCollections: backupData.includeCollections,
               excludeCollections: backupData.excludeCollections,
-            });
+            };
+
+            // Add optional config parameters if provided
+            if (backupData.cpuPercentage !== undefined) {
+              backupConfig.cpuPercentage = backupData.cpuPercentage;
+            }
+            if (backupData.chunkSize !== undefined) {
+              backupConfig.chunkSize = backupData.chunkSize;
+            }
+            if (backupData.compressionLevel) {
+              backupConfig.compressionLevel = backupData.compressionLevel;
+            }
+            if (backupData.path) {
+              backupConfig.path = backupData.path;
+            }
+
+            await client.backup.create(backupConfig);
           },
           async (message, postMessage) => {
             // Handle additional messages
@@ -682,12 +698,52 @@ export function activate(context: vscode.ExtensionContext) {
                     const backupsResponse = await client.backup.list(backend);
 
                     if (backupsResponse && Array.isArray(backupsResponse)) {
-                      const backupsWithBackend = backupsResponse.map((b: any) => ({
-                        id: b.id,
-                        backend: backend,
-                        status: b.status,
-                        error: b.error,
-                      }));
+                      const backupsWithBackend = backupsResponse.map((b: any) => {
+                        // Calculate duration if startedAt and completedAt are present
+                        let duration = undefined;
+                        if (b.startedAt && b.completedAt) {
+                          try {
+                            const start = new Date(b.startedAt).getTime();
+                            const end = new Date(b.completedAt).getTime();
+                            const diffMs = end - start;
+
+                            if (diffMs >= 0 && !isNaN(diffMs)) {
+                              const seconds = Math.floor(diffMs / 1000);
+                              const minutes = Math.floor(seconds / 60);
+                              const hours = Math.floor(minutes / 60);
+                              const days = Math.floor(hours / 24);
+
+                              const parts: string[] = [];
+
+                              if (days > 0) {
+                                parts.push(`${days}d`);
+                              }
+                              if (hours % 24 > 0) {
+                                parts.push(`${hours % 24}h`);
+                              }
+                              if (minutes % 60 > 0) {
+                                parts.push(`${minutes % 60}m`);
+                              }
+                              if (seconds % 60 > 0 && hours === 0) {
+                                parts.push(`${seconds % 60}s`);
+                              }
+
+                              duration = parts.length > 0 ? parts.join(' ') : '0s';
+                            }
+                          } catch (error) {
+                            // Duration calculation failed, leave it undefined
+                          }
+                        }
+
+                        return {
+                          id: b.id,
+                          backend: backend,
+                          status: b.status,
+                          error: b.error,
+                          path: b.path,
+                          duration: duration,
+                        };
+                      });
                       allBackups.push(...backupsWithBackend);
                     }
                   } catch (err) {
@@ -698,6 +754,28 @@ export function activate(context: vscode.ExtensionContext) {
                 postMessage({
                   command: 'backupsList',
                   backups: allBackups,
+                });
+
+                // Refresh the tree view backups
+                await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            } else if (message.command === 'cancelBackup') {
+              try {
+                const { backupId, backend } = message;
+                const cancelStatus = await client.backup.cancel({
+                  backupId: backupId,
+                  backend: backend,
+                });
+
+                postMessage({
+                  command: 'backupCancelled',
+                  backupId: backupId,
+                  status: cancelStatus,
                 });
 
                 // Refresh the tree view backups

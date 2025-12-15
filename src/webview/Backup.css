@@ -15,6 +15,18 @@
   font-size: 18px;
 }
 
+.new-backup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.new-backup-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
 .error-message {
   padding: 10px;
   margin-bottom: 20px;
@@ -109,6 +121,76 @@
 
 .collection-name {
   margin-left: 8px;
+}
+
+/* Collapsible header */
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 10px;
+}
+
+.collapsible-header:hover {
+  opacity: 0.8;
+}
+
+.collapsible-header:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.collapse-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 5px;
+  font-size: 0.8em;
+}
+
+.collapse-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* Advanced configuration grid */
+.advanced-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  padding: 10px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label-small {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.form-input-small {
+  padding: 6px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-family: var(--vscode-font-family);
+  font-size: 13px;
+}
+
+.form-input-small:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.form-input-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .button-group {

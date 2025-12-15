@@ -25,6 +25,10 @@ interface BackupData {
   backend: string;
   includeCollections?: string[];
   excludeCollections?: string[];
+  cpuPercentage?: number;
+  chunkSize?: number;
+  compressionLevel?: string;
+  path?: string;
 }
 
 interface BackupStatus {
@@ -32,6 +36,8 @@ interface BackupStatus {
   backend: string;
   status: string;
   error?: string;
+  path?: string;
+  duration?: string;
 }
 
 function NewBackupWebview() {
@@ -50,10 +56,63 @@ function NewBackupWebview() {
   const [showForm, setShowForm] = useState<boolean>(true);
   const [currentBackupId, setCurrentBackupId] = useState<string>('');
   const [showAll, setShowAll] = useState<boolean>(false);
+  const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
+  const [cpuPercentage, setCpuPercentage] = useState<string>('');
+  const [chunkSize, setChunkSize] = useState<string>('');
+  const [compressionLevel, setCompressionLevel] = useState<string>('DefaultCompression');
+  const [path, setPath] = useState<string>('');
 
   // Sanitize backup ID to only allow lowercase, 0-9, _, -
   const sanitizeBackupId = (value: string): string => {
     return value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  };
+
+  // Validate and handle CPU percentage input (1-80)
+  const handleCpuPercentageChange = (value: string): void => {
+    // Allow empty string
+    if (value === '') {
+      setCpuPercentage('');
+      return;
+    }
+
+    // Only allow numeric input
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) {
+      return;
+    }
+
+    // Constrain to valid range (1-80)
+    if (numValue >= 1 && numValue <= 80) {
+      setCpuPercentage(value);
+    } else if (numValue > 80) {
+      setCpuPercentage('80');
+    } else if (numValue < 1 && value.length > 0) {
+      setCpuPercentage('1');
+    }
+  };
+
+  // Validate and handle chunk size input (2-512)
+  const handleChunkSizeChange = (value: string): void => {
+    // Allow empty string
+    if (value === '') {
+      setChunkSize('');
+      return;
+    }
+
+    // Only allow numeric input
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) {
+      return;
+    }
+
+    // Constrain to valid range (2-512)
+    if (numValue >= 2 && numValue <= 512) {
+      setChunkSize(value);
+    } else if (numValue > 512) {
+      setChunkSize('512');
+    } else if (numValue < 2 && value.length > 0) {
+      setChunkSize('2');
+    }
   };
 
   // Generate default backup ID in format weaviate-YYYYMMDD-HH:MM:SS
@@ -135,6 +194,11 @@ function NewBackupWebview() {
           setError('');
           // Clear backup list
           setBackups([]);
+          // Reset advanced config fields
+          setCpuPercentage('');
+          setChunkSize('');
+          setCompressionLevel('DefaultCompression');
+          setPath('');
           // Reset backend to default if available
           const resetBackupModules =
             availableModules?.['backup-filesystem'] ||
@@ -207,6 +271,20 @@ function NewBackupWebview() {
       backupData.excludeCollections = selectedCollections;
     }
 
+    // Add optional configuration parameters
+    if (cpuPercentage) {
+      backupData.cpuPercentage = parseInt(cpuPercentage);
+    }
+    if (chunkSize) {
+      backupData.chunkSize = parseInt(chunkSize);
+    }
+    if (compressionLevel && compressionLevel !== 'DefaultCompression') {
+      backupData.compressionLevel = compressionLevel;
+    }
+    if (path && path.trim() && selectedBackend === 'filesystem') {
+      backupData.path = path.trim();
+    }
+
     if (vscode) {
       vscode.postMessage({
         command: 'createBackup',
@@ -224,12 +302,42 @@ function NewBackupWebview() {
     }
   };
 
+  const handleCancelBackup = (backupId: string, backend: string) => {
+    if (vscode) {
+      vscode.postMessage({
+        command: 'cancelBackup',
+        backupId,
+        backend,
+      });
+      // Refresh backups after a short delay
+      setTimeout(() => {
+        fetchBackups();
+      }, 1000);
+    }
+  };
+
   const handleCancel = () => {
     if (vscode) {
       vscode.postMessage({
         command: 'cancel',
       });
     }
+  };
+
+  const handleCreateNewBackup = () => {
+    // Reset form to initial state
+    setBackupId(generateBackupId());
+    setCollectionMode('all');
+    setSelectedCollections([]);
+    setIsCreating(false);
+    setCurrentBackupId('');
+    setShowForm(true);
+    setError('');
+    setCpuPercentage('');
+    setChunkSize('');
+    setCompressionLevel('DefaultCompression');
+    setPath('');
+    setShowAdvancedConfig(false);
   };
 
   const getBackendOptions = () => {
@@ -253,6 +361,15 @@ function NewBackupWebview() {
 
   return (
     <div className="backup-container">
+      {!showForm && (
+        <div className="new-backup-header">
+          <h1>Backup Status</h1>
+          <button className="theme-button" onClick={handleCreateNewBackup}>
+            Create New Backup
+          </button>
+        </div>
+      )}
+
       {showForm && (
         <>
           <div className="backup-header">
@@ -298,6 +415,98 @@ function NewBackupWebview() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="form-section">
+            <div
+              className="collapsible-header"
+              onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowAdvancedConfig(!showAdvancedConfig);
+                }
+              }}
+            >
+              <h3 className="collections-section-title">
+                <span className={`collapse-icon ${showAdvancedConfig ? 'expanded' : ''}`}>▶</span>
+                Advanced Configuration (optional)
+              </h3>
+            </div>
+
+            {showAdvancedConfig && (
+              <div className="advanced-config-grid">
+                <div className="form-field">
+                  <label htmlFor="cpuPercentage" className="form-label-small">
+                    CPU Percentage (1-80%):
+                  </label>
+                  <input
+                    id="cpuPercentage"
+                    type="number"
+                    className="form-input-small"
+                    value={cpuPercentage}
+                    onChange={(e) => handleCpuPercentageChange(e.target.value)}
+                    placeholder="50"
+                    min="1"
+                    max="80"
+                    disabled={isCreating}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="chunkSize" className="form-label-small">
+                    Chunk Size (2-512 MB):
+                  </label>
+                  <input
+                    id="chunkSize"
+                    type="number"
+                    className="form-input-small"
+                    value={chunkSize}
+                    onChange={(e) => handleChunkSizeChange(e.target.value)}
+                    placeholder="128"
+                    min="2"
+                    max="512"
+                    disabled={isCreating}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="compressionLevel" className="form-label-small">
+                    Compression Level:
+                  </label>
+                  <select
+                    id="compressionLevel"
+                    className="form-input-small"
+                    value={compressionLevel}
+                    onChange={(e) => setCompressionLevel(e.target.value)}
+                    disabled={isCreating}
+                  >
+                    <option value="DefaultCompression">Default Compression</option>
+                    <option value="BestSpeed">Best Speed</option>
+                    <option value="BestCompression">Best Compression</option>
+                  </select>
+                </div>
+
+                {selectedBackend === 'filesystem' && (
+                  <div className="form-field">
+                    <label htmlFor="path" className="form-label-small">
+                      Path (filesystem only):
+                    </label>
+                    <input
+                      id="path"
+                      type="text"
+                      className="form-input-small"
+                      value={path}
+                      onChange={(e) => setPath(e.target.value)}
+                      placeholder="/custom/backup/path"
+                      disabled={isCreating}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="form-section">
@@ -443,7 +652,9 @@ function NewBackupWebview() {
           <p className="muted-text backups-empty">
             {isLoadingBackups
               ? 'Loading backups...'
-              : 'No backups found. Click Reload to fetch backups.'}
+              : showAll
+                ? 'No backups to list'
+                : 'No backups to list. Try clicking on show all to list all backups'}
           </p>
         ) : (
           <table className="theme-table">
@@ -452,7 +663,9 @@ function NewBackupWebview() {
                 <th className="theme-table-cell">Backup ID</th>
                 <th className="theme-table-cell">Backend</th>
                 <th className="theme-table-cell">Status</th>
+                <th className="theme-table-cell">Duration</th>
                 <th className="theme-table-cell">Error</th>
+                <th className="theme-table-cell">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -465,7 +678,19 @@ function NewBackupWebview() {
                       {backup.status}
                     </span>
                   </td>
+                  <td className="theme-table-cell">{backup.duration || '-'}</td>
                   <td className="theme-table-cell">{backup.error || '-'}</td>
+                  <td className="theme-table-cell">
+                    {backup.status === 'STARTED' && (
+                      <button
+                        className="theme-button-secondary-compact"
+                        onClick={() => handleCancelBackup(backup.id, backup.backend)}
+                        title="Cancel backup"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

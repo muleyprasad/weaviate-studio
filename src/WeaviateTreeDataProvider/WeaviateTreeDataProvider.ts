@@ -1731,7 +1731,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         const allBackups: any[] = [];
         results.forEach(({ backend, backups }) => {
           backups.forEach((backup: any) => {
-            allBackups.push({ ...backup, backend });
+            // Calculate duration if startedAt and completedAt are present
+            let duration = undefined;
+            if (backup.startedAt && backup.completedAt) {
+              duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
+            }
+            allBackups.push({ ...backup, backend, duration });
             totalBackups++;
           });
         });
@@ -1758,13 +1763,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                   ? 'problemsWarningIcon.foreground'
                   : 'foreground';
 
-          // Calculate duration for successful backups
+          // Use precalculated duration from cache
           let descriptionText = `${backup.backend} - ${backup.status}`;
-          if (backup.status === 'SUCCESS' && backup.startedAt && backup.completedAt) {
-            const duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
-            if (duration) {
-              descriptionText += ` (${duration})`;
-            }
+          if (backup.duration) {
+            descriptionText += ` (${backup.duration})`;
           }
 
           backupItems.push(
@@ -1878,22 +1880,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         );
       }
 
-      // Duration (only for successful backups)
-      if (backup.status === 'SUCCESS' && backup.startedAt && backup.completedAt) {
-        const duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
-        if (duration) {
-          backupDetailItems.push(
-            new WeaviateTreeItem(
-              `Duration: ${duration}`,
-              vscode.TreeItemCollapsibleState.None,
-              'object',
-              element.connectionId,
-              undefined,
-              'duration',
-              new vscode.ThemeIcon('watch')
-            )
-          );
-        }
+      // Duration (if available)
+      if (backup.duration) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Duration: ${backup.duration}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'duration',
+            new vscode.ThemeIcon('watch')
+          )
+        );
       }
 
       // Path
@@ -2386,7 +2385,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const allBackups: any[] = [];
       results.forEach(({ backend, backups }) => {
         backups.forEach((backup: any) => {
-          allBackups.push({ ...backup, backend });
+          // Calculate duration if startedAt and completedAt are present
+          let duration = undefined;
+          if (backup.startedAt && backup.completedAt) {
+            duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
+          }
+          allBackups.push({ ...backup, backend, duration });
         });
       });
 
