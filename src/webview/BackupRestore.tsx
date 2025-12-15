@@ -69,6 +69,7 @@ function BackupRestoreWebview() {
   const [showForm, setShowForm] = useState<boolean>(true);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [refreshInterval, setRefreshInterval] = useState<number>(5);
+  const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
 
   // Validate and handle CPU percentage input (1-80)
   const handleCpuPercentageChange = (value: string): void => {
@@ -128,10 +129,10 @@ function BackupRestoreWebview() {
           }, 0);
           break;
         case 'restoreStatus':
+          setIsLoadingStatus(false);
           // Check if the status indicates a 404 (no restore found)
           if (message.status && message.status.error && message.status.error.includes('404')) {
             setRestoreStatus(null);
-            setAutoRefresh(false);
           } else {
             setRestoreStatus(message.status);
             // If restore is in progress, enable auto-refresh
@@ -141,17 +142,12 @@ function BackupRestoreWebview() {
             ) {
               setAutoRefresh(true);
             }
-            // If restore is completed or failed, stop auto-refresh
-            else if (
-              message.status &&
-              (message.status.status === 'SUCCESS' || message.status.status === 'FAILED')
-            ) {
-              setAutoRefresh(false);
-            }
+            // If restore is completed or failed, keep auto-refresh as is (don't force disable)
           }
           break;
         case 'error':
           setIsRestoring(false);
+          setIsLoadingStatus(false);
           // Don't show error if it's a 404 (no restore found) - that's expected
           if (!message.message || !message.message.includes('404')) {
             setError(message.message);
@@ -196,6 +192,7 @@ function BackupRestoreWebview() {
 
     if (vscode && useBackupId && useBackend) {
       console.log('[BackupRestore] Fetching restore status for:', useBackupId, useBackend);
+      setIsLoadingStatus(true);
       vscode.postMessage({
         command: 'fetchRestoreStatus',
         backupId: useBackupId,
@@ -370,12 +367,8 @@ function BackupRestoreWebview() {
               <option value="10">10s</option>
               <option value="30">30s</option>
             </select>
-            <button
-              className="refresh-button"
-              onClick={() => fetchRestoreStatus()}
-              disabled={autoRefresh}
-            >
-              ↻ Refresh
+            <button className="refresh-button" onClick={() => fetchRestoreStatus()}>
+              {isLoadingStatus ? '⟳' : '↻'} {isLoadingStatus ? 'Loading...' : 'Refresh'}
             </button>
           </div>
         </div>
