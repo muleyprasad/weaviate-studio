@@ -913,12 +913,6 @@ export function activate(context: vscode.ExtensionContext) {
               try {
                 const { backupId, backend } = message;
 
-                console.log(
-                  'calling backup.getRestoreStatus with backupId:',
-                  backupId,
-                  'backend:',
-                  backend
-                );
                 const restoreStatus = await client.backup.getRestoreStatus({ backend, backupId });
 
                 postMessage({
