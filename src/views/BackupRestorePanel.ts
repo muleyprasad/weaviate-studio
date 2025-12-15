@@ -57,7 +57,7 @@ export class BackupRestorePanel {
   /**
    * Creates or shows the Backup Restore panel
    */
-  public static createOrShow(
+  public static async createOrShow(
     extensionUri: vscode.Uri,
     connectionId: string,
     backupId: string,
@@ -66,17 +66,52 @@ export class BackupRestorePanel {
     backupDetails: any,
     onRestoreCallback: (restoreData: any) => Promise<void>,
     onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>
-  ): BackupRestorePanel {
+  ): Promise<BackupRestorePanel> {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // If we already have a panel, show it and reset the form.
+    // If we already have a panel, show it and update with new data.
     if (BackupRestorePanel.currentPanel) {
-      BackupRestorePanel.currentPanel._panel.reveal(column);
-      // Send reset command to the webview to clear the form
-      BackupRestorePanel.currentPanel.postMessage({ command: 'resetForm' });
-      return BackupRestorePanel.currentPanel;
+      const panel = BackupRestorePanel.currentPanel;
+      panel._panel.reveal(column);
+
+      // Update the panel title
+      panel._panel.title = `Restore Backup: ${backupId}`;
+
+      // Update panel data
+      (panel as any)._connectionId = connectionId;
+      (panel as any)._backupId = backupId;
+      (panel as any)._backend = backend;
+      (panel as any)._collections = collections;
+      (panel as any)._backupDetails = backupDetails;
+      (panel as any).onRestoreCallback = onRestoreCallback;
+      (panel as any).onMessageCallback = onMessageCallback;
+
+      // Send updated data to webview
+      panel.postMessage({
+        command: 'initData',
+        connectionId: connectionId,
+        backupId: backupId,
+        backend: backend,
+        collections: collections,
+        backupDetails: backupDetails,
+      });
+
+      // Automatically fetch restore status for the current backup
+      if (onMessageCallback) {
+        await onMessageCallback(
+          {
+            command: 'fetchRestoreStatus',
+            connectionId: connectionId,
+            backupId: backupId,
+            backend: backend,
+          },
+          (msg) => panel.postMessage(msg)
+        );
+      }
+
+      return panel;
     }
 
     // Otherwise, create a new panel.
@@ -147,6 +182,18 @@ export class BackupRestorePanel {
           collections: this._collections,
           backupDetails: this._backupDetails,
         });
+        // Automatically fetch restore status for the current backup
+        if (this.onMessageCallback) {
+          await this.onMessageCallback(
+            {
+              command: 'fetchRestoreStatus',
+              connectionId: this._connectionId,
+              backupId: this._backupId,
+              backend: this._backend,
+            },
+            (msg) => this.postMessage(msg)
+          );
+        }
         break;
       case 'restoreBackup':
         try {

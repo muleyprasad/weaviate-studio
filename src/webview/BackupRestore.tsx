@@ -114,31 +114,48 @@ function BackupRestoreWebview() {
           setBackend(message.backend || '');
           setCollections(message.collections || []);
           setBackupDetails(message.backupDetails || null);
+          setRestoreStatus(null);
+          setShowForm(true);
           break;
         case 'backupRestored':
           setIsRestoring(false);
           setError('');
           setShowForm(false);
           setAutoRefresh(true);
-          // Fetch initial status - use values from current state that should be set by initData
-          // Wait a tick to ensure state is updated
+          // Fetch status after restore completes
           setTimeout(() => {
-            fetchRestoreStatus(backupId, backend);
+            fetchRestoreStatus();
           }, 0);
           break;
         case 'restoreStatus':
-          setRestoreStatus(message.status);
-          // If restore is completed or failed, stop auto-refresh
-          if (
-            message.status &&
-            (message.status.status === 'SUCCESS' || message.status.status === 'FAILED')
-          ) {
+          // Check if the status indicates a 404 (no restore found)
+          if (message.status && message.status.error && message.status.error.includes('404')) {
+            setRestoreStatus(null);
             setAutoRefresh(false);
+          } else {
+            setRestoreStatus(message.status);
+            // If restore is in progress, enable auto-refresh
+            if (
+              message.status &&
+              (message.status.status === 'STARTED' || message.status.status === 'TRANSFERRING')
+            ) {
+              setAutoRefresh(true);
+            }
+            // If restore is completed or failed, stop auto-refresh
+            else if (
+              message.status &&
+              (message.status.status === 'SUCCESS' || message.status.status === 'FAILED')
+            ) {
+              setAutoRefresh(false);
+            }
           }
           break;
         case 'error':
           setIsRestoring(false);
-          setError(message.message);
+          // Don't show error if it's a 404 (no restore found) - that's expected
+          if (!message.message || !message.message.includes('404')) {
+            setError(message.message);
+          }
           break;
         case 'resetForm':
           // Reset form to initial state
@@ -261,8 +278,6 @@ function BackupRestoreWebview() {
 
   const handleStartNewRestore = () => {
     setShowForm(true);
-    setRestoreStatus(null);
-    setAutoRefresh(false);
     setIsRestoring(false);
     setError('');
     setCollectionMode('all');
@@ -279,11 +294,6 @@ function BackupRestoreWebview() {
     <div className="backup-restore-container">
       <div className="backup-restore-header">
         <h1>Restore Backup: {backupId}</h1>
-        {!showForm && (
-          <button className="theme-button" onClick={handleStartNewRestore}>
-            Start New Restore
-          </button>
-        )}
       </div>
 
       {error && (
@@ -332,87 +342,98 @@ function BackupRestoreWebview() {
         </div>
       )}
 
-      {!showForm && (
-        <div className="restore-status-section">
-          <div className="status-header">
-            <h2>Restore Status</h2>
-            <div className="auto-refresh-controls">
-              <label className="refresh-label">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                />
-                <span>Auto-refresh every</span>
-              </label>
-              <select
-                className="refresh-interval"
-                value={refreshInterval}
-                onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                disabled={!autoRefresh}
-              >
-                <option value="2">2s</option>
-                <option value="5">5s</option>
-                <option value="10">10s</option>
-                <option value="30">30s</option>
-              </select>
-              <button
-                className="refresh-button"
-                onClick={() => fetchRestoreStatus()}
-                disabled={autoRefresh}
-              >
-                ↻ Refresh
-              </button>
-            </div>
+      <div className="restore-status-section">
+        <div className="status-header">
+          <h2>Restore Status</h2>
+          {!showForm && (
+            <button className="theme-button" onClick={handleStartNewRestore}>
+              New Restore
+            </button>
+          )}
+          <div className="auto-refresh-controls">
+            <label className="refresh-label">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+              />
+              <span>Auto-refresh every</span>
+            </label>
+            <select
+              className="refresh-interval"
+              value={refreshInterval}
+              onChange={(e) => setRefreshInterval(Number(e.target.value))}
+              disabled={!autoRefresh}
+            >
+              <option value="2">2s</option>
+              <option value="5">5s</option>
+              <option value="10">10s</option>
+              <option value="30">30s</option>
+            </select>
+            <button
+              className="refresh-button"
+              onClick={() => fetchRestoreStatus()}
+              disabled={autoRefresh}
+            >
+              ↻ Refresh
+            </button>
           </div>
-
-          {restoreStatus ? (
-            <>
-              <div className="status-details">
-                <div className="status-item">
-                  <span className="status-label">Status:</span>
-                  <span className={`status-value status-${restoreStatus.status.toLowerCase()}`}>
-                    {restoreStatus.status}
-                  </span>
-                </div>
-                {restoreStatus.error && (
-                  <div className="status-item full-width">
-                    <span className="status-label">Error:</span>
-                    <span className="status-value error-text">{restoreStatus.error}</span>
-                  </div>
-                )}
-                {restoreStatus.path && (
-                  <div className="status-item">
-                    <span className="status-label">Path:</span>
-                    <span className="status-value">{restoreStatus.path}</span>
-                  </div>
-                )}
-              </div>
-
-              {restoreStatus.status === 'SUCCESS' && (
-                <div className="success-message">✓ Backup restored successfully!</div>
-              )}
-
-              {restoreStatus.status === 'FAILED' && (
-                <div className="error-message">
-                  ✗ Backup restore failed. Check the error details above.
-                </div>
-              )}
-
-              {restoreStatus.status === 'STARTED' && (
-                <div className="info-message">⏳ Backup restore is in progress...</div>
-              )}
-
-              {restoreStatus.status === 'TRANSFERRING' && (
-                <div className="info-message">📦 Transferring backup data...</div>
-              )}
-            </>
-          ) : null}
         </div>
-      )}
+
+        {restoreStatus ? (
+          <>
+            <div className="status-details">
+              <div className="status-item">
+                <span className="status-label">Status:</span>
+                <span className={`status-value status-${restoreStatus.status.toLowerCase()}`}>
+                  {restoreStatus.status}
+                </span>
+              </div>
+              {restoreStatus.error && (
+                <div className="status-item full-width">
+                  <span className="status-label">Error:</span>
+                  <span className="status-value error-text">{restoreStatus.error}</span>
+                </div>
+              )}
+              {restoreStatus.path && (
+                <div className="status-item">
+                  <span className="status-label">Path:</span>
+                  <span className="status-value">{restoreStatus.path}</span>
+                </div>
+              )}
+            </div>
+
+            {restoreStatus.status === 'SUCCESS' && (
+              <div className="success-message">✓ Backup restored successfully!</div>
+            )}
+
+            {restoreStatus.status === 'FAILED' && (
+              <div className="error-message">
+                ✗ Backup restore failed. Check the error details above.
+              </div>
+            )}
+
+            {restoreStatus.status === 'STARTED' && (
+              <div className="info-message">⏳ Backup restore is in progress...</div>
+            )}
+
+            {restoreStatus.status === 'TRANSFERRING' && (
+              <div className="info-message">📦 Transferring backup data...</div>
+            )}
+          </>
+        ) : (
+          <div className="info-message">
+            ℹ️ No restore process is currently running for this backup.
+          </div>
+        )}
+      </div>
 
       {showForm && (
         <>
+          <div className="form-section">
+            <h2>Restore Configuration</h2>
+          </div>
+
           <div className="form-section">
             <label htmlFor="collectionMode" className="form-label">
               Collections to Restore:
