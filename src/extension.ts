@@ -149,16 +149,31 @@ export function activate(context: vscode.ExtensionContext) {
     if (item.itemType === 'connection' && item.connectionId) {
       const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
 
-      // If disconnected, show dialog asking to connect
+      // If disconnected, check autoConnect setting
       if (connection && connection.status !== 'connected') {
-        const result = await vscode.window.showInformationMessage(
-          `The connection "${connection.name}" is disconnected. Would you like to connect now?`,
-          { modal: true },
-          'Connect'
-        );
-
-        if (result === 'Connect') {
+        // If autoConnect is enabled, connect automatically without showing dialog
+        if (connection.autoConnect) {
           await weaviateTreeDataProvider.connect(item.connectionId);
+        } else {
+          // Show dialog asking to connect with option to enable auto-connect
+          const result = await vscode.window.showInformationMessage(
+            `The connection "${connection.name}" is disconnected. Would you like to connect now?`,
+            { modal: true },
+            'Connect',
+            'Connect & Auto Connect for This Cluster'
+          );
+
+          if (result === 'Connect') {
+            await weaviateTreeDataProvider.connect(item.connectionId);
+          } else if (result === 'Connect & Auto Connect for This Cluster') {
+            // Enable auto-connect for this connection
+            const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+            await connectionManager.updateConnection(item.connectionId, { autoConnect: true });
+            await weaviateTreeDataProvider.connect(item.connectionId);
+            vscode.window.showInformationMessage(
+              `Auto Connect enabled for "${connection.name}". This cluster will now connect automatically when expanded.`
+            );
+          }
         }
       }
     }
