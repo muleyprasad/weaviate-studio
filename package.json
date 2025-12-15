@@ -175,6 +175,11 @@
         "command": "weaviate.createBackup",
         "title": "Create Backup",
         "icon": "$(add)"
+      },
+      {
+        "command": "weaviate.restoreBackup",
+        "title": "Restore Backup",
+        "icon": "$(debug-restart)"
       }
     ],
     "languages": [
@@ -375,6 +380,17 @@
           "command": "weaviate.deleteConnectionLink",
           "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionLink",
           "group": "1_link_actions@2"
+        },
+        {
+          "command": "weaviate.restoreBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupSuccess",
+          "group": "1_backup_actions@1"
+        },
+        {
+          "command": "weaviate.restoreBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupSuccess",
+          "group": "inline@1",
+          "icon": "$(debug-restart)"
         }
       ]
     }

@@ -43,38 +43,69 @@ class InjectBackupCssPlugin {
       HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
         'InjectBackupCssPlugin',
         (data, cb) => {
-          // Only inject CSS for backup.html
-          if (!data.outputName.includes('backup')) {
-            cb(null, data);
+          // Inject CSS for backup.html
+          if (data.outputName.includes('backup.html')) {
+            const cssFiles = [
+              { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
+              { path: path.resolve(__dirname, 'src/webview/Backup.css'), name: 'Custom Backup Styles' },
+            ];
+
+            try {
+              let cssContent = '';
+              cssFiles.forEach(({ path: filePath, name }) => {
+                if (fs.existsSync(filePath)) {
+                  const content = fs.readFileSync(filePath, 'utf8');
+                  cssContent += `\n/* ${name} */\n${content}\n`;
+                }
+              });
+
+              if (cssContent) {
+                data.html = data.html.replace(
+                  '</head>',
+                  `<style nonce="{{nonce}}">${cssContent}</style></head>`
+                );
+              }
+
+              cb(null, data);
+            } catch (err) {
+              console.error('Error injecting CSS:', err);
+              cb(err);
+            }
+            return;
+          }
+          
+          // Inject CSS for backup-restore.html
+          if (data.outputName.includes('backup-restore.html')) {
+            const cssFiles = [
+              { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
+              { path: path.resolve(__dirname, 'src/webview/BackupRestore.css'), name: 'Custom Backup Restore Styles' },
+            ];
+
+            try {
+              let cssContent = '';
+              cssFiles.forEach(({ path: filePath, name }) => {
+                if (fs.existsSync(filePath)) {
+                  const content = fs.readFileSync(filePath, 'utf8');
+                  cssContent += `\n/* ${name} */\n${content}\n`;
+                }
+              });
+
+              if (cssContent) {
+                data.html = data.html.replace(
+                  '</head>',
+                  `<style nonce="{{nonce}}">${cssContent}</style></head>`
+                );
+              }
+
+              cb(null, data);
+            } catch (err) {
+              console.error('Error injecting CSS:', err);
+              cb(err);
+            }
             return;
           }
 
-          const cssFiles = [
-            { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
-            { path: path.resolve(__dirname, 'src/webview/Backup.css'), name: 'Custom Backup Styles' },
-          ];
-
-          try {
-            let cssContent = '';
-            cssFiles.forEach(({ path: filePath, name }) => {
-              if (fs.existsSync(filePath)) {
-                const content = fs.readFileSync(filePath, 'utf8');
-                cssContent += `\n/* ${name} */\n${content}\n`;
-              }
-            });
-
-            if (cssContent) {
-              data.html = data.html.replace(
-                '</head>',
-                `<style nonce="{{nonce}}">${cssContent}</style></head>`
-              );
-            }
-
-            cb(null, data);
-          } catch (err) {
-            console.error('Error injecting CSS:', err);
-            cb(err);
-          }
+          cb(null, data);
         }
       );
     });
@@ -87,6 +118,7 @@ module.exports = {
   entry: {
     main: './src/webview/index.tsx',
     backup: './src/webview/Backup.tsx',
+    'backup-restore': './src/webview/BackupRestore.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -154,6 +186,14 @@ module.exports = {
       template: './src/webview/backup.html',
       filename: 'backup.html',
       chunks: ['backup'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/backup-restore.html',
+      filename: 'backup-restore.html',
+      chunks: ['backup-restore'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,

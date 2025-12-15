@@ -1764,10 +1764,25 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                   : 'foreground';
 
           // Use precalculated duration from cache
-          let descriptionText = `${backup.backend} - ${backup.status}`;
-          if (backup.duration) {
-            descriptionText += ` (${backup.duration})`;
+          let descriptionText = '';
+
+          // Add collections count if available
+          if (backup.classes && Array.isArray(backup.classes) && backup.classes.length > 0) {
+            descriptionText = `${backup.classes.length} collection${backup.classes.length !== 1 ? 's' : ''}`;
           }
+
+          // Add duration if available
+          if (backup.duration) {
+            if (descriptionText) {
+              descriptionText += ` (took ${backup.duration})`;
+            } else {
+              descriptionText = `took ${backup.duration}`;
+            }
+          }
+
+          // Set contextValue based on backup status
+          const contextValue =
+            backup.status === 'SUCCESS' ? 'weaviateBackupSuccess' : 'weaviateBackup';
 
           backupItems.push(
             new WeaviateTreeItem(
@@ -1778,7 +1793,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               undefined,
               backup.id,
               new vscode.ThemeIcon(statusIcon, new vscode.ThemeColor(statusColor)),
-              'weaviateBackup',
+              contextValue,
               descriptionText
             )
           );
@@ -1847,6 +1862,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           new vscode.ThemeIcon('info')
         )
       );
+
+      // Collections count
+      if (backup.classes && Array.isArray(backup.classes)) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Collections: ${backup.classes.length}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'collectionsCount',
+            new vscode.ThemeIcon('database')
+          )
+        );
+      }
 
       // Started At
       if (backup.startedAt) {
@@ -2143,6 +2173,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   // Get the connection manager (for debugging purposes)
   getConnectionManager(): ConnectionManager {
     return this.connectionManager;
+  }
+
+  /**
+   * Get backup details by connection ID and backup ID
+   * @param connectionId - The ID of the connection
+   * @param backupId - The ID of the backup
+   * @returns The backup details or undefined if not found
+   */
+  getBackupDetails(connectionId: string, backupId: string): any {
+    const backups = this.backupsCache[connectionId] || [];
+    return backups.find((b) => b.id === backupId);
   }
 
   // --- Data Fetch Methods ---

@@ -4,6 +4,7 @@ import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
 import { BackupPanel } from './views/BackupPanel';
+import { BackupRestorePanel } from './views/BackupRestorePanel';
 
 /**
  * Handles opening of .weaviate files
@@ -792,6 +793,139 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to open backup panel: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Restore backup command
+    vscode.commands.registerCommand('weaviate.restoreBackup', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or backup information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get backup details from cache
+        const backupDetails = weaviateTreeDataProvider.getBackupDetails(
+          item.connectionId,
+          item.itemId
+        );
+
+        if (!backupDetails) {
+          vscode.window.showErrorMessage('Backup details not found');
+          return;
+        }
+
+        // Only allow restore for SUCCESS backups
+        if (backupDetails.status !== 'SUCCESS') {
+          vscode.window.showWarningMessage(
+            `Cannot restore backup with status: ${backupDetails.status}. Only SUCCESS backups can be restored.`
+          );
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Open restore panel
+        const panel = BackupRestorePanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          backupDetails.id,
+          backupDetails.backend,
+          collectionNames,
+          backupDetails,
+          async (restoreData) => {
+            try {
+              // Restore backup - build config object
+              const restoreConfig: any = {
+                backupId: restoreData.backupId,
+                backend: restoreData.backend,
+              };
+
+              // Add waitForCompletion
+              if (restoreData.waitForCompletion !== undefined) {
+                restoreConfig.waitForCompletion = restoreData.waitForCompletion;
+              }
+
+              // Add optional parameters only if they have values
+              if (restoreData.includeCollections && restoreData.includeCollections.length > 0) {
+                restoreConfig.includeCollections = restoreData.includeCollections;
+              }
+              if (restoreData.excludeCollections && restoreData.excludeCollections.length > 0) {
+                restoreConfig.excludeCollections = restoreData.excludeCollections;
+              }
+              if (restoreData.cpuPercentage !== undefined) {
+                restoreConfig.cpuPercentage = restoreData.cpuPercentage;
+              }
+              if (restoreData.path) {
+                restoreConfig.path = restoreData.path;
+              }
+              if (restoreData.rolesOptions) {
+                restoreConfig.rolesOptions = restoreData.rolesOptions;
+              }
+              if (restoreData.usersOptions) {
+                restoreConfig.usersOptions = restoreData.usersOptions;
+              }
+              console.log('calling backup.restore with config:', restoreConfig);
+              const result = await client.backup.restore(restoreConfig);
+
+              vscode.window.showInformationMessage(
+                `Backup restore initiated. Status: ${result.status}`
+              );
+
+              // Refresh collections after restore
+              setTimeout(async () => {
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+              }, 2000);
+            } catch (error) {
+              throw error; // Re-throw to be handled by the panel
+            }
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchRestoreStatus') {
+              try {
+                const { backupId, backend } = message;
+
+                console.log(
+                  'calling backup.getRestoreStatus with backupId:',
+                  backupId,
+                  'backend:',
+                  backend
+                );
+                const restoreStatus = await client.backup.getRestoreStatus({ backend, backupId });
+
+                postMessage({
+                  command: 'restoreStatus',
+                  status: restoreStatus,
+                });
+
+                // Refresh collections after each status check
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to restore backup: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }),
