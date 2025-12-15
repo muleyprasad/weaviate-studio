@@ -2455,8 +2455,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       vscode.window.showInformationMessage('Backups refreshed successfully');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error refreshing backups:', error);
-      throw new Error(`Failed to refresh backups: ${errorMessage}`);
+      // Show notification even on error
+      vscode.window.showWarningMessage(`Backups refresh completed with issues: ${errorMessage}`);
     }
   }
 
@@ -2464,10 +2464,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * Refreshes collections for a connection (public method that can be called from UI)
    * @param connectionId - The ID of the connection
    */
-  async refreshCollections(connectionId: string): Promise<void> {
+  async refreshCollections(connectionId: string, silent: boolean = false): Promise<void> {
     try {
       await this.fetchCollectionsData(connectionId);
-      vscode.window.showInformationMessage('Collections refreshed successfully');
+      if (!silent) {
+        vscode.window.showInformationMessage('Collections refreshed successfully');
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error refreshing collections:', error);
@@ -2605,11 +2607,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       // Reconnect to refresh the connection info
       await this.connect(connectionId, true);
-      await this.fetchData(connectionId);
+
+      // Refresh server statistics first
+      await this.fetchServerStatistics(connectionId);
+
+      // Call public refresh methods sequentially to show individual toasts
+      await this.refreshMetadata(connectionId).catch(() => {});
+      await this.refreshNodes(connectionId).catch(() => {});
+      await this.refreshCollections(connectionId).catch(() => {});
+      await this.refreshBackups(connectionId).catch(() => {});
+
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Error refreshing connection info:', error);
       throw new Error(`Failed to refresh connection info: ${errorMessage}`);
     }
   }

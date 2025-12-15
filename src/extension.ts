@@ -616,7 +616,6 @@ export function activate(context: vscode.ExtensionContext) {
 
       try {
         await weaviateTreeDataProvider.refreshBackups(item.connectionId);
-        vscode.window.showInformationMessage('Backups refreshed');
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh backups: ${error instanceof Error ? error.message : String(error)}`
@@ -887,7 +886,7 @@ export function activate(context: vscode.ExtensionContext) {
 
               // Refresh collections after restore
               setTimeout(async () => {
-                await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
               }, 2000);
             } catch (error) {
               throw error; // Re-throw to be handled by the panel
@@ -913,7 +912,7 @@ export function activate(context: vscode.ExtensionContext) {
                 });
 
                 // Refresh collections after each status check
-                await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
               } catch (error) {
                 postMessage({
                   command: 'error',
@@ -939,7 +938,6 @@ export function activate(context: vscode.ExtensionContext) {
 
       try {
         await weaviateTreeDataProvider.refreshCollections(item.connectionId);
-        vscode.window.showInformationMessage('Collections refreshed');
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh collections: ${error instanceof Error ? error.message : String(error)}`
@@ -956,7 +954,6 @@ export function activate(context: vscode.ExtensionContext) {
 
       try {
         await weaviateTreeDataProvider.refreshNodes(item.connectionId);
-        vscode.window.showInformationMessage('Nodes refreshed');
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh nodes: ${error instanceof Error ? error.message : String(error)}`
@@ -973,7 +970,6 @@ export function activate(context: vscode.ExtensionContext) {
 
       try {
         await weaviateTreeDataProvider.refreshMetadata(item.connectionId);
-        vscode.window.showInformationMessage('Metadata refreshed');
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh metadata: ${error instanceof Error ? error.message : String(error)}`
