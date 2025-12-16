@@ -280,7 +280,6 @@ describe('ConnectionManager', () => {
         httpSecure: false,
         grpcSecure: false,
         authCredentials: { key: 'test-key' },
-        type: 'custom',
         timeout: {
           init: 30,
           query: 60,
