@@ -2108,8 +2108,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vectorIndexConfig.skip = srcIdx.skip;
             }
 
-            // hnsw
+            // hnsw - check both nested structure and flat structure
             if (srcIdx.hnsw) {
+              // Nested structure: indexConfig.hnsw contains the config
               const h: any = { ...srcIdx.hnsw };
               if (h.distance) {
                 h.distanceMetric = h.distance;
@@ -2126,6 +2127,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     trainingLimit: q.trainingLimit,
                     encoder: q.encoder,
                   };
+                } else if (q.type === 'rq') {
+                  h.rq = {
+                    enabled: true,
+                    bits: q.bits,
+                    rescoreLimit: q.rescoreLimit,
+                  };
                 }
                 delete h.quantizer;
               }
@@ -2133,6 +2140,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 delete h.type;
               }
               vectorIndexConfig.hnsw = h;
+            } else if (vectorIndexType === 'hnsw' && Object.keys(srcIdx).length > 0) {
+              // Flat structure: all HNSW properties are directly in indexConfig
+              const h: any = { ...srcIdx };
+
+              // Remove fields that are not part of HNSW config
+              delete h.type;
+
+              if (h.distance) {
+                h.distanceMetric = h.distance;
+                delete h.distance;
+              }
+
+              // Handle quantizer if present
+              if (h.quantizer) {
+                const q = h.quantizer;
+                if (q.type === 'pq') {
+                  h.pq = {
+                    enabled: true,
+                    internalBitCompression: q.bitCompression || false,
+                    segments: q.segments,
+                    centroids: q.centroids,
+                    trainingLimit: q.trainingLimit,
+                    encoder: q.encoder,
+                  };
+                } else if (q.type === 'rq') {
+                  h.rq = {
+                    enabled: true,
+                    bits: q.bits,
+                    rescoreLimit: q.rescoreLimit,
+                  };
+                }
+                delete h.quantizer;
+              }
+
+              // Only add to vectorIndexConfig if there are actual config values
+              if (Object.keys(h).length > 0) {
+                vectorIndexConfig.hnsw = h;
+              }
             }
 
             // flat
