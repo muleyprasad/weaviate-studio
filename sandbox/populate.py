@@ -6,7 +6,8 @@ import json
 # Connect to Weaviate (v4 syntax)
 client = weaviate.connect_to_local(
     host="localhost",
-    port=8080
+    port=8080,
+    auth_credentials=weaviate.auth.AuthApiKey("test-key-123")
 )
 
 try:
