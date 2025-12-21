@@ -21,6 +21,62 @@ Contents
 - Templates are processed by processTemplate, which injects the collection name, limit, and schema-aware fields when available.
 - Execute the generated GraphQL against your Weaviate instance and iterate.
 
+## When to Use Which Template?
+
+Choosing the right template depends on your use case:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    What do you need to do?                      │
+└───────────────┬─────────────────────────────────────────────────┘
+                │
+    ┌───────────┴───────────┐
+    │                       │
+┌───▼────┐            ┌─────▼─────┐
+│ Search │            │  Analyze  │
+└───┬────┘            └─────┬─────┘
+    │                       │
+    ├─── Exact keywords? ───┐            ├─── Statistics? ────────┐
+    │                       │            │                        │
+    │    ┌──────────────────▼──────┐     │    ┌──────────────────▼────────┐
+    │    │   BM25 Search           │     │    │   Aggregation Query       │
+    │    │   Fast keyword matching │     │    │   Count, min, max, mean   │
+    │    └─────────────────────────┘     │    └───────────────────────────┘
+    │                                    │
+    ├─── Semantic meaning? ──────┐       ├─── Group by field? ────┐
+    │                            │       │                        │
+    │    ┌───────────────────────▼─┐     │    ┌──────────────────▼────────┐
+    │    │   nearText / nearVector│     │    │   Group By Query          │
+    │    │   AI-powered similarity │     │    │   Aggregate by categories │
+    │    └────────────────────────┘     │    └───────────────────────────┘
+    │                                    │
+    ├─── Best of both? ──────────┐       └─── Filter data? ────────┐
+    │                            │                                 │
+    │    ┌───────────────────────▼─┐         ┌──────────────────▼────────┐
+    │    │   Hybrid Search         │         │   Filter Query            │
+    │    │   Keyword + Vector (α)  │         │   Where conditions        │
+    │    └─────────────────────────┘         └───────────────────────────┘
+    │
+    └─── AI-generated summaries? ─┐
+                                  │
+         ┌────────────────────────▼──────┐
+         │   Generative Search           │
+         │   RAG with summaries          │
+         └───────────────────────────────┘
+```
+
+**Quick decision guide:**
+
+- **Keyword search** (exact matches, SQL-like) → **BM25 Search**
+- **Semantic search** (meaning, concepts) → **nearText** or **nearVector**
+- **Both keyword + semantic** → **Hybrid Search** (adjust alpha: 0=vector, 1=keyword)
+- **Count, sum, average** → **Aggregation Query**
+- **Group results by property** → **Group By Query**
+- **Filter specific values** → **Filter Query**
+- **AI-generated answers** → **Generative Search**
+- **Find similar to object** → **nearObject**
+- **Multi-tenant data** → **Tenant Query**
+
 ## Template catalog
 
 The selector surfaces non-mutating templates that are stable across Weaviate versions. Below are summaries and minimal examples. Replace "Article" with your collection.
@@ -357,27 +413,147 @@ Formatting:
 
 Weaviate GraphQL does not support mutations for insert/update/delete; those operations are handled via REST/clients. The selector excludes mutation templates to avoid confusion, though the codebase contains illustrative generators as references.
 
+## Common Mistakes & Solutions
+
+Understanding common pitfalls can save you time and frustration. Here's a comprehensive guide:
+
+### Template Selection Mistakes
+
+| Mistake                                  | Symptom                           | Solution                                                                      |
+| ---------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| Using nearText without text vectorizer   | "Unknown argument nearText"       | Use nearVector instead or configure a text vectorizer (text2vec-openai, etc.) |
+| Using BM25 on non-indexed properties     | Poor/no results                   | Ensure properties have `indexSearchable: true` or omit `properties` parameter |
+| Mixing distance and certainty            | Unexpected result ordering        | Use **either** distance (v1.14+) **or** certainty, not both                   |
+| High certainty (>0.9) with no results    | Empty response                    | Lower certainty (try 0.7) or switch to distance (~0.6)                        |
+| Wrong alpha value in hybrid              | Results don't match expectations  | alpha: 0=pure vector, 0.5=balanced, 1=pure keyword. Start with 0.5 and tune   |
+| Large limit (>1000) with nested refs     | Timeout or very slow              | Reduce limit or use pagination with `offset`. Query references separately     |
+| Using aggregation in Get                 | Syntax error                      | Aggregations use `Aggregate` not `Get`                                        |
+| Filtering dates without timezone         | Wrong results or errors           | Use ISO 8601 format with timezone: `"2024-01-01T00:00:00Z"`                   |
+| Cross-references without inline fragment | "Cannot query field" error        | Use `... on ClassName { }` syntax for cross-references                        |
+| Missing \_additional.id                  | Can't identify objects in results | Always include `_additional { id }` for object identification                 |
+
+### Vector Search Mistakes
+
+| Mistake                          | Symptom                        | Solution                                                                   |
+| -------------------------------- | ------------------------------ | -------------------------------------------------------------------------- |
+| Wrong vector dimensions          | "Vector length mismatch" error | Match vector length to your model (OpenAI ada-002: 1536, mpnet: 768, etc.) |
+| Using random vectors for testing | Nonsensical results            | Use actual embeddings from your vectorizer or similar objects              |
+| Distance threshold too strict    | Empty results                  | Try higher distance (0.6-1.0) or lower certainty (0.6-0.8)                 |
+| Not normalizing vectors          | Inconsistent similarity scores | Ensure vectors are L2-normalized if using cosine similarity                |
+| Comparing vectors across models  | Meaningless similarity         | Don't compare vectors from different models (ada-002 vs Cohere won't work) |
+
+### Query Performance Mistakes
+
+| Mistake                            | Symptom                              | Solution                                                   |
+| ---------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| No limit specified                 | Returns all objects (very slow)      | Always specify `limit` (default: 10, max recommended: 100) |
+| Fetching all properties            | Slow queries, large payloads         | Only select properties you need                            |
+| Deep reference nesting (3+ levels) | Exponential data explosion           | Flatten queries: do separate queries for each level        |
+| No filters on large collections    | Scanning millions of objects         | Add `where` filters to reduce search space                 |
+| Requesting vectors in every query  | 10-100x larger payloads              | Only include `vector` in `_additional` when you need it    |
+| Not using pagination               | Trying to fetch 10K+ results at once | Use `limit` + `offset` or cursor-based pagination          |
+
+### Schema-Related Mistakes
+
+| Mistake                             | Symptom                                     | Solution                                                                      |
+| ----------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| Querying non-existent properties    | "Cannot query field" error                  | Check schema first or use template auto-generation                            |
+| Wrong property type in filters      | Type mismatch errors                        | Use `valueText` for strings, `valueInt` for numbers, `valueBoolean` for bools |
+| Querying wrong collection name      | "Unknown type" error                        | Collection names are case-sensitive (use exact name from schema)              |
+| Missing cross-reference declaration | Can't query relationships                   | Ensure cross-references are defined in collection schema                      |
+| Inconsistent property naming        | Query works in some collections, not others | Use schema-aware templates or check property names per collection             |
+
+### Generative Search Mistakes
+
+| Mistake                           | Symptom                               | Solution                                                                   |
+| --------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- |
+| Missing generative module config  | "Generative module not enabled" error | Configure generative-openai, generative-cohere, etc. on your collection    |
+| Vague/generic prompts             | Poor quality summaries                | Be specific: "Summarize in 2 sentences focusing on X" not "Summarize this" |
+| Too many properties in generate   | Slow, expensive API calls             | Limit to 2-3 most relevant properties                                      |
+| Large result sets with generation | Timeout, high costs                   | Use small limit (5-10) for generative queries                              |
+| Not handling generate errors      | Silent failures                       | Always check `_additional.generate.error` in results                       |
+
+### Multi-Tenancy Mistakes
+
+| Mistake                        | Symptom                              | Solution                                                         |
+| ------------------------------ | ------------------------------------ | ---------------------------------------------------------------- |
+| Forgetting tenant parameter    | "Tenant required" error              | Add `tenant: "tenant-name"` to query                             |
+| Wrong tenant name              | Empty results or "Tenant not found"  | Verify tenant exists: check collection schema for active tenants |
+| Mixing tenants in single query | Can't query multiple tenants at once | Run separate queries per tenant and merge results client-side    |
+
 ## Troubleshooting FAQ
 
-- “Unknown argument nearText”:
+### Quick Diagnostics
 
-  - Ensure a text vectorizer is configured; otherwise use nearVector or hybrid/BM25.
+**"Unknown argument nearText"**
 
-- “No results returned”:
+- **Cause**: No text vectorizer configured on collection
+- **Fix**: Use nearVector instead, or configure a text vectorizer (text2vec-openai, text2vec-cohere, text2vec-transformers)
+- **Verify**: Check schema → moduleConfig for text2vec-\* entries
 
-  - Check your thresholds (distance too low or certainty too high).
-  - Confirm your class names and property selections match the schema.
+**"No results returned"**
 
-- “Nested results are huge” in relationship queries:
+- **Causes**:
+  - Thresholds too strict (distance too low, certainty too high)
+  - Collection name mismatch (case-sensitive!)
+  - Property names don't match schema
+  - No data in collection
+- **Fixes**:
+  - Try distance: 1.0 or certainty: 0.5 (very permissive) to test
+  - Confirm collection name exactly matches schema
+  - Use schema-aware templates to auto-populate correct properties
+  - Verify data exists: run simple `Get { Collection(limit: 1) { _additional { id } } }`
 
-  - Lower the main query limit or query references with separate, targeted calls.
+**"Nested results are huge" in relationship queries**
 
-- “ExplainScore missing”:
+- **Cause**: Cross-references multiply result size (1 article with 100 authors = 100x data)
+- **Fix**:
+  - Lower main query limit (e.g., `limit: 5`)
+  - Query references separately with targeted properties
+  - Use `_additional { id }` only for refs, then fetch details separately
 
-  - Confirm includeScores is true and includeExplainScore isn’t explicitly set to false.
+**"ExplainScore missing"**
 
-- “Slow queries”:
-  - Reduce limit, scope properties (BM25/hybrid), add where filters, and avoid large nested selections.
+- **Causes**:
+  - Not using vector/hybrid search (explainScore only works with similarity searches)
+  - `includeExplainScore: false` in config
+- **Fix**: Ensure using nearVector/nearText/hybrid and include `explainScore` in `_additional`
+
+**"Slow queries"**
+
+- **Diagnostics**:
+  - Check `limit` value (>100 is slow)
+  - Count nested cross-references (each level multiplies data)
+  - Check if requesting `vector` in results (large payloads)
+- **Optimizations**:
+  - Reduce limit to 10-50
+  - Scope BM25/hybrid to specific properties: `properties: ["title"]`
+  - Add `where` filters to reduce search space
+  - Avoid deep nesting (>2 levels)
+  - Exclude `vector` from `_additional` unless needed
+  - Use pagination instead of large single queries
+
+**"Vector length mismatch"**
+
+- **Cause**: Vector dimensions don't match configured model
+- **Fix**:
+  - OpenAI ada-002: 1536 dimensions
+  - OpenAI text-embedding-3-small: 1536
+  - OpenAI text-embedding-3-large: 3072
+  - Cohere v3: 1024
+  - Sentence Transformers (mpnet): 768
+  - Check your model's documentation for exact dimensions
+
+**"Cannot query field X"**
+
+- **Causes**:
+  - Property doesn't exist in schema
+  - Typo in property name
+  - Cross-reference without inline fragment
+- **Fixes**:
+  - View schema in Weaviate Studio explorer
+  - Use schema-aware templates (auto-populates correct properties)
+  - For cross-refs: use `... on ClassName { properties }`
 
 Best practices:
 

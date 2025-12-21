@@ -1009,6 +1009,63 @@ ${nestedProps}
 }
 
 /**
+ * Generate a static fallback query when template processing fails
+ * @param template The template string or template name
+ * @param collectionName The name of the collection
+ * @param limit Optional limit for queries (default: 10)
+ * @returns Static fallback query string
+ */
+function generateStaticFallback(
+  template: string,
+  collectionName: string,
+  limit: number = 10
+): string {
+  console.warn(`Using static fallback for template: ${template}`);
+
+  // Check if template is a predefined template name
+  const predefinedTemplate = queryTemplates.find((t) => t.name === template);
+  const templateToUse = predefinedTemplate?.template || template;
+
+  // Provide basic static templates for common placeholders
+  const fallbackMap: Record<string, () => string> = {
+    '{nearVectorQuery}': () => generateNearVectorQuery(collectionName, limit),
+    '{nearObjectQuery}': () => generateNearObjectQuery(collectionName, undefined, limit),
+    '{nearTextQuery}': () => generateNearTextQuery(collectionName, limit),
+    '{hybridQuery}': () => generateHybridQuery(collectionName, limit),
+    '{bm25Query}': () => generateBM25Query(collectionName, limit),
+    '{generativeSearchQuery}': () => generateGenerativeSearchQuery(collectionName, limit),
+    '{groupByQuery}': () => generateGroupByQuery(collectionName),
+    '{filterQuery}': () => generateFilterQuery(collectionName, limit),
+    '{aggregationQuery}': () => generateAggregationQuery(collectionName),
+    '{exploreQuery}': () => generateExploreQuery(collectionName, limit),
+    '{tenantQuery}': () => generateTenantQuery(collectionName, 'tenant-name', limit),
+  };
+
+  // Try to find a matching fallback
+  for (const [placeholder, generator] of Object.entries(fallbackMap)) {
+    if (templateToUse.includes(placeholder)) {
+      try {
+        return generator();
+      } catch (error) {
+        console.error(`Fallback generation failed for ${placeholder}:`, error);
+      }
+    }
+  }
+
+  // Ultimate fallback: simple Get query
+  return `{
+  Get {
+    ${collectionName}(limit: ${limit}) {
+      # Add your properties here
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+}
+
+/**
  * Process a template by replacing placeholders with actual values
  * @param template The template string or template name
  * @param collectionName The name of the collection
@@ -1023,125 +1080,140 @@ export function processTemplate(
   schema?: { classes?: ClassSchema[] },
   config?: QueryConfig
 ): string {
-  // Helpers to normalize various schema shapes (v1/v2)
-  const coerceToArray = (v: any): string[] =>
-    Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
+  try {
+    // Helpers to normalize various schema shapes (v1/v2)
+    const coerceToArray = (v: any): string[] =>
+      Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
 
-  const normalizeClassSchema = (input: any): ClassSchema | undefined => {
-    if (!input) {
-      return undefined;
-    }
-    const normalized: ClassSchema = {
-      class: input.class ?? input.name,
-      description: input.description,
-      properties: Array.isArray(input.properties)
-        ? input.properties.map((p: any) => ({
-            name: p.name,
-            dataType: coerceToArray(p.dataType),
-            description: p.description,
-            tokenization: p.tokenization,
-            indexSearchable: p.indexSearchable,
-            indexFilterable: p.indexFilterable,
-            moduleConfig: p.moduleConfig,
-            vectorizerConfig: p.vectorizerConfig,
-          }))
-        : [],
-      vectorizer: input.vectorizer,
-      moduleConfig: input.moduleConfig,
-      vectorizers: input.vectorizers,
+    const normalizeClassSchema = (input: any): ClassSchema | undefined => {
+      if (!input) {
+        return undefined;
+      }
+      const normalized: ClassSchema = {
+        class: input.class ?? input.name,
+        description: input.description,
+        properties: Array.isArray(input.properties)
+          ? input.properties.map((p: any) => ({
+              name: p.name,
+              dataType: coerceToArray(p.dataType),
+              description: p.description,
+              tokenization: p.tokenization,
+              indexSearchable: p.indexSearchable,
+              indexFilterable: p.indexFilterable,
+              moduleConfig: p.moduleConfig,
+              vectorizerConfig: p.vectorizerConfig,
+            }))
+          : [],
+        vectorizer: input.vectorizer,
+        moduleConfig: input.moduleConfig,
+        vectorizers: input.vectorizers,
+      };
+      return normalized;
     };
-    return normalized;
-  };
 
-  // Find the class/collection definition across possible schema shapes
-  let classSchema: ClassSchema | undefined = undefined;
-  const classesAny = (schema as any)?.classes || (schema as any)?.collections;
-  const lc = (s: any) => (typeof s === 'string' ? s.toLowerCase() : '');
-  if (Array.isArray(classesAny)) {
-    let raw = classesAny.find(
-      (c: any) => lc(c.class) === lc(collectionName) || lc(c.name) === lc(collectionName)
-    );
-    if (!raw && classesAny.length === 1) {
-      raw = classesAny[0];
+    // Find the class/collection definition across possible schema shapes
+    let classSchema: ClassSchema | undefined = undefined;
+    const classesAny = (schema as any)?.classes || (schema as any)?.collections;
+    const lc = (s: any) => (typeof s === 'string' ? s.toLowerCase() : '');
+    if (Array.isArray(classesAny)) {
+      let raw = classesAny.find(
+        (c: any) => lc(c.class) === lc(collectionName) || lc(c.name) === lc(collectionName)
+      );
+      if (!raw && classesAny.length === 1) {
+        raw = classesAny[0];
+      }
+      classSchema = normalizeClassSchema(raw);
+    } else if (
+      lc((schema as any)?.name) === lc(collectionName) ||
+      lc((schema as any)?.class) === lc(collectionName)
+    ) {
+      classSchema = normalizeClassSchema(schema);
     }
-    classSchema = normalizeClassSchema(raw);
-  } else if (
-    lc((schema as any)?.name) === lc(collectionName) ||
-    lc((schema as any)?.class) === lc(collectionName)
-  ) {
-    classSchema = normalizeClassSchema(schema);
+
+    // Check if the template is a predefined template name (queries only)
+    const predefinedTemplate = queryTemplates.find((t) => t.name === template);
+    if (predefinedTemplate) {
+      template = predefinedTemplate.template;
+    }
+
+    // Determine effective limit (config overrides param)
+    const effectiveLimit = config?.limit ?? limit;
+
+    // Replace placeholders with actual values using dynamic generation when possible
+    let query = template
+      .replace(
+        '{nearVectorQuery}',
+        classSchema
+          ? generateDynamicNearVectorQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateNearVectorQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{nearObjectQuery}',
+        generateNearObjectQuery(collectionName, undefined, effectiveLimit)
+      )
+      .replace(
+        '{nearTextQuery}',
+        classSchema
+          ? generateDynamicNearTextQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateNearTextQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{hybridQuery}',
+        classSchema
+          ? generateDynamicHybridQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateHybridQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{bm25Query}',
+        classSchema
+          ? generateDynamicBM25Query(collectionName, classSchema, effectiveLimit, config)
+          : generateBM25Query(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{generativeSearchQuery}',
+        classSchema
+          ? generateDynamicGenerativeSearchQuery(
+              collectionName,
+              classSchema,
+              effectiveLimit,
+              config
+            )
+          : generateGenerativeSearchQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{groupByQuery}',
+        classSchema
+          ? generateDynamicGroupByQuery(collectionName, classSchema)
+          : generateGroupByQuery(collectionName)
+      )
+      .replace(
+        '{filterQuery}',
+        classSchema
+          ? generateDynamicFilterQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateFilterQuery(collectionName, effectiveLimit)
+      )
+      .replace(
+        '{aggregationQuery}',
+        classSchema
+          ? generateDynamicAggregationQuery(collectionName, classSchema)
+          : generateAggregationQuery(collectionName)
+      )
+      .replace(
+        '{tenantQuery}',
+        generateTenantQuery(collectionName, config?.tenantName ?? 'tenant-name', effectiveLimit)
+      )
+      .replace('{exploreQuery}', generateExploreQuery(collectionName, effectiveLimit));
+
+    return query;
+  } catch (error) {
+    console.error('Error processing template:', error);
+    console.error('Template:', template);
+    console.error('Collection:', collectionName);
+    console.error('Schema:', schema);
+
+    // Return static fallback to ensure users always get a usable query
+    return generateStaticFallback(template, collectionName, limit);
   }
-
-  // Check if the template is a predefined template name (queries only)
-  const predefinedTemplate = queryTemplates.find((t) => t.name === template);
-  if (predefinedTemplate) {
-    template = predefinedTemplate.template;
-  }
-
-  // Determine effective limit (config overrides param)
-  const effectiveLimit = config?.limit ?? limit;
-
-  // Replace placeholders with actual values using dynamic generation when possible
-  let query = template
-    .replace(
-      '{nearVectorQuery}',
-      classSchema
-        ? generateDynamicNearVectorQuery(collectionName, classSchema, effectiveLimit, config)
-        : generateNearVectorQuery(collectionName, effectiveLimit, config?.returnProperties)
-    )
-    .replace(
-      '{nearObjectQuery}',
-      generateNearObjectQuery(collectionName, undefined, effectiveLimit)
-    )
-    .replace(
-      '{nearTextQuery}',
-      classSchema
-        ? generateDynamicNearTextQuery(collectionName, classSchema, effectiveLimit, config)
-        : generateNearTextQuery(collectionName, effectiveLimit, config?.returnProperties)
-    )
-    .replace(
-      '{hybridQuery}',
-      classSchema
-        ? generateDynamicHybridQuery(collectionName, classSchema, effectiveLimit, config)
-        : generateHybridQuery(collectionName, effectiveLimit, config?.returnProperties)
-    )
-    .replace(
-      '{bm25Query}',
-      classSchema
-        ? generateDynamicBM25Query(collectionName, classSchema, effectiveLimit, config)
-        : generateBM25Query(collectionName, effectiveLimit, config?.returnProperties)
-    )
-    .replace(
-      '{generativeSearchQuery}',
-      classSchema
-        ? generateDynamicGenerativeSearchQuery(collectionName, classSchema, effectiveLimit, config)
-        : generateGenerativeSearchQuery(collectionName, effectiveLimit, config?.returnProperties)
-    )
-    .replace(
-      '{groupByQuery}',
-      classSchema
-        ? generateDynamicGroupByQuery(collectionName, classSchema)
-        : generateGroupByQuery(collectionName)
-    )
-    .replace(
-      '{filterQuery}',
-      classSchema
-        ? generateDynamicFilterQuery(collectionName, classSchema, effectiveLimit, config)
-        : generateFilterQuery(collectionName, effectiveLimit)
-    )
-    .replace(
-      '{aggregationQuery}',
-      classSchema
-        ? generateDynamicAggregationQuery(collectionName, classSchema)
-        : generateAggregationQuery(collectionName)
-    )
-    .replace(
-      '{tenantQuery}',
-      generateTenantQuery(collectionName, config?.tenantName ?? 'tenant-name', effectiveLimit)
-    )
-    .replace('{exploreQuery}', generateExploreQuery(collectionName, effectiveLimit));
-
-  return query;
 }
 
 /**
@@ -1845,27 +1917,130 @@ function hasAnyVectorizerConfigured(classSchema?: ClassSchema): boolean {
  * Helper function to estimate vector dimensions from schema
  */
 function getVectorDimensions(classSchema?: ClassSchema): string {
-  // Try to extract from vectorizer config
+  if (!classSchema) {
+    return 'match your vectorizer dimensions';
+  }
+
+  // Strategy 1: Try to extract from vectorizer config (v1 style)
   if (classSchema?.moduleConfig) {
     const configs = Object.values(classSchema.moduleConfig);
     for (const config of configs) {
       if (typeof config === 'object' && config && 'model' in config) {
-        // Common dimension sizes for popular models
-        const model = String(config.model).toLowerCase();
-        if (model.includes('openai') || model.includes('ada-002')) {
-          return '1536';
+        const dimension = inferDimensionFromModel(String(config.model));
+        if (dimension) {
+          return dimension;
         }
-        if (model.includes('sentence-transformers') || model.includes('all-mpnet')) {
-          return '768';
-        }
-        if (model.includes('cohere')) {
-          return '4096';
+      }
+      // Check for explicit vectorIndexConfig dimensions
+      if (typeof config === 'object' && config && 'vectorIndexConfig' in config) {
+        const vectorConfig = (config as any).vectorIndexConfig;
+        if (vectorConfig?.dimensions) {
+          return String(vectorConfig.dimensions);
         }
       }
     }
   }
 
+  // Strategy 2: Check v2-style vectorizers config
+  if (classSchema?.vectorizers) {
+    const v = classSchema.vectorizers as any;
+    if (typeof v === 'object') {
+      // Check default vectorizer
+      const defaultVectorizer = v?.default?.vectorizer;
+      if (defaultVectorizer?.name) {
+        const dimension = inferDimensionFromModel(String(defaultVectorizer.name));
+        if (dimension) {
+          return dimension;
+        }
+      }
+      // Check for model in config
+      if (defaultVectorizer?.model) {
+        const dimension = inferDimensionFromModel(String(defaultVectorizer.model));
+        if (dimension) {
+          return dimension;
+        }
+      }
+    }
+  }
+
+  // Strategy 3: Check legacy vectorizer field
+  if (classSchema?.vectorizer) {
+    const dimension = inferDimensionFromModel(String(classSchema.vectorizer));
+    if (dimension) {
+      return dimension;
+    }
+  }
+
+  // Fallback: generic message
   return 'match your vectorizer dimensions';
+}
+
+/**
+ * Infer vector dimensions from model name
+ */
+function inferDimensionFromModel(modelName: string): string | null {
+  const model = modelName.toLowerCase();
+
+  // OpenAI models
+  if (model.includes('text-embedding-3-large')) {
+    return '3072';
+  }
+  if (model.includes('text-embedding-3-small')) {
+    return '1536';
+  }
+  if (model.includes('ada-002') || model.includes('text-embedding-ada')) {
+    return '1536';
+  }
+
+  // Cohere models
+  if (model.includes('embed-english-v3') || model.includes('embed-multilingual-v3')) {
+    return '1024';
+  }
+  if (model.includes('cohere')) {
+    return '4096'; // Legacy default
+  }
+
+  // Sentence Transformers models
+  if (model.includes('all-mpnet-base-v2')) {
+    return '768';
+  }
+  if (model.includes('all-minilm-l6-v2')) {
+    return '384';
+  }
+  if (model.includes('all-minilm-l12-v2')) {
+    return '384';
+  }
+  if (model.includes('sentence-transformers')) {
+    return '768'; // Common default
+  }
+
+  // HuggingFace models
+  if (model.includes('bert-base')) {
+    return '768';
+  }
+  if (model.includes('bert-large')) {
+    return '1024';
+  }
+
+  // PaLM models
+  if (model.includes('palm') || model.includes('gecko')) {
+    return '768';
+  }
+
+  // Ollama models
+  if (model.includes('llama')) {
+    return '4096';
+  }
+  if (model.includes('mistral')) {
+    return '4096';
+  }
+
+  // AWS Bedrock models
+  if (model.includes('titan-embed')) {
+    return '1536';
+  }
+
+  return null;
 }
 
 /**

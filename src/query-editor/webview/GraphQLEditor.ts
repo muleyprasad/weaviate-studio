@@ -27,6 +27,8 @@ export class GraphQLEditor {
   private disposables: monaco.IDisposable[] = [];
   private currentCollectionName: string = 'Article';
   private schemaConfigRetryHandle: number | null = null;
+  private schemaConfigRetryCount: number = 0;
+  private readonly MAX_SCHEMA_CONFIG_RETRIES = 10;
 
   // Event listener management
   private changeListeners: Array<(value: string) => void> = [];
@@ -375,10 +377,22 @@ export class GraphQLEditor {
     try {
       const api = (monaco.languages as any).graphql?.api;
       if (!api || typeof api.setSchemaConfig !== 'function') {
+        if (this.schemaConfigRetryCount >= this.MAX_SCHEMA_CONFIG_RETRIES) {
+          console.error(
+            `Failed to configure GraphQL language service after ${this.MAX_SCHEMA_CONFIG_RETRIES} retries. Schema features may not work correctly.`
+          );
+          return;
+        }
+
         if (this.schemaConfigRetryHandle) {
           window.clearTimeout(this.schemaConfigRetryHandle);
         }
-        console.warn('GraphQL language service not ready; retrying schema configuration...');
+
+        this.schemaConfigRetryCount++;
+        console.warn(
+          `GraphQL language service not ready; retrying schema configuration (attempt ${this.schemaConfigRetryCount}/${this.MAX_SCHEMA_CONFIG_RETRIES})...`
+        );
+
         this.schemaConfigRetryHandle = window.setTimeout(() => {
           this.schemaConfigRetryHandle = null;
           if (this.schemaConfig) {
@@ -387,6 +401,9 @@ export class GraphQLEditor {
         }, 100);
         return;
       }
+
+      // Reset retry count on success
+      this.schemaConfigRetryCount = 0;
 
       if (schemaConfig?.introspectionJSON) {
         // Associate the schema to the model via fileMatch and uri
