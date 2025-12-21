@@ -21,6 +21,12 @@
   --fallback-light-hover-bg: #E8E8E8;
 }
 
+/* Immediate background to prevent flash - applied to html and body */
+html {
+  background-color: var(--vscode-editor-background, var(--fallback-background));
+  color: var(--vscode-editor-foreground, var(--fallback-foreground));
+}
+
 /* Main webview styling */
 body {
   margin: 0;
