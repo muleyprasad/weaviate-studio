@@ -395,6 +395,28 @@ export function generateTenantQuery(
 }
 
 /**
+ * Generate an explore query that returns metadata, vectors, and optional generation
+ * @param collectionName The name of the collection to query
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateExploreQuery(collectionName: string, limit: number = 10): string {
+  return `{
+  Get {
+    ${collectionName} (limit: ${limit}) {
+      # Add your properties here
+      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+        vector
+      }
+    }
+  }
+}`;
+}
+
+/**
  * Generate a query with advanced configuration options
  * @param collectionName The name of the collection
  * @param config Configuration options for the query
@@ -1116,7 +1138,8 @@ export function processTemplate(
     .replace(
       '{tenantQuery}',
       generateTenantQuery(collectionName, config?.tenantName ?? 'tenant-name', effectiveLimit)
-    );
+    )
+    .replace('{exploreQuery}', generateExploreQuery(collectionName, effectiveLimit));
 
   return query;
 }
