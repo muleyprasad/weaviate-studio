@@ -2,7 +2,6 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const fs = require('fs');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -19,7 +18,7 @@ class WebviewNoncePlugin {
         'WebviewNoncePlugin',
         (data) => {
           const addNonce = (tag) => {
-            if (tag.tagName === 'script') {
+            if (tag.tagName === 'script' || tag.tagName === 'link') {
               tag.attributes = tag.attributes || {};
               // VS Code extension will replace this placeholder at runtime.
               tag.attributes.nonce = '{{nonce}}';
@@ -28,84 +27,6 @@ class WebviewNoncePlugin {
 
           data.headTags.forEach(addNonce);
           data.bodyTags.forEach(addNonce);
-        }
-      );
-    });
-  }
-}
-
-// Plugin to inject CSS styles inline into the HTML for backup webview
-class InjectBackupCssPlugin {
-  apply(compiler) {
-    compiler.hooks.compilation.tap('InjectBackupCssPlugin', (compilation) => {
-      const HtmlWebpackPlugin = require('html-webpack-plugin');
-      
-      HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
-        'InjectBackupCssPlugin',
-        (data, cb) => {
-          // Inject CSS for backup.html
-          if (data.outputName.includes('backup.html')) {
-            const cssFiles = [
-              { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
-              { path: path.resolve(__dirname, 'src/webview/Backup.css'), name: 'Custom Backup Styles' },
-            ];
-
-            try {
-              let cssContent = '';
-              cssFiles.forEach(({ path: filePath, name }) => {
-                if (fs.existsSync(filePath)) {
-                  const content = fs.readFileSync(filePath, 'utf8');
-                  cssContent += `\n/* ${name} */\n${content}\n`;
-                }
-              });
-
-              if (cssContent) {
-                data.html = data.html.replace(
-                  '</head>',
-                  `<style nonce="{{nonce}}">${cssContent}</style></head>`
-                );
-              }
-
-              cb(null, data);
-            } catch (err) {
-              console.error('Error injecting CSS:', err);
-              cb(err);
-            }
-            return;
-          }
-          
-          // Inject CSS for backup-restore.html
-          if (data.outputName.includes('backup-restore.html')) {
-            const cssFiles = [
-              { path: path.resolve(__dirname, 'src/webview/theme.css'), name: 'VS Code Theme Base' },
-              { path: path.resolve(__dirname, 'src/webview/BackupRestore.css'), name: 'Custom Backup Restore Styles' },
-            ];
-
-            try {
-              let cssContent = '';
-              cssFiles.forEach(({ path: filePath, name }) => {
-                if (fs.existsSync(filePath)) {
-                  const content = fs.readFileSync(filePath, 'utf8');
-                  cssContent += `\n/* ${name} */\n${content}\n`;
-                }
-              });
-
-              if (cssContent) {
-                data.html = data.html.replace(
-                  '</head>',
-                  `<style nonce="{{nonce}}">${cssContent}</style></head>`
-                );
-              }
-
-              cb(null, data);
-            } catch (err) {
-              console.error('Error injecting CSS:', err);
-              cb(err);
-            }
-            return;
-          }
-
-          cb(null, data);
         }
       );
     });
@@ -143,10 +64,18 @@ module.exports = {
           chunks: 'all',
           priority: 20,
         },
+        sharedStyles: {
+          test: /[\\/]src[\\/]webview[\\/]theme\.css$/,
+          name: 'shared-theme',
+          chunks: 'all',
+          priority: 30,
+          enforce: true,
+        },
       },
     },
     usedExports: true,
     sideEffects: false,
+    minimize: isProduction,
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.css'],
@@ -163,9 +92,7 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: isProduction
-          ? [MiniCssExtractPlugin.loader, 'css-loader']
-          : ['style-loader', 'css-loader'],
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
       {
         test: /\.ttf$/,
@@ -200,11 +127,9 @@ module.exports = {
     }),
     // Attach the nonce placeholder to every injected script tag.
     new WebviewNoncePlugin(),
-    // Inject CSS for backup webview
-    new InjectBackupCssPlugin(),
-    ...(isProduction ? [new MiniCssExtractPlugin({
-      filename: '[name].[contenthash].css',
-    })] : []),
+    new MiniCssExtractPlugin({
+      filename: isProduction ? '[name].[contenthash].css' : '[name].css',
+    }),
     new MonacoWebpackPlugin({
       languages: ['json'], // Rely on custom monaco-graphql language bundle
       customLanguages: [
@@ -241,9 +166,9 @@ module.exports = {
   ],
   devtool: isProduction ? 'hidden-source-map' : 'source-map',
   performance: {
-    maxAssetSize: 1000000, // 1MB
-    maxEntrypointSize: 1000000, // 1MB
-    hints: 'warning',
+    maxAssetSize: 4000000, // 4MB - Monaco bundle is large by nature
+    maxEntrypointSize: 5000000, // 5MB - Main entrypoint includes Monaco
+    hints: isProduction ? 'warning' : false, // Only show warnings in production
   },
   infrastructureLogging: {
     level: 'log',

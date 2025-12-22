@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BACKUP_CONFIG } from '../constants/backupConfig';
+import './theme.css';
+import './BackupRestore.css';
 
 // Setup VS Code API for message passing with the extension host
 declare global {
