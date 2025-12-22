@@ -229,9 +229,13 @@ describe('Backup Management', () => {
     // Test icon mapping logic for different backup statuses
     const statusIconMapping = [
       { status: 'SUCCESS', expectedIcon: 'check', expectedContext: 'weaviateBackupSuccess' },
-      { status: 'FAILED', expectedIcon: 'error', expectedContext: 'weaviateBackup' },
-      { status: 'CANCELED', expectedIcon: 'circle-slash', expectedContext: 'weaviateBackup' },
-      { status: 'STARTED', expectedIcon: 'sync~spin', expectedContext: 'weaviateBackup' },
+      { status: 'FAILED', expectedIcon: 'error', expectedContext: 'weaviateBackupFailed' },
+      {
+        status: 'CANCELED',
+        expectedIcon: 'circle-slash',
+        expectedContext: 'weaviateBackupCanceled',
+      },
+      { status: 'STARTED', expectedIcon: 'sync~spin', expectedContext: 'weaviateBackupInProgress' },
     ];
 
     statusIconMapping.forEach(({ status, expectedIcon, expectedContext }) => {
@@ -244,7 +248,14 @@ describe('Backup Management', () => {
               ? 'circle-slash'
               : 'sync~spin';
 
-      const contextValue = status === 'SUCCESS' ? 'weaviateBackupSuccess' : 'weaviateBackup';
+      const contextValueMap: Record<string, string> = {
+        SUCCESS: 'weaviateBackupSuccess',
+        FAILED: 'weaviateBackupFailed',
+        CANCELED: 'weaviateBackupCanceled',
+        STARTED: 'weaviateBackupInProgress',
+        TRANSFERRING: 'weaviateBackupInProgress',
+      };
+      const contextValue = contextValueMap[status] || 'weaviateBackup';
 
       expect(statusIcon).toBe(expectedIcon);
       expect(contextValue).toBe(expectedContext);

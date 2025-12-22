@@ -180,6 +180,16 @@
         "command": "weaviate.restoreBackup",
         "title": "Restore Backup",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "weaviate.retryBackup",
+        "title": "Retry Backup",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "weaviate.cancelBackup",
+        "title": "Cancel Backup",
+        "icon": "$(close)"
       }
     ],
     "languages": [
@@ -391,6 +401,28 @@
           "when": "view == weaviateConnectionsView && viewItem == weaviateBackupSuccess",
           "group": "inline@1",
           "icon": "$(debug-restart)"
+        },
+        {
+          "command": "weaviate.retryBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupFailed",
+          "group": "1_backup_actions@1"
+        },
+        {
+          "command": "weaviate.retryBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupFailed",
+          "group": "inline@1",
+          "icon": "$(sync)"
+        },
+        {
+          "command": "weaviate.cancelBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupInProgress",
+          "group": "1_backup_actions@1"
+        },
+        {
+          "command": "weaviate.cancelBackup",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateBackupInProgress",
+          "group": "inline@1",
+          "icon": "$(close)"
         }
       ]
     }

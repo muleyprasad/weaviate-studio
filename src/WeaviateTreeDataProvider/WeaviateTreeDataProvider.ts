@@ -1806,8 +1806,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           }
 
           // Set contextValue based on backup status
-          const contextValue =
-            backup.status === 'SUCCESS' ? 'weaviateBackupSuccess' : 'weaviateBackup';
+          const contextValueMap: Record<string, string> = {
+            SUCCESS: 'weaviateBackupSuccess',
+            FAILED: 'weaviateBackupFailed',
+            CANCELED: 'weaviateBackupCanceled',
+            STARTED: 'weaviateBackupInProgress',
+            TRANSFERRING: 'weaviateBackupInProgress',
+          };
+          const contextValue = contextValueMap[backup.status] || 'weaviateBackup';
 
           backupItems.push(
             new WeaviateTreeItem(
