@@ -690,6 +690,23 @@ function NewBackupWebview() {
                         Cancel
                       </button>
                     )}
+                    {backup.status === 'SUCCESS' && (
+                      <button
+                        className="theme-button-compact"
+                        onClick={() => {
+                          if (vscode) {
+                            vscode.postMessage({
+                              command: 'viewBackup',
+                              backupId: backup.id,
+                              backend: backup.backend,
+                            });
+                          }
+                        }}
+                        title="View backup details"
+                      >
+                        View
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

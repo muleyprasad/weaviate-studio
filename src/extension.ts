@@ -801,6 +801,107 @@ export function activate(context: vscode.ExtensionContext) {
                   message: error instanceof Error ? error.message : String(error),
                 });
               }
+            } else if (message.command === 'viewBackup') {
+              try {
+                const { backupId, backend } = message;
+
+                // Get backup details from the backend
+                const backupsResponse = await client.backup.list(backend);
+                const backupDetails = backupsResponse?.find((b: any) => b.id === backupId);
+
+                if (!backupDetails) {
+                  postMessage({
+                    command: 'error',
+                    message: 'Backup not found',
+                  });
+                  return;
+                }
+
+                // Open BackupRestorePanel
+                await BackupRestorePanel.createOrShow(
+                  context.extensionUri,
+                  item.connectionId,
+                  backupId,
+                  backend,
+                  collectionNames,
+                  { ...backupDetails, backend },
+                  async (restoreData) => {
+                    try {
+                      const restoreConfig: any = {
+                        backupId: restoreData.backupId,
+                        backend: restoreData.backend,
+                      };
+
+                      if (restoreData.waitForCompletion !== undefined) {
+                        restoreConfig.waitForCompletion = restoreData.waitForCompletion;
+                      }
+                      if (
+                        restoreData.includeCollections &&
+                        restoreData.includeCollections.length > 0
+                      ) {
+                        restoreConfig.includeCollections = restoreData.includeCollections;
+                      }
+                      if (
+                        restoreData.excludeCollections &&
+                        restoreData.excludeCollections.length > 0
+                      ) {
+                        restoreConfig.excludeCollections = restoreData.excludeCollections;
+                      }
+                      if (restoreData.cpuPercentage !== undefined) {
+                        restoreConfig.cpuPercentage = restoreData.cpuPercentage;
+                      }
+                      if (restoreData.path) {
+                        restoreConfig.path = restoreData.path;
+                      }
+                      if (restoreData.rolesOptions) {
+                        restoreConfig.rolesOptions = restoreData.rolesOptions;
+                      }
+                      if (restoreData.usersOptions) {
+                        restoreConfig.usersOptions = restoreData.usersOptions;
+                      }
+
+                      const result = await client.backup.restore(restoreConfig);
+
+                      vscode.window.showInformationMessage(
+                        `Backup restore initiated. Status: ${result.status}`
+                      );
+
+                      setTimeout(async () => {
+                        await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                      }, 2000);
+                    } catch (error) {
+                      throw error;
+                    }
+                  },
+                  async (msg, postMsg) => {
+                    if (msg.command === 'fetchRestoreStatus') {
+                      try {
+                        const restoreStatus = await client.backup.getRestoreStatus({
+                          backend: msg.backend,
+                          backupId: msg.backupId,
+                        });
+
+                        postMsg({
+                          command: 'restoreStatus',
+                          status: restoreStatus,
+                        });
+
+                        await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                      } catch (error) {
+                        postMsg({
+                          command: 'error',
+                          message: error instanceof Error ? error.message : String(error),
+                        });
+                      }
+                    }
+                  }
+                );
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
             }
           }
         );
