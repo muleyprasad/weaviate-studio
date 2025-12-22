@@ -1688,6 +1688,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Get available backup modules from cluster metadata
       const meta = this.clusterMetadataCache[element.connectionId];
       const availableBackends: ('filesystem' | 's3' | 'gcs' | 'azure')[] = [];
+      let hasBackupModule = false;
 
       if (meta?.modules) {
         const moduleNames = Object.keys(meta.modules);
@@ -1695,21 +1696,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         // Map module names to backend types
         if (moduleNames.includes('backup-filesystem')) {
           availableBackends.push('filesystem');
+          hasBackupModule = true;
         }
         if (moduleNames.includes('backup-s3')) {
           availableBackends.push('s3');
+          hasBackupModule = true;
         }
         if (moduleNames.includes('backup-gcs')) {
           availableBackends.push('gcs');
+          hasBackupModule = true;
         }
         if (moduleNames.includes('backup-azure')) {
           availableBackends.push('azure');
+          hasBackupModule = true;
         }
       }
 
-      // If no backup modules found, try filesystem as default
-      if (availableBackends.length === 0) {
-        availableBackends.push('filesystem');
+      // If no backup modules found, show a helpful message
+      if (!hasBackupModule) {
+        const noModuleItem = new WeaviateTreeItem(
+          'Backup module not found. Click to learn more.',
+          vscode.TreeItemCollapsibleState.None,
+          'message',
+          element.connectionId,
+          undefined,
+          'noBackupModule',
+          new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground')),
+          'weaviateNoBackupModule'
+        );
+
+        // Make it clickable to open documentation
+        noModuleItem.tooltip = 'Click to open backup configuration documentation';
+        noModuleItem.command = {
+          command: 'weaviate-studio.openLink',
+          title: 'Open Backup Documentation',
+          arguments: ['https://docs.weaviate.io/deploy/configuration/backups'],
+        };
+
+        return [noModuleItem];
       }
 
       try {
@@ -2384,6 +2408,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // Get available backup modules from cluster metadata
     const meta = this.clusterMetadataCache[connectionId];
     const availableBackends: ('filesystem' | 's3' | 'gcs' | 'azure')[] = [];
+    let hasBackupModule = false;
 
     if (meta?.modules) {
       const moduleNames = Object.keys(meta.modules);
@@ -2391,21 +2416,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Map module names to backend types
       if (moduleNames.includes('backup-filesystem')) {
         availableBackends.push('filesystem');
+        hasBackupModule = true;
       }
       if (moduleNames.includes('backup-s3')) {
         availableBackends.push('s3');
+        hasBackupModule = true;
       }
       if (moduleNames.includes('backup-gcs')) {
         availableBackends.push('gcs');
+        hasBackupModule = true;
       }
       if (moduleNames.includes('backup-azure')) {
         availableBackends.push('azure');
+        hasBackupModule = true;
       }
     }
 
-    // If no backup modules found, try filesystem as default
-    if (availableBackends.length === 0) {
-      availableBackends.push('filesystem');
+    // If no backup modules found, set empty cache and return
+    if (!hasBackupModule) {
+      this.backupsCache[connectionId] = [];
+      return;
     }
 
     try {

@@ -150,6 +150,12 @@ export class BackupPanel {
           });
         }
         break;
+      case 'openExternal':
+        // Open external URL in the default browser
+        if (message.url) {
+          vscode.env.openExternal(vscode.Uri.parse(message.url));
+        }
+        break;
       case 'cancel':
         this.dispose();
         break;

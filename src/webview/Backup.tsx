@@ -348,6 +348,7 @@ function NewBackupWebview() {
   };
 
   const backendOptions = getBackendOptions();
+  const hasBackupModule = backendOptions.length > 0;
 
   // Filter backups based on showAll, showForm, and currentBackupId
   // Priority: showAll > showForm > currentBackupId
@@ -361,359 +362,411 @@ function NewBackupWebview() {
 
   return (
     <div className="backup-container">
-      {!showForm && (
-        <div className="new-backup-header">
-          <h1>Backup Status</h1>
-          <button className="theme-button" onClick={handleCreateNewBackup}>
-            Create New Backup
-          </button>
-        </div>
-      )}
-
-      {showForm && (
-        <>
-          <div className="backup-header">
-            <h1>Create Backup</h1>
+      {!hasBackupModule ? (
+        <div className="backup-header">
+          <h1>Backup</h1>
+          <div
+            className="error-message"
+            style={{
+              backgroundColor: 'var(--vscode-inputValidation-warningBackground)',
+              borderColor: 'var(--vscode-inputValidation-warningBorder)',
+            }}
+          >
+            <strong>⚠️ No Backup Module Found</strong>
+            <p style={{ marginTop: '8px', marginBottom: '8px' }}>
+              No backup module is installed in your Weaviate instance. Backup functionality requires
+              one of the following modules:
+            </p>
+            <ul style={{ marginLeft: '20px', marginBottom: '8px' }}>
+              <li>backup-filesystem</li>
+              <li>backup-s3</li>
+              <li>backup-gcs</li>
+              <li>backup-azure</li>
+            </ul>
+            <p style={{ marginTop: '8px' }}>
+              Please refer to the{' '}
+              <a
+                href="https://docs.weaviate.io/deploy/configuration/backups"
+                style={{ color: 'var(--vscode-textLink-foreground)', textDecoration: 'underline' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (vscode) {
+                    vscode.postMessage({
+                      command: 'openExternal',
+                      url: 'https://docs.weaviate.io/deploy/configuration/backups',
+                    });
+                  }
+                }}
+              >
+                Weaviate backup configuration documentation
+              </a>{' '}
+              for more information.
+            </p>
           </div>
-
-          {error && (
-            <div className="error-message">
-              <strong>Error:</strong> {error}
+        </div>
+      ) : (
+        <>
+          {!showForm && (
+            <div className="new-backup-header">
+              <h1>Backup Status</h1>
+              <button className="theme-button" onClick={handleCreateNewBackup}>
+                Create New Backup
+              </button>
             </div>
           )}
 
-          <div className="form-section">
-            <label htmlFor="backupId" className="form-label">
-              Backup ID:
-            </label>
-            <input
-              id="backupId"
-              type="text"
-              className="form-input"
-              value={backupId}
-              onChange={(e) => setBackupId(sanitizeBackupId(e.target.value))}
-              placeholder="weaviate-yyyymmdd-hh_mm_ss"
-              disabled={isCreating}
-            />
-          </div>
+          {showForm && (
+            <>
+              <div className="backup-header">
+                <h1>Create Backup</h1>
+              </div>
 
-          <div className="form-section">
-            <label htmlFor="backend" className="form-label">
-              Backend:
-            </label>
-            <select
-              id="backend"
-              className="form-input"
-              value={selectedBackend}
-              onChange={(e) => setSelectedBackend(e.target.value)}
-              disabled={isCreating || backendOptions.length === 0}
-            >
-              <option value="">Select backend...</option>
-              {backendOptions.map((backend) => (
-                <option key={backend} value={backend}>
-                  {backend}
-                </option>
-              ))}
-            </select>
-          </div>
+              {error && (
+                <div className="error-message">
+                  <strong>Error:</strong> {error}
+                </div>
+              )}
 
-          <div className="form-section">
-            <div
-              className="collapsible-header"
-              onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setShowAdvancedConfig(!showAdvancedConfig);
-                }
-              }}
-            >
-              <h3 className="collections-section-title">
-                <span className={`collapse-icon ${showAdvancedConfig ? 'expanded' : ''}`}>▶</span>
-                Advanced Configuration (optional)
-              </h3>
-            </div>
+              <div className="form-section">
+                <label htmlFor="backupId" className="form-label">
+                  Backup ID:
+                </label>
+                <input
+                  id="backupId"
+                  type="text"
+                  className="form-input"
+                  value={backupId}
+                  onChange={(e) => setBackupId(sanitizeBackupId(e.target.value))}
+                  placeholder="weaviate-yyyymmdd-hh_mm_ss"
+                  disabled={isCreating || !hasBackupModule}
+                />
+              </div>
 
-            {showAdvancedConfig && (
-              <div className="advanced-config-grid">
-                <div className="form-field">
-                  <label htmlFor="cpuPercentage" className="form-label-small">
-                    CPU Percentage (1-80%):
-                  </label>
-                  <input
-                    id="cpuPercentage"
-                    type="number"
-                    className="form-input-small"
-                    value={cpuPercentage}
-                    onChange={(e) => handleCpuPercentageChange(e.target.value)}
-                    placeholder="50"
-                    min="1"
-                    max="80"
-                    disabled={isCreating}
-                  />
+              <div className="form-section">
+                <label htmlFor="backend" className="form-label">
+                  Backend:
+                </label>
+                <select
+                  id="backend"
+                  className="form-input"
+                  value={selectedBackend}
+                  onChange={(e) => setSelectedBackend(e.target.value)}
+                  disabled={isCreating || !hasBackupModule}
+                >
+                  <option value="">Select backend...</option>
+                  {backendOptions.map((backend) => (
+                    <option key={backend} value={backend}>
+                      {backend}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-section">
+                <div
+                  className="collapsible-header"
+                  onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setShowAdvancedConfig(!showAdvancedConfig);
+                    }
+                  }}
+                >
+                  <h3 className="collections-section-title">
+                    <span className={`collapse-icon ${showAdvancedConfig ? 'expanded' : ''}`}>
+                      ▶
+                    </span>
+                    Advanced Configuration (optional)
+                  </h3>
                 </div>
 
-                <div className="form-field">
-                  <label htmlFor="chunkSize" className="form-label-small">
-                    Chunk Size (2-512 MB):
-                  </label>
-                  <input
-                    id="chunkSize"
-                    type="number"
-                    className="form-input-small"
-                    value={chunkSize}
-                    onChange={(e) => handleChunkSizeChange(e.target.value)}
-                    placeholder="128"
-                    min="2"
-                    max="512"
-                    disabled={isCreating}
-                  />
-                </div>
+                {showAdvancedConfig && (
+                  <div className="advanced-config-grid">
+                    <div className="form-field">
+                      <label htmlFor="cpuPercentage" className="form-label-small">
+                        CPU Percentage (1-80%):
+                      </label>
+                      <input
+                        id="cpuPercentage"
+                        type="number"
+                        className="form-input-small"
+                        value={cpuPercentage}
+                        onChange={(e) => handleCpuPercentageChange(e.target.value)}
+                        placeholder="50"
+                        min="1"
+                        max="80"
+                        disabled={isCreating}
+                      />
+                    </div>
 
-                <div className="form-field">
-                  <label htmlFor="compressionLevel" className="form-label-small">
-                    Compression Level:
-                  </label>
-                  <select
-                    id="compressionLevel"
-                    className="form-input-small"
-                    value={compressionLevel}
-                    onChange={(e) => setCompressionLevel(e.target.value)}
-                    disabled={isCreating}
-                  >
-                    <option value="DefaultCompression">Default Compression</option>
-                    <option value="BestSpeed">Best Speed</option>
-                    <option value="BestCompression">Best Compression</option>
-                  </select>
-                </div>
+                    <div className="form-field">
+                      <label htmlFor="chunkSize" className="form-label-small">
+                        Chunk Size (2-512 MB):
+                      </label>
+                      <input
+                        id="chunkSize"
+                        type="number"
+                        className="form-input-small"
+                        value={chunkSize}
+                        onChange={(e) => handleChunkSizeChange(e.target.value)}
+                        placeholder="128"
+                        min="2"
+                        max="512"
+                        disabled={isCreating}
+                      />
+                    </div>
 
-                {selectedBackend === 'filesystem' && (
-                  <div className="form-field">
-                    <label htmlFor="path" className="form-label-small">
-                      Path (filesystem only):
-                    </label>
-                    <input
-                      id="path"
-                      type="text"
-                      className="form-input-small"
-                      value={path}
-                      onChange={(e) => setPath(e.target.value)}
-                      placeholder="/custom/backup/path"
-                      disabled={isCreating}
-                    />
+                    <div className="form-field">
+                      <label htmlFor="compressionLevel" className="form-label-small">
+                        Compression Level:
+                      </label>
+                      <select
+                        id="compressionLevel"
+                        className="form-input-small"
+                        value={compressionLevel}
+                        onChange={(e) => setCompressionLevel(e.target.value)}
+                        disabled={isCreating}
+                      >
+                        <option value="DefaultCompression">Default Compression</option>
+                        <option value="BestSpeed">Best Speed</option>
+                        <option value="BestCompression">Best Compression</option>
+                      </select>
+                    </div>
+
+                    {selectedBackend === 'filesystem' && (
+                      <div className="form-field">
+                        <label htmlFor="path" className="form-label-small">
+                          Path (filesystem only):
+                        </label>
+                        <input
+                          id="path"
+                          type="text"
+                          className="form-input-small"
+                          value={path}
+                          onChange={(e) => setPath(e.target.value)}
+                          placeholder="/custom/backup/path"
+                          disabled={isCreating}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className="form-section">
-            <h3 className="collections-section-title">Collections (optional):</h3>
-            <p className="muted-text collections-hint">
-              Include and exclude options are mutually exclusive. Select one or leave as "All
-              Collections".
-            </p>
+              <div className="form-section">
+                <h3 className="collections-section-title">Collections (optional):</h3>
+                <p className="muted-text collections-hint">
+                  Include and exclude options are mutually exclusive. Select one or leave as "All
+                  Collections".
+                </p>
 
-            <div className="radio-group">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="collectionMode"
-                  value="all"
-                  className="radio-input"
-                  checked={collectionMode === 'all'}
-                  onChange={() => {
-                    setCollectionMode('all');
-                    setSelectedCollections([]);
-                  }}
-                  disabled={isCreating}
-                />
-                <span>All Collections</span>
-              </label>
+                <div className="radio-group">
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      name="collectionMode"
+                      value="all"
+                      className="radio-input"
+                      checked={collectionMode === 'all'}
+                      onChange={() => {
+                        setCollectionMode('all');
+                        setSelectedCollections([]);
+                      }}
+                      disabled={isCreating}
+                    />
+                    <span>All Collections</span>
+                  </label>
 
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="collectionMode"
-                  value="include"
-                  className="radio-input"
-                  checked={collectionMode === 'include'}
-                  onChange={() => {
-                    setCollectionMode('include');
-                    setSelectedCollections([]);
-                  }}
-                  disabled={isCreating}
-                />
-                <span>Include specific collections</span>
-              </label>
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      name="collectionMode"
+                      value="include"
+                      className="radio-input"
+                      checked={collectionMode === 'include'}
+                      onChange={() => {
+                        setCollectionMode('include');
+                        setSelectedCollections([]);
+                      }}
+                      disabled={isCreating}
+                    />
+                    <span>Include specific collections</span>
+                  </label>
 
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  name="collectionMode"
-                  value="exclude"
-                  className="radio-input"
-                  checked={collectionMode === 'exclude'}
-                  onChange={() => {
-                    setCollectionMode('exclude');
-                    setSelectedCollections([]);
-                  }}
-                  disabled={isCreating}
-                />
-                <span>Exclude specific collections</span>
-              </label>
-            </div>
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      name="collectionMode"
+                      value="exclude"
+                      className="radio-input"
+                      checked={collectionMode === 'exclude'}
+                      onChange={() => {
+                        setCollectionMode('exclude');
+                        setSelectedCollections([]);
+                      }}
+                      disabled={isCreating}
+                    />
+                    <span>Exclude specific collections</span>
+                  </label>
+                </div>
 
-            {collectionMode !== 'all' && (
-              <div className="collections-list">
-                {collections.length === 0 ? (
-                  <p className="muted-text collections-empty">No collections available</p>
-                ) : (
-                  collections.map((collection) => (
-                    <label key={collection} className="collection-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={selectedCollections.includes(collection)}
-                        onChange={() => handleCollectionToggle(collection)}
-                        disabled={isCreating}
-                      />
-                      <span className="collection-name">{collection}</span>
-                    </label>
-                  ))
+                {collectionMode !== 'all' && (
+                  <div className="collections-list">
+                    {collections.length === 0 ? (
+                      <p className="muted-text collections-empty">No collections available</p>
+                    ) : (
+                      collections.map((collection) => (
+                        <label key={collection} className="collection-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={selectedCollections.includes(collection)}
+                            onChange={() => handleCollectionToggle(collection)}
+                            disabled={isCreating}
+                          />
+                          <span className="collection-name">{collection}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className="button-group">
-            <button
-              className="theme-button"
-              onClick={handleCreateBackup}
-              disabled={isCreating || !backupId.trim() || !selectedBackend}
-            >
-              {isCreating ? 'Creating...' : 'Create Backup'}
-            </button>
-            <button className="theme-button-secondary" onClick={handleCancel} disabled={isCreating}>
-              Cancel
-            </button>
+              <div className="button-group">
+                <button
+                  className="theme-button"
+                  onClick={handleCreateBackup}
+                  disabled={isCreating || !backupId.trim() || !selectedBackend || !hasBackupModule}
+                >
+                  {isCreating ? 'Creating...' : 'Create Backup'}
+                </button>
+                <button
+                  className="theme-button-secondary"
+                  onClick={handleCancel}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {!showForm && <hr className="section-divider" />}
+
+          <div className={`backups-status-section ${!showForm ? 'expanded' : ''}`}>
+            <div className="status-header">
+              <h2 className="status-title">{showForm ? 'Backups Status' : 'Backup Status'}</h2>
+              <div className="status-controls">
+                <label className="auto-refresh-label">
+                  <input
+                    type="checkbox"
+                    checked={showAll}
+                    onChange={(e) => setShowAll(e.target.checked)}
+                    disabled={isLoadingBackups}
+                  />
+                  <span>Show all</span>
+                </label>
+                <label className="auto-refresh-label">
+                  <input
+                    type="checkbox"
+                    checked={autoRefresh}
+                    onChange={(e) => setAutoRefresh(e.target.checked)}
+                    disabled={isLoadingBackups}
+                  />
+                  <span>Auto-refresh</span>
+                </label>
+                {autoRefresh && (
+                  <select
+                    className="refresh-interval-select"
+                    value={refreshInterval}
+                    onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                    disabled={isLoadingBackups}
+                  >
+                    <option value={5}>5s</option>
+                    <option value={10}>10s</option>
+                    <option value={30}>30s</option>
+                  </select>
+                )}
+                <button
+                  className="theme-button-secondary-compact"
+                  onClick={fetchBackups}
+                  disabled={isLoadingBackups}
+                >
+                  {isLoadingBackups ? 'Loading...' : 'Reload'}
+                </button>
+              </div>
+            </div>
+
+            {displayedBackups.length === 0 ? (
+              <p className="muted-text backups-empty">
+                {isLoadingBackups
+                  ? 'Loading backups...'
+                  : showAll
+                    ? 'No backups to list'
+                    : 'No backups to list. Try clicking on show all to list all backups'}
+              </p>
+            ) : (
+              <table className="theme-table">
+                <thead>
+                  <tr className="theme-table-header">
+                    <th className="theme-table-cell">Backup ID</th>
+                    <th className="theme-table-cell">Backend</th>
+                    <th className="theme-table-cell">Status</th>
+                    <th className="theme-table-cell">Duration</th>
+                    <th className="theme-table-cell">Error</th>
+                    <th className="theme-table-cell">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedBackups.map((backup) => (
+                    <tr key={`${backup.id}-${backup.backend}`} className="theme-table-row">
+                      <td className="theme-table-cell">{backup.id}</td>
+                      <td className="theme-table-cell">{backup.backend}</td>
+                      <td className="theme-table-cell">
+                        <span className={`status-badge status-${backup.status.toLowerCase()}`}>
+                          {backup.status}
+                        </span>
+                      </td>
+                      <td className="theme-table-cell">{backup.duration || '-'}</td>
+                      <td className="theme-table-cell">{backup.error || '-'}</td>
+                      <td className="theme-table-cell">
+                        {backup.status === 'STARTED' && (
+                          <button
+                            className="theme-button-secondary-compact"
+                            onClick={() => handleCancelBackup(backup.id, backup.backend)}
+                            title="Cancel backup"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        {backup.status === 'SUCCESS' && (
+                          <button
+                            className="theme-button-compact"
+                            onClick={() => {
+                              if (vscode) {
+                                vscode.postMessage({
+                                  command: 'viewBackup',
+                                  backupId: backup.id,
+                                  backend: backup.backend,
+                                });
+                              }
+                            }}
+                            title="View backup details"
+                          >
+                            View
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </>
       )}
-
-      {!showForm && <hr className="section-divider" />}
-
-      <div className={`backups-status-section ${!showForm ? 'expanded' : ''}`}>
-        <div className="status-header">
-          <h2 className="status-title">{showForm ? 'Backups Status' : 'Backup Status'}</h2>
-          <div className="status-controls">
-            <label className="auto-refresh-label">
-              <input
-                type="checkbox"
-                checked={showAll}
-                onChange={(e) => setShowAll(e.target.checked)}
-                disabled={isLoadingBackups}
-              />
-              <span>Show all</span>
-            </label>
-            <label className="auto-refresh-label">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                disabled={isLoadingBackups}
-              />
-              <span>Auto-refresh</span>
-            </label>
-            {autoRefresh && (
-              <select
-                className="refresh-interval-select"
-                value={refreshInterval}
-                onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                disabled={isLoadingBackups}
-              >
-                <option value={5}>5s</option>
-                <option value={10}>10s</option>
-                <option value={30}>30s</option>
-              </select>
-            )}
-            <button
-              className="theme-button-secondary-compact"
-              onClick={fetchBackups}
-              disabled={isLoadingBackups}
-            >
-              {isLoadingBackups ? 'Loading...' : 'Reload'}
-            </button>
-          </div>
-        </div>
-
-        {displayedBackups.length === 0 ? (
-          <p className="muted-text backups-empty">
-            {isLoadingBackups
-              ? 'Loading backups...'
-              : showAll
-                ? 'No backups to list'
-                : 'No backups to list. Try clicking on show all to list all backups'}
-          </p>
-        ) : (
-          <table className="theme-table">
-            <thead>
-              <tr className="theme-table-header">
-                <th className="theme-table-cell">Backup ID</th>
-                <th className="theme-table-cell">Backend</th>
-                <th className="theme-table-cell">Status</th>
-                <th className="theme-table-cell">Duration</th>
-                <th className="theme-table-cell">Error</th>
-                <th className="theme-table-cell">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedBackups.map((backup) => (
-                <tr key={`${backup.id}-${backup.backend}`} className="theme-table-row">
-                  <td className="theme-table-cell">{backup.id}</td>
-                  <td className="theme-table-cell">{backup.backend}</td>
-                  <td className="theme-table-cell">
-                    <span className={`status-badge status-${backup.status.toLowerCase()}`}>
-                      {backup.status}
-                    </span>
-                  </td>
-                  <td className="theme-table-cell">{backup.duration || '-'}</td>
-                  <td className="theme-table-cell">{backup.error || '-'}</td>
-                  <td className="theme-table-cell">
-                    {backup.status === 'STARTED' && (
-                      <button
-                        className="theme-button-secondary-compact"
-                        onClick={() => handleCancelBackup(backup.id, backup.backend)}
-                        title="Cancel backup"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    {backup.status === 'SUCCESS' && (
-                      <button
-                        className="theme-button-compact"
-                        onClick={() => {
-                          if (vscode) {
-                            vscode.postMessage({
-                              command: 'viewBackup',
-                              backupId: backup.id,
-                              backend: backup.backend,
-                            });
-                          }
-                        }}
-                        title="View backup details"
-                      >
-                        View
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 }
