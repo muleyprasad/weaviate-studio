@@ -37,7 +37,7 @@ describe('Backup Management', () => {
     };
 
     const connectionManager = ConnectionManager.getInstance(mockContext);
-    treeDataProvider = new WeaviateTreeDataProvider(connectionManager, mockContext);
+    treeDataProvider = new WeaviateTreeDataProvider(mockContext);
 
     // Mock client with backup methods
     mockClient = {
