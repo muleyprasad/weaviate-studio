@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { BACKUP_CONFIG } from '../../constants/backupConfig';
 import '@testing-library/jest-dom';
 
 describe('Backup Webview Component', () => {
@@ -70,12 +71,13 @@ describe('Backup Webview Component', () => {
         const numValue = parseInt(value);
         if (isNaN(numValue)) return '';
 
-        if (numValue >= 1 && numValue <= 80) {
+        const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
+        if (numValue >= MIN && numValue <= MAX) {
           return value;
-        } else if (numValue > 80) {
-          return '80';
-        } else if (numValue < 1 && value.length > 0) {
-          return '1';
+        } else if (numValue > MAX) {
+          return MAX.toString();
+        } else if (numValue < MIN && value.length > 0) {
+          return MIN.toString();
         }
         return '';
       };
@@ -91,8 +93,9 @@ describe('Backup Webview Component', () => {
         if (value === '') return '';
         const numValue = parseInt(value);
         if (isNaN(numValue)) return '';
-        if (numValue > 80) return '80';
-        if (numValue >= 1) return value;
+        const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
+        if (numValue > MAX) return MAX.toString();
+        if (numValue >= MIN) return value;
         return '';
       };
 

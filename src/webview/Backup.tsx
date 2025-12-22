@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BACKUP_CONFIG } from '../constants/backupConfig';
 
 // Setup VS Code API for message passing with the extension host
 declare global {
@@ -52,14 +53,18 @@ function NewBackupWebview() {
   const [isLoadingBackups, setIsLoadingBackups] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [refreshInterval, setRefreshInterval] = useState<number>(5);
+  const [refreshInterval, setRefreshInterval] = useState<number>(
+    BACKUP_CONFIG.REFRESH_INTERVAL.DEFAULT
+  );
   const [showForm, setShowForm] = useState<boolean>(true);
   const [currentBackupId, setCurrentBackupId] = useState<string>('');
   const [showAll, setShowAll] = useState<boolean>(false);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
   const [cpuPercentage, setCpuPercentage] = useState<string>('');
   const [chunkSize, setChunkSize] = useState<string>('');
-  const [compressionLevel, setCompressionLevel] = useState<string>('DefaultCompression');
+  const [compressionLevel, setCompressionLevel] = useState<string>(
+    BACKUP_CONFIG.COMPRESSION_LEVELS[0]
+  );
   const [path, setPath] = useState<string>('');
 
   // Sanitize backup ID to only allow lowercase, 0-9, _, -
@@ -81,13 +86,14 @@ function NewBackupWebview() {
       return;
     }
 
-    // Constrain to valid range (1-80)
-    if (numValue >= 1 && numValue <= 80) {
+    // Constrain to valid range
+    const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
+    if (numValue >= MIN && numValue <= MAX) {
       setCpuPercentage(value);
-    } else if (numValue > 80) {
-      setCpuPercentage('80');
-    } else if (numValue < 1 && value.length > 0) {
-      setCpuPercentage('1');
+    } else if (numValue > MAX) {
+      setCpuPercentage(MAX.toString());
+    } else if (numValue < MIN && value.length > 0) {
+      setCpuPercentage(MIN.toString());
     }
   };
 
@@ -105,13 +111,14 @@ function NewBackupWebview() {
       return;
     }
 
-    // Constrain to valid range (2-512)
-    if (numValue >= 2 && numValue <= 512) {
+    // Constrain to valid range
+    const { MIN, MAX } = BACKUP_CONFIG.CHUNK_SIZE;
+    if (numValue >= MIN && numValue <= MAX) {
       setChunkSize(value);
-    } else if (numValue > 512) {
-      setChunkSize('512');
-    } else if (numValue < 2 && value.length > 0) {
-      setChunkSize('2');
+    } else if (numValue > MAX) {
+      setChunkSize(MAX.toString());
+    } else if (numValue < MIN && value.length > 0) {
+      setChunkSize(MIN.toString());
     }
   };
 
@@ -197,7 +204,7 @@ function NewBackupWebview() {
           // Reset advanced config fields
           setCpuPercentage('');
           setChunkSize('');
-          setCompressionLevel('DefaultCompression');
+          setCompressionLevel(BACKUP_CONFIG.COMPRESSION_LEVELS[0]);
           setPath('');
           // Reset backend to default if available
           const resetBackupModules =
@@ -278,7 +285,7 @@ function NewBackupWebview() {
     if (chunkSize) {
       backupData.chunkSize = parseInt(chunkSize);
     }
-    if (compressionLevel && compressionLevel !== 'DefaultCompression') {
+    if (compressionLevel && compressionLevel !== BACKUP_CONFIG.COMPRESSION_LEVELS[0]) {
       backupData.compressionLevel = compressionLevel;
     }
     if (path && path.trim() && selectedBackend === 'filesystem') {
@@ -335,7 +342,7 @@ function NewBackupWebview() {
     setError('');
     setCpuPercentage('');
     setChunkSize('');
-    setCompressionLevel('DefaultCompression');
+    setCompressionLevel(BACKUP_CONFIG.COMPRESSION_LEVELS[0]);
     setPath('');
     setShowAdvancedConfig(false);
   };

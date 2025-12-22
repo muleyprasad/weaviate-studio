@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BACKUP_CONFIG } from '../constants/backupConfig';
 
 // Setup VS Code API for message passing with the extension host
 declare global {
@@ -85,13 +86,14 @@ function BackupRestoreWebview() {
       return;
     }
 
-    // Constrain to valid range (1-80)
-    if (numValue >= 1 && numValue <= 80) {
+    // Constrain to valid range
+    const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
+    if (numValue >= MIN && numValue <= MAX) {
       setCpuPercentage(value);
-    } else if (numValue > 80) {
-      setCpuPercentage('80');
-    } else if (numValue < 1 && value.length > 0) {
-      setCpuPercentage('1');
+    } else if (numValue > MAX) {
+      setCpuPercentage(MAX.toString());
+    } else if (numValue < MIN && value.length > 0) {
+      setCpuPercentage(MIN.toString());
     }
   };
 
