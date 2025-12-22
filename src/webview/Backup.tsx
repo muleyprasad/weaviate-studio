@@ -53,6 +53,7 @@ function NewBackupWebview() {
   const [isLoadingBackups, setIsLoadingBackups] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [refreshInterval, setRefreshInterval] = useState<number>(
     BACKUP_CONFIG.REFRESH_INTERVAL.DEFAULT
   );
@@ -230,7 +231,14 @@ function NewBackupWebview() {
 
   // Auto-refresh effect - refresh when a backup has been created or showAll is enabled
   useEffect(() => {
-    if (!autoRefresh || (showForm && !showAll)) {
+    if (!autoRefresh || isPaused || (showForm && !showAll)) {
+      return;
+    }
+
+    // Don't auto-refresh if current backup is in terminal state
+    const currentBackup = backups.find((b) => b.id === currentBackupId);
+    if (currentBackup && ['SUCCESS', 'FAILED', 'CANCELED'].includes(currentBackup.status)) {
+      setAutoRefresh(false);
       return;
     }
 
@@ -239,7 +247,7 @@ function NewBackupWebview() {
     }, refreshInterval * 1000);
 
     return () => clearInterval(intervalId);
-  }, [autoRefresh, refreshInterval, showForm, showAll]);
+  }, [autoRefresh, isPaused, refreshInterval, showForm, showAll, currentBackupId, backups]);
 
   // Fetch backups when showAll is enabled
   useEffect(() => {
@@ -685,16 +693,26 @@ function NewBackupWebview() {
                   <span>Auto-refresh</span>
                 </label>
                 {autoRefresh && (
-                  <select
-                    className="refresh-interval-select"
-                    value={refreshInterval}
-                    onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                    disabled={isLoadingBackups}
-                  >
-                    <option value={5}>5s</option>
-                    <option value={10}>10s</option>
-                    <option value={30}>30s</option>
-                  </select>
+                  <>
+                    <button
+                      className="theme-button-secondary-compact"
+                      onClick={() => setIsPaused(!isPaused)}
+                      disabled={isLoadingBackups}
+                      title={isPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+                    >
+                      {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+                    </button>
+                    <select
+                      className="refresh-interval-select"
+                      value={refreshInterval}
+                      onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                      disabled={isLoadingBackups}
+                    >
+                      <option value={5}>5s</option>
+                      <option value={10}>10s</option>
+                      <option value={30}>30s</option>
+                    </select>
+                  </>
                 )}
                 <button
                   className="theme-button-secondary-compact"

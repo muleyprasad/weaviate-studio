@@ -69,6 +69,7 @@ function BackupRestoreWebview() {
   const [restoreStatus, setRestoreStatus] = useState<RestoreStatus | null>(null);
   const [showForm, setShowForm] = useState<boolean>(true);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [refreshInterval, setRefreshInterval] = useState<number>(5);
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
 
@@ -177,7 +178,13 @@ function BackupRestoreWebview() {
 
   // Auto-refresh effect - refresh restore status when enabled
   useEffect(() => {
-    if (!autoRefresh) {
+    if (!autoRefresh || isPaused) {
+      return;
+    }
+
+    // Don't auto-refresh if current restore is in terminal state
+    if (restoreStatus && ['SUCCESS', 'FAILED', 'CANCELED'].includes(restoreStatus.status)) {
+      setAutoRefresh(false);
       return;
     }
 
@@ -186,7 +193,7 @@ function BackupRestoreWebview() {
     }, refreshInterval * 1000);
 
     return () => clearInterval(intervalId);
-  }, [autoRefresh, refreshInterval, backupId, backend]);
+  }, [autoRefresh, isPaused, refreshInterval, backupId, backend, restoreStatus]);
 
   const fetchRestoreStatus = (bid?: string, bknd?: string) => {
     const useBackupId = bid || backupId;
@@ -358,17 +365,27 @@ function BackupRestoreWebview() {
               />
               <span>Auto-refresh every</span>
             </label>
-            <select
-              className="refresh-interval"
-              value={refreshInterval}
-              onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              disabled={!autoRefresh}
-            >
-              <option value="2">2s</option>
-              <option value="5">5s</option>
-              <option value="10">10s</option>
-              <option value="30">30s</option>
-            </select>
+            {autoRefresh && (
+              <>
+                <button
+                  className="refresh-button"
+                  onClick={() => setIsPaused(!isPaused)}
+                  title={isPaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+                >
+                  {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+                </button>
+                <select
+                  className="refresh-interval"
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                >
+                  <option value="2">2s</option>
+                  <option value="5">5s</option>
+                  <option value="10">10s</option>
+                  <option value="30">30s</option>
+                </select>
+              </>
+            )}
             <button className="refresh-button" onClick={() => fetchRestoreStatus()}>
               {isLoadingStatus ? '⟳' : '↻'} {isLoadingStatus ? 'Loading...' : 'Refresh'}
             </button>
