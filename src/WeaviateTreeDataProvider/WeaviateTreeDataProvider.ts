@@ -8,6 +8,7 @@ import {
   ExtendedSchemaClass,
   SchemaClass,
   WeaviateMetadata,
+  BackupItem,
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
@@ -51,7 +52,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   private clusterStatisticsCache: Record<string, any> = {};
 
   /** Cache of backups per connection */
-  private backupsCache: Record<string, any[]> = {};
+  private backupsCache: Record<string, BackupItem[]> = {};
 
   /** VS Code extension context */
   private readonly context: vscode.ExtensionContext;
@@ -1752,7 +1753,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         let totalBackups = 0;
 
         // Collect all backups and store in cache
-        const allBackups: any[] = [];
+        const allBackups: BackupItem[] = [];
         results.forEach(({ backend, backups }) => {
           backups.forEach((backup: any) => {
             // Calculate duration if startedAt and completedAt are present
@@ -2453,7 +2454,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const results = await Promise.all(backupPromises);
 
       // Collect all backups and store in cache
-      const allBackups: any[] = [];
+      const allBackups: BackupItem[] = [];
       results.forEach(({ backend, backups }) => {
         backups.forEach((backup: any) => {
           // Calculate duration if startedAt and completedAt are present

@@ -1,6 +1,52 @@
 import * as vscode from 'vscode';
 import { WeaviateConnection } from '../services/ConnectionManager';
 import { CollectionConfig, Node } from 'weaviate-client';
+import type {
+  Backend,
+  BackupStatus as WeaviateBackupStatus,
+  BackupCompressionLevel,
+  BackupConfigCreate,
+  BackupConfigRestore,
+  BackupArgs,
+} from 'weaviate-client';
+
+// Extend BackupStatus to include 'CANCELED' status (from collections API)
+export type BackupStatus = WeaviateBackupStatus | 'CANCELED';
+
+// Re-export weaviate-client backup types for convenience
+export type {
+  Backend,
+  BackupCompressionLevel,
+  BackupConfigCreate,
+  BackupConfigRestore,
+  BackupArgs,
+};
+
+// Backup item with all properties from weaviate-client plus additional fields
+export interface BackupItem {
+  // From BackupStatusReturn (weaviate-client internal type)
+  id: string;
+  error?: string;
+  path: string;
+  status: BackupStatus;
+  // From BackupReturn (weaviate-client internal type)
+  backend: Backend;
+  collections: string[];
+  // Additional fields used internally
+  duration?: string;
+  startedAt?: string;
+  completedAt?: string;
+  classes?: string[]; // Legacy field, use 'collections' instead
+}
+
+// Available modules type
+export interface AvailableModules {
+  [key: string]: {
+    name?: string;
+    version?: string;
+    [key: string]: any;
+  };
+}
 
 // Extended schema interfaces to include vector-related fields
 export interface ExtendedSchemaProperty extends SchemaProperty {

@@ -5,6 +5,7 @@ import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
 import { BackupPanel } from './views/BackupPanel';
 import { BackupRestorePanel } from './views/BackupRestorePanel';
+import type { BackupArgs, BackupConfigCreate, BackupItem } from './types';
 
 /**
  * Handles opening of .weaviate files
@@ -672,7 +673,7 @@ export function activate(context: vscode.ExtensionContext) {
           availableModules,
           async (backupData) => {
             // Create backup with waitForCompletion: false
-            const backupConfig: any = {
+            const backupConfig: BackupArgs<BackupConfigCreate> = {
               backupId: backupData.backupId,
               backend: backupData.backend,
               waitForCompletion: false,
@@ -682,16 +683,16 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Add optional config parameters if provided
             if (backupData.cpuPercentage !== undefined) {
-              backupConfig.cpuPercentage = backupData.cpuPercentage;
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.cpuPercentage = backupData.cpuPercentage;
             }
             if (backupData.chunkSize !== undefined) {
-              backupConfig.chunkSize = backupData.chunkSize;
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.chunkSize = backupData.chunkSize;
             }
             if (backupData.compressionLevel) {
-              backupConfig.compressionLevel = backupData.compressionLevel;
-            }
-            if (backupData.path) {
-              backupConfig.path = backupData.path;
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.compressionLevel = backupData.compressionLevel;
             }
 
             await client.backup.create(backupConfig);
@@ -705,7 +706,7 @@ export function activate(context: vscode.ExtensionContext) {
                   key.startsWith('backup-')
                 );
 
-                const allBackups: any[] = [];
+                const allBackups: BackupItem[] = [];
 
                 for (const moduleName of backupModules) {
                   const backend = moduleName.replace('backup-', '') as any;
@@ -756,6 +757,7 @@ export function activate(context: vscode.ExtensionContext) {
                           status: b.status,
                           error: b.error,
                           path: b.path,
+                          collections: b.collections || [],
                           duration: duration,
                         };
                       });
