@@ -5,6 +5,7 @@ import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
 import { BackupPanel } from './views/BackupPanel';
 import { BackupRestorePanel } from './views/BackupRestorePanel';
+import { ClusterPanel } from './views/ClusterPanel';
 import type { BackupArgs, BackupConfigCreate, BackupItem } from './types';
 
 /**
@@ -636,6 +637,47 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(
           `Failed to refresh backups: ${error instanceof Error ? error.message : String(error)}`
         );
+      }
+    }),
+
+    // View cluster information command
+    vscode.commands.registerCommand('weaviate.viewClusterInfo', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get node status data
+        const nodeStatusData = await client.cluster.nodes({ output: 'verbose' });
+
+        // Open cluster panel
+        ClusterPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          nodeStatusData,
+          async (message, postMessage) => {
+            if (message.command === 'refresh') {
+              // Refresh node status data
+              const updatedData = await client.cluster.nodes({ output: 'verbose' });
+              postMessage({
+                command: 'updateData',
+                nodeStatusData: updatedData,
+              });
+            }
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to get cluster information: ${errorMessage}`);
       }
     }),
 

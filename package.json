@@ -190,6 +190,12 @@
         "command": "weaviate.cancelBackup",
         "title": "Cancel Backup",
         "icon": "$(close)"
+      },
+      {
+        "command": "weaviate.viewClusterInfo",
+        "title": "View Cluster Information",
+        "category": "Weaviate",
+        "icon": "$(dashboard)"
       }
     ],
     "languages": [
@@ -348,6 +354,12 @@
           "command": "weaviate.refreshMetadata",
           "when": "view == weaviateConnectionsView && viewItem == weaviateServerInfo",
           "group": "inline@1"
+        },
+        {
+          "command": "weaviate.viewClusterInfo",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateServerInfo",
+          "group": "inline@2",
+          "icon": "$(dashboard)"
         },
         {
           "command": "weaviate.queryCollection",
