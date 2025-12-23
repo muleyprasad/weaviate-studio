@@ -18,7 +18,7 @@ class WebviewNoncePlugin {
         'WebviewNoncePlugin',
         (data) => {
           const addNonce = (tag) => {
-            if (tag.tagName === 'script') {
+            if (tag.tagName === 'script' || tag.tagName === 'link') {
               tag.attributes = tag.attributes || {};
               // VS Code extension will replace this placeholder at runtime.
               tag.attributes.nonce = '{{nonce}}';
@@ -36,7 +36,11 @@ class WebviewNoncePlugin {
 module.exports = {
   target: 'web',
   mode: isProduction ? 'production' : 'development',
-  entry: './src/webview/index.tsx',
+  entry: {
+    main: './src/webview/index.tsx',
+    backup: './src/webview/Backup.tsx',
+    'backup-restore': './src/webview/BackupRestore.tsx',
+  },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
     filename: isProduction ? '[name].[contenthash].bundle.js' : '[name].bundle.js',
@@ -60,10 +64,18 @@ module.exports = {
           chunks: 'all',
           priority: 20,
         },
+        sharedStyles: {
+          test: /[\\/]src[\\/]webview[\\/]theme\.css$/,
+          name: 'shared-theme',
+          chunks: 'all',
+          priority: 30,
+          enforce: true,
+        },
       },
     },
     usedExports: true,
     sideEffects: false,
+    minimize: isProduction,
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.css'],
@@ -80,9 +92,7 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: isProduction
-          ? [MiniCssExtractPlugin.loader, 'css-loader']
-          : ['style-loader', 'css-loader'],
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
       {
         test: /\.ttf$/,
@@ -94,15 +104,32 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/webview/index.html',
       filename: 'index.html',
+      chunks: ['main'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/backup.html',
+      filename: 'backup.html',
+      chunks: ['backup'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/backup-restore.html',
+      filename: 'backup-restore.html',
+      chunks: ['backup-restore'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,
     }),
     // Attach the nonce placeholder to every injected script tag.
     new WebviewNoncePlugin(),
-    ...(isProduction ? [new MiniCssExtractPlugin({
-      filename: '[name].[contenthash].css',
-    })] : []),
+    new MiniCssExtractPlugin({
+      filename: isProduction ? '[name].[contenthash].css' : '[name].css',
+    }),
     new MonacoWebpackPlugin({
       languages: ['json'], // Rely on custom monaco-graphql language bundle
       customLanguages: [
@@ -139,9 +166,9 @@ module.exports = {
   ],
   devtool: isProduction ? 'hidden-source-map' : 'source-map',
   performance: {
-    maxAssetSize: 1000000, // 1MB
-    maxEntrypointSize: 1000000, // 1MB
-    hints: 'warning',
+    maxAssetSize: 4000000, // 4MB - Monaco bundle is large by nature
+    maxEntrypointSize: 5000000, // 5MB - Main entrypoint includes Monaco
+    hints: isProduction ? 'warning' : false, // Only show warnings in production
   },
   infrastructureLogging: {
     level: 'log',
