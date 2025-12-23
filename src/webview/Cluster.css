@@ -56,25 +56,257 @@
   color: var(--vscode-descriptionForeground);
 }
 
-.json-container {
-  margin-top: 10px;
+/* Nodes List */
+.nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.json-container h2 {
+/* Node Container */
+.node-container {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.node-container.selected {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.node-header {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.node-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.node-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.node-title h3 {
+  margin: 0;
   font-size: 18px;
-  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.node-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.node-status.status-healthy {
+  background-color: rgba(0, 128, 0, 0.2);
+  color: #4caf50;
+}
+
+.node-status.status-unhealthy {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: #f44336;
+}
+
+.non-ready-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.readonly-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.node-info {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.node-info span {
+  display: flex;
+  align-items: center;
+}
+
+/* Node Stats */
+.node-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--vscode-sideBar-background);
+}
+
+.stat-card {
+  padding: 12px;
+  border-radius: 4px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.stat-card.warning {
+  border-color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.stat-card.warning .stat-value {
+  color: #ff9800;
+}
+
+.stat-card.readonly {
+  border-color: #f44336;
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+.stat-card.readonly .stat-value {
+  color: #f44336;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
   color: var(--vscode-foreground);
 }
 
-.json-display {
+/* Shards Container */
+.shards-container {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+}
+
+.shards-container h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.shards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+/* Shard Item */
+.shard-item {
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: var(--vscode-sideBar-background);
+}
+
+.shard-item:hover {
+  border-color: var(--vscode-focusBorder);
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.shard-item.selected {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.shard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.shard-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.shard-name {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-family: monospace;
+}
+
+.shard-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.shard-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.shard-stat .label {
+  color: var(--vscode-descriptionForeground);
+}
+
+.shard-stat .value {
+  font-weight: 500;
+  color: var(--vscode-foreground);
+}
+
+.shard-stat .value.status-ready {
+  color: #4caf50;
+}
+
+.shard-stat .value.status-indexing {
+  color: #ff9800;
+}
+
+.shard-stat .value.status-readonly {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.shard-full-data {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.shard-full-data h5 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.shard-full-data pre {
   background-color: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
-  padding: 16px;
+  padding: 8px;
   overflow: auto;
   font-family: var(--vscode-editor-font-family);
-  font-size: var(--vscode-editor-font-size);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  font-size: 11px;
+  line-height: 1.4;
+  max-height: 300px;
 }
