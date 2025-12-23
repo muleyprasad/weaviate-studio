@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.33.1
@@ -8,6 +7,7 @@ services:
       - 50051:50051
     volumes:
       - weaviate_data:/var/lib/weaviate
+      - weaviate_backups:/var/lib/weaviate/backups
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       # REMOVE anonymous access, enable API key auth:
@@ -19,9 +19,11 @@ services:
       AUTHORIZATION_ADMINLIST_USERS: 'studio-user@example.com'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
       DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
-      ENABLE_MODULES: 'text2vec-transformers'
+      ENABLE_MODULES: 'text2vec-transformers,backup-filesystem'
       TRANSFORMERS_INFERENCE_API: 'http://text2vec-transformers:8080'
       CLUSTER_HOSTNAME: 'node1'
+      # Backup filesystem configuration
+      BACKUP_FILESYSTEM_PATH: '/var/lib/weaviate/backups'
     depends_on:
       - text2vec-transformers
 
@@ -32,3 +34,4 @@ services:
 
 volumes:
   weaviate_data:
+  weaviate_backups:
