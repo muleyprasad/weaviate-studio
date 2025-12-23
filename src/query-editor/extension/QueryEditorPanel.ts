@@ -156,8 +156,8 @@ export class QueryEditorPanel {
       }>;
     }>;
   }> {
-    // Update and check connection status before fetching schema
-    this._updateConnectionState();
+    // Check if connection is still active (state is maintained by the listener)
+    // No need to refresh here - listener keeps state synchronized
     if (!this._isConnectionActive) {
       throw new Error(QueryEditorPanel.CONNECTION_ERROR_MESSAGE);
     }
@@ -447,7 +447,10 @@ export class QueryEditorPanel {
     // Check initial connection state
     this._updateConnectionState();
 
-    // Subscribe to connection changes to track if the connection becomes disconnected
+    // Subscribe to connection changes from the ConnectionManager.
+    // When a connection is disconnected in the tree view, this listener ensures
+    // that all query windows using that connection are immediately notified.
+    // This maintains UI consistency across all open query editor panels.
     if (this._connectionManager?.onConnectionsChanged) {
       this._connectionStateListener = this._connectionManager.onConnectionsChanged(() => {
         this._updateConnectionState();

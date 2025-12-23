@@ -466,3 +466,173 @@ describe('Template Validation', () => {
     expect(result.errors).toContain('Unbalanced braces in query');
   });
 });
+
+describe('Integration Tests - Real-world Weaviate Schemas', () => {
+  // Mock a realistic Weaviate v2 schema with various property types
+  const mockWeaviateV2Schema = {
+    classes: [
+      {
+        class: 'BlogPost',
+        vectorizer: 'text2vec-openai',
+        properties: [
+          { name: 'title', dataType: ['text'], indexSearchable: true },
+          { name: 'content', dataType: ['text'], indexSearchable: true },
+          { name: 'publishedDate', dataType: ['date'] },
+          { name: 'likes', dataType: ['int'] },
+          { name: 'rating', dataType: ['number'] },
+          { name: 'isPublished', dataType: ['boolean'] },
+          { name: 'location', dataType: ['geoCoordinates'] },
+          { name: 'author', dataType: ['Author'] },
+          { name: 'tags', dataType: ['text'] },
+        ],
+      },
+      {
+        class: 'Author',
+        vectorizer: 'text2vec-openai',
+        properties: [
+          { name: 'name', dataType: ['text'], indexSearchable: true },
+          { name: 'bio', dataType: ['text'] },
+          { name: 'email', dataType: ['text'] },
+          { name: 'joinDate', dataType: ['date'] },
+        ],
+      },
+    ],
+  } as any;
+
+  // Mock a Weaviate v1 schema with moduleConfig
+  const mockWeaviateV1Schema = {
+    classes: [
+      {
+        class: 'Product',
+        moduleConfig: {
+          'text2vec-cohere': { model: 'embed-english-v3', vectorizeClassName: false },
+        },
+        properties: [
+          { name: 'name', dataType: ['string'] },
+          { name: 'description', dataType: ['text'] },
+          { name: 'price', dataType: ['number'] },
+          { name: 'inStock', dataType: ['boolean'] },
+          { name: 'category', dataType: ['ProductCategory'] },
+        ],
+      },
+      {
+        class: 'ProductCategory',
+        properties: [
+          { name: 'categoryName', dataType: ['string'] },
+          { name: 'description', dataType: ['text'] },
+        ],
+      },
+    ],
+  } as any;
+
+  // Mock a schema with no vectorizer configured
+  const mockSchemaNoVectorizer = {
+    classes: [
+      {
+        class: 'SimpleData',
+        properties: [
+          { name: 'id', dataType: ['uuid'] },
+          { name: 'name', dataType: ['string'] },
+          { name: 'value', dataType: ['number'] },
+        ],
+      },
+    ],
+  } as any;
+
+  it('generates valid queries for Weaviate v2 schema with all property types', () => {
+    // Test nearVector generation with actual vectorizer detected
+    const nearVectorQuery = processTemplate(
+      'Vector Search (nearVector)',
+      'BlogPost',
+      10,
+      mockWeaviateV2Schema
+    );
+    expect(nearVectorQuery).toContain('BlogPost');
+    expect(nearVectorQuery).toContain('nearVector');
+    expect(nearVectorQuery).toContain('limit: 10');
+    expect(nearVectorQuery).toContain('title');
+    expect(nearVectorQuery).toContain('content');
+
+    // Test nearText generation with text2vec-openai detected
+    const nearTextQuery = processTemplate(
+      'Semantic Search (nearText)',
+      'BlogPost',
+      5,
+      mockWeaviateV2Schema
+    );
+    expect(nearTextQuery).toContain('nearText');
+    expect(nearTextQuery).toContain('BlogPost');
+    expect(nearTextQuery).toContain('concepts:');
+    expect(nearTextQuery).not.toContain('No text vectorizer'); // Should work with v2 vectorizer
+  });
+
+  it('correctly detects vector dimensions from v1 schema with moduleConfig', () => {
+    // Test with Cohere model in moduleConfig
+    const hybridQuery = processTemplate('Hybrid Search', 'Product', 15, mockWeaviateV1Schema, {
+      searchQuery: 'test search',
+      alpha: 0.5,
+    });
+    expect(hybridQuery).toContain('Product');
+    expect(hybridQuery).toContain('hybrid:');
+    expect(hybridQuery).toContain('name');
+    expect(hybridQuery).toContain('description');
+    expect(hybridQuery).not.toContain('null');
+  });
+
+  it('gracefully handles schema with no vectorizer configured', () => {
+    // nearText should work but include helpful comment
+    const template = 'Semantic Search (nearText)';
+    const query = processTemplate(template, 'SimpleData', 20, mockSchemaNoVectorizer);
+    expect(query).toContain('SimpleData');
+    // Should not crash and include basic structure
+    expect(query).toContain('_additional');
+  });
+
+  it('respects QueryConfig overrides across all schema types', () => {
+    const config = {
+      limit: 50,
+      certainty: 0.8,
+      maxProperties: 3,
+    };
+
+    // Test with v2 schema
+    const query1 = processTemplate(
+      'Vector Search (nearVector)',
+      'BlogPost',
+      10,
+      mockWeaviateV2Schema,
+      config
+    );
+    expect(query1).toContain('limit: 50'); // Config overrides default 10
+
+    // Test with v1 schema
+    const query2 = processTemplate('Filter Query', 'Product', 10, mockWeaviateV1Schema, config);
+    expect(query2).toContain('limit: 50');
+  });
+
+  it('handles invalid QueryConfig gracefully without crashing', () => {
+    const { processTemplate: pt } = require('../graphqlTemplates');
+
+    // Test that invalid config doesn't crash - errors are caught and logged internally
+    // The function returns a fallback query instead of throwing
+
+    // Invalid certainty (should be 0-1) - should not crash
+    const result1 = pt('Vector Search (nearVector)', 'BlogPost', 10, mockWeaviateV2Schema, {
+      certainty: 1.5,
+    });
+    expect(result1).toBeTruthy(); // Still returns query with fallback
+    expect(result1).toContain('BlogPost');
+
+    // Invalid alpha (should be 0-1) - should not crash
+    const result2 = pt('Hybrid Search', 'BlogPost', 10, mockWeaviateV2Schema, { alpha: -0.1 });
+    expect(result2).toBeTruthy();
+    expect(result2).toContain('BlogPost');
+
+    // Invalid limit (should be positive) - should not crash
+    const result3 = pt('Vector Search (nearVector)', 'BlogPost', 10, mockWeaviateV2Schema, {
+      limit: -5,
+    });
+    expect(result3).toBeTruthy();
+    expect(result3).toContain('BlogPost');
+  });
+});

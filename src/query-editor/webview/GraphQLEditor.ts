@@ -370,13 +370,27 @@ export class GraphQLEditor {
   }
 
   /**
-   * Configure GraphQL language support with schema
+   * Configure GraphQL language support with schema.
+   *
+   * RETRY LOGIC RATIONALE:
+   * The monaco-graphql language service requires initialization that happens asynchronously.
+   * When configureGraphQLLanguage is called shortly after editor creation, the GraphQL API
+   * may not be ready yet. Rather than failing silently, we implement bounded retries to:
+   *
+   * 1. Wait for the GraphQL language service to initialize (max 10 attempts, 100ms apart)
+   * 2. Provide clear progress logging for debugging connection issues
+   * 3. Fail gracefully with a clear error message after max retries
+   * 4. Ensure users still get a functional editor even if language features are unavailable
+   *
+   * This prevents browser hangs (bounded by MAX_SCHEMA_CONFIG_RETRIES) while maximizing
+   * the chance that schema-aware features (autocomplete, diagnostics) become available.
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
     this.schemaConfig = schemaConfig;
     try {
       const api = (monaco.languages as any).graphql?.api;
       if (!api || typeof api.setSchemaConfig !== 'function') {
+        // Retry limit check: prevent infinite retry loops
         if (this.schemaConfigRetryCount >= this.MAX_SCHEMA_CONFIG_RETRIES) {
           console.error(
             `Failed to configure GraphQL language service after ${this.MAX_SCHEMA_CONFIG_RETRIES} retries. Schema features may not work correctly.`
@@ -393,6 +407,7 @@ export class GraphQLEditor {
           `GraphQL language service not ready; retrying schema configuration (attempt ${this.schemaConfigRetryCount}/${this.MAX_SCHEMA_CONFIG_RETRIES})...`
         );
 
+        // Wait 100ms before retrying to give the language service time to initialize
         this.schemaConfigRetryHandle = window.setTimeout(() => {
           this.schemaConfigRetryHandle = null;
           if (this.schemaConfig) {
@@ -402,7 +417,7 @@ export class GraphQLEditor {
         return;
       }
 
-      // Reset retry count on success
+      // Language service ready: reset retry counter for future attempts
       this.schemaConfigRetryCount = 0;
 
       if (schemaConfig?.introspectionJSON) {

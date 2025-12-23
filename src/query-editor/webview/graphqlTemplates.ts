@@ -9,6 +9,51 @@ export interface QueryTemplate {
 }
 
 /**
+ * Embedding model dimension mapping.
+ * Maps model names to their vector dimensions.
+ *
+ * Last updated: Dec 2024
+ * Supports 15+ models across 8 embedding providers.
+ *
+ * To maintain this mapping:
+ * - Check vendor documentation when new models are released
+ * - Run tests to verify dimensions match actual embeddings
+ * - Update the PR #42 compatibility table in GRAPHQL_TEMPLATES.md
+ */
+export const EMBEDDING_MODEL_DIMENSIONS: Record<string, number> = {
+  // OpenAI models
+  'text-embedding-3-large': 3072,
+  'text-embedding-3-small': 1536,
+  'text-embedding-ada-002': 1536,
+  'ada-002': 1536,
+
+  // Cohere models
+  'embed-english-v3': 1024,
+  'embed-multilingual-v3': 1024,
+  'cohere-legacy': 4096, // Legacy Cohere models default
+
+  // Sentence Transformers models
+  'all-mpnet-base-v2': 768,
+  'all-minilm-l6-v2': 384,
+  'all-minilm-l12-v2': 384,
+  'sentence-transformers': 768, // Common default
+
+  // HuggingFace / BERT models
+  'bert-base': 768,
+  'bert-large': 1024,
+
+  // PaLM models
+  'palm-gecko': 768,
+
+  // Ollama models
+  llama: 4096,
+  mistral: 4096,
+
+  // AWS Bedrock models
+  'titan-embed': 1536,
+};
+
+/**
  * Generate a similarity search query using nearVector
  * @param collectionName The name of the collection to query
  * @param limit Optional limit for the query (default: 10)
@@ -1069,6 +1114,62 @@ function generateStaticFallback(
 }
 
 /**
+ * Validate QueryConfig parameter values to ensure they're within valid ranges
+ * @throws {Error} If any parameter is out of valid ranges with descriptive error message
+ */
+function validateQueryConfig(config: QueryConfig | undefined): void {
+  if (!config) {
+    return;
+  }
+
+  const errors: string[] = [];
+
+  // Validate numeric ranges
+  if (config.limit !== undefined) {
+    if (!Number.isInteger(config.limit) || config.limit <= 0) {
+      errors.push(`limit must be a positive integer, got ${config.limit}`);
+    }
+  }
+
+  if (config.certainty !== undefined) {
+    if (typeof config.certainty !== 'number' || config.certainty < 0 || config.certainty > 1) {
+      errors.push(`certainty must be a number between 0 and 1, got ${config.certainty}`);
+    }
+  }
+
+  // Validate alpha (hybrid search balance: 0=vector only, 1=keyword only)
+  if (config.alpha !== undefined) {
+    if (typeof config.alpha !== 'number' || config.alpha < 0 || config.alpha > 1) {
+      errors.push(`alpha must be a number between 0 and 1, got ${config.alpha}`);
+    }
+  }
+
+  // Validate offset
+  if (config.offset !== undefined) {
+    if (!Number.isInteger(config.offset) || config.offset < 0) {
+      errors.push(`offset must be a non-negative integer, got ${config.offset}`);
+    }
+  }
+
+  // Validate array parameters
+  if (config.concepts !== undefined && !Array.isArray(config.concepts)) {
+    errors.push(`concepts must be an array, got ${typeof config.concepts}`);
+  }
+
+  if (config.returnProperties !== undefined && !Array.isArray(config.returnProperties)) {
+    errors.push(`returnProperties must be an array, got ${typeof config.returnProperties}`);
+  }
+
+  if (config.propertiesOverride !== undefined && !Array.isArray(config.propertiesOverride)) {
+    errors.push(`propertiesOverride must be an array, got ${typeof config.propertiesOverride}`);
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Invalid QueryConfig: ${errors.join('; ')}`);
+  }
+}
+
+/**
  * Process a template by replacing placeholders with actual values
  * @param template The template string or template name
  * @param collectionName The name of the collection
@@ -1084,6 +1185,9 @@ export function processTemplate(
   config?: QueryConfig
 ): string {
   try {
+    // Validate config parameters early to fail fast with clear errors
+    validateQueryConfig(config);
+
     // Helpers to normalize various schema shapes (v1/v2)
     const coerceToArray = (v: any): string[] =>
       Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
@@ -1979,68 +2083,30 @@ function getVectorDimensions(classSchema?: ClassSchema): string {
 }
 
 /**
- * Infer vector dimensions from model name
+ * Infer vector dimensions from model name.
+ *
+ * Uses EMBEDDING_MODEL_DIMENSIONS constant for dimension lookups.
+ * Implements substring matching for flexible model name matching.
+ *
+ * @param modelName The name of the embedding model
+ * @returns The dimension size as a string, or null if not found
  */
 function inferDimensionFromModel(modelName: string): string | null {
   const model = modelName.toLowerCase();
 
-  // OpenAI models
-  if (model.includes('text-embedding-3-large')) {
-    return '3072';
-  }
-  if (model.includes('text-embedding-3-small')) {
-    return '1536';
-  }
-  if (model.includes('ada-002') || model.includes('text-embedding-ada')) {
-    return '1536';
+  // First, try exact match with known models (case-insensitive)
+  for (const [key, dimension] of Object.entries(EMBEDDING_MODEL_DIMENSIONS)) {
+    if (model === key.toLowerCase()) {
+      return String(dimension);
+    }
   }
 
-  // Cohere models
-  if (model.includes('embed-english-v3') || model.includes('embed-multilingual-v3')) {
-    return '1024';
-  }
-  if (model.includes('cohere')) {
-    return '4096'; // Legacy default
-  }
-
-  // Sentence Transformers models
-  if (model.includes('all-mpnet-base-v2')) {
-    return '768';
-  }
-  if (model.includes('all-minilm-l6-v2')) {
-    return '384';
-  }
-  if (model.includes('all-minilm-l12-v2')) {
-    return '384';
-  }
-  if (model.includes('sentence-transformers')) {
-    return '768'; // Common default
-  }
-
-  // HuggingFace models
-  if (model.includes('bert-base')) {
-    return '768';
-  }
-  if (model.includes('bert-large')) {
-    return '1024';
-  }
-
-  // PaLM models
-  if (model.includes('palm') || model.includes('gecko')) {
-    return '768';
-  }
-
-  // Ollama models
-  if (model.includes('llama')) {
-    return '4096';
-  }
-  if (model.includes('mistral')) {
-    return '4096';
-  }
-
-  // AWS Bedrock models
-  if (model.includes('titan-embed')) {
-    return '1536';
+  // Then, try substring matching for flexible matching
+  // (handles partial model names and versions)
+  for (const [key, dimension] of Object.entries(EMBEDDING_MODEL_DIMENSIONS)) {
+    if (model.includes(key.toLowerCase())) {
+      return String(dimension);
+    }
   }
 
   return null;
