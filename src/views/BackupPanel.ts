@@ -3,34 +3,39 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 /**
- * Manages the Add Collection webview panel
+ * Manages the Backup webview panel
  */
-export class AddCollectionPanel {
-  public static currentPanel: AddCollectionPanel | undefined;
+export class BackupPanel {
+  public static currentPanel: BackupPanel | undefined;
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
-  private readonly _initialSchema: any | undefined;
+  private readonly _connectionId: string;
+  private readonly _collections: string[];
+  private readonly _availableModules: any;
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    private readonly onCreateCallback: (schema: any) => Promise<void>,
+    connectionId: string,
+    collections: string[],
+    availableModules: any,
+    private readonly onCreateCallback: (backupData: any) => Promise<void>,
     private readonly onMessageCallback?: (
       message: any,
       postMessage: (msg: any) => void
-    ) => Promise<void>,
-    initialSchema?: any
+    ) => Promise<void>
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
-    this._initialSchema = initialSchema;
+    this._connectionId = connectionId;
+    this._collections = collections;
+    this._availableModules = availableModules;
 
     // Set the webview's initial html content
     this._update();
 
     // Listen for when the panel is disposed
-    // This happens when the user closes the panel or when the panel is closed programmatically
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
     // Handle messages from the webview
@@ -44,55 +49,53 @@ export class AddCollectionPanel {
   }
 
   /**
-   * Creates or shows the Add Collection panel
+   * Creates or shows the Backup panel
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
-    onCreateCallback: (schema: any) => Promise<void>,
-    onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>,
-    initialSchema?: any
-  ): AddCollectionPanel {
+    connectionId: string,
+    collections: string[],
+    availableModules: any,
+    onCreateCallback: (backupData: any) => Promise<void>,
+    onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>
+  ): BackupPanel {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // If we already have a panel, show it.
-    if (AddCollectionPanel.currentPanel) {
-      AddCollectionPanel.currentPanel._panel.reveal(column);
-      if (initialSchema) {
-        AddCollectionPanel.currentPanel.postMessage({
-          command: 'initialSchema',
-          schema: initialSchema,
-        });
-      }
-      return AddCollectionPanel.currentPanel;
+    // If we already have a panel, show it and reset the form.
+    if (BackupPanel.currentPanel) {
+      BackupPanel.currentPanel._panel.reveal(column);
+      // Send reset command to the webview to clear the form
+      BackupPanel.currentPanel.postMessage({ command: 'resetForm' });
+      return BackupPanel.currentPanel;
     }
 
     // Otherwise, create a new panel.
     const panel = vscode.window.createWebviewPanel(
-      'weaviateAddCollection',
-      'Add Collection',
+      'weaviateBackup',
+      'Create Backup',
       column || vscode.ViewColumn.One,
       {
         // Enable javascript in the webview
         enableScripts: true,
         retainContextWhenHidden: true,
         // And restrict the webview to only loading content from our extension's dist directory.
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview-add-collection')],
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
       }
     );
 
-    AddCollectionPanel.currentPanel = new AddCollectionPanel(
+    BackupPanel.currentPanel = new BackupPanel(
       panel,
       extensionUri,
+      connectionId,
+      collections,
+      availableModules,
       onCreateCallback,
-      onMessageCallback,
-      initialSchema
+      onMessageCallback
     );
 
-    // Note: initial schema will also be sent when the webview signals it's ready
-
-    return AddCollectionPanel.currentPanel;
+    return BackupPanel.currentPanel;
   }
 
   /**
@@ -106,7 +109,7 @@ export class AddCollectionPanel {
    * Disposes the panel
    */
   public dispose(): void {
-    AddCollectionPanel.currentPanel = undefined;
+    BackupPanel.currentPanel = undefined;
 
     // Clean up our resources
     this._panel.dispose();
@@ -125,21 +128,21 @@ export class AddCollectionPanel {
   private async _handleMessage(message: any): Promise<void> {
     switch (message.command) {
       case 'ready':
-        // Webview is ready to receive data; send initial schema if provided
-        if (this._initialSchema) {
-          this.postMessage({
-            command: 'initialSchema',
-            schema: this._initialSchema,
-          });
-        }
+        // Webview is ready to receive data; send initial data
+        this.postMessage({
+          command: 'initData',
+          connectionId: this._connectionId,
+          collections: this._collections,
+          availableModules: this._availableModules,
+        });
         break;
-      case 'create':
+      case 'createBackup':
         try {
-          await this.onCreateCallback(message.schema);
-          this.dispose();
-          vscode.window.showInformationMessage(
-            `Collection "${message.schema.class}" created successfully`
-          );
+          await this.onCreateCallback(message.backupData);
+          this.postMessage({
+            command: 'backupCreated',
+            backupId: message.backupData.backupId,
+          });
         } catch (error) {
           this.postMessage({
             command: 'error',
@@ -147,8 +150,20 @@ export class AddCollectionPanel {
           });
         }
         break;
+      case 'openExternal':
+        // Open external URL in the default browser
+        if (message.url) {
+          vscode.env.openExternal(vscode.Uri.parse(message.url));
+        }
+        break;
       case 'cancel':
         this.dispose();
+        break;
+      case 'viewBackup':
+        // Delegate viewBackup command to the message callback
+        if (this.onMessageCallback) {
+          await this.onMessageCallback(message, (msg) => this.postMessage(msg));
+        }
         break;
       default:
         // Delegate to the optional message callback
@@ -172,10 +187,10 @@ export class AddCollectionPanel {
    */
   private _getHtmlForWebview(webview: vscode.Webview): string {
     // Get the dist folder path
-    const distPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview-add-collection');
+    const distPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview');
 
     // Read the generated HTML file
-    const htmlPath = vscode.Uri.joinPath(distPath, 'index.html');
+    const htmlPath = vscode.Uri.joinPath(distPath, 'backup.html');
     let html = '';
 
     try {
@@ -185,8 +200,8 @@ export class AddCollectionPanel {
       return `<!DOCTYPE html>
         <html>
         <body>
-          <h1>Error loading Add Collection panel</h1>
-          <p>The webview bundle has not been built. Please run: npm run build:add-collection</p>
+          <h1>Error loading Backup panel</h1>
+          <p>The webview bundle has not been built. Please run: npm run build:webview</p>
         </body>
         </html>`;
     }
@@ -205,7 +220,7 @@ export class AddCollectionPanel {
     html = html.replace(
       '<head>',
       `<head>
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}' ${cspSource}; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
     );
 
     // Replace nonce placeholder

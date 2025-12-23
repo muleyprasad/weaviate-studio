@@ -27,6 +27,9 @@ function createClient() {
     cluster: {
       nodes: jest.fn().mockResolvedValue({}),
     },
+    backup: {
+      list: jest.fn().mockResolvedValue([]),
+    },
     isReady: jest.fn().mockResolvedValue(true),
   };
 }
@@ -64,6 +67,9 @@ const exported = {
     cluster: {
       nodes: jest.fn().mockResolvedValue({}),
     },
+    backup: {
+      list: jest.fn().mockResolvedValue([]),
+    },
     isReady: jest.fn().mockResolvedValue(true),
   }),
   connectToWeaviateCloud: jest.fn().mockResolvedValue({
@@ -93,6 +99,9 @@ const exported = {
     }),
     cluster: {
       nodes: jest.fn().mockResolvedValue({}),
+    },
+    backup: {
+      list: jest.fn().mockResolvedValue([]),
     },
     isReady: jest.fn().mockResolvedValue(true),
   }),
