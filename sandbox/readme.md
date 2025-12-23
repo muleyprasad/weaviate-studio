@@ -2,7 +2,7 @@
 
 This sandbox provides a lightweight **two-container Weaviate environment** for local testing and development:
 
-- One container runs **Weaviate**, the open-source vector database with **file-based backup support**
+- One container runs **Weaviate**, the open-source vector database
 - The second container runs a **local text2vec-transformers inference service** for text embeddings
 
 Everything runs locally — **no paid API keys or external services** are required, since embeddings are generated within the local transformer container.
@@ -93,44 +93,7 @@ Try the following:
 
 ---
 
-### 4. Create Backups (Optional)
-
-This sandbox includes **file-based backup support** enabled by default. You can create backups of your collections using the Weaviate client:
-
-**Python Example:**
-
-```python
-from weaviate.classes.backup import BackupLocation
-
-result = client.backup.create(
-    backup_id="my-backup",
-    backend="filesystem",
-    wait_for_completion=True,
-    backup_location=BackupLocation.FileSystem(path="/var/lib/weaviate/backups")
-)
-print(result)
-```
-
-**REST API Example:**
-
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer test-key-123" \
-  -d '{"id": "my-backup"}' \
-  http://localhost:8080/v1/backups/filesystem
-```
-
-**Key Points:**
-
-- Backups are stored in the `weaviate_backups` Docker volume
-- Backups include all collections by default (you can specify include/exclude)
-- Suitable for development and testing (not recommended for production)
-- Use `backup-s3`, `backup-gcs`, or `backup-azure` for production deployments
-
----
-
-### 5. Stop the Environment
+### 4. Stop the Environment
 
 To stop the sandbox but keep your data:
 
