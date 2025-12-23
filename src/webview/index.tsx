@@ -5,6 +5,11 @@ import ResultsTable from './components/ResultsTable';
 import * as monaco from 'monaco-editor';
 import { queryTemplates, processTemplate } from '../query-editor/webview/graphqlTemplates';
 
+// Standardized error messages for consistency
+const CONNECTION_ERROR_MESSAGE =
+  'Not connected to Weaviate. Please reconnect from the Connections view.';
+const CONNECTION_MISSING_MESSAGE = 'Not connected to Weaviate';
+
 // Define the generateGraphQLQuery function directly in the webview since importing from utils may not work
 // due to webview bundle isolation
 /**
@@ -501,9 +506,7 @@ const App = () => {
   // Handle query execution
   const handleRunQuery = () => {
     if (!isConnected) {
-      setError(
-        'Not connected to Weaviate. Please reconnect this connection from the Connections view.'
-      );
+      setError(CONNECTION_ERROR_MESSAGE);
       return;
     }
 
@@ -536,9 +539,7 @@ const App = () => {
   // Handle sample query generation
   const handleGenerateQuery = () => {
     if (!isConnected) {
-      setError(
-        'Not connected to Weaviate. Please reconnect this connection from the Connections view.'
-      );
+      setError(CONNECTION_ERROR_MESSAGE);
       return;
     }
 
@@ -937,8 +938,8 @@ const App = () => {
           setIsConnected(message.isConnected);
           if (!message.isConnected) {
             // Show a clear message when disconnected
-            setError('Connection lost. Please reconnect from the Connections view.');
-          } else if (error === 'Connection lost. Please reconnect from the Connections view.') {
+            setError(CONNECTION_ERROR_MESSAGE);
+          } else if (error === CONNECTION_ERROR_MESSAGE) {
             // Clear the disconnection error if we reconnect
             setError(null);
           }
@@ -987,31 +988,6 @@ const App = () => {
 
   return (
     <div style={styles.container}>
-      {/* Display connection status banner when disconnected */}
-      {!isConnected && (
-        <div
-          style={{
-            backgroundColor:
-              'var(--vscode-inputValidation-warningBackground, rgba(200, 150, 0, 0.2))',
-            borderLeft: '4px solid var(--vscode-inputValidation-warningBorder, #c89b00)',
-            padding: '12px 15px',
-            marginBottom: '15px',
-            borderRadius: '2px',
-            color: 'var(--vscode-inputValidation-warningForeground, #e0e0e0)',
-            fontSize: '13px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>⚠️</span>
-          <span>
-            <strong>Connection Lost.</strong> This connection has been disconnected. Please
-            reconnect from the Connections view.
-          </span>
-        </div>
-      )}
-
       {/* Display error messages if present */}
       {error && (
         <div style={styles.error}>
