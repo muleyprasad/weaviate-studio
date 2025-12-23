@@ -24,11 +24,14 @@ export function generateNearVectorQuery(
       ? returnProperties.map((p) => `      ${p}`).join('\n')
       : '      # Add your properties here';
 
+  // Use generic dimension message since we don't have schema context in static function
+  const dimsText = 'match your vectorizer dimensions';
+
   return `{
   Get {
     ${collectionName} (
       nearVector: {
-        vector: [0.1, 0.2, 0.3] # Replace with your actual vector (must match vectorizer dimensions)
+        vector: [0.1, 0.2, 0.3] # If you paste your own vector, ensure its length matches the embedding model's dimension (${dimsText})
         distance: 0.6 # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)
       }
       limit: ${limit}
@@ -140,7 +143,7 @@ export function generateHybridQuery(
       hybrid: {
         query: "your search query here"
         alpha: 0.5 # Balance: 0=pure vector, 1=pure keyword search
-        vector: [0.1, 0.2, 0.3] # Optional: provide custom vector
+        vector: [0.1, 0.2, 0.3] # Optional: provide custom vector (ensure its length matches your embedding model's dimension)
         properties: ["title", "description"] # Optional: limit search to specific properties
       }
       limit: ${limit}
@@ -1551,7 +1554,7 @@ export function generateDynamicHybridQuery(
       hybrid: {
         query: "${queryText}"
         alpha: ${alphaVal} # Balance: 0=pure vector, 1=pure keyword search
-        vector: ${vec} # Optional: provide custom vector
+        vector: ${vec} # Optional: provide custom vector (ensure its length matches your embedding model's dimension)
         properties: [${propsOverride.map((p) => `"${p}"`).join(', ')}] # Optional: limit search to specific properties
       }
       limit: ${limit}
