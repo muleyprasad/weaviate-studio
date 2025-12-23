@@ -416,6 +416,7 @@ const App = () => {
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [errorId, setErrorId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
   const errorBufferRef = useRef<string>('');
 
   // Keyboard shortcuts within the webview
@@ -499,6 +500,13 @@ const App = () => {
 
   // Handle query execution
   const handleRunQuery = () => {
+    if (!isConnected) {
+      setError(
+        'Not connected to Weaviate. Please reconnect this connection from the Connections view.'
+      );
+      return;
+    }
+
     if (!queryText.trim()) {
       setError('Please enter a GraphQL query');
       return;
@@ -527,6 +535,13 @@ const App = () => {
 
   // Handle sample query generation
   const handleGenerateQuery = () => {
+    if (!isConnected) {
+      setError(
+        'Not connected to Weaviate. Please reconnect this connection from the Connections view.'
+      );
+      return;
+    }
+
     if (!collection) {
       setError('No collection selected');
       return;
@@ -917,6 +932,18 @@ const App = () => {
           }
           break;
 
+        case 'connectionStatusChanged':
+          // Handle connection status changes
+          setIsConnected(message.isConnected);
+          if (!message.isConnected) {
+            // Show a clear message when disconnected
+            setError('Connection lost. Please reconnect from the Connections view.');
+          } else if (error === 'Connection lost. Please reconnect from the Connections view.') {
+            // Clear the disconnection error if we reconnect
+            setError(null);
+          }
+          break;
+
         case 'ping':
           // Respond to backend ping to indicate webview is alive
           if (vscode) {
@@ -960,6 +987,31 @@ const App = () => {
 
   return (
     <div style={styles.container}>
+      {/* Display connection status banner when disconnected */}
+      {!isConnected && (
+        <div
+          style={{
+            backgroundColor:
+              'var(--vscode-inputValidation-warningBackground, rgba(200, 150, 0, 0.2))',
+            borderLeft: '4px solid var(--vscode-inputValidation-warningBorder, #c89b00)',
+            padding: '12px 15px',
+            marginBottom: '15px',
+            borderRadius: '2px',
+            color: 'var(--vscode-inputValidation-warningForeground, #e0e0e0)',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>⚠️</span>
+          <span>
+            <strong>Connection Lost.</strong> This connection has been disconnected. Please
+            reconnect from the Connections view.
+          </span>
+        </div>
+      )}
+
       {/* Display error messages if present */}
       {error && (
         <div style={styles.error}>
@@ -1115,13 +1167,20 @@ const App = () => {
                 <div className="template-dropdown-container" style={{ position: 'relative' }}>
                   <button
                     onClick={handleToggleTemplateDropdown}
-                    disabled={!collection}
-                    title={collection ? 'Choose a query template' : 'Select a collection first'}
+                    disabled={!collection || !isConnected}
+                    title={
+                      !isConnected
+                        ? 'Not connected to Weaviate'
+                        : collection
+                          ? 'Choose a query template'
+                          : 'Select a collection first'
+                    }
                     style={{
                       backgroundColor: 'var(--vscode-input-background, #2D2D2D)',
-                      color: collection
-                        ? 'var(--vscode-input-foreground, #E0E0E0)'
-                        : 'var(--vscode-descriptionForeground, #888)',
+                      color:
+                        collection && isConnected
+                          ? 'var(--vscode-input-foreground, #E0E0E0)'
+                          : 'var(--vscode-descriptionForeground, #888)',
                       border: '1px solid var(--vscode-input-border, #444)',
                       borderRadius: '3px',
                       padding: '4px 10px',
@@ -1129,20 +1188,20 @@ const App = () => {
                       fontWeight: 500,
                       height: '28px',
                       minWidth: '42px',
-                      cursor: collection ? 'pointer' : 'not-allowed',
+                      cursor: collection && isConnected ? 'pointer' : 'not-allowed',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
                       transition: 'background-color 0.2s ease',
                     }}
                     onMouseEnter={(e) => {
-                      if (collection) {
+                      if (collection && isConnected) {
                         e.currentTarget.style.backgroundColor =
                           'var(--vscode-list-hoverBackground, #3A3A3A)';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (collection) {
+                      if (collection && isConnected) {
                         e.currentTarget.style.backgroundColor =
                           'var(--vscode-input-background, #2D2D2D)';
                       }
@@ -1153,7 +1212,7 @@ const App = () => {
                   </button>
 
                   {/* Template Dropdown Menu - positioned relative to button */}
-                  {showTemplateDropdown && collection && (
+                  {showTemplateDropdown && collection && isConnected && (
                     <div
                       className="template-dropdown-menu theme-dropdown"
                       style={{
