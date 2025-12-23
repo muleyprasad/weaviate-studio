@@ -48,7 +48,9 @@ export class ClusterPanel {
     extensionUri: vscode.Uri,
     connectionId: string,
     nodeStatusData: any,
-    onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>
+    connectionName: string,
+    onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>,
+    openClusterViewOnConnect?: boolean
   ): ClusterPanel {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -61,6 +63,7 @@ export class ClusterPanel {
       ClusterPanel.currentPanel.postMessage({
         command: 'updateData',
         nodeStatusData,
+        openClusterViewOnConnect,
       });
       return ClusterPanel.currentPanel;
     }
@@ -68,7 +71,7 @@ export class ClusterPanel {
     // Otherwise, create a new panel.
     const panel = vscode.window.createWebviewPanel(
       'weaviateCluster',
-      'Cluster Information',
+      `Cluster Info: ${connectionName}`,
       column || vscode.ViewColumn.One,
       {
         // Enable javascript in the webview
@@ -96,6 +99,7 @@ export class ClusterPanel {
     ClusterPanel.currentPanel.postMessage({
       command: 'init',
       nodeStatusData,
+      openClusterViewOnConnect,
     });
 
     return ClusterPanel.currentPanel;

@@ -13,6 +13,7 @@ export interface WeaviateConnection {
   lastUsed?: number;
   links?: ConnectionLink[];
   autoConnect?: boolean; // Auto connect on expand, default: false
+  openClusterViewOnConnect?: boolean; // Auto open cluster view on connect, default: true
 
   // Either cloud or custom (discriminated union with "type")
   type: 'custom' | 'cloud';
@@ -829,6 +830,10 @@ export class ConnectionManager {
         <small>When enabled, connection will be established automatically when expanded without prompting</small>
       </div>
       <div class="form-group">
+        <label><input type="checkbox" id="openClusterViewOnConnect" ${connection?.openClusterViewOnConnect !== false ? 'checked' : ''}> Open Cluster View on Connect</label>
+        <small>Automatically open the cluster information panel when connecting (enabled by default)</small>
+      </div>
+      <div class="form-group">
         <label for="timeoutInit">Timeout (Init, seconds)</label>
         <input type="number" id="timeoutInit" value="${connection?.timeoutInit || 30}">
       </div>
@@ -961,6 +966,7 @@ export class ConnectionManager {
     const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
     const skipInitChecks = document.getElementById('skipInitChecks').checked;
     const autoConnect = document.getElementById('autoConnect').checked;
+    const openClusterViewOnConnect = document.getElementById('openClusterViewOnConnect').checked;
 
     // Clear errors
     document.querySelectorAll('.error').forEach(el => {
@@ -976,7 +982,7 @@ export class ConnectionManager {
     // Filter out empty links
     const validLinks = links.filter(link => link.name.trim() && link.url.trim());
 
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, links: validLinks };
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
 
     if (currentType === "custom") {
       const httpHost = document.getElementById('httpHost').value.trim();
@@ -991,7 +997,7 @@ export class ConnectionManager {
         return;
       }
 
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, links: validLinks };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
       if (apiKeyCustom) {
         connection.apiKey = apiKeyCustom;
       }
@@ -1007,7 +1013,7 @@ export class ConnectionManager {
         showError('apiKeyError', 'API Key is required for cloud connection');
         return;
       }
-      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, links: validLinks };
+      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
       if (apiKeyCloud) {
         connection.apiKey = apiKeyCloud;
       }

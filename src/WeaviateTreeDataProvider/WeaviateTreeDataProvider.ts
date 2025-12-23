@@ -452,16 +452,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       const items: WeaviateTreeItem[] = [];
 
-      // Add server information section
+      // Add cluster information section
       items.push(
         new WeaviateTreeItem(
-          'Server Information',
+          'Cluster Information',
           vscode.TreeItemCollapsibleState.Collapsed,
           'serverInfo',
           element.connectionId,
           undefined,
           'serverInfo',
-          new vscode.ThemeIcon('info'),
+          new vscode.ThemeIcon('dashboard'),
           'weaviateServerInfo'
         )
       );
@@ -2135,6 +2135,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         // Only fetch collections if we're not in a refresh loop
         if (!this.isRefreshing) {
           await this.fetchData(connectionId);
+        }
+
+        // Auto-open cluster view by default (unless explicitly disabled)
+        if (connection.openClusterViewOnConnect !== false && !silent) {
+          vscode.commands.executeCommand('weaviate.viewClusterInfo', { connectionId });
         }
 
         // Do not auto-open the query editor on connect. Let the user open it

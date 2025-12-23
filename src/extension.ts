@@ -659,21 +659,74 @@ export function activate(context: vscode.ExtensionContext) {
         // Get node status data
         const nodeStatusData = await client.cluster.nodes({ output: 'verbose' });
 
+        // Get connection to access openClusterViewOnConnect setting
+        const connection = connectionManager.getConnection(item.connectionId);
+
         // Open cluster panel
         ClusterPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           nodeStatusData,
+          connection?.name || 'Unknown',
           async (message, postMessage) => {
             if (message.command === 'refresh') {
               // Refresh node status data
               const updatedData = await client.cluster.nodes({ output: 'verbose' });
+              const updatedConnection = connectionManager.getConnection(item.connectionId);
               postMessage({
                 command: 'updateData',
                 nodeStatusData: updatedData,
+                openClusterViewOnConnect: updatedConnection?.openClusterViewOnConnect,
               });
+            } else if (message.command === 'toggleAutoOpen') {
+              // Update connection openClusterViewOnConnect setting
+              try {
+                const currentConnection = connectionManager.getConnection(item.connectionId);
+                if (currentConnection) {
+                  await connectionManager.updateConnection(item.connectionId, {
+                    openClusterViewOnConnect: message.value,
+                  });
+                  vscode.window.showInformationMessage(
+                    message.value
+                      ? 'Cluster view will now open automatically on connect'
+                      : 'Cluster view auto-open disabled'
+                  );
+                }
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to update setting: ${errorMessage}`);
+              }
+            } else if (message.command === 'updateShardStatus') {
+              // Update shard status
+              try {
+                const collection = client.collections.get(message.collection);
+                const shardNames = message.shardNames || [message.shardName]; // Support both array and single
+
+                // updateShards accepts string or string[]
+                await collection.config.updateShards(message.newStatus, shardNames);
+
+                // Show success message
+                const shardText =
+                  shardNames.length === 1
+                    ? `Shard ${shardNames[0]}`
+                    : `${shardNames.length} shards`;
+                vscode.window.showInformationMessage(
+                  `${shardText} status updated to ${message.newStatus}`
+                );
+
+                // Refresh the data
+                const updatedData = await client.cluster.nodes({ output: 'verbose' });
+                postMessage({
+                  command: 'updateData',
+                  nodeStatusData: updatedData,
+                });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to update shard status: ${errorMessage}`);
+              }
             }
-          }
+          },
+          connection?.openClusterViewOnConnect
         );
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
