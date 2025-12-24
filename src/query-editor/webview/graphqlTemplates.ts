@@ -757,6 +757,7 @@ export interface PropertySchema {
   indexFilterable?: boolean;
   moduleConfig?: Record<string, any>;
   vectorizerConfig?: Record<string, any>;
+  nestedProperties?: PropertySchema[];
 }
 
 /**
@@ -835,16 +836,25 @@ export function generateSampleQuery(
       'blob',
     ];
 
-    // Separate primitive and reference properties
+    // Separate primitive, nested object, and reference properties
     const primitiveProps = classSchema.properties.filter((p) =>
       p.dataType.some(
         (dt) => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates'
       )
     );
+    const nestedObjectProps = classSchema.properties.filter(
+      (p) =>
+        p.dataType.some((dt) => dt.toLowerCase() === 'object') &&
+        p.nestedProperties &&
+        p.nestedProperties.length > 0
+    );
     const referenceProps = classSchema.properties.filter(
       (p) =>
         !p.dataType.some(
-          (dt) => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates'
+          (dt) =>
+            primitiveTypes.includes(dt.toLowerCase()) ||
+            dt.toLowerCase() === 'geocoordinates' ||
+            dt.toLowerCase() === 'object'
         )
     );
 
@@ -858,6 +868,23 @@ export function generateSampleQuery(
       }`);
       } else {
         propertyStrings.push(prop.name);
+      }
+    });
+
+    // Add all nested object properties
+    nestedObjectProps.forEach((prop) => {
+      if (prop.nestedProperties && prop.nestedProperties.length > 0) {
+        const nestedTypeName = `${classSchema.class}_${prop.name}_object`;
+        const nestedPropsStr = prop.nestedProperties
+          .slice(0, 5) // Limit to 5 nested properties
+          .map((np) => `          ${np.name}`)
+          .join('\n');
+        propertyStrings.push(`${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedPropsStr}
+        }
+      }`);
       }
     });
 
@@ -922,7 +949,7 @@ ${nestedProps}
           // Cross-references in Weaviate have dataType starting with the class name
           const referencedClassName = propSchema.dataType[0];
 
-          // If it's not a primitive type, it's likely a reference
+          // If it's not a primitive type, it's likely a reference or nested object
           const primitiveTypes = [
             'text',
             'string',
@@ -934,6 +961,26 @@ ${nestedProps}
             'uuid',
             'blob',
           ];
+
+          // Check if it's a nested object property with nestedProperties
+          if (
+            referencedClassName.toLowerCase() === 'object' &&
+            propSchema.nestedProperties &&
+            propSchema.nestedProperties.length > 0
+          ) {
+            const nestedTypeName = `${classSchema.class}_${propName}_object`;
+            const nestedProps = propSchema.nestedProperties
+              .slice(0, 5) // Limit to 5 properties
+              .map((np) => `          ${np.name}`)
+              .join('\n');
+            return `${propName} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedProps}
+        }
+      }`;
+          }
+
           if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
             // Find the referenced class's schema
             const referencedClass = schema?.classes?.find((c) => c.class === referencedClassName);
@@ -1356,6 +1403,7 @@ export function generateDynamicSampleQuery(
   const primitiveProps: PropertySchema[] = [];
   const referenceProps: PropertySchema[] = [];
   const geoProps: PropertySchema[] = [];
+  const nestedObjectProps: PropertySchema[] = [];
 
   properties.forEach((prop) => {
     const dataType = prop.dataType?.[0]?.toLowerCase() || '';
@@ -1376,6 +1424,9 @@ export function generateDynamicSampleQuery(
       ].includes(dataType)
     ) {
       primitiveProps.push(prop);
+    } else if (dataType === 'object' && prop.nestedProperties && prop.nestedProperties.length > 0) {
+      // It's a nested object property with nested properties defined
+      nestedObjectProps.push(prop);
     } else {
       // It's likely a reference to another class
       referenceProps.push(prop);
@@ -1399,8 +1450,27 @@ export function generateDynamicSampleQuery(
       }`);
   });
 
+  // Add nested object properties
+  const selectedNestedProps = nestedObjectProps.slice(0, 2);
+  selectedNestedProps.forEach((prop) => {
+    if (prop.nestedProperties && prop.nestedProperties.length > 0) {
+      // Generate inline fragment with the nested object type name
+      const nestedTypeName = `${collectionName}_${prop.name}_object`;
+      const nestedPropsStr = prop.nestedProperties
+        .slice(0, 3) // Limit to 3 nested properties for readability
+        .map((np) => `          ${np.name}`)
+        .join('\n');
+      propertyLines.push(`      ${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedPropsStr}
+        }
+      }`);
+    }
+  });
+
   // Add up to 2 reference properties with nested selection
-  const selectedReferenceProps = referenceProps.slice(0, 2);
+  const selectedReferenceProps = referenceProps.slice(0, 2 - selectedNestedProps.length);
   selectedReferenceProps.forEach((prop) => {
     const referencedClassName = prop.dataType?.[0] || 'Unknown';
     propertyLines.push(`      ${prop.name} {

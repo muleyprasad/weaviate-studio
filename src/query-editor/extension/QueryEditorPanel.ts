@@ -144,6 +144,36 @@ export class QueryEditorPanel {
     }
   `;
 
+  // Helper function to recursively map property schema including nested properties
+  private _mapPropertySchema(prop: PropertyConfig): {
+    name: string;
+    dataType: string[];
+    description?: string;
+    nestedProperties?: Array<{
+      name: string;
+      dataType: string[];
+      description?: string;
+      nestedProperties?: any[];
+    }>;
+  } {
+    const result: any = {
+      name: prop.name || '',
+      dataType: Array.isArray((prop as any).dataType)
+        ? ((prop as any).dataType as string[])
+        : [((prop as any).dataType as any) || 'string'],
+      description: (prop as any).description,
+    };
+
+    // Extract nested properties for object-type properties
+    if (result.dataType.includes('object') && (prop as any).nestedProperties) {
+      result.nestedProperties = ((prop as any).nestedProperties as PropertyConfig[]).map((nested) =>
+        this._mapPropertySchema(nested)
+      );
+    }
+
+    return result;
+  }
+
   // Minimal schema types for webview compatibility
   private async _fetchSchema(): Promise<{
     classes: Array<{
@@ -153,6 +183,7 @@ export class QueryEditorPanel {
         name: string;
         dataType: string[];
         description?: string;
+        nestedProperties?: any[];
       }>;
     }>;
   }> {
@@ -172,13 +203,9 @@ export class QueryEditorPanel {
       classes: (collections || []).map((collection: CollectionConfig) => ({
         class: collection.name || '',
         description: (collection as any).description,
-        properties: (collection.properties || []).map((prop: PropertyConfig) => ({
-          name: prop.name || '',
-          dataType: Array.isArray((prop as any).dataType)
-            ? ((prop as any).dataType as string[])
-            : [((prop as any).dataType as any) || 'string'],
-          description: (prop as any).description,
-        })),
+        properties: (collection.properties || []).map((prop: PropertyConfig) =>
+          this._mapPropertySchema(prop)
+        ),
       })),
     };
   }
