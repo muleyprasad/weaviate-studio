@@ -341,13 +341,11 @@ export class ConnectionManager {
         });
       } else {
         // Extract only the fields needed for connectToCustom
+        //  Use gRPC for faster performance on v1.27.0+
         const customOptions: ConnectToCustomOptions = {
           httpHost: connection.httpHost,
           httpPort: connection.httpPort,
-          grpcHost: connection.grpcHost,
-          grpcPort: connection.grpcPort,
           httpSecure: connection.httpSecure,
-          grpcSecure: connection.grpcSecure,
           skipInitChecks: connection.skipInitChecks,
           timeout: {
             init: connection.timeoutInit,
@@ -355,10 +353,68 @@ export class ConnectionManager {
             insert: connection.timeoutInsert,
           },
         };
+
+        // Only add gRPC options if they're configured
+        if (connection.grpcHost && connection.grpcPort) {
+          customOptions.grpcHost = connection.grpcHost;
+          customOptions.grpcPort = connection.grpcPort;
+          customOptions.grpcSecure = connection.grpcSecure;
+        }
+
         if (connection.apiKey) {
           customOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
         }
-        client = await weaviate.connectToCustom(customOptions);
+
+        try {
+          // Attempt connection with gRPC (if configured)
+          client = await weaviate.connectToCustom(customOptions);
+        } catch (error: any) {
+          // Detect gRPC compatibility error
+          console.log('Initial connection error:', error);
+
+          // Check for gRPC compatibility issues more comprehensively
+          const isGrpcError =
+            error.message.includes('gRPC') ||
+            error.message.includes('is not supported') ||
+            error.message.includes('v1.26.7') ||
+            error.message.includes('v1.27.0') ||
+            (error.name === 'WeaviateStartUpError' && error.message.includes('gRPC'));
+
+          if (isGrpcError) {
+            console.warn('gRPC failed, retrying with HTTP-only...');
+
+            // Create a new options object without gRPC parameters
+            const httpOnlyOptions: ConnectToCustomOptions = {
+              httpHost: connection.httpHost,
+              httpPort: connection.httpPort,
+              httpSecure: connection.httpSecure,
+              grpcHost: undefined, // Explicitly set to undefined
+              grpcPort: undefined, // Explicitly set to undefined
+              grpcSecure: undefined, // Explicitly set to undefined
+              skipInitChecks: true, // Force skip init checks to avoid gRPC compatibility issues
+              timeout: {
+                init: connection.timeoutInit,
+                query: connection.timeoutQuery,
+                insert: connection.timeoutInsert,
+              },
+            };
+
+            if (connection.apiKey) {
+              httpOnlyOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
+            }
+
+            try {
+              // Retry with HTTP-only
+              client = await weaviate.connectToCustom(httpOnlyOptions);
+              console.log('HTTP-only connection successful');
+            } catch (httpError: any) {
+              console.error('HTTP-only connection also failed:', httpError);
+              throw httpError;
+            }
+          } else {
+            throw error;
+          }
+        }
       }
       if (!client) {
         throw new Error('Failed to create Weaviate client');
