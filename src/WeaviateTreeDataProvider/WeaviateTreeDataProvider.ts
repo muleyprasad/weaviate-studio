@@ -13,6 +13,7 @@ import {
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { AddCollectionPanel } from '../views/AddCollectionPanel';
+import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -2170,6 +2171,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       await this.connectionManager.disconnect(connectionId);
       // Clear collections for this connection
       delete this.collections[connectionId];
+      // Close cluster panel if it's open for this connection
+      ClusterPanel.closeForConnection(connectionId);
       // Refresh connections and update tree view
       this.connections = this.connectionManager.getConnections();
       this.refresh();

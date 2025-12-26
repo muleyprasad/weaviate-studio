@@ -91,6 +91,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.html).toContain('Add Weaviate Connection');
       expect(mockPanel.webview.html).toContain('Connection Type');
       expect(mockPanel.webview.html).toContain('Connection Name');
+      expect(mockPanel.webview.html).toContain('Save Connection');
       expect(mockPanel.webview.html).toContain('Save and Connect');
 
       // Clean up
@@ -134,6 +135,42 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
+    test('saves and connects on saveAndConnect command', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const dialogPromise = mgr.showAddConnectionDialog();
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate saving and connecting a custom connection
+      messageHandler({
+        command: 'saveAndConnect',
+        connection: {
+          name: 'Test Custom Connect',
+          type: 'custom',
+          httpHost: 'localhost',
+          httpPort: 8080,
+          grpcHost: 'localhost',
+          grpcPort: 50051,
+          httpSecure: false,
+          grpcSecure: false,
+          apiKey: 'test-key',
+          timeoutInit: 30,
+          timeoutQuery: 60,
+          timeoutInsert: 120,
+        },
+      });
+
+      const result = await dialogPromise;
+
+      expect(result).toBeDefined();
+      expect(result?.connection.name).toBe('Test Custom Connect');
+      expect(result?.connection.type).toBe('custom');
+      expect(result?.connection.httpHost).toBe('localhost');
+      expect(result?.shouldConnect).toBe(true);
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+
     test('saves new cloud connection on save command', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
@@ -162,6 +199,37 @@ describe('ConnectionManager Webview Tests', () => {
       expect(result?.connection.type).toBe('cloud');
       expect(result?.connection.cloudUrl).toBe('https://test.weaviate.network');
       expect(result?.shouldConnect).toBe(false);
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+
+    test('saves and connects on saveAndConnect command for cloud connection', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const dialogPromise = mgr.showAddConnectionDialog();
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate saving and connecting a cloud connection
+      messageHandler({
+        command: 'saveAndConnect',
+        connection: {
+          name: 'Test Cloud Connect',
+          type: 'cloud',
+          cloudUrl: 'https://test-connect.weaviate.network',
+          apiKey: 'cloud-key-connect',
+          timeoutInit: 45,
+          timeoutQuery: 90,
+          timeoutInsert: 180,
+        },
+      });
+
+      const result = await dialogPromise;
+
+      expect(result).toBeDefined();
+      expect(result?.connection.name).toBe('Test Cloud Connect');
+      expect(result?.connection.type).toBe('cloud');
+      expect(result?.connection.cloudUrl).toBe('https://test-connect.weaviate.network');
+      expect(result?.shouldConnect).toBe(true);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -345,6 +413,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.html).toContain('50052');
       expect(mockPanel.webview.html).not.toContain('existing-key');
       expect(mockPanel.webview.html).toContain('Leave blank to keep existing key');
+      expect(mockPanel.webview.html).toContain('Update Connection');
       expect(mockPanel.webview.html).toContain('Update and Connect');
 
       // Clean up
@@ -392,6 +461,49 @@ describe('ConnectionManager Webview Tests', () => {
       expect(result?.connection.httpPort).toBe(9090);
       expect(result?.connection.httpSecure).toBe(true);
       expect(result?.shouldConnect).toBe(false);
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+
+    test('updates and connects on saveAndConnect command', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const connection = await mgr.addConnection({
+        name: 'Original Name Connect',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      const dialogPromise = mgr.showEditConnectionDialog(connection.id);
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      messageHandler({
+        command: 'saveAndConnect',
+        connection: {
+          name: 'Updated Name Connect',
+          type: 'custom',
+          httpHost: 'updated-host-connect',
+          httpPort: 9090,
+          grpcHost: 'updated-host-connect',
+          grpcPort: 50052,
+          httpSecure: true,
+          grpcSecure: true,
+          apiKey: 'updated-key-connect',
+        },
+      });
+
+      const result = await dialogPromise;
+
+      expect(result?.connection.name).toBe('Updated Name Connect');
+      expect(result?.connection.httpHost).toBe('updated-host-connect');
+      expect(result?.connection.httpPort).toBe(9090);
+      expect(result?.connection.httpSecure).toBe(true);
+      expect(result?.shouldConnect).toBe(true);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 

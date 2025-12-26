@@ -130,6 +130,22 @@ export class ClusterPanel {
   }
 
   /**
+   * Gets the connection ID for this panel
+   */
+  public getConnectionId(): string {
+    return this._connectionId;
+  }
+
+  /**
+   * Closes the panel if it's for the specified connection
+   */
+  public static closeForConnection(connectionId: string): void {
+    if (ClusterPanel.currentPanel && ClusterPanel.currentPanel.getConnectionId() === connectionId) {
+      ClusterPanel.currentPanel.dispose();
+    }
+  }
+
+  /**
    * Handles messages from the webview
    */
   private async _handleMessage(message: any): Promise<void> {
