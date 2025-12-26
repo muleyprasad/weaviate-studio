@@ -3063,6 +3063,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         async (message: any, postMessage: (msg: any) => void) => {
           // On message callback for handling webview requests
           switch (message.command) {
+            case 'ready':
+              // Send the number of nodes when webview is ready
+              const nodesNumber = this.clusterNodesCache[connectionId]?.length || 1;
+              postMessage({
+                command: 'nodesNumber',
+                nodesNumber: nodesNumber,
+              });
+
+              // Also send modules/vectorizers data
+              const modules = this.clusterMetadataCache[connectionId]?.modules || {};
+              postMessage({
+                command: 'availableModules',
+                modules: modules,
+              });
+              break;
             case 'getVectorizers':
               try {
                 const vectorizers = await this.getAvailableVectorizers(connectionId);
@@ -3081,10 +3096,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 });
 
                 // Send the number of nodes
-                const nodesNumber = this.clusterNodesCache[connectionId]?.length || 1;
+                const nodesNumberVectorizers = this.clusterNodesCache[connectionId]?.length || 1;
                 postMessage({
                   command: 'nodesNumber',
-                  nodesNumber: nodesNumber,
+                  nodesNumber: nodesNumberVectorizers,
                 });
               } catch (error) {
                 postMessage({
