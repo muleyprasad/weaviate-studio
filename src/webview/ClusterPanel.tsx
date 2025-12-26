@@ -325,12 +325,219 @@ function NodeComponent({
   );
 }
 
+// Collection View Component
+interface CollectionViewProps {
+  nodeStatusData: Node[];
+  selectedNodeName: string | null;
+  selectedShardName: string | null;
+  onNodeSelect: (nodeName: string) => void;
+  onShardSelect: (shardName: string) => void;
+}
+
+interface CollectionData {
+  name: string;
+  totalObjects: number;
+  nodes: {
+    nodeName: string;
+    shards: Shard[];
+  }[];
+}
+
+function CollectionView({
+  nodeStatusData,
+  selectedNodeName,
+  selectedShardName,
+  onNodeSelect,
+  onShardSelect,
+}: CollectionViewProps) {
+  // Group shards by collection
+  const collectionMap = new Map<string, CollectionData>();
+
+  nodeStatusData.forEach((node) => {
+    node.shards.forEach((shard) => {
+      if (!collectionMap.has(shard.class)) {
+        collectionMap.set(shard.class, {
+          name: shard.class,
+          totalObjects: 0,
+          nodes: [],
+        });
+      }
+
+      const collection = collectionMap.get(shard.class)!;
+      collection.totalObjects += shard.objectCount;
+
+      let nodeData = collection.nodes.find((n) => n.nodeName === node.name);
+      if (!nodeData) {
+        nodeData = {
+          nodeName: node.name,
+          shards: [],
+        };
+        collection.nodes.push(nodeData);
+      }
+
+      nodeData.shards.push(shard);
+    });
+  });
+
+  const collections = Array.from(collectionMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+
+  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
+
+  const handleCollectionSelect = (collectionName: string) => {
+    setSelectedCollectionName(collectionName === selectedCollectionName ? null : collectionName);
+    onNodeSelect(''); // Reset node selection
+  };
+
+  const handleNodeSelectInCollection = (nodeName: string) => {
+    onNodeSelect(nodeName === selectedNodeName ? '' : nodeName);
+    onShardSelect(''); // Reset shard selection
+  };
+
+  return (
+    <div className="collections-list">
+      {collections.map((collection) => {
+        const isCollectionSelected = selectedCollectionName === collection.name;
+
+        // Check for READONLY shards in this collection
+        const readonlyShards = collection.nodes.flatMap((node) =>
+          node.shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY')
+        );
+        const hasReadonly = readonlyShards.length > 0;
+
+        const handleSetAllReadyToReady = () => {
+          const shardNames = readonlyShards.map((shard) => shard.name);
+          vscode.postMessage({
+            command: 'updateShardStatus',
+            collection: collection.name,
+            shardNames: shardNames,
+            newStatus: 'READY',
+          });
+        };
+
+        return (
+          <div
+            key={collection.name}
+            className={`collection-container ${isCollectionSelected ? 'selected' : ''}`}
+          >
+            <div
+              className="collection-header"
+              onClick={() => handleCollectionSelect(collection.name)}
+            >
+              <div className="collection-title">
+                <h3>{collection.name}</h3>
+                {hasReadonly && (
+                  <span
+                    className="readonly-badge"
+                    title={`${readonlyShards.length} READONLY shards`}
+                  >
+                    ⚠️ {readonlyShards.length} READONLY
+                  </span>
+                )}
+              </div>
+              <div className="collection-info">
+                <span>Total Objects: {collection.totalObjects}</span>
+                <span>Nodes: {collection.nodes.length}</span>
+                <span>
+                  Shards: {collection.nodes.reduce((sum, node) => sum + node.shards.length, 0)}
+                </span>
+              </div>
+            </div>
+
+            {isCollectionSelected && (
+              <>
+                {hasReadonly && (
+                  <div className="readonly-alert">
+                    <div className="alert-icon">⚠️</div>
+                    <div className="alert-content">
+                      <div className="alert-title">READONLY Shards Detected</div>
+                      <div className="alert-message">
+                        This may indicate memory or disk pressure. Check system resources and
+                        consider scaling.
+                      </div>
+                    </div>
+                    <button className="alert-button" onClick={handleSetAllReadyToReady}>
+                      Set All to READY
+                    </button>
+                  </div>
+                )}
+                <div className="collection-nodes">
+                  {collection.nodes
+                    .sort((a, b) => a.nodeName.localeCompare(b.nodeName))
+                    .map((nodeData) => {
+                      const isNodeSelected = selectedNodeName === nodeData.nodeName;
+                      const nodeReadonlyShards = nodeData.shards.filter(
+                        (shard) => shard.vectorIndexingStatus === 'READONLY'
+                      );
+                      const nodeHasReadonly = nodeReadonlyShards.length > 0;
+
+                      return (
+                        <div
+                          key={nodeData.nodeName}
+                          className={`collection-node ${isNodeSelected ? 'selected' : ''}`}
+                        >
+                          <div
+                            className="collection-node-header"
+                            onClick={() => handleNodeSelectInCollection(nodeData.nodeName)}
+                          >
+                            <div className="node-title">
+                              <h4>{nodeData.nodeName}</h4>
+                              {nodeHasReadonly && (
+                                <span
+                                  className="readonly-badge"
+                                  title={`${nodeReadonlyShards.length} READONLY shards`}
+                                >
+                                  ⚠️ {nodeReadonlyShards.length} READONLY
+                                </span>
+                              )}
+                            </div>
+                            <div className="node-info">
+                              <span>
+                                Objects:{' '}
+                                {nodeData.shards.reduce((sum, shard) => sum + shard.objectCount, 0)}
+                              </span>
+                              <span>Shards: {nodeData.shards.length}</span>
+                            </div>
+                          </div>
+
+                          {isNodeSelected && (
+                            <div className="shards-container">
+                              <div className="shards-grid">
+                                {nodeData.shards
+                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .map((shard) => (
+                                    <ShardComponent
+                                      key={shard.name}
+                                      shard={shard}
+                                      nodeName={nodeData.nodeName}
+                                      isSelected={selectedShardName === shard.name}
+                                      onSelect={() => onShardSelect(shard.name)}
+                                    />
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ClusterPanelWebview() {
   const [nodeStatusData, setNodeStatusData] = useState<Node[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNodeName, setSelectedNodeName] = useState<string | null>(null);
   const [selectedShardName, setSelectedShardName] = useState<string | null>(null);
   const [openClusterViewOnConnect, setOpenClusterViewOnConnect] = useState<boolean>(true);
+  const [viewType, setViewType] = useState<'node' | 'collection'>('node');
 
   useEffect(() => {
     // Handle messages from the extension
@@ -392,9 +599,25 @@ function ClusterPanelWebview() {
     <div className="cluster-panel">
       <div className="cluster-header">
         <h1>Cluster Information</h1>
-        <button onClick={handleRefresh} className="refresh-button" disabled={isLoading}>
-          {isLoading ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="header-controls">
+          <div className="view-toggle">
+            <button
+              className={`view-toggle-button ${viewType === 'node' ? 'active' : ''}`}
+              onClick={() => setViewType('node')}
+            >
+              Node View
+            </button>
+            <button
+              className={`view-toggle-button ${viewType === 'collection' ? 'active' : ''}`}
+              onClick={() => setViewType('collection')}
+            >
+              Collection View
+            </button>
+          </div>
+          <button onClick={handleRefresh} className="refresh-button" disabled={isLoading}>
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       <div className="cluster-content">
@@ -403,18 +626,28 @@ function ClusterPanelWebview() {
             <p>Loading cluster data...</p>
           </div>
         ) : nodeStatusData && nodeStatusData.length > 0 ? (
-          <div className="nodes-list">
-            {nodeStatusData.map((node) => (
-              <NodeComponent
-                key={node.name}
-                node={node}
-                isSelected={selectedNodeName === node.name}
-                onSelect={() => handleNodeSelect(node.name)}
-                selectedShardName={selectedShardName}
-                onShardSelect={handleShardSelect}
-              />
-            ))}
-          </div>
+          viewType === 'node' ? (
+            <div className="nodes-list">
+              {nodeStatusData.map((node) => (
+                <NodeComponent
+                  key={node.name}
+                  node={node}
+                  isSelected={selectedNodeName === node.name}
+                  onSelect={() => handleNodeSelect(node.name)}
+                  selectedShardName={selectedShardName}
+                  onShardSelect={handleShardSelect}
+                />
+              ))}
+            </div>
+          ) : (
+            <CollectionView
+              nodeStatusData={nodeStatusData}
+              selectedNodeName={selectedNodeName}
+              selectedShardName={selectedShardName}
+              onNodeSelect={handleNodeSelect}
+              onShardSelect={handleShardSelect}
+            />
+          )
         ) : (
           <div className="no-data">
             <p>No cluster data available</p>

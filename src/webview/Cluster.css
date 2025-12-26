@@ -22,6 +22,46 @@
   font-weight: 600;
 }
 
+.header-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.view-toggle-button {
+  padding: 8px 16px;
+  background-color: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  border-right: 1px solid var(--vscode-panel-border);
+}
+
+.view-toggle-button:last-child {
+  border-right: none;
+}
+
+.view-toggle-button:hover:not(.active) {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.view-toggle-button.active {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font-weight: 600;
+}
+
 .refresh-button {
   padding: 8px 16px;
   background-color: var(--vscode-button-background);
@@ -465,4 +505,109 @@
 
 .toggle-auto-open-button:hover {
   background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* Collection View Styles */
+.collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.collection-container {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.collection-container.selected {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.collection-header {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.collection-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.collection-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.collection-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.collection-info {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.collection-info span {
+  display: flex;
+  align-items: center;
+}
+
+.collection-nodes {
+  padding: 16px;
+  background-color: var(--vscode-sideBar-background);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collection-node {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: var(--vscode-editor-background);
+}
+
+.collection-node.selected {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.collection-node-header {
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.collection-node-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.collection-node-header .node-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.collection-node-header .node-title h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.collection-node-header .node-info {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
 }
