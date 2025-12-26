@@ -6,9 +6,58 @@ A comprehensive local Weaviate environment for testing **nested properties** and
 
 1. **Start Weaviate:**
 
-   ```bash
-   docker-compose up -d
-   ```
+# Weaviate Local Sandbox
+
+This sandbox provides a lightweight **two-container Weaviate environment** for local testing and development:
+
+- One container runs **Weaviate**, the open-source vector database with **file-based backup support**
+- The second container runs a **local text2vec-transformers inference service** for text embeddings
+
+Everything runs locally — **no paid API keys or external services** are required, since embeddings are generated within the local transformer container.
+
+This setup is ideal for experimenting with schema design, testing queries, integrating with the Weaviate client libraries, or building local prototypes before deploying to the cloud.
+
+For more details, see the official Weaviate documentation:
+
+- [Weaviate Quickstart (Local)](https://docs.weaviate.io/weaviate/quickstart/local)
+- [Docker Installation Guide](https://docs.weaviate.io/deploy/installation-guides/docker-installation)
+- [Local Transformers Module](https://docs.weaviate.io/weaviate/model-providers/transformers)
+
+---
+
+## Prerequisites
+
+- Docker and Docker Compose installed
+- Python 3.8+ (for running the sample data script)
+- At least 4GB of available RAM (8GB recommended)
+- Optional: NVIDIA GPU for accelerated embeddings
+
+---
+
+## What’s Included
+
+- **docker-compose.yml**  
+  Launches a local Weaviate instance with the `text2vec-transformers` module configured for CPU or GPU embeddings.
+- **populate.py**  
+  A sample script that:
+  - Uses Weaviate’s latest v4 client API
+  - Creates a `JeopardyQuestion` collection with text vectorization
+  - Imports 100 sample Jeopardy questions
+  - Demonstrates schema creation, batch importing, and error handling
+- **API Key configuration**
+  - API Key: `test-key-123`
+  - User: `studio-user@example.com` (any username works)
+- **Preconfigured for fast local testing** with VS Code extensions, Weaviate Studio, or CLI-based scripts.
+
+---
+
+## Getting Started
+
+### 1. Start the Environment
+
+```bash
+docker-compose up -d
+```
 
 2. **Populate with test data:**
 
