@@ -66,10 +66,14 @@ describe('Backup Webview Component', () => {
   describe('CPU Percentage Validation', () => {
     it('should accept valid CPU percentage values (1-80)', () => {
       const handleCpuPercentageChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
 
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
+        if (isNaN(numValue)) {
+          return '';
+        }
 
         const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
         if (numValue >= MIN && numValue <= MAX) {
@@ -90,12 +94,20 @@ describe('Backup Webview Component', () => {
 
     it('should constrain CPU percentage to maximum of 80', () => {
       const handleCpuPercentageChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
+        if (isNaN(numValue)) {
+          return '';
+        }
         const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
-        if (numValue > MAX) return MAX.toString();
-        if (numValue >= MIN) return value;
+        if (numValue > MAX) {
+          return MAX.toString();
+        }
+        if (numValue >= MIN) {
+          return value;
+        }
         return '';
       };
 
@@ -106,11 +118,19 @@ describe('Backup Webview Component', () => {
 
     it('should constrain CPU percentage to minimum of 1', () => {
       const handleCpuPercentageChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
-        if (numValue < 1 && value.length > 0) return '1';
-        if (numValue <= 80) return value;
+        if (isNaN(numValue)) {
+          return '';
+        }
+        if (numValue < 1 && value.length > 0) {
+          return '1';
+        }
+        if (numValue <= 80) {
+          return value;
+        }
         return '80';
       };
 
@@ -122,10 +142,14 @@ describe('Backup Webview Component', () => {
   describe('Chunk Size Validation', () => {
     it('should accept valid chunk size values (2-512)', () => {
       const handleChunkSizeChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
 
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
+        if (isNaN(numValue)) {
+          return '';
+        }
 
         if (numValue >= 2 && numValue <= 512) {
           return value;
@@ -145,11 +169,19 @@ describe('Backup Webview Component', () => {
 
     it('should constrain chunk size to maximum of 512', () => {
       const handleChunkSizeChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
-        if (numValue > 512) return '512';
-        if (numValue >= 2) return value;
+        if (isNaN(numValue)) {
+          return '';
+        }
+        if (numValue > 512) {
+          return '512';
+        }
+        if (numValue >= 2) {
+          return value;
+        }
         return '';
       };
 
@@ -159,11 +191,19 @@ describe('Backup Webview Component', () => {
 
     it('should constrain chunk size to minimum of 2', () => {
       const handleChunkSizeChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
-        if (numValue < 2 && value.length > 0) return '2';
-        if (numValue <= 512) return value;
+        if (isNaN(numValue)) {
+          return '';
+        }
+        if (numValue < 2 && value.length > 0) {
+          return '2';
+        }
+        if (numValue <= 512) {
+          return value;
+        }
         return '512';
       };
 

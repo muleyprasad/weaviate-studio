@@ -33,10 +33,14 @@ describe('BackupRestore Webview Component', () => {
   describe('CPU Percentage Validation', () => {
     it('should accept valid CPU percentage values (1-80)', () => {
       const handleCpuPercentageChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
 
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
+        if (isNaN(numValue)) {
+          return '';
+        }
 
         const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
         if (numValue >= MIN && numValue <= MAX) {
@@ -57,14 +61,26 @@ describe('BackupRestore Webview Component', () => {
 
     it('should constrain CPU percentage to maximum of 80', () => {
       const handleCpuPercentageChange = (value: string): string => {
-        if (value === '') return '';
+        if (value === '') {
+          return '';
+        }
         const numValue = parseInt(value);
-        if (isNaN(numValue)) return '';
+        if (isNaN(numValue)) {
+          return '';
+        }
         const { MIN, MAX } = BACKUP_CONFIG.CPU_PERCENTAGE;
-        if (numValue > MAX) return MAX.toString();
-        if (numValue >= MIN) return value;
-        if (numValue > 80) return '80';
-        if (numValue >= 1) return value;
+        if (numValue > MAX) {
+          return MAX.toString();
+        }
+        if (numValue >= MIN) {
+          return value;
+        }
+        if (numValue > 80) {
+          return '80';
+        }
+        if (numValue >= 1) {
+          return value;
+        }
         return '';
       };
 

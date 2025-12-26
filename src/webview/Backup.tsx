@@ -358,7 +358,9 @@ function NewBackupWebview() {
   };
 
   const getBackendOptions = () => {
-    if (!availableModules) return [];
+    if (!availableModules) {
+      return [];
+    }
     return Object.keys(availableModules)
       .filter((key) => key.startsWith('backup-'))
       .map((key) => key.replace('backup-', ''));
