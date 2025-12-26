@@ -2062,15 +2062,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       if (!connectionDetails) {
         // If no details provided, show the dialog
-        const newConnection = await this.connectionManager.showAddConnectionDialog();
+        const result = await this.connectionManager.showAddConnectionDialog();
 
         // Check if we should auto-connect
-        if (newConnection && (newConnection as any).__shouldConnect) {
-          delete (newConnection as any).__shouldConnect;
-          await this.connect(newConnection.id);
+        if (result?.shouldConnect) {
+          await this.connect(result.connection.id);
         }
 
-        return newConnection;
+        return result?.connection || null;
       }
 
       // Validate connection details
@@ -2191,16 +2190,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         vscode.window.showInformationMessage('Connection updated successfully');
       } else {
         // Show the edit dialog
-        const updatedConnection =
-          await this.connectionManager.showEditConnectionDialog(connectionId);
-        if (updatedConnection) {
+        const result = await this.connectionManager.showEditConnectionDialog(connectionId);
+        if (result) {
           this.refresh();
           vscode.window.showInformationMessage('Connection updated successfully');
 
           // Check if we should auto-connect
-          if ((updatedConnection as any).__shouldConnect) {
-            delete (updatedConnection as any).__shouldConnect;
-            await this.connect(updatedConnection.id);
+          if (result.shouldConnect) {
+            await this.connect(result.connection.id);
           }
         }
       }

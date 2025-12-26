@@ -127,9 +127,10 @@ describe('ConnectionManager Webview Tests', () => {
       const result = await dialogPromise;
 
       expect(result).toBeDefined();
-      expect(result?.name).toBe('Test Custom');
-      expect(result?.type).toBe('custom');
-      expect(result?.httpHost).toBe('localhost');
+      expect(result?.connection.name).toBe('Test Custom');
+      expect(result?.connection.type).toBe('custom');
+      expect(result?.connection.httpHost).toBe('localhost');
+      expect(result?.shouldConnect).toBe(false);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -157,9 +158,10 @@ describe('ConnectionManager Webview Tests', () => {
       const result = await dialogPromise;
 
       expect(result).toBeDefined();
-      expect(result?.name).toBe('Test Cloud');
-      expect(result?.type).toBe('cloud');
-      expect(result?.cloudUrl).toBe('https://test.weaviate.network');
+      expect(result?.connection.name).toBe('Test Cloud');
+      expect(result?.connection.type).toBe('cloud');
+      expect(result?.connection.cloudUrl).toBe('https://test.weaviate.network');
+      expect(result?.shouldConnect).toBe(false);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -385,10 +387,11 @@ describe('ConnectionManager Webview Tests', () => {
 
       const result = await dialogPromise;
 
-      expect(result?.name).toBe('Updated Name');
-      expect(result?.httpHost).toBe('updated-host');
-      expect(result?.httpPort).toBe(9090);
-      expect(result?.httpSecure).toBe(true);
+      expect(result?.connection.name).toBe('Updated Name');
+      expect(result?.connection.httpHost).toBe('updated-host');
+      expect(result?.connection.httpPort).toBe(9090);
+      expect(result?.connection.httpSecure).toBe(true);
+      expect(result?.shouldConnect).toBe(false);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -418,7 +421,8 @@ describe('ConnectionManager Webview Tests', () => {
 
       const result = await dialogPromise;
 
-      expect(result?.apiKey).toBe('secret-key');
+      expect(result?.connection.apiKey).toBe('secret-key');
+      expect(result?.shouldConnect).toBe(false);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 

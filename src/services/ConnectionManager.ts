@@ -520,11 +520,16 @@ export class ConnectionManager {
     return connection.links || [];
   }
 
-  public async showAddConnectionDialog(): Promise<WeaviateConnection | null> {
+  public async showAddConnectionDialog(): Promise<{
+    connection: WeaviateConnection;
+    shouldConnect: boolean;
+  } | null> {
     return this.showConnectionDialog();
   }
 
-  public async showEditConnectionDialog(connectionId: string): Promise<WeaviateConnection | null> {
+  public async showEditConnectionDialog(
+    connectionId: string
+  ): Promise<{ connection: WeaviateConnection; shouldConnect: boolean } | null> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
       throw new Error('Connection not found');
@@ -534,7 +539,7 @@ export class ConnectionManager {
 
   private async showConnectionDialog(
     connection?: WeaviateConnection
-  ): Promise<WeaviateConnection | null> {
+  ): Promise<{ connection: WeaviateConnection; shouldConnect: boolean } | null> {
     return new Promise((resolve) => {
       const isEditMode = !!connection;
       const panel = vscode.window.createWebviewPanel(
@@ -619,7 +624,7 @@ export class ConnectionManager {
 
                 if (updatedConnection) {
                   panel.dispose();
-                  resolve(updatedConnection);
+                  resolve({ connection: updatedConnection, shouldConnect: false });
                 }
               } catch (error) {
                 const errorMessage =
@@ -703,9 +708,8 @@ export class ConnectionManager {
 
                 if (updatedConnection) {
                   panel.dispose();
-                  // Mark that this should auto-connect
-                  (updatedConnection as any).__shouldConnect = true;
-                  resolve(updatedConnection);
+                  // Return with shouldConnect flag instead of using __shouldConnect hack
+                  resolve({ connection: updatedConnection, shouldConnect: true });
                 }
               } catch (error) {
                 const errorMessage =
@@ -953,8 +957,8 @@ export class ConnectionManager {
   <div id="formError" class="error"></div>
   <div class="button-container">
     <button class="cancel-button" id="cancelButton">Cancel</button>
-    <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'}</button>
-    <button class="save-and-connect-button" id="saveAndConnectButton">${connection ? 'Update' : 'Save'} and Connect</button>
+    <button class="save-button" id="saveButton">${connection ? 'Update Connection' : 'Save Connection'}</button>
+    <button class="save-and-connect-button" id="saveAndConnectButton">${connection ? 'Update and Connect' : 'Save and Connect'}</button>
   </div>
   <small>Connection version: ${connection ? connection.connectionVersion || ConnectionManager.currentVersion : ConnectionManager.currentVersion}</small>
 
