@@ -4,6 +4,72 @@ All notable changes to the "weaviate-studio" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.3.0] — 2025-12-26
+
+### Added
+
+- Cluster Information Panel for comprehensive cluster monitoring and management (PR #48):
+
+  - Replaces "Server Information" with enhanced "Cluster Information" dashboard
+  - Auto-opens cluster view on connection by default (configurable)
+  - "Save and Connect" functionality in connection manager for streamlined workflow
+  - Automatically closes cluster panel when disconnecting
+
+- Nested Object support with enhanced tree view and Add Collection integration (PR #47):
+
+  - Visual property type icons in tree view (text, number, boolean, date, object, geo coordinates, phone, blob)
+  - Recursive property navigation for deeply nested object structures
+  - Tree view displays nested properties hierarchically with type-aware icons
+  - Full nested object support in clone and import collection workflows
+
+- Comprehensive Backup and Restore system with multi-backend support (PR #41):
+
+  - Create, monitor, restore, retry, and cancel backup operations
+  - Real-time backup progress tracking with status indicators (in-progress, success, failed)
+  - Support for multiple backup backends: filesystem, S3, GCS, Azure
+  - Automatic detection of available backup modules with helpful setup guidance
+  - Advanced backup configuration options (include/exclude collections, custom paths)
+  - Independent refresh controls for backups, collections, nodes, and metadata
+  - Dedicated Backup and Restore UI panels with comprehensive workflow management
+
+- Sandbox environment with filesystem backup support enabled (PR #46):
+
+  - Docker Compose configuration with backup-filesystem module
+  - Persistent backup storage via weaviate_backups volume
+  - Example backup/restore commands in documentation
+  - Ready-to-use local development environment with backup capabilities
+
+- React-based Add Collection interface as external module (PR #38):
+
+  - Migrated to external React component package (weaviate-add-collection)
+  - Enhanced collection creation workflow with improved UX and comprehensive feature exploration
+  - Support for creating collections from scratch, cloning existing collections, and importing from JSON
+  - Dedicated build step for add-collection webview
+  - Updated CI/CD workflows to include add-collection build process
+  - Developer documentation for working with external module dependency
+
+- Enhanced GraphQL template system with intelligent, schema-aware query generation (PR #42):
+  - 8 new dynamic query generators that adapt to collection schema (nearVector, nearText, hybrid, BM25, generative search, filter, aggregation, groupBy)
+  - Auto-populated properties based on actual collection schema and data types
+  - Support for 15+ popular embedding models with automatic dimension detection (OpenAI, Cohere, Sentence Transformers, BERT, PaLM, Ollama, AWS Bedrock)
+  - Comprehensive error handling with graceful fallback to static templates
+  - Multi-strategy vector dimension detection across Weaviate v1/v2 schema formats
+  - Test coverage increased from ~40% to ~80% with 21 new test cases across 6 comprehensive test suites
+  - Enhanced documentation with visual decision tree and troubleshooting guide covering 41 common mistakes
+  - Retry logic with maximum attempt limits to prevent infinite loops
+
+### Changed
+
+- Connection Manager now supports "Save and Connect" workflow for faster connection setup (PR #48)
+- Tree view refresh commands are now granular: separate refresh for backups, collections, nodes, and metadata (PR #41)
+- Add Collection workflow now uses external React component for better maintainability (PR #38)
+
+### Fixed
+
+- Connection instantiation issue when no API key is provided for custom connections (PR #37)
+- RQ compression not being exported correctly in Add Collection workflow (PR #40)
+- Static query templates now dynamically generated based on collection schema (Issue #36, resolved in PR #42)
+
 ## [1.2.0] — 2025-10-21
 
 ### Added
