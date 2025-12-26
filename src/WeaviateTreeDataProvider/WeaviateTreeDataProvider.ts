@@ -384,6 +384,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * - Collection level: Shows metadata, properties, and vector configurations
    */
   async getChildren(element?: WeaviateTreeItem): Promise<WeaviateTreeItem[]> {
+    // Helper function to map property types to icons
+    const getPropertyTypeIcon = (dataType: any): vscode.ThemeIcon => {
+      // Normalize dataType to string - handle both array and string formats
+      let type: string;
+      if (Array.isArray(dataType)) {
+        type = dataType[0] || '';
+      } else if (typeof dataType === 'string') {
+        type = dataType;
+      } else {
+        type = String(dataType || '');
+      }
+
+      // Convert to lowercase for case-insensitive matching
+      const typeLC = type.toLowerCase();
+
+      if (typeLC === 'text' || typeLC === 'string') {
+        return new vscode.ThemeIcon('symbol-text');
+      } else if (
+        typeLC === 'int' ||
+        typeLC === 'number' ||
+        typeLC === 'float' ||
+        typeLC === 'number[]'
+      ) {
+        return new vscode.ThemeIcon('symbol-number');
+      } else if (typeLC === 'boolean') {
+        return new vscode.ThemeIcon('symbol-boolean');
+      } else if (typeLC === 'date' || typeLC === 'datetime') {
+        return new vscode.ThemeIcon('calendar');
+      } else if (typeLC === 'object' || typeLC === 'object[]') {
+        return new vscode.ThemeIcon('symbol-object');
+      } else if (typeLC === 'geocoordinates') {
+        return new vscode.ThemeIcon('location');
+      } else if (typeLC === 'phonenumber') {
+        return new vscode.ThemeIcon('device-mobile');
+      } else if (typeLC === 'blob') {
+        return new vscode.ThemeIcon('file-binary');
+      } else {
+        return new vscode.ThemeIcon('symbol-property');
+      }
+    };
+
     // No connections case
     if (this.connections.length === 0) {
       return [
@@ -687,47 +728,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         ];
       }
 
-      // Map property types to icons
-      const getPropertyIcon = (dataType: any): vscode.ThemeIcon => {
-        // Normalize dataType to string - handle both array and string formats
-        let type: string;
-        if (Array.isArray(dataType)) {
-          type = dataType[0] || '';
-        } else if (typeof dataType === 'string') {
-          type = dataType;
-        } else {
-          type = String(dataType || '');
-        }
-
-        // Convert to lowercase for case-insensitive matching
-        const typeLC = type.toLowerCase();
-
-        if (typeLC === 'text' || typeLC === 'string') {
-          return new vscode.ThemeIcon('symbol-text');
-        } else if (
-          typeLC === 'int' ||
-          typeLC === 'number' ||
-          typeLC === 'float' ||
-          typeLC === 'number[]'
-        ) {
-          return new vscode.ThemeIcon('symbol-number');
-        } else if (typeLC === 'boolean') {
-          return new vscode.ThemeIcon('symbol-boolean');
-        } else if (typeLC === 'date' || typeLC === 'datetime') {
-          return new vscode.ThemeIcon('calendar');
-        } else if (typeLC === 'object' || typeLC === 'object[]') {
-          return new vscode.ThemeIcon('symbol-object');
-        } else if (typeLC === 'geocoordinates') {
-          return new vscode.ThemeIcon('location');
-        } else if (typeLC === 'phonenumber') {
-          return new vscode.ThemeIcon('device-mobile');
-        } else if (typeLC === 'blob') {
-          return new vscode.ThemeIcon('file-binary');
-        } else {
-          return new vscode.ThemeIcon('symbol-property');
-        }
-      };
-
       const propertyItems = schema.properties.map((prop: any) => {
         // Normalize dataType for display
         let dataTypeDisplay: string;
@@ -738,7 +738,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
 
         const description = prop.description ?? undefined;
-        const icon = getPropertyIcon(prop.dataType);
+        const icon = getPropertyTypeIcon(prop.dataType);
 
         // Check if property has nested properties (object type)
         const hasNestedProperties =
@@ -817,47 +817,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         Array.isArray(property.nestedProperties) &&
         property.nestedProperties.length > 0
       ) {
-        // Map property types to icons for nested properties
-        const getNestedPropertyIcon = (dataType: any): vscode.ThemeIcon => {
-          // Normalize dataType to string - handle both array and string formats
-          let type: string;
-          if (Array.isArray(dataType)) {
-            type = dataType[0] || '';
-          } else if (typeof dataType === 'string') {
-            type = dataType;
-          } else {
-            type = String(dataType || '');
-          }
-
-          // Convert to lowercase for case-insensitive matching
-          const typeLC = type.toLowerCase();
-
-          if (typeLC === 'text' || typeLC === 'string') {
-            return new vscode.ThemeIcon('symbol-text');
-          } else if (
-            typeLC === 'int' ||
-            typeLC === 'number' ||
-            typeLC === 'float' ||
-            typeLC === 'number[]'
-          ) {
-            return new vscode.ThemeIcon('symbol-number');
-          } else if (typeLC === 'boolean') {
-            return new vscode.ThemeIcon('symbol-boolean');
-          } else if (typeLC === 'date' || typeLC === 'datetime') {
-            return new vscode.ThemeIcon('calendar');
-          } else if (typeLC === 'object' || typeLC === 'object[]') {
-            return new vscode.ThemeIcon('symbol-object');
-          } else if (typeLC === 'geocoordinates') {
-            return new vscode.ThemeIcon('location');
-          } else if (typeLC === 'phonenumber') {
-            return new vscode.ThemeIcon('device-mobile');
-          } else if (typeLC === 'blob') {
-            return new vscode.ThemeIcon('file-binary');
-          } else {
-            return new vscode.ThemeIcon('symbol-property');
-          }
-        };
-
         // Render nested properties
         const nestedItems = property.nestedProperties.map((nestedProp: any) => {
           // Normalize dataType for display
@@ -869,7 +828,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           }
 
           const description = nestedProp.description ?? undefined;
-          const icon = getNestedPropertyIcon(nestedProp.dataType);
+          const icon = getPropertyTypeIcon(nestedProp.dataType);
           const hasNestedProperties =
             nestedProp.nestedProperties &&
             Array.isArray(nestedProp.nestedProperties) &&
