@@ -177,6 +177,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     this._onDidChangeTreeData.fire();
   }
 
+  /**
+   * Forces an immediate refresh by updating connections from ConnectionManager
+   * and firing the tree data change event. Bypasses the debounce mechanism.
+   */
+  async forceRefresh(): Promise<void> {
+    this.connections = this.connectionManager.getConnections();
+    this._onDidChangeTreeData.fire();
+  }
+
   // #region Command Handlers
 
   /**
@@ -232,10 +241,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   // #endregion Command Handlers
 
   // Helper to get connected status theme icon
-  getStatusIcon(status: 'connected' | 'disconnected'): vscode.ThemeIcon {
+  getStatusIcon(status: 'connected' | 'disconnected' | 'connecting'): vscode.ThemeIcon {
     if (status === 'connected') {
       // Green dot for connected
       return new vscode.ThemeIcon('circle-filled', new vscode.ThemeColor('testing.iconPassed'));
+    } else if (status === 'connecting') {
+      // Syncing icon for connecting
+      return new vscode.ThemeIcon('sync~spin');
     } else {
       // Gray/hollow dot for disconnected
       return new vscode.ThemeIcon('circle-outline');
@@ -478,9 +490,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       if (!connection || connection.status !== 'connected') {
         const message =
-          connection?.status === 'connected'
-            ? 'Loading...'
-            : 'Not connected. Right-click and select "Connect" to view information.';
+          connection?.status === 'connecting'
+            ? 'Connecting to cluster...'
+            : connection?.status === 'connected'
+              ? 'Loading...'
+              : 'Not connected. Right-click and select "Connect" to view information.';
 
         return [
           new WeaviateTreeItem(
@@ -2235,9 +2249,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         // explicitly from a collection to ensure a valid context/connection.
 
         return true;
+      } else {
+        // Connection failed - revert status to disconnected
+        await this.connectionManager.updateConnection(connectionId, { status: 'disconnected' });
+        this.connections = this.connectionManager.getConnections();
+        this._onDidChangeTreeData.fire();
+        return false;
       }
-      return false;
     } catch (error) {
+      // Connection failed - revert status to disconnected
+      await this.connectionManager.updateConnection(connectionId, { status: 'disconnected' });
+      this.connections = this.connectionManager.getConnections();
+      this._onDidChangeTreeData.fire();
+
       if (!silent) {
         vscode.window.showErrorMessage(`Failed to connect: ${error}`);
       }

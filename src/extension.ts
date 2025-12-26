@@ -155,6 +155,11 @@ export function activate(context: vscode.ExtensionContext) {
       if (connection && connection.status !== 'connected') {
         // If autoConnect is enabled, connect automatically without showing dialog
         if (connection.autoConnect) {
+          // Set status to connecting before starting connection
+          const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+          await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
+          // Force immediate update of local connections list
+          await weaviateTreeDataProvider.forceRefresh();
           await weaviateTreeDataProvider.connect(item.connectionId);
         } else {
           // Show dialog asking to connect with option to enable auto-connect
@@ -166,11 +171,21 @@ export function activate(context: vscode.ExtensionContext) {
           );
 
           if (result === 'Connect') {
+            // Set status to connecting after user confirms
+            const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+            await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
+            // Force immediate update of local connections list
+            await weaviateTreeDataProvider.forceRefresh();
             await weaviateTreeDataProvider.connect(item.connectionId);
           } else if (result === 'Connect & Auto Connect for This Cluster') {
             // Enable auto-connect for this connection
             const connectionManager = weaviateTreeDataProvider.getConnectionManager();
-            await connectionManager.updateConnection(item.connectionId, { autoConnect: true });
+            await connectionManager.updateConnection(item.connectionId, {
+              autoConnect: true,
+              status: 'connecting',
+            });
+            // Force immediate update of local connections list
+            await weaviateTreeDataProvider.forceRefresh();
             await weaviateTreeDataProvider.connect(item.connectionId);
             vscode.window.showInformationMessage(
               `Auto Connect enabled for "${connection.name}". This cluster will now connect automatically when expanded.`
