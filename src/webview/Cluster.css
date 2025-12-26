@@ -28,9 +28,22 @@
   align-items: center;
 }
 
+.header-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.view-toggle-label {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 500;
+}
+
 .view-toggle {
   display: flex;
   gap: 0;
+  align-items: center;
   background-color: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
@@ -38,18 +51,18 @@
 }
 
 .view-toggle-button {
-  padding: 8px 16px;
+  padding: 8px 12px;
   background-color: transparent;
   color: var(--vscode-foreground);
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
-  border-right: 1px solid var(--vscode-panel-border);
+  border-left: 1px solid var(--vscode-panel-border);
 }
 
-.view-toggle-button:last-child {
-  border-right: none;
+.view-toggle-button:first-child {
+  border-left: none;
 }
 
 .view-toggle-button:hover:not(.active) {

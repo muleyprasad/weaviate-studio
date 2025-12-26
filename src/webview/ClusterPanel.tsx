@@ -330,8 +330,10 @@ interface CollectionViewProps {
   nodeStatusData: Node[];
   selectedNodeName: string | null;
   selectedShardName: string | null;
+  selectedCollectionName: string | null;
   onNodeSelect: (nodeName: string) => void;
   onShardSelect: (shardName: string) => void;
+  onCollectionSelect: (collectionName: string) => void;
 }
 
 interface CollectionData {
@@ -339,6 +341,7 @@ interface CollectionData {
   totalObjects: number;
   nodes: {
     nodeName: string;
+    nodeStatus: string;
     shards: Shard[];
   }[];
 }
@@ -347,8 +350,10 @@ function CollectionView({
   nodeStatusData,
   selectedNodeName,
   selectedShardName,
+  selectedCollectionName,
   onNodeSelect,
   onShardSelect,
+  onCollectionSelect,
 }: CollectionViewProps) {
   // Group shards by collection
   const collectionMap = new Map<string, CollectionData>();
@@ -370,6 +375,7 @@ function CollectionView({
       if (!nodeData) {
         nodeData = {
           nodeName: node.name,
+          nodeStatus: node.status,
           shards: [],
         };
         collection.nodes.push(nodeData);
@@ -383,10 +389,8 @@ function CollectionView({
     a.name.localeCompare(b.name)
   );
 
-  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
-
   const handleCollectionSelect = (collectionName: string) => {
-    setSelectedCollectionName(collectionName === selectedCollectionName ? null : collectionName);
+    onCollectionSelect(collectionName === selectedCollectionName ? '' : collectionName);
     onNodeSelect(''); // Reset node selection
   };
 
@@ -405,6 +409,22 @@ function CollectionView({
           node.shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY')
         );
         const hasReadonly = readonlyShards.length > 0;
+
+        // Get all shards for status check
+        const allShards = collection.nodes.flatMap((node) => node.shards);
+        const allReady = allShards.every((shard) => shard.vectorIndexingStatus === 'READY');
+
+        // Group shards by status (excluding READY)
+        const nonReadyShards = allShards.filter((shard) => shard.vectorIndexingStatus !== 'READY');
+        const statusGroups = nonReadyShards.reduce(
+          (acc, shard) => {
+            const status = shard.vectorIndexingStatus;
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        );
+        const nonReadyCount = nonReadyShards.length;
 
         const handleSetAllReadyToReady = () => {
           const shardNames = readonlyShards.map((shard) => shard.name);
@@ -427,14 +447,21 @@ function CollectionView({
             >
               <div className="collection-title">
                 <h3>{collection.name}</h3>
-                {hasReadonly && (
+                {allReady ? (
+                  <span className="node-status status-healthy">READY</span>
+                ) : nonReadyCount > 0 ? (
                   <span
-                    className="readonly-badge"
-                    title={`${readonlyShards.length} READONLY shards`}
+                    className={hasReadonly ? 'readonly-badge' : 'non-ready-badge'}
+                    title={Object.entries(statusGroups)
+                      .map(([status, count]) => `${count} ${status}`)
+                      .join(', ')}
                   >
-                    ⚠️ {readonlyShards.length} READONLY
+                    ⚠️{' '}
+                    {Object.entries(statusGroups)
+                      .map(([status, count]) => `${count} ${status}`)
+                      .join(', ')}
                   </span>
-                )}
+                ) : null}
               </div>
               <div className="collection-info">
                 <span>Total Objects: {collection.totalObjects}</span>
@@ -483,6 +510,11 @@ function CollectionView({
                           >
                             <div className="node-title">
                               <h4>{nodeData.nodeName}</h4>
+                              <span
+                                className={`node-status status-${nodeData.nodeStatus.toLowerCase()}`}
+                              >
+                                {nodeData.nodeStatus}
+                              </span>
                               {nodeHasReadonly && (
                                 <span
                                   className="readonly-badge"
@@ -536,8 +568,10 @@ function ClusterPanelWebview() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNodeName, setSelectedNodeName] = useState<string | null>(null);
   const [selectedShardName, setSelectedShardName] = useState<string | null>(null);
+  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
   const [openClusterViewOnConnect, setOpenClusterViewOnConnect] = useState<boolean>(true);
   const [viewType, setViewType] = useState<'node' | 'collection'>('node');
+  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
 
   useEffect(() => {
     // Handle messages from the extension
@@ -555,9 +589,15 @@ function ClusterPanelWebview() {
             setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
           }
 
-          // Auto-select first node if none selected
-          if (message.nodeStatusData && message.nodeStatusData.length > 0 && !selectedNodeName) {
+          // Auto-select first node only on initial load, not on refresh
+          if (
+            message.nodeStatusData &&
+            message.nodeStatusData.length > 0 &&
+            !selectedNodeName &&
+            !hasInitialized
+          ) {
             setSelectedNodeName(message.nodeStatusData[0].name);
+            setHasInitialized(true);
           }
           break;
       }
@@ -586,6 +626,12 @@ function ClusterPanelWebview() {
     setSelectedShardName(shardName === selectedShardName ? null : shardName);
   };
 
+  const handleCollectionSelect = (collectionName: string) => {
+    setSelectedCollectionName(collectionName === selectedCollectionName ? null : collectionName);
+    setSelectedNodeName(null); // Reset node selection when changing collections
+    setSelectedShardName(null); // Reset shard selection when changing collections
+  };
+
   const handleToggleAutoOpen = () => {
     const newValue = !openClusterViewOnConnect;
     setOpenClusterViewOnConnect(newValue);
@@ -600,18 +646,19 @@ function ClusterPanelWebview() {
       <div className="cluster-header">
         <h1>Cluster Information</h1>
         <div className="header-controls">
+          <span className="view-toggle-label">View:</span>
           <div className="view-toggle">
             <button
               className={`view-toggle-button ${viewType === 'node' ? 'active' : ''}`}
               onClick={() => setViewType('node')}
             >
-              Node View
+              Node
             </button>
             <button
               className={`view-toggle-button ${viewType === 'collection' ? 'active' : ''}`}
               onClick={() => setViewType('collection')}
             >
-              Collection View
+              Collection
             </button>
           </div>
           <button onClick={handleRefresh} className="refresh-button" disabled={isLoading}>
@@ -644,8 +691,10 @@ function ClusterPanelWebview() {
               nodeStatusData={nodeStatusData}
               selectedNodeName={selectedNodeName}
               selectedShardName={selectedShardName}
+              selectedCollectionName={selectedCollectionName}
               onNodeSelect={handleNodeSelect}
               onShardSelect={handleShardSelect}
+              onCollectionSelect={handleCollectionSelect}
             />
           )
         ) : (
