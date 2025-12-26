@@ -13,6 +13,7 @@ import {
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { AddCollectionPanel } from '../views/AddCollectionPanel';
+import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -493,16 +494,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       const items: WeaviateTreeItem[] = [];
 
-      // Add server information section
+      // Add cluster information section
       items.push(
         new WeaviateTreeItem(
-          'Server Information',
+          'Cluster Information',
           vscode.TreeItemCollapsibleState.Collapsed,
           'serverInfo',
           element.connectionId,
           undefined,
           'serverInfo',
-          new vscode.ThemeIcon('info'),
+          new vscode.ThemeIcon('dashboard'),
           'weaviateServerInfo'
         )
       );
@@ -2143,7 +2144,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       if (!connectionDetails) {
         // If no details provided, show the dialog
-        return await this.connectionManager.showAddConnectionDialog();
+        const result = await this.connectionManager.showAddConnectionDialog();
+
+        // Check if we should auto-connect
+        if (result?.shouldConnect) {
+          await this.connect(result.connection.id);
+        }
+
+        return result?.connection || null;
       }
 
       // Validate connection details
@@ -2218,6 +2226,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           await this.fetchData(connectionId);
         }
 
+        // Auto-open cluster view by default (unless explicitly disabled)
+        if (connection.openClusterViewOnConnect !== false && !silent) {
+          vscode.commands.executeCommand('weaviate.viewClusterInfo', { connectionId });
+        }
+
         // Do not auto-open the query editor on connect. Let the user open it
         // explicitly from a collection to ensure a valid context/connection.
 
@@ -2239,6 +2252,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       await this.connectionManager.disconnect(connectionId);
       // Clear collections for this connection
       delete this.collections[connectionId];
+      // Close cluster panel if it's open for this connection
+      ClusterPanel.closeForConnection(connectionId);
       // Refresh connections and update tree view
       this.connections = this.connectionManager.getConnections();
       this.refresh();
@@ -2259,11 +2274,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         vscode.window.showInformationMessage('Connection updated successfully');
       } else {
         // Show the edit dialog
-        const updatedConnection =
-          await this.connectionManager.showEditConnectionDialog(connectionId);
-        if (updatedConnection) {
+        const result = await this.connectionManager.showEditConnectionDialog(connectionId);
+        if (result) {
           this.refresh();
           vscode.window.showInformationMessage('Connection updated successfully');
+
+          // Check if we should auto-connect
+          if (result.shouldConnect) {
+            await this.connect(result.connection.id);
+          }
         }
       }
     } catch (error) {
