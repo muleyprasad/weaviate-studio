@@ -2,7 +2,7 @@
   "name": "weaviate-studio",
   "displayName": "Weaviate Studio",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
   "publisher": "prasadmuley",
