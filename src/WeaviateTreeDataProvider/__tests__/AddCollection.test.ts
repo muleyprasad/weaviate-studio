@@ -183,7 +183,14 @@ describe('Add Collection', () => {
         },
       };
 
-      mockConnectionManager.getClient.mockReturnValue({});
+      const mockClient: any = {
+        getMeta: jest.fn().mockImplementation(() => Promise.resolve({} as any)),
+        cluster: {
+          nodes: jest.fn().mockImplementation(() => Promise.resolve({ nodes: [] } as any)),
+        },
+      };
+
+      mockConnectionManager.getClient.mockReturnValue(mockClient);
 
       await capturedOnMessage!({ command: 'getVectorizers' }, postMessageSpy);
 
@@ -341,7 +348,7 @@ describe('Add Collection', () => {
 
   describe('createCollection', () => {
     it('validates required collection name', async () => {
-      const mockClient = { schema: { classCreator: jest.fn() } };
+      const mockClient: any = { schema: { classCreator: jest.fn() } };
       mockConnectionManager.getClient.mockReturnValue(mockClient);
 
       await expect((provider as any).createCollection('conn1', { class: '' })).rejects.toThrow(
@@ -351,7 +358,7 @@ describe('Add Collection', () => {
 
     it('builds correct schema object', async () => {
       const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockResolvedValue({});
+      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
       const mockClient = {
         collections: {
           createFromSchema: mockCreateFromSchema,
@@ -392,7 +399,7 @@ describe('Add Collection', () => {
 
     it('handles vectorizer "none" correctly', async () => {
       const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockResolvedValue({});
+      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
       const mockClient = {
         collections: {
           createFromSchema: mockCreateFromSchema,
@@ -428,7 +435,7 @@ describe('Add Collection', () => {
     });
 
     it('returns vectorizers based on available modules', async () => {
-      const mockClient = {
+      const mockClient: any = {
         misc: {
           metaGetter: () => ({
             do: () =>
@@ -440,6 +447,10 @@ describe('Add Collection', () => {
                 },
               }),
           }),
+          getMeta: jest.fn().mockImplementation(() => Promise.resolve({} as any)),
+          cluster: {
+            nodes: jest.fn().mockImplementation(() => Promise.resolve({ nodes: [] } as any)),
+          },
         },
       };
       mockConnectionManager.getClient.mockReturnValue(mockClient);

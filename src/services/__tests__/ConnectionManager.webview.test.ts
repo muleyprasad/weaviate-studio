@@ -91,7 +91,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.html).toContain('Add Weaviate Connection');
       expect(mockPanel.webview.html).toContain('Connection Type');
       expect(mockPanel.webview.html).toContain('Connection Name');
-      expect(mockPanel.webview.html).toContain('Save Connection');
+      expect(mockPanel.webview.html).toContain('Save and Connect');
 
       // Clean up
       mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
@@ -343,7 +343,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.webview.html).toContain('50052');
       expect(mockPanel.webview.html).not.toContain('existing-key');
       expect(mockPanel.webview.html).toContain('Leave blank to keep existing key');
-      expect(mockPanel.webview.html).toContain('Update Connection');
+      expect(mockPanel.webview.html).toContain('Update and Connect');
 
       // Clean up
       mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
