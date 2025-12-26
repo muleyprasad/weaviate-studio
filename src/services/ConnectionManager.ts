@@ -9,7 +9,7 @@ export interface ConnectionLink {
 export interface WeaviateConnection {
   id: string;
   name: string;
-  status: 'connected' | 'disconnected';
+  status: 'connected' | 'disconnected' | 'connecting';
   lastUsed?: number;
   links?: ConnectionLink[];
   autoConnect?: boolean; // Auto connect on expand, default: false
