@@ -6,12 +6,20 @@ export interface WeaviateSchemaProperty {
   name: string;
   dataType: string[];
   description?: string;
+  tokenization?: string;
+  indexSearchable?: boolean;
+  indexFilterable?: boolean;
+  moduleConfig?: Record<string, any>;
+  vectorizerConfig?: Record<string, any>;
 }
 
 export interface WeaviateSchemaClass {
   class: string;
   description?: string;
   properties: WeaviateSchemaProperty[];
+  vectorizer?: string;
+  moduleConfig?: Record<string, any>;
+  vectorizers?: Record<string, any>;
 }
 
 export interface WeaviateSchema {
@@ -116,16 +124,68 @@ export class SchemaProvider {
       const collections = await weaviateClient.collections.listAll();
 
       // Cache the result
+      // Enrich collections with full config if listAll() does not include vectorizer details
+      const classes = await Promise.all(
+        (collections || []).map(async (collection: CollectionConfig) => {
+          let description = (collection as any).description;
+          let rawProps: any[] = ((collection as any).properties || []) as any[];
+          let vectorizer = (collection as any).vectorizer as any;
+          let moduleConfig = (collection as any).moduleConfig as any;
+          let vectorizers = (collection as any).vectorizers as any;
+
+          // If vectorizer details are missing, attempt to fetch full config for this collection
+          try {
+            const collHandle: any = (weaviateClient as any)?.collections?.get?.(
+              (collection as any).name || (collection as any).class
+            );
+
+            const cfg =
+              collHandle && typeof collHandle.config === 'function'
+                ? await collHandle.config()
+                : collHandle && typeof collHandle.getConfig === 'function'
+                  ? await collHandle.getConfig()
+                  : undefined;
+
+            if (cfg && typeof cfg === 'object') {
+              // Prefer values from cfg when available
+              description = cfg.description ?? description;
+              rawProps = Array.isArray(cfg.properties) ? cfg.properties : rawProps;
+              vectorizer = cfg.vectorizer ?? vectorizer;
+              moduleConfig = cfg.moduleConfig ?? moduleConfig;
+              vectorizers = cfg.vectorizers ?? vectorizers;
+            }
+          } catch (e) {
+            console.warn(
+              'Could not fetch full collection config; proceeding with listAll() data',
+              e
+            );
+          }
+
+          const properties = (rawProps || []).map((prop: any) => ({
+            name: prop?.name || '',
+            dataType: Array.isArray(prop?.dataType) ? prop.dataType : [prop?.dataType || 'string'],
+            description: prop?.description,
+            tokenization: prop?.tokenization,
+            indexSearchable: prop?.indexSearchable,
+            indexFilterable: prop?.indexFilterable,
+            moduleConfig: prop?.moduleConfig,
+            vectorizerConfig: prop?.vectorizerConfig,
+          }));
+
+          return {
+            class: (collection as any).name || (collection as any).class || '',
+            description,
+            properties,
+            // Pass through vectorizer info so template generators can detect nearText support
+            vectorizer,
+            moduleConfig,
+            vectorizers,
+          } as WeaviateSchemaClass;
+        })
+      );
+
       const schemaData: WeaviateSchema = {
-        classes: (collections || []).map((collection: CollectionConfig) => ({
-          class: collection.name || '',
-          description: collection.description,
-          properties: (collection.properties || []).map((prop: PropertyConfig) => ({
-            name: prop.name || '',
-            dataType: Array.isArray(prop.dataType) ? prop.dataType : [prop.dataType || 'string'],
-            description: prop.description,
-          })),
-        })),
+        classes,
       };
 
       this.schemaCache.set(cacheKey, {

@@ -126,6 +126,8 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Advanced: Filter, Aggregation, Relationship, Sort, Explore
 - Schema-aware, type-safe, and educational templates
 
+See the GraphQL Templates Guide for detailed usage, examples, and best practices: [docs/GRAPHQL_TEMPLATES.md](docs/GRAPHQL_TEMPLATES.md)
+
 ### Bulk Operations
 
 - Delete All Collections (destructive) with double confirmation
