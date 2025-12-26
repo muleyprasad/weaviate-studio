@@ -8,10 +8,12 @@ import {
   ExtendedSchemaClass,
   SchemaClass,
   WeaviateMetadata,
+  BackupItem,
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { AddCollectionPanel } from '../views/AddCollectionPanel';
+import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
@@ -49,6 +51,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
   /** Cache of cluster metadata per connection */
   private clusterStatisticsCache: Record<string, any> = {};
+
+  /** Cache of backups per connection */
+  private backupsCache: Record<string, BackupItem[]> = {};
 
   /** VS Code extension context */
   private readonly context: vscode.ExtensionContext;
@@ -274,6 +279,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     } else if (element.itemType === 'collectionsGroup' && !element.iconPath) {
       element.iconPath = new vscode.ThemeIcon('database');
       element.tooltip = 'Collections in this instance';
+    } else if (element.itemType === 'backups' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('archive');
+      element.tooltip = 'Backups for this cluster';
+    } else if (element.itemType === 'backupItem' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('file-zip');
+      element.tooltip = 'Backup details';
     } else if (element.itemType === 'property') {
       // Ensure property items have the correct context value
       if (!element.contextValue) {
@@ -374,6 +385,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * - Collection level: Shows metadata, properties, and vector configurations
    */
   async getChildren(element?: WeaviateTreeItem): Promise<WeaviateTreeItem[]> {
+    // Helper function to map property types to icons
+    const getPropertyTypeIcon = (dataType: any): vscode.ThemeIcon => {
+      // Normalize dataType to string - handle both array and string formats
+      let type: string;
+      if (Array.isArray(dataType)) {
+        type = dataType[0] || '';
+      } else if (typeof dataType === 'string') {
+        type = dataType;
+      } else {
+        type = String(dataType || '');
+      }
+
+      // Convert to lowercase for case-insensitive matching
+      const typeLC = type.toLowerCase();
+
+      if (typeLC === 'text' || typeLC === 'string') {
+        return new vscode.ThemeIcon('symbol-text');
+      } else if (
+        typeLC === 'int' ||
+        typeLC === 'number' ||
+        typeLC === 'float' ||
+        typeLC === 'number[]'
+      ) {
+        return new vscode.ThemeIcon('symbol-number');
+      } else if (typeLC === 'boolean') {
+        return new vscode.ThemeIcon('symbol-boolean');
+      } else if (typeLC === 'date' || typeLC === 'datetime') {
+        return new vscode.ThemeIcon('calendar');
+      } else if (typeLC === 'object' || typeLC === 'object[]') {
+        return new vscode.ThemeIcon('symbol-object');
+      } else if (typeLC === 'geocoordinates') {
+        return new vscode.ThemeIcon('location');
+      } else if (typeLC === 'phonenumber') {
+        return new vscode.ThemeIcon('device-mobile');
+      } else if (typeLC === 'blob') {
+        return new vscode.ThemeIcon('file-binary');
+      } else {
+        return new vscode.ThemeIcon('symbol-property');
+      }
+    };
+
     // No connections case
     if (this.connections.length === 0) {
       return [
@@ -442,16 +494,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       const items: WeaviateTreeItem[] = [];
 
-      // Add server information section
+      // Add cluster information section
       items.push(
         new WeaviateTreeItem(
-          'Server Information',
+          'Cluster Information',
           vscode.TreeItemCollapsibleState.Collapsed,
           'serverInfo',
           element.connectionId,
           undefined,
           'serverInfo',
-          new vscode.ThemeIcon('info'),
+          new vscode.ThemeIcon('dashboard'),
           'weaviateServerInfo'
         )
       );
@@ -506,6 +558,25 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           'collections',
           new vscode.ThemeIcon('database'),
           'weaviateCollectionsGroup'
+        )
+      );
+
+      // Add backups section
+      // Get cached backup count if available
+      const cachedBackups = this.backupsCache[element.connectionId] || [];
+      const backupsLabel =
+        cachedBackups.length > 0 ? `Backups (${cachedBackups.length})` : 'Backups';
+
+      items.push(
+        new WeaviateTreeItem(
+          backupsLabel,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'backups',
+          element.connectionId,
+          undefined,
+          'backups',
+          new vscode.ThemeIcon('archive'),
+          'weaviateBackups'
         )
       );
 
@@ -658,44 +729,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         ];
       }
 
-      // Map property types to icons
-      const getPropertyIcon = (dataType: string[]): vscode.ThemeIcon => {
-        const type = Array.isArray(dataType) ? dataType[0] : dataType;
-        switch (type) {
-          case 'text':
-          case 'string':
-            return new vscode.ThemeIcon('symbol-text');
-          case 'int':
-          case 'number':
-          case 'float':
-          case 'number[]':
-            return new vscode.ThemeIcon('symbol-number');
-          case 'boolean':
-            return new vscode.ThemeIcon('symbol-boolean');
-          case 'date':
-          case 'dateTime':
-            return new vscode.ThemeIcon('calendar');
-          case 'object':
-          case 'object[]':
-            return new vscode.ThemeIcon('symbol-object');
-          case 'geoCoordinates':
-            return new vscode.ThemeIcon('location');
-          case 'phoneNumber':
-            return new vscode.ThemeIcon('device-mobile');
-          case 'blob':
-            return new vscode.ThemeIcon('file-binary');
-          default:
-            return new vscode.ThemeIcon('symbol-property');
-        }
-      };
-
       const propertyItems = schema.properties.map((prop: any) => {
-        const dataType = Array.isArray(prop.dataType) ? prop.dataType.join(' | ') : prop.dataType;
+        // Normalize dataType for display
+        let dataTypeDisplay: string;
+        if (Array.isArray(prop.dataType)) {
+          dataTypeDisplay = prop.dataType.join(' | ');
+        } else {
+          dataTypeDisplay = String(prop.dataType || 'unknown');
+        }
+
         const description = prop.description ?? undefined;
-        const icon = getPropertyIcon(prop.dataType);
+        const icon = getPropertyTypeIcon(prop.dataType);
+
+        // Check if property has nested properties (object type)
+        const hasNestedProperties =
+          prop.nestedProperties &&
+          Array.isArray(prop.nestedProperties) &&
+          prop.nestedProperties.length > 0;
 
         return new WeaviateTreeItem(
-          `${prop.name} (${dataType})`,
+          `${prop.name} (${dataTypeDisplay})`,
           vscode.TreeItemCollapsibleState.Collapsed,
           'propertyItem',
           element.connectionId,
@@ -730,10 +783,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         ];
       }
 
-      // Find the property
-      const property = collection.schema?.properties.find(
-        (prop: any) => prop.name === element.itemId
-      );
+      // Find the property - need to search recursively in nested properties
+      const findProperty = (props: any[], propName: string): any => {
+        for (const prop of props) {
+          if (prop.name === propName) {
+            return prop;
+          }
+          // Search in nested properties recursively
+          if (prop.nestedProperties && Array.isArray(prop.nestedProperties)) {
+            const found = findProperty(prop.nestedProperties, propName);
+            if (found) {
+              return found;
+            }
+          }
+        }
+        return null;
+      };
+
+      const property = findProperty(collection.schema?.properties || [], element.itemId);
 
       if (!property) {
         return [
@@ -744,8 +811,52 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           ),
         ];
       }
-      // Show property details
-      for (const [key, value] of Object.entries(await this.flattenObject(property))) {
+
+      // Check if property has nested properties
+      if (
+        property.nestedProperties &&
+        Array.isArray(property.nestedProperties) &&
+        property.nestedProperties.length > 0
+      ) {
+        // Render nested properties
+        const nestedItems = property.nestedProperties.map((nestedProp: any) => {
+          // Normalize dataType for display
+          let dataTypeDisplay: string;
+          if (Array.isArray(nestedProp.dataType)) {
+            dataTypeDisplay = nestedProp.dataType.join(' | ');
+          } else {
+            dataTypeDisplay = String(nestedProp.dataType || 'unknown');
+          }
+
+          const description = nestedProp.description ?? undefined;
+          const icon = getPropertyTypeIcon(nestedProp.dataType);
+          const hasNestedProperties =
+            nestedProp.nestedProperties &&
+            Array.isArray(nestedProp.nestedProperties) &&
+            nestedProp.nestedProperties.length > 0;
+
+          return new WeaviateTreeItem(
+            `${nestedProp.name} (${dataTypeDisplay})`,
+            hasNestedProperties
+              ? vscode.TreeItemCollapsibleState.Collapsed
+              : vscode.TreeItemCollapsibleState.Collapsed,
+            'propertyItem',
+            element.connectionId,
+            element.collectionName,
+            nestedProp.name,
+            icon,
+            'weaviateProperty',
+            description?.trim() ?? ''
+          );
+        });
+
+        return nestedItems;
+      }
+
+      // Show property details (for properties without nested properties)
+      for (const [key, value] of Object.entries(
+        await this.flattenObject(property, ['nestedProperties'])
+      )) {
         vectorItems.push(
           new WeaviateTreeItem(
             `${key}: ${value}`,
@@ -1642,6 +1753,352 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       }
       return MultiTenancyItems;
+    } else if (element.itemType === 'backups' && element.connectionId) {
+      // Backups section - fetch backups from all backends
+      const client = this.connectionManager.getClient(element.connectionId);
+      if (!client) {
+        return [
+          new WeaviateTreeItem(
+            'Client not available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const backupItems: WeaviateTreeItem[] = [];
+
+      // Get available backup modules from cluster metadata
+      const meta = this.clusterMetadataCache[element.connectionId];
+      const availableBackends: ('filesystem' | 's3' | 'gcs' | 'azure')[] = [];
+      let hasBackupModule = false;
+
+      if (meta?.modules) {
+        const moduleNames = Object.keys(meta.modules);
+
+        // Map module names to backend types
+        if (moduleNames.includes('backup-filesystem')) {
+          availableBackends.push('filesystem');
+          hasBackupModule = true;
+        }
+        if (moduleNames.includes('backup-s3')) {
+          availableBackends.push('s3');
+          hasBackupModule = true;
+        }
+        if (moduleNames.includes('backup-gcs')) {
+          availableBackends.push('gcs');
+          hasBackupModule = true;
+        }
+        if (moduleNames.includes('backup-azure')) {
+          availableBackends.push('azure');
+          hasBackupModule = true;
+        }
+      }
+
+      // If no backup modules found, show a helpful message
+      if (!hasBackupModule) {
+        const noModuleItem = new WeaviateTreeItem(
+          'Backup module not found. Click to learn more.',
+          vscode.TreeItemCollapsibleState.None,
+          'message',
+          element.connectionId,
+          undefined,
+          'noBackupModule',
+          new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground')),
+          'weaviateNoBackupModule'
+        );
+
+        // Make it clickable to open documentation
+        noModuleItem.tooltip = 'Click to open backup configuration documentation';
+        noModuleItem.command = {
+          command: 'weaviate-studio.openLink',
+          title: 'Open Backup Documentation',
+          arguments: ['https://docs.weaviate.io/deploy/configuration/backups'],
+        };
+
+        return [noModuleItem];
+      }
+
+      try {
+        // Fetch backups only from available backends in parallel
+        const backupPromises = availableBackends.map(async (backend) => {
+          try {
+            const backups = await client.backup.list(backend);
+            return { backend, backups };
+          } catch (error) {
+            // Backend might not be configured, that's okay
+            return { backend, backups: [] };
+          }
+        });
+
+        const results = await Promise.all(backupPromises);
+        let totalBackups = 0;
+
+        // Collect all backups and store in cache
+        const allBackups: BackupItem[] = [];
+        results.forEach(({ backend, backups }) => {
+          backups.forEach((backup: any) => {
+            // Calculate duration if startedAt and completedAt are present
+            let duration = undefined;
+            if (backup.startedAt && backup.completedAt) {
+              duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
+            }
+            allBackups.push({ ...backup, backend, duration });
+            totalBackups++;
+          });
+        });
+
+        this.backupsCache[element.connectionId] = allBackups;
+
+        // Create tree items for each backup
+        allBackups.forEach((backup) => {
+          const statusIcon =
+            backup.status === 'SUCCESS'
+              ? 'check'
+              : backup.status === 'FAILED'
+                ? 'error'
+                : backup.status === 'CANCELED'
+                  ? 'circle-slash'
+                  : 'sync~spin';
+
+          const statusColor =
+            backup.status === 'SUCCESS'
+              ? 'testing.iconPassed'
+              : backup.status === 'FAILED'
+                ? 'testing.iconFailed'
+                : backup.status === 'CANCELED'
+                  ? 'problemsWarningIcon.foreground'
+                  : 'foreground';
+
+          // Use precalculated duration from cache
+          let descriptionText = '';
+
+          // Add collections count if available
+          if (backup.classes && Array.isArray(backup.classes) && backup.classes.length > 0) {
+            descriptionText = `${backup.classes.length} collection${backup.classes.length !== 1 ? 's' : ''}`;
+          }
+
+          // Add duration if available
+          if (backup.duration) {
+            if (descriptionText) {
+              descriptionText += ` (took ${backup.duration})`;
+            } else {
+              descriptionText = `took ${backup.duration}`;
+            }
+          }
+
+          // Set contextValue based on backup status
+          const contextValueMap: Record<string, string> = {
+            SUCCESS: 'weaviateBackupSuccess',
+            FAILED: 'weaviateBackupFailed',
+            CANCELED: 'weaviateBackupCanceled',
+            STARTED: 'weaviateBackupInProgress',
+            TRANSFERRING: 'weaviateBackupInProgress',
+          };
+          const contextValue = contextValueMap[backup.status] || 'weaviateBackup';
+
+          backupItems.push(
+            new WeaviateTreeItem(
+              `${backup.id}`,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'backupItem',
+              element.connectionId,
+              undefined,
+              backup.id,
+              new vscode.ThemeIcon(statusIcon, new vscode.ThemeColor(statusColor)),
+              contextValue,
+              descriptionText
+            )
+          );
+        });
+
+        if (backupItems.length === 0) {
+          return [
+            new WeaviateTreeItem(
+              'No backups found',
+              vscode.TreeItemCollapsibleState.None,
+              'message'
+            ),
+          ];
+        }
+
+        return backupItems;
+      } catch (error) {
+        console.error('Error fetching backups:', error);
+        return [
+          new WeaviateTreeItem(
+            'Error fetching backups',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+    } else if (element.itemType === 'backupItem' && element.connectionId && element.itemId) {
+      // Backup item details - show detailed information about a specific backup
+      const backups = this.backupsCache[element.connectionId] || [];
+      const backup = backups.find((b) => b.id === element.itemId);
+
+      if (!backup) {
+        return [
+          new WeaviateTreeItem(
+            'Backup details not available',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const backupDetailItems: WeaviateTreeItem[] = [];
+
+      // Backend
+      backupDetailItems.push(
+        new WeaviateTreeItem(
+          `Backend: ${backup.backend}`,
+          vscode.TreeItemCollapsibleState.None,
+          'object',
+          element.connectionId,
+          undefined,
+          'backend',
+          new vscode.ThemeIcon('server-environment')
+        )
+      );
+
+      // Status
+      backupDetailItems.push(
+        new WeaviateTreeItem(
+          `Status: ${backup.status}`,
+          vscode.TreeItemCollapsibleState.None,
+          'object',
+          element.connectionId,
+          undefined,
+          'status',
+          new vscode.ThemeIcon('info')
+        )
+      );
+
+      // Collections count
+      if (backup.classes && Array.isArray(backup.classes)) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Collections: ${backup.classes.length}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'collectionsCount',
+            new vscode.ThemeIcon('database')
+          )
+        );
+      }
+
+      // Started At
+      if (backup.startedAt) {
+        const startedDate = new Date(backup.startedAt);
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Started: ${startedDate.toLocaleString()}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'startedAt',
+            new vscode.ThemeIcon('clock')
+          )
+        );
+      }
+
+      // Completed At
+      if (backup.completedAt) {
+        const completedDate = new Date(backup.completedAt);
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Completed: ${completedDate.toLocaleString()}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'completedAt',
+            new vscode.ThemeIcon('check')
+          )
+        );
+      }
+
+      // Duration (if available)
+      if (backup.duration) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Duration: ${backup.duration}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'duration',
+            new vscode.ThemeIcon('watch')
+          )
+        );
+      }
+
+      // Path
+      if (backup.path) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Path: ${backup.path}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'path',
+            new vscode.ThemeIcon('folder')
+          )
+        );
+      }
+
+      // Error (if any)
+      if (backup.error) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Error: ${backup.error}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'error',
+            new vscode.ThemeIcon('error', new vscode.ThemeColor('testing.iconFailed'))
+          )
+        );
+      }
+
+      // Collections
+      if (backup.collections && backup.collections.length > 0) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Collections (${backup.collections.length})`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'collections',
+            new vscode.ThemeIcon('database')
+          )
+        );
+
+        // List each collection
+        backup.collections.forEach((collectionName: string) => {
+          backupDetailItems.push(
+            new WeaviateTreeItem(
+              `  • ${collectionName}`,
+              vscode.TreeItemCollapsibleState.None,
+              'object',
+              element.connectionId,
+              undefined,
+              collectionName,
+              new vscode.ThemeIcon('symbol-class')
+            )
+          );
+        });
+      }
+
+      return backupDetailItems;
     } else if (element.itemType === 'connectionLinks' && element.connectionId) {
       // Show individual connection links
       const connectionData = this.connectionManager.getConnection(element.connectionId);
@@ -1687,7 +2144,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       if (!connectionDetails) {
         // If no details provided, show the dialog
-        return await this.connectionManager.showAddConnectionDialog();
+        const result = await this.connectionManager.showAddConnectionDialog();
+
+        // Check if we should auto-connect
+        if (result?.shouldConnect) {
+          await this.connect(result.connection.id);
+        }
+
+        return result?.connection || null;
       }
 
       // Validate connection details
@@ -1759,7 +2223,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
         // Only fetch collections if we're not in a refresh loop
         if (!this.isRefreshing) {
-          await this.fetchCollections(connectionId);
+          await this.fetchData(connectionId);
+        }
+
+        // Auto-open cluster view by default (unless explicitly disabled)
+        if (connection.openClusterViewOnConnect !== false && !silent) {
+          vscode.commands.executeCommand('weaviate.viewClusterInfo', { connectionId });
         }
 
         // Do not auto-open the query editor on connect. Let the user open it
@@ -1783,6 +2252,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       await this.connectionManager.disconnect(connectionId);
       // Clear collections for this connection
       delete this.collections[connectionId];
+      // Close cluster panel if it's open for this connection
+      ClusterPanel.closeForConnection(connectionId);
       // Refresh connections and update tree view
       this.connections = this.connectionManager.getConnections();
       this.refresh();
@@ -1803,11 +2274,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         vscode.window.showInformationMessage('Connection updated successfully');
       } else {
         // Show the edit dialog
-        const updatedConnection =
-          await this.connectionManager.showEditConnectionDialog(connectionId);
-        if (updatedConnection) {
+        const result = await this.connectionManager.showEditConnectionDialog(connectionId);
+        if (result) {
           this.refresh();
           vscode.window.showInformationMessage('Connection updated successfully');
+
+          // Check if we should auto-connect
+          if (result.shouldConnect) {
+            await this.connect(result.connection.id);
+          }
         }
       }
     } catch (error) {
@@ -1831,20 +2306,28 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     return this.connectionManager;
   }
 
-  // --- Collection Management Methods ---
+  /**
+   * Get backup details by connection ID and backup ID
+   * @param connectionId - The ID of the connection
+   * @param backupId - The ID of the backup
+   * @returns The backup details or undefined if not found
+   */
+  getBackupDetails(connectionId: string, backupId: string): any {
+    const backups = this.backupsCache[connectionId] || [];
+    return backups.find((b) => b.id === backupId);
+  }
 
-  // Fetch collections from Weaviate
-  async fetchCollections(connectionId: string): Promise<void> {
+  // --- Data Fetch Methods ---
+
+  /**
+   * Fetches server statistics for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchServerStatistics(connectionId: string): Promise<void> {
     try {
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
         throw new Error('Connection not found');
-      }
-
-      // Get the client for this connection
-      const client = this.connectionManager.getClient(connectionId);
-      if (!client) {
-        throw new Error('Client not initialized');
       }
 
       // Get stats from server
@@ -1876,6 +2359,74 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
       this.clusterStatisticsCache[connectionId] = clusterStatsMapped;
 
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchServerStatistics:', error);
+      vscode.window.showErrorMessage(`Failed to fetch server statistics: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches metadata for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchMetadata(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Get metaData from Weaviate
+      const metaData = await client.getMeta();
+      this.clusterMetadataCache[connectionId] = metaData;
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchMetadata:', error);
+      vscode.window.showErrorMessage(`Failed to fetch metadata: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches cluster nodes for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchNodes(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Get Nodes from Weaviate
+      const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
+      this.clusterNodesCache[connectionId] = clusterNodes;
+
+      // Refresh the tree view
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchNodes:', error);
+      vscode.window.showErrorMessage(`Failed to fetch cluster nodes: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches collections for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchCollectionsData(connectionId: string): Promise<void> {
+    try {
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
       // Get collections from Weaviate
       const collections = await client.collections.listAll();
       // Store collections with their schema
@@ -1903,20 +2454,193 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this.collections[connectionId] = [];
       }
 
-      // Get metaData from Weaviate
-      const metaData = await client.getMeta();
-      this.clusterMetadataCache[connectionId] = metaData;
-
-      // Get Nodes from Weaviate
-      const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
-      this.clusterNodesCache[connectionId] = clusterNodes;
-
-      // Refresh the tree view to show updated collections
+      // Refresh the tree view
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error in fetchCollections:', error);
+      console.error('Error in fetchCollectionsData:', error);
       vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches all data (collections, stats, metadata, nodes, and backups) for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async fetchData(connectionId: string): Promise<void> {
+    try {
+      const connection = this.connectionManager.getConnection(connectionId);
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      // Get the client for this connection
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      // Fetch all data in parallel for better performance
+      await Promise.all([
+        this.fetchServerStatistics(connectionId),
+        this.fetchMetadata(connectionId),
+        this.fetchNodes(connectionId),
+        this.fetchCollectionsData(connectionId),
+      ]);
+
+      // Fetch backups in the background to populate cache for count display
+      this.fetchBackups(connectionId).catch((error: unknown) => {
+        console.warn('Error fetching backups (non-critical):', error);
+      });
+
+      // Refresh the tree view to show updated data
+      this.refresh();
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in fetchData:', error);
+      vscode.window.showErrorMessage(`Failed to fetch data: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetches backups from all backends and populates the cache
+   * @param connectionId - The ID of the connection
+   */
+  private async fetchBackups(connectionId: string): Promise<void> {
+    const client = this.connectionManager.getClient(connectionId);
+    if (!client) {
+      return;
+    }
+
+    // Get available backup modules from cluster metadata
+    const meta = this.clusterMetadataCache[connectionId];
+    const availableBackends: ('filesystem' | 's3' | 'gcs' | 'azure')[] = [];
+    let hasBackupModule = false;
+
+    if (meta?.modules) {
+      const moduleNames = Object.keys(meta.modules);
+
+      // Map module names to backend types
+      if (moduleNames.includes('backup-filesystem')) {
+        availableBackends.push('filesystem');
+        hasBackupModule = true;
+      }
+      if (moduleNames.includes('backup-s3')) {
+        availableBackends.push('s3');
+        hasBackupModule = true;
+      }
+      if (moduleNames.includes('backup-gcs')) {
+        availableBackends.push('gcs');
+        hasBackupModule = true;
+      }
+      if (moduleNames.includes('backup-azure')) {
+        availableBackends.push('azure');
+        hasBackupModule = true;
+      }
+    }
+
+    // If no backup modules found, set empty cache and return
+    if (!hasBackupModule) {
+      this.backupsCache[connectionId] = [];
+      return;
+    }
+
+    try {
+      // Fetch backups only from available backends in parallel
+      const backupPromises = availableBackends.map(async (backend) => {
+        try {
+          const backups = await client.backup.list(backend);
+          return { backend, backups };
+        } catch (error) {
+          // Backend might not be configured, that's okay
+          return { backend, backups: [] };
+        }
+      });
+
+      const results = await Promise.all(backupPromises);
+
+      // Collect all backups and store in cache
+      const allBackups: BackupItem[] = [];
+      results.forEach(({ backend, backups }) => {
+        backups.forEach((backup: any) => {
+          // Calculate duration if startedAt and completedAt are present
+          let duration = undefined;
+          if (backup.startedAt && backup.completedAt) {
+            duration = this.humanizeDuration(backup.startedAt, backup.completedAt);
+          }
+          allBackups.push({ ...backup, backend, duration });
+        });
+      });
+
+      this.backupsCache[connectionId] = allBackups;
+
+      // Refresh tree to update the count
+      this.refresh();
+    } catch (error) {
+      console.error('Error fetching backups:', error);
+      // Don't throw - this is non-critical
+    }
+  }
+
+  /**
+   * Refreshes backups for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshBackups(connectionId: string): Promise<void> {
+    try {
+      await this.fetchBackups(connectionId);
+      vscode.window.showInformationMessage('Backups refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Show notification even on error
+      vscode.window.showWarningMessage(`Backups refresh completed with issues: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes collections for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshCollections(connectionId: string, silent: boolean = false): Promise<void> {
+    try {
+      await this.fetchCollectionsData(connectionId);
+      if (!silent) {
+        vscode.window.showInformationMessage('Collections refreshed successfully');
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing collections:', error);
+      throw new Error(`Failed to refresh collections: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes cluster nodes for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshNodes(connectionId: string): Promise<void> {
+    try {
+      await this.fetchNodes(connectionId);
+      vscode.window.showInformationMessage('Nodes refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing nodes:', error);
+      throw new Error(`Failed to refresh nodes: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes metadata for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  async refreshMetadata(connectionId: string): Promise<void> {
+    try {
+      await this.fetchMetadata(connectionId);
+      vscode.window.showInformationMessage('Metadata refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing metadata:', error);
+      throw new Error(`Failed to refresh metadata: ${errorMessage}`);
     }
   }
 
@@ -2020,11 +2744,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       // Reconnect to refresh the connection info
       await this.connect(connectionId, true);
-      await this.fetchCollections(connectionId);
+
+      // Refresh server statistics first
+      await this.fetchServerStatistics(connectionId);
+
+      // Call public refresh methods sequentially to show individual toasts
+      await this.refreshMetadata(connectionId).catch(() => {});
+      await this.refreshNodes(connectionId).catch(() => {});
+      await this.refreshCollections(connectionId).catch(() => {});
+      await this.refreshBackups(connectionId).catch(() => {});
+
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Error refreshing connection info:', error);
       throw new Error(`Failed to refresh connection info: ${errorMessage}`);
     }
   }
@@ -2051,8 +2783,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @returns The formatted schema ready for API consumption
    */
   private convertSchemaToApiFormat(schema: any): any {
-    // Convert properties to request format: ensure dataType is array, move vectorizerConfig -> moduleConfig, drop indexInverted
-    const fixed_properties = (schema.properties || []).map((prop: any) => {
+    // Helper function to recursively process properties and nested properties
+    const processProperty = (prop: any): any => {
       const dataType = Array.isArray(prop?.dataType)
         ? prop.dataType
         : [prop?.dataType].filter(Boolean);
@@ -2072,8 +2804,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         delete converted.tokenization;
       }
 
+      // Recursively process nested properties for object types
+      if (converted.nestedProperties && Array.isArray(converted.nestedProperties)) {
+        converted.nestedProperties = converted.nestedProperties.map(processProperty);
+      }
+
       return converted;
-    });
+    };
+
+    // Convert properties to request format: ensure dataType is array, move vectorizerConfig -> moduleConfig, drop indexInverted
+    const fixed_properties = (schema.properties || []).map(processProperty);
 
     // Convert vectorizers -> vectorConfig with proper index mapping
     const fixed_vectorConfig = schema.vectorizers
@@ -2108,8 +2848,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vectorIndexConfig.skip = srcIdx.skip;
             }
 
-            // hnsw
+            // hnsw - check both nested structure and flat structure
             if (srcIdx.hnsw) {
+              // Nested structure: indexConfig.hnsw contains the config
               const h: any = { ...srcIdx.hnsw };
               if (h.distance) {
                 h.distanceMetric = h.distance;
@@ -2126,6 +2867,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                     trainingLimit: q.trainingLimit,
                     encoder: q.encoder,
                   };
+                } else if (q.type === 'rq') {
+                  h.rq = {
+                    enabled: true,
+                    bits: q.bits,
+                    rescoreLimit: q.rescoreLimit,
+                  };
                 }
                 delete h.quantizer;
               }
@@ -2133,6 +2880,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 delete h.type;
               }
               vectorIndexConfig.hnsw = h;
+            } else if (vectorIndexType === 'hnsw' && Object.keys(srcIdx).length > 0) {
+              // Flat structure: all HNSW properties are directly in indexConfig
+              const h: any = { ...srcIdx };
+
+              // Remove fields that are not part of HNSW config
+              delete h.type;
+
+              if (h.distance) {
+                h.distanceMetric = h.distance;
+                delete h.distance;
+              }
+
+              // Handle quantizer if present
+              if (h.quantizer) {
+                const q = h.quantizer;
+                if (q.type === 'pq') {
+                  h.pq = {
+                    enabled: true,
+                    internalBitCompression: q.bitCompression || false,
+                    segments: q.segments,
+                    centroids: q.centroids,
+                    trainingLimit: q.trainingLimit,
+                    encoder: q.encoder,
+                  };
+                } else if (q.type === 'rq') {
+                  h.rq = {
+                    enabled: true,
+                    bits: q.bits,
+                    rescoreLimit: q.rescoreLimit,
+                  };
+                }
+                delete h.quantizer;
+              }
+
+              // Only add to vectorIndexConfig if there are actual config values
+              if (Object.keys(h).length > 0) {
+                vectorIndexConfig.hnsw = h;
+              }
             }
 
             // flat
@@ -2273,7 +3058,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         async (schema: any) => {
           // On create callback
           await this.createCollection(connectionId, schema);
-          await this.fetchCollections(connectionId);
+          await this.fetchData(connectionId);
         },
         async (message: any, postMessage: (msg: any) => void) => {
           // On message callback for handling webview requests
@@ -4505,6 +5290,49 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     });
   }
 
+  /**
+   * Humanizes duration between two timestamps
+   * @param startedAt - Start timestamp
+   * @param completedAt - End timestamp
+   * @returns Humanized duration string (e.g., "2h 30m", "45s", "5m 12s")
+   */
+  private humanizeDuration(startedAt: string, completedAt: string): string | null {
+    try {
+      const start = new Date(startedAt).getTime();
+      const end = new Date(completedAt).getTime();
+      const diffMs = end - start;
+
+      if (diffMs < 0 || isNaN(diffMs)) {
+        return null;
+      }
+
+      const seconds = Math.floor(diffMs / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      const parts: string[] = [];
+
+      if (days > 0) {
+        parts.push(`${days}d`);
+      }
+      if (hours % 24 > 0) {
+        parts.push(`${hours % 24}h`);
+      }
+      if (minutes % 60 > 0) {
+        parts.push(`${minutes % 60}m`);
+      }
+      if (seconds % 60 > 0 && hours === 0) {
+        // Only show seconds if less than an hour
+        parts.push(`${seconds % 60}s`);
+      }
+
+      return parts.length > 0 ? parts.join(' ') : '0s';
+    } catch (error) {
+      return null;
+    }
+  }
+
   async flattenObject(
     node: Record<string, unknown>,
     exclude_keys: string[] = [],
@@ -5526,7 +6354,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vscode.window.showInformationMessage(
                 `Collection "${message.schema.class}" created successfully`
               );
-              await this.fetchCollections(connectionId);
+              await this.fetchData(connectionId);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',
@@ -5689,7 +6517,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               vscode.window.showInformationMessage(
                 `Collection "${message.schema.class}" imported successfully`
               );
-              await this.fetchCollections(connectionId);
+              await this.fetchData(connectionId);
             } catch (error) {
               panel.webview.postMessage({
                 command: 'error',

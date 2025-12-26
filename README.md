@@ -47,6 +47,20 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ## Getting Started
 
+### New to Weaviate? 🚀
+
+**Try our quick local sandbox with Docker!** Perfect for learning and development:
+
+```bash
+cd sandbox
+docker-compose up -d
+python3 populate.py
+```
+
+This spins up a fully-configured Weaviate instance with sample jeopardy questions and vector embeddings. [Learn more →](sandbox/readme.md)
+
+### Connecting to Weaviate
+
 1. **Install** Weaviate Studio from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio) or [Open VSX](https://open-vsx.org/extension/prasadmuley/weaviate-studio).
 2. **Open the Weaviate Studio panel** from the VS Code sidebar.
 3. **Add a connection** to your Weaviate instance (local, on-prem, or cloud).
@@ -111,6 +125,8 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - Core: Basic Get, Vector Search, Semantic Search, Hybrid Search
 - Advanced: Filter, Aggregation, Relationship, Sort, Explore
 - Schema-aware, type-safe, and educational templates
+
+See the GraphQL Templates Guide for detailed usage, examples, and best practices: [docs/GRAPHQL_TEMPLATES.md](docs/GRAPHQL_TEMPLATES.md)
 
 ### Bulk Operations
 

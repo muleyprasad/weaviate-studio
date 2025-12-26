@@ -12,6 +12,8 @@ export interface WeaviateConnection {
   status: 'connected' | 'disconnected';
   lastUsed?: number;
   links?: ConnectionLink[];
+  autoConnect?: boolean; // Auto connect on expand, default: false
+  openClusterViewOnConnect?: boolean; // Auto open cluster view on connect, default: true
 
   // Either cloud or custom (discriminated union with "type")
   type: 'custom' | 'cloud';
@@ -75,6 +77,12 @@ export class ConnectionManager {
     // if it doesn't have connectionVersion, need to migrate
     const migratedConnections = validConnections.map((conn) => {
       try {
+        // Ensure autoConnect has a default value
+        if (conn.autoConnect === undefined) {
+          conn.autoConnect = false;
+          need_to_save = true;
+        }
+
         if (conn.connectionVersion === ConnectionManager.currentVersion) {
           // future migrations here
           return conn;
@@ -334,13 +342,11 @@ export class ConnectionManager {
         });
       } else {
         // Extract only the fields needed for connectToCustom
+        //  Use gRPC for faster performance on v1.27.0+
         const customOptions: ConnectToCustomOptions = {
           httpHost: connection.httpHost,
           httpPort: connection.httpPort,
-          grpcHost: connection.grpcHost,
-          grpcPort: connection.grpcPort,
           httpSecure: connection.httpSecure,
-          grpcSecure: connection.grpcSecure,
           skipInitChecks: connection.skipInitChecks,
           timeout: {
             init: connection.timeoutInit,
@@ -348,10 +354,68 @@ export class ConnectionManager {
             insert: connection.timeoutInsert,
           },
         };
+
+        // Only add gRPC options if they're configured
+        if (connection.grpcHost && connection.grpcPort) {
+          customOptions.grpcHost = connection.grpcHost;
+          customOptions.grpcPort = connection.grpcPort;
+          customOptions.grpcSecure = connection.grpcSecure;
+        }
+
         if (connection.apiKey) {
           customOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
         }
-        client = await weaviate.connectToCustom(customOptions);
+
+        try {
+          // Attempt connection with gRPC (if configured)
+          client = await weaviate.connectToCustom(customOptions);
+        } catch (error: any) {
+          // Detect gRPC compatibility error
+          console.log('Initial connection error:', error);
+
+          // Check for gRPC compatibility issues more comprehensively
+          const isGrpcError =
+            error.message.includes('gRPC') ||
+            error.message.includes('is not supported') ||
+            error.message.includes('v1.26.7') ||
+            error.message.includes('v1.27.0') ||
+            (error.name === 'WeaviateStartUpError' && error.message.includes('gRPC'));
+
+          if (isGrpcError) {
+            console.warn('gRPC failed, retrying with HTTP-only...');
+
+            // Create a new options object without gRPC parameters
+            const httpOnlyOptions: ConnectToCustomOptions = {
+              httpHost: connection.httpHost,
+              httpPort: connection.httpPort,
+              httpSecure: connection.httpSecure,
+              grpcHost: undefined, // Explicitly set to undefined
+              grpcPort: undefined, // Explicitly set to undefined
+              grpcSecure: undefined, // Explicitly set to undefined
+              skipInitChecks: true, // Force skip init checks to avoid gRPC compatibility issues
+              timeout: {
+                init: connection.timeoutInit,
+                query: connection.timeoutQuery,
+                insert: connection.timeoutInsert,
+              },
+            };
+
+            if (connection.apiKey) {
+              httpOnlyOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
+            }
+
+            try {
+              // Retry with HTTP-only
+              client = await weaviate.connectToCustom(httpOnlyOptions);
+              console.log('HTTP-only connection successful');
+            } catch (httpError: any) {
+              console.error('HTTP-only connection also failed:', httpError);
+              throw httpError;
+            }
+          } else {
+            throw error;
+          }
+        }
       }
       if (!client) {
         throw new Error('Failed to create Weaviate client');
@@ -512,11 +576,16 @@ export class ConnectionManager {
     return connection.links || [];
   }
 
-  public async showAddConnectionDialog(): Promise<WeaviateConnection | null> {
+  public async showAddConnectionDialog(): Promise<{
+    connection: WeaviateConnection;
+    shouldConnect: boolean;
+  } | null> {
     return this.showConnectionDialog();
   }
 
-  public async showEditConnectionDialog(connectionId: string): Promise<WeaviateConnection | null> {
+  public async showEditConnectionDialog(
+    connectionId: string
+  ): Promise<{ connection: WeaviateConnection; shouldConnect: boolean } | null> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
       throw new Error('Connection not found');
@@ -526,7 +595,7 @@ export class ConnectionManager {
 
   private async showConnectionDialog(
     connection?: WeaviateConnection
-  ): Promise<WeaviateConnection | null> {
+  ): Promise<{ connection: WeaviateConnection; shouldConnect: boolean } | null> {
     return new Promise((resolve) => {
       const isEditMode = !!connection;
       const panel = vscode.window.createWebviewPanel(
@@ -605,12 +674,98 @@ export class ConnectionManager {
                     timeoutQuery: message.connection.timeoutQuery || undefined,
                     timeoutInsert: message.connection.timeoutInsert || undefined,
                     skipInitChecks: message.connection.skipInitChecks,
+                    autoConnect: message.connection.autoConnect || false,
                   });
                 }
 
                 if (updatedConnection) {
                   panel.dispose();
-                  resolve(updatedConnection);
+                  resolve({ connection: updatedConnection, shouldConnect: false });
+                }
+              } catch (error) {
+                const errorMessage =
+                  error instanceof Error
+                    ? error.message
+                    : isEditMode
+                      ? 'Failed to update connection'
+                      : 'Failed to add connection';
+                panel.webview.postMessage({
+                  command: 'error',
+                  message: errorMessage,
+                });
+              }
+              break;
+            case 'saveAndConnect':
+              try {
+                const { name, httpHost, apiKey, type } = message.connection;
+                if (type === 'custom') {
+                  if (!name || !httpHost) {
+                    panel.webview.postMessage({
+                      command: 'error',
+                      message: 'Name and httpHost are required',
+                    });
+                    return;
+                  }
+                }
+                if (type === 'cloud') {
+                  const cloudUrlChanged = !!(
+                    connection &&
+                    connection.cloudUrl &&
+                    message.connection.cloudUrl &&
+                    connection.cloudUrl !== message.connection.cloudUrl
+                  );
+                  const needsApiKey =
+                    !isEditMode ||
+                    !connection ||
+                    connection.type !== 'cloud' ||
+                    !connection.apiKey ||
+                    cloudUrlChanged;
+                  if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
+                    panel.webview.postMessage({
+                      command: 'error',
+                      message: needsApiKey
+                        ? 'Name, cloudUrl and apiKey are required'
+                        : 'Name and cloudUrl are required',
+                    });
+                    return;
+                  }
+                }
+
+                let updatedConnection: WeaviateConnection | null = null;
+
+                if (isEditMode && connection) {
+                  // Update existing connection
+                  updatedConnection = await this.updateConnection(
+                    connection.id,
+                    message.connection
+                  );
+                } else {
+                  // Add new connection
+                  updatedConnection = await this.addConnection({
+                    name: message.connection.name.trim(),
+                    httpHost: message.connection.httpHost?.trim(),
+                    httpPort: message.connection.httpPort,
+                    grpcHost: message.connection.grpcHost?.trim(),
+                    grpcPort: message.connection.grpcPort,
+                    grpcSecure: message.connection.grpcSecure,
+                    httpSecure: message.connection.httpSecure,
+                    apiKey: apiKey?.trim() || undefined,
+                    type: message.connection.cloudUrl === undefined ? 'custom' : 'cloud',
+                    cloudUrl: message.connection.cloudUrl?.trim() || undefined,
+                    timeoutInit: message.connection.timeoutInit || undefined,
+                    timeoutQuery: message.connection.timeoutQuery || undefined,
+                    timeoutInsert: message.connection.timeoutInsert || undefined,
+                    skipInitChecks: message.connection.skipInitChecks,
+                    autoConnect: message.connection.autoConnect || false,
+                    openClusterViewOnConnect: message.connection.openClusterViewOnConnect,
+                    links: message.connection.links || [],
+                  });
+                }
+
+                if (updatedConnection) {
+                  panel.dispose();
+                  // Return with shouldConnect flag instead of using __shouldConnect hack
+                  resolve({ connection: updatedConnection, shouldConnect: true });
                 }
               } catch (error) {
                 const errorMessage =
@@ -693,6 +848,10 @@ export class ConnectionManager {
       cursor: pointer;
     }
     .save-button {
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    .save-and-connect-button {
       background-color: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
@@ -817,6 +976,14 @@ export class ConnectionManager {
     
     <div class="advanced-settings" id="advancedSettings">
       <div class="form-group">
+        <label><input type="checkbox" id="autoConnect" ${connection?.autoConnect ? 'checked' : ''}> Auto Connect on Expand</label>
+        <small>When enabled, connection will be established automatically when expanded without prompting</small>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="openClusterViewOnConnect" ${connection?.openClusterViewOnConnect !== false ? 'checked' : ''}> Open Cluster View on Connect</label>
+        <small>Automatically open the cluster information panel when connecting (enabled by default)</small>
+      </div>
+      <div class="form-group">
         <label for="timeoutInit">Timeout (Init, seconds)</label>
         <input type="number" id="timeoutInit" value="${connection?.timeoutInit || 30}">
       </div>
@@ -846,7 +1013,8 @@ export class ConnectionManager {
   <div id="formError" class="error"></div>
   <div class="button-container">
     <button class="cancel-button" id="cancelButton">Cancel</button>
-    <button class="save-button" id="saveButton">${connection ? 'Update' : 'Save'} Connection</button>
+    <button class="save-button" id="saveButton">${connection ? 'Update Connection' : 'Save Connection'}</button>
+    <button class="save-and-connect-button" id="saveAndConnectButton">${connection ? 'Update and Connect' : 'Save and Connect'}</button>
   </div>
   <small>Connection version: ${connection ? connection.connectionVersion || ConnectionManager.currentVersion : ConnectionManager.currentVersion}</small>
 
@@ -948,6 +1116,8 @@ export class ConnectionManager {
     const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
     const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
     const skipInitChecks = document.getElementById('skipInitChecks').checked;
+    const autoConnect = document.getElementById('autoConnect').checked;
+    const openClusterViewOnConnect = document.getElementById('openClusterViewOnConnect').checked;
 
     // Clear errors
     document.querySelectorAll('.error').forEach(el => {
@@ -963,7 +1133,7 @@ export class ConnectionManager {
     // Filter out empty links
     const validLinks = links.filter(link => link.name.trim() && link.url.trim());
 
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
 
     if (currentType === "custom") {
       const httpHost = document.getElementById('httpHost').value.trim();
@@ -978,7 +1148,7 @@ export class ConnectionManager {
         return;
       }
 
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
       if (apiKeyCustom) {
         connection.apiKey = apiKeyCustom;
       }
@@ -994,13 +1164,79 @@ export class ConnectionManager {
         showError('apiKeyError', 'API Key is required for cloud connection');
         return;
       }
-      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, links: validLinks };
+      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
       if (apiKeyCloud) {
         connection.apiKey = apiKeyCloud;
       }
     }
 
     vscode.postMessage({ command: 'save', connection });
+  });
+
+  // Save and Connect button
+  document.getElementById('saveAndConnectButton').addEventListener('click', () => {
+    const name = document.getElementById('connectionName').value.trim();
+    const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
+    const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
+    const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
+    const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
+    const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
+    const skipInitChecks = document.getElementById('skipInitChecks').checked;
+    const autoConnect = document.getElementById('autoConnect').checked;
+    const openClusterViewOnConnect = document.getElementById('openClusterViewOnConnect').checked;
+
+    // Clear errors
+    document.querySelectorAll('.error').forEach(el => {
+      el.style.display = 'none';
+      el.textContent = '';
+    });
+
+    if (!name) {
+      showError('nameError', 'Name is required');
+      return;
+    }
+
+    // Filter out empty links
+    const validLinks = links.filter(link => link.name.trim() && link.url.trim());
+
+    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
+
+    if (currentType === "custom") {
+      const httpHost = document.getElementById('httpHost').value.trim();
+      const httpPort = parseInt(document.getElementById('httpPort').value, 10);
+      const grpcHost = document.getElementById('grpcHost').value.trim();
+      const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
+      const httpSecure = document.getElementById('httpSecure').checked;
+      const grpcSecure = document.getElementById('grpcSecure').checked;
+
+      if (!httpHost) {
+        showError('httpHostError', 'HTTP Host is required');
+        return;
+      }
+
+      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
+      if (apiKeyCustom) {
+        connection.apiKey = apiKeyCustom;
+      }
+    } else {
+      const cloudUrl = document.getElementById('cloudUrl').value.trim();
+      if (!cloudUrl) {
+        showError('cloudUrlError', 'Cloud URL is required');
+        return;
+      }
+      const cloudUrlChanged = isEditMode && existingCloudUrl && cloudUrl && existingCloudUrl !== cloudUrl;
+      const requiresApiKey = !isEditMode || currentType !== existingType || !existingApiKeyPresent || cloudUrlChanged;
+      if (requiresApiKey && !apiKeyCloud) {
+        showError('apiKeyError', 'API Key is required for cloud connection');
+        return;
+      }
+      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
+      if (apiKeyCloud) {
+        connection.apiKey = apiKeyCloud;
+      }
+    }
+
+    vscode.postMessage({ command: 'saveAndConnect', connection });
   });
 
   // Cancel button

@@ -9,22 +9,79 @@ export interface QueryTemplate {
 }
 
 /**
+ * Embedding model dimension mapping.
+ * Maps model names to their vector dimensions.
+ *
+ * Last updated: Dec 2024
+ * Supports 15+ models across 8 embedding providers.
+ *
+ * To maintain this mapping:
+ * - Check vendor documentation when new models are released
+ * - Run tests to verify dimensions match actual embeddings
+ * - Update the PR #42 compatibility table in GRAPHQL_TEMPLATES.md
+ */
+export const EMBEDDING_MODEL_DIMENSIONS: Record<string, number> = {
+  // OpenAI models
+  'text-embedding-3-large': 3072,
+  'text-embedding-3-small': 1536,
+  'text-embedding-ada-002': 1536,
+  'ada-002': 1536,
+
+  // Cohere models
+  'embed-english-v3': 1024,
+  'embed-multilingual-v3': 1024,
+  'cohere-legacy': 4096, // Legacy Cohere models default
+
+  // Sentence Transformers models
+  'all-mpnet-base-v2': 768,
+  'all-minilm-l6-v2': 384,
+  'all-minilm-l12-v2': 384,
+  'sentence-transformers': 768, // Common default
+
+  // HuggingFace / BERT models
+  'bert-base': 768,
+  'bert-large': 1024,
+
+  // PaLM models
+  'palm-gecko': 768,
+
+  // Ollama models
+  llama: 4096,
+  mistral: 4096,
+
+  // AWS Bedrock models
+  'titan-embed': 1536,
+};
+
+/**
  * Generate a similarity search query using nearVector
  * @param collectionName The name of the collection to query
  * @param limit Optional limit for the query (default: 10)
  * @returns GraphQL query string
  */
-export function generateNearVectorQuery(collectionName: string, limit: number = 10): string {
+export function generateNearVectorQuery(
+  collectionName: string,
+  limit: number = 10,
+  returnProperties?: string[]
+): string {
+  const props =
+    Array.isArray(returnProperties) && returnProperties.length > 0
+      ? returnProperties.map((p) => `      ${p}`).join('\n')
+      : '      # Add your properties here';
+
+  // Use generic dimension message since we don't have schema context in static function
+  const dimsText = 'match your vectorizer dimensions';
+
   return `{
   Get {
     ${collectionName} (
       nearVector: {
-        vector: [0.1, 0.2, 0.3] # Replace with your actual vector (must match vectorizer dimensions)
-        certainty: 0.7 # Minimum similarity threshold (0-1)
+        vector: [0.1, 0.2, 0.3] # If you paste your own vector, ensure its length matches the embedding model's dimension (${dimsText})
+        distance: 0.6 # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)
       }
       limit: ${limit}
     ) {
-      # Replace with actual properties from your schema
+${props}
       _additional {
         id
         distance
@@ -42,7 +99,16 @@ export function generateNearVectorQuery(collectionName: string, limit: number = 
  * @param limit Optional limit for the query (default: 10)
  * @returns GraphQL query string
  */
-export function generateNearTextQuery(collectionName: string, limit: number = 10): string {
+export function generateNearTextQuery(
+  collectionName: string,
+  limit: number = 10,
+  returnProperties?: string[]
+): string {
+  const props =
+    Array.isArray(returnProperties) && returnProperties.length > 0
+      ? returnProperties.map((p) => `      ${p}`).join('\n')
+      : '      # Add your properties here';
+
   return `{
   # NOTE: nearText requires a text vectorizer module (text2vec-openai, text2vec-cohere, etc.)
   # If you get an "Unknown argument nearText" error, use nearVector instead or configure a text vectorizer
@@ -51,7 +117,7 @@ export function generateNearTextQuery(collectionName: string, limit: number = 10
     ${collectionName} (
       nearText: {
         concepts: ["search terms", "semantic concepts"]
-        certainty: 0.7 # Minimum similarity threshold (0-1)
+        distance: 0.6 # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)
         moveAwayFrom: {
           concepts: ["unwanted terms"]
           force: 0.45
@@ -63,12 +129,37 @@ export function generateNearTextQuery(collectionName: string, limit: number = 10
       }
       limit: ${limit}
     ) {
-      # Replace with actual properties from your schema
+${props}
       _additional {
         id
         distance
         certainty
         explainScore
+      }
+    }
+  }
+}`;
+}
+
+export function generateNearObjectQuery(
+  collectionName: string,
+  id?: string,
+  limit: number = 10
+): string {
+  const idParam = id ? `"${id}"` : '"your-object-id"';
+  return `{
+  Get {
+    ${collectionName} (
+      nearObject: {
+        id: ${idParam}
+      }
+      limit: ${limit}
+    ) {
+      # Replace with actual properties from your schema
+      _additional {
+        id
+        distance
+        certainty
       }
     }
   }
@@ -81,19 +172,28 @@ export function generateNearTextQuery(collectionName: string, limit: number = 10
  * @param limit Optional limit for the query (default: 10)
  * @returns GraphQL query string
  */
-export function generateHybridQuery(collectionName: string, limit: number = 10): string {
+export function generateHybridQuery(
+  collectionName: string,
+  limit: number = 10,
+  returnProperties?: string[]
+): string {
+  const props =
+    Array.isArray(returnProperties) && returnProperties.length > 0
+      ? returnProperties.map((p) => `      ${p}`).join('\n')
+      : '      # Add your properties here';
+
   return `{
   Get {
     ${collectionName} (
       hybrid: {
         query: "your search query here"
         alpha: 0.5 # Balance: 0=pure vector, 1=pure keyword search
-        vector: [0.1, 0.2, 0.3] # Optional: provide custom vector
+        vector: [0.1, 0.2, 0.3] # Optional: provide custom vector (ensure its length matches your embedding model's dimension)
         properties: ["title", "description"] # Optional: limit search to specific properties
       }
       limit: ${limit}
     ) {
-      # Replace with actual properties from your schema
+${props}
       _additional {
         id
         score
@@ -198,40 +298,34 @@ export function generateAggregationQuery(collectionName: string): string {
 }
 
 /**
- * Generate a query to explore object relationships
+ * Generate a BM25 search query (keyword-based search)
  * @param collectionName The name of the collection to query
- * @param limit Optional limit for the query (default: 5)
+ * @param limit Optional limit for the query (default: 10)
  * @returns GraphQL query string
  */
-export function generateRelationshipQuery(collectionName: string, limit: number = 5): string {
+export function generateBM25Query(
+  collectionName: string,
+  limit: number = 10,
+  returnProperties?: string[]
+): string {
+  const props =
+    Array.isArray(returnProperties) && returnProperties.length > 0
+      ? returnProperties.map((p) => `      ${p}`).join('\n')
+      : '      # Add your properties here';
+
   return `{
   Get {
-    ${collectionName} (limit: ${limit}) {
-      # Replace with actual properties from your schema
-      
-      # Example reference properties (replace with actual ones):
-      # NOTE: Reference properties cannot be limited individually in Weaviate GraphQL.
-      # To control results: 1) Use a smaller main query limit, 2) Use separate queries, 
-      # or 3) Filter the main query to reduce linked objects.
-      
-      # hasAuthor {
-      #   ... on Author {
-      #     name
-      #     email
-      #     _additional { id }
-      #   }
-      # }
-      
-      # belongsToCategory {
-      #   ... on Category {
-      #     name
-      #     description
-      #     _additional { id }
-      #   }
-      # }
-      
+    ${collectionName} (
+      bm25: {
+        query: "search keywords here"
+        properties: ["title", "description"] # Optional: limit search to specific properties
+      }
+      limit: ${limit}
+    ) {
+${props}
       _additional {
         id
+        score
       }
     }
   }
@@ -239,31 +333,365 @@ export function generateRelationshipQuery(collectionName: string, limit: number 
 }
 
 /**
- * Generate a query to check object existence and get metadata
+ * Generate a generative search query (AI-powered search with generated responses)
  * @param collectionName The name of the collection to query
+ * @param limit Optional limit for the query (default: 5)
  * @returns GraphQL query string
  */
-export function generateExploreQuery(collectionName: string): string {
+export function generateGenerativeSearchQuery(
+  collectionName: string,
+  limit: number = 5,
+  returnProperties?: string[]
+): string {
+  const props =
+    Array.isArray(returnProperties) && returnProperties.length > 0
+      ? returnProperties.map((p) => `      ${p}`).join('\n')
+      : '      # Add your properties here';
+
   return `{
   Get {
-    ${collectionName} (limit: 1) {
+    ${collectionName} (
+      nearText: {
+        concepts: ["search terms"]
+        distance: 0.6 # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)
+      }
+      limit: ${limit}
+    ) {
+${props}
       _additional {
         id
-        creationTimeUnix
-        lastUpdateTimeUnix
-        vector
         generate(
-          singleResult: {
-            prompt: "Summarize this object in one sentence: {title} {description}"
+          groupedResult: {
+            task: "Summarize these results in 2-3 sentences"
+            properties: ["title", "description"]
           }
         ) {
-          singleResult
+          groupedResult
           error
         }
       }
     }
   }
 }`;
+}
+
+/**
+ * Generate a query with grouping (groupBy)
+ * @param collectionName The name of the collection to query
+ * @param groupByPath The property path to group by
+ * @param limit Optional limit for groups (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateGroupByQuery(
+  collectionName: string,
+  groupByPath: string = 'category',
+  limit: number = 10
+): string {
+  return `{
+  Aggregate {
+    ${collectionName} (
+      groupBy: ["${groupByPath}"]
+      limit: ${limit}
+    ) {
+      groupedBy {
+        value
+        path
+      }
+      meta {
+        count
+      }
+      # Add aggregations for grouped results
+      # title {
+      #   count
+      #   topOccurrences(limit: 3) {
+      #     value
+      #     occurs
+      #   }
+      # }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a tenant-specific query for multi-tenant collections
+ * @param collectionName The name of the collection to query
+ * @param tenantName The name of the tenant
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateTenantQuery(
+  collectionName: string,
+  tenantName: string,
+  limit: number = 10
+): string {
+  return `{
+  Get {
+    ${collectionName} (
+      tenant: "${tenantName}"
+      limit: ${limit}
+    ) {
+      # Replace with actual properties from your schema
+      _additional {
+        id
+        creationTimeUnix
+        tenant
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate an explore query that returns metadata, vectors, and optional generation
+ * @param collectionName The name of the collection to query
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateExploreQuery(collectionName: string, limit: number = 10): string {
+  return `{
+  Get {
+    ${collectionName} (limit: ${limit}) {
+      # Add your properties here
+      _additional {
+        id
+        creationTimeUnix
+        lastUpdateTimeUnix
+        vector
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a query with advanced configuration options
+ * @param collectionName The name of the collection
+ * @param config Configuration options for the query
+ * @param classSchema Optional schema for better property handling
+ * @returns GraphQL query string
+ */
+export function generateAdvancedQuery(
+  collectionName: string,
+  config: QueryConfig = {},
+  classSchema?: ClassSchema
+): string {
+  const {
+    includeVectors = false,
+    includeMetadata = true,
+    includeScores = false,
+    maxProperties = 5,
+    tenantName,
+    limit = 10,
+    offset,
+  } = config;
+
+  const properties =
+    Array.isArray(config?.returnProperties) && config.returnProperties.length > 0
+      ? config.returnProperties.map((p) => `      ${p}`)
+      : generateAdvancedProperties(classSchema, config);
+
+  const additionalFields = generateAdditionalFields(config);
+
+  const tenantParam = tenantName ? `tenant: "${tenantName}"` : '';
+  const sortClause = config?.sortBy?.path
+    ? `sort: [{ path: ["${config.sortBy.path}"], order: ${config.sortBy.order ?? 'asc'} }]`
+    : '';
+
+  return `{
+  Get {
+    ${collectionName} (
+      ${tenantParam}
+      ${sortClause ? `\n      ${sortClause}` : ''}
+      limit: ${limit}${typeof offset === 'number' ? `\n      offset: ${offset}` : ''}
+    ) {
+${properties.join('\n')}
+${additionalFields.length > 0 ? `      _additional {\n${additionalFields.map((f) => `        ${f}`).join('\n')}\n      }` : ''}
+    }
+  }
+}`;
+}
+
+/**
+ * Generate properties for advanced queries based on schema and config
+ */
+function generateAdvancedProperties(classSchema?: ClassSchema, config: QueryConfig = {}): string[] {
+  const { maxProperties = 5, includeVectors = false } = config;
+
+  if (!classSchema?.properties) {
+    return ['      # Add your properties here'];
+  }
+
+  const properties = classSchema.properties;
+  const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date'];
+
+  // Get primitive properties first
+  const primitives = properties
+    .filter((p) => primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || ''))
+    .slice(0, maxProperties);
+
+  const result: string[] = [];
+
+  primitives.forEach((prop) => {
+    result.push(`      ${prop.name}`);
+  });
+
+  // Add geo coordinates if available and space allows
+  if (result.length < maxProperties) {
+    const geoProps = properties
+      .filter((p) => p.dataType?.[0]?.toLowerCase() === 'geocoordinates')
+      .slice(0, 1);
+
+    geoProps.forEach((prop) => {
+      result.push(`      ${prop.name} {
+        latitude
+        longitude
+      }`);
+    });
+  }
+
+  return result.length > 0 ? result : ['      # No properties found in schema'];
+}
+
+/**
+ * Generate additional fields based on configuration
+ */
+function generateAdditionalFields(config: QueryConfig = {}): string[] {
+  const {
+    includeVectors = false,
+    includeMetadata = true,
+    includeScores = false,
+    generativePrompt,
+  } = config;
+
+  const fields: string[] = [];
+
+  if (includeMetadata) {
+    fields.push('id');
+    fields.push('creationTimeUnix');
+    fields.push('lastUpdateTimeUnix');
+  }
+
+  if (includeVectors) {
+    fields.push('vector');
+  }
+
+  if (includeScores) {
+    fields.push('score');
+    fields.push('certainty');
+    fields.push('distance');
+    if (config.includeExplainScore !== false) {
+      fields.push('explainScore');
+    }
+  }
+
+  if (generativePrompt) {
+    fields.push(`generate(
+      singleResult: {
+        prompt: "${generativePrompt.replace(/"/g, '\\"')}"
+      }
+    ) {
+      singleResult
+      error
+    }`);
+  }
+
+  if (config.tenantName) {
+    fields.push('tenant');
+  }
+
+  return fields;
+}
+
+/**
+ * Validate collection name for GraphQL compatibility
+ * @param collectionName The collection name to validate
+ * @returns Validation result with error message if invalid
+ */
+export function validateCollectionName(collectionName: string): { valid: boolean; error?: string } {
+  if (!collectionName || collectionName.trim().length === 0) {
+    return { valid: false, error: 'Collection name cannot be empty' };
+  }
+
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(collectionName)) {
+    return {
+      valid: false,
+      error:
+        'Collection name must start with a letter or underscore and contain only alphanumeric characters and underscores',
+    };
+  }
+
+  if (collectionName.length > 256) {
+    return { valid: false, error: 'Collection name cannot exceed 256 characters' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate and sanitize a GraphQL query string
+ * @param query The query string to validate
+ * @returns Validation result with sanitized query
+ */
+export function validateAndSanitizeQuery(query: string): {
+  valid: boolean;
+  sanitizedQuery: string;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  // Basic validation - check for balanced braces
+  const openBraces = (query.match(/{/g) || []).length;
+  const closeBraces = (query.match(/}/g) || []).length;
+
+  if (openBraces !== closeBraces) {
+    errors.push('Unbalanced braces in query');
+  }
+
+  // Check for basic GraphQL structure
+  if (!query.trim().startsWith('{') && !query.trim().startsWith('mutation')) {
+    errors.push('Query must start with "{" or "mutation"');
+  }
+
+  // Sanitize by removing potential harmful content (basic implementation)
+  let sanitizedQuery = query
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .trim();
+
+  return {
+    valid: errors.length === 0,
+    sanitizedQuery,
+    errors,
+  };
+}
+
+/**
+ * Get recommended query parameters based on collection schema
+ * @param classSchema The class schema
+ * @returns Recommended configuration options
+ */
+export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryConfig> {
+  if (!classSchema?.properties) {
+    return {};
+  }
+
+  const hasVector = classSchema.vectorizer !== undefined;
+  const hasTextProperties = classSchema.properties.some((p) =>
+    ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || '')
+  );
+  const hasGeoProperties = classSchema.properties.some(
+    (p) => p.dataType?.[0]?.toLowerCase() === 'geocoordinates'
+  );
+
+  return {
+    includeVectors: hasVector,
+    includeMetadata: true,
+    includeScores: hasVector,
+    maxProperties: hasGeoProperties ? 4 : 5,
+    certainty: 0.7,
+    distance: 0.6,
+    limit: 10,
+  };
 }
 
 /**
@@ -276,6 +704,11 @@ export const queryTemplates: QueryTemplate[] = [
     template: '{nearVectorQuery}',
   },
   {
+    name: 'Vector Search (nearObject)',
+    description: 'Search for similar objects using a reference object ID',
+    template: '{nearObjectQuery}',
+  },
+  {
     name: 'Semantic Search (nearText)',
     description: 'Search for similar objects using text concepts with move operations',
     template: '{nearTextQuery}',
@@ -286,6 +719,21 @@ export const queryTemplates: QueryTemplate[] = [
     template: '{hybridQuery}',
   },
   {
+    name: 'BM25 Search',
+    description: 'Perform keyword-based search using BM25 algorithm',
+    template: '{bm25Query}',
+  },
+  {
+    name: 'Generative Search',
+    description: 'AI-powered search with generated summaries and responses',
+    template: '{generativeSearchQuery}',
+  },
+  {
+    name: 'Group By Query',
+    description: 'Group results by property values with aggregations',
+    template: '{groupByQuery}',
+  },
+  {
     name: 'Filter Query',
     description: 'Filter objects based on property values with multiple operators',
     template: '{filterQuery}',
@@ -294,16 +742,6 @@ export const queryTemplates: QueryTemplate[] = [
     name: 'Aggregation Query',
     description: 'Calculate comprehensive statistics across objects by property type',
     template: '{aggregationQuery}',
-  },
-  {
-    name: 'Relationship Query',
-    description: 'Explore object relationships and cross-references',
-    template: '{relationshipQuery}',
-  },
-  {
-    name: 'Explore Query',
-    description: 'Get object metadata, vectors, and AI-generated summaries',
-    template: '{exploreQuery}',
   },
 ];
 
@@ -318,6 +756,8 @@ export interface PropertySchema {
   indexSearchable?: boolean;
   indexFilterable?: boolean;
   moduleConfig?: Record<string, any>;
+  vectorizerConfig?: Record<string, any>;
+  nestedProperties?: PropertySchema[];
 }
 
 /**
@@ -329,6 +769,37 @@ export interface ClassSchema {
   properties: PropertySchema[];
   vectorizer?: string;
   moduleConfig?: Record<string, any>;
+  vectorizers?: Record<string, any>;
+}
+
+/**
+ * Configuration options for query generation
+ */
+export interface QueryConfig {
+  includeVectors?: boolean;
+  includeMetadata?: boolean;
+  includeScores?: boolean;
+  includeExplainScore?: boolean;
+  maxProperties?: number;
+  tenantName?: string;
+  groupByPath?: string;
+  batchSize?: number;
+  generativePrompt?: string;
+  searchProperties?: string[];
+  filterOperator?: 'And' | 'Or';
+  certainty?: number;
+  distance?: number;
+  limit?: number;
+  offset?: number;
+  alpha?: number;
+  searchQuery?: string;
+  concepts?: string[];
+  propertiesOverride?: string[];
+  moveTo?: { concepts: string[]; force?: number };
+  moveAwayFrom?: { concepts: string[]; force?: number };
+  vector?: number[];
+  sortBy?: { path: string; order?: 'asc' | 'desc' };
+  returnProperties?: string[];
 }
 
 /**
@@ -365,16 +836,25 @@ export function generateSampleQuery(
       'blob',
     ];
 
-    // Separate primitive and reference properties
+    // Separate primitive, nested object, and reference properties
     const primitiveProps = classSchema.properties.filter((p) =>
       p.dataType.some(
         (dt) => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates'
       )
     );
+    const nestedObjectProps = classSchema.properties.filter(
+      (p) =>
+        p.dataType.some((dt) => dt.toLowerCase() === 'object') &&
+        p.nestedProperties &&
+        p.nestedProperties.length > 0
+    );
     const referenceProps = classSchema.properties.filter(
       (p) =>
         !p.dataType.some(
-          (dt) => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates'
+          (dt) =>
+            primitiveTypes.includes(dt.toLowerCase()) ||
+            dt.toLowerCase() === 'geocoordinates' ||
+            dt.toLowerCase() === 'object'
         )
     );
 
@@ -388,6 +868,23 @@ export function generateSampleQuery(
       }`);
       } else {
         propertyStrings.push(prop.name);
+      }
+    });
+
+    // Add all nested object properties
+    nestedObjectProps.forEach((prop) => {
+      if (prop.nestedProperties && prop.nestedProperties.length > 0) {
+        const nestedTypeName = `${classSchema.class}_${prop.name}_object`;
+        const nestedPropsStr = prop.nestedProperties
+          .slice(0, 5) // Limit to 5 nested properties
+          .map((np) => `          ${np.name}`)
+          .join('\n');
+        propertyStrings.push(`${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedPropsStr}
+        }
+      }`);
       }
     });
 
@@ -452,7 +949,7 @@ ${nestedProps}
           // Cross-references in Weaviate have dataType starting with the class name
           const referencedClassName = propSchema.dataType[0];
 
-          // If it's not a primitive type, it's likely a reference
+          // If it's not a primitive type, it's likely a reference or nested object
           const primitiveTypes = [
             'text',
             'string',
@@ -464,6 +961,26 @@ ${nestedProps}
             'uuid',
             'blob',
           ];
+
+          // Check if it's a nested object property with nestedProperties
+          if (
+            referencedClassName.toLowerCase() === 'object' &&
+            propSchema.nestedProperties &&
+            propSchema.nestedProperties.length > 0
+          ) {
+            const nestedTypeName = `${classSchema.class}_${propName}_object`;
+            const nestedProps = propSchema.nestedProperties
+              .slice(0, 5) // Limit to 5 properties
+              .map((np) => `          ${np.name}`)
+              .join('\n');
+            return `${propName} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedProps}
+        }
+      }`;
+          }
+
           if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
             // Find the referenced class's schema
             const referencedClass = schema?.classes?.find((c) => c.class === referencedClassName);
@@ -587,6 +1104,119 @@ ${nestedProps}
 }
 
 /**
+ * Generate a static fallback query when template processing fails
+ * @param template The template string or template name
+ * @param collectionName The name of the collection
+ * @param limit Optional limit for queries (default: 10)
+ * @returns Static fallback query string
+ */
+function generateStaticFallback(
+  template: string,
+  collectionName: string,
+  limit: number = 10
+): string {
+  console.warn(`Using static fallback for template: ${template}`);
+
+  // Check if template is a predefined template name
+  const predefinedTemplate = queryTemplates.find((t) => t.name === template);
+  const templateToUse = predefinedTemplate?.template || template;
+
+  // Provide basic static templates for common placeholders
+  const fallbackMap: Record<string, () => string> = {
+    '{nearVectorQuery}': () => generateNearVectorQuery(collectionName, limit),
+    '{nearObjectQuery}': () => generateNearObjectQuery(collectionName, undefined, limit),
+    '{nearTextQuery}': () => generateNearTextQuery(collectionName, limit),
+    '{hybridQuery}': () => generateHybridQuery(collectionName, limit),
+    '{bm25Query}': () => generateBM25Query(collectionName, limit),
+    '{generativeSearchQuery}': () => generateGenerativeSearchQuery(collectionName, limit),
+    '{groupByQuery}': () => generateGroupByQuery(collectionName),
+    '{filterQuery}': () => generateFilterQuery(collectionName, limit),
+    '{aggregationQuery}': () => generateAggregationQuery(collectionName),
+    '{exploreQuery}': () => generateExploreQuery(collectionName, limit),
+    '{tenantQuery}': () => generateTenantQuery(collectionName, 'tenant-name', limit),
+  };
+
+  // Try to find a matching fallback
+  for (const [placeholder, generator] of Object.entries(fallbackMap)) {
+    if (templateToUse.includes(placeholder)) {
+      try {
+        return generator();
+      } catch (error) {
+        console.error(`Fallback generation failed for ${placeholder}:`, error);
+      }
+    }
+  }
+
+  // Ultimate fallback: simple Get query
+  return `{
+  Get {
+    ${collectionName}(limit: ${limit}) {
+      # Add your properties here
+      _additional {
+        id
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Validate QueryConfig parameter values to ensure they're within valid ranges
+ * @throws {Error} If any parameter is out of valid ranges with descriptive error message
+ */
+function validateQueryConfig(config: QueryConfig | undefined): void {
+  if (!config) {
+    return;
+  }
+
+  const errors: string[] = [];
+
+  // Validate numeric ranges
+  if (config.limit !== undefined) {
+    if (!Number.isInteger(config.limit) || config.limit <= 0) {
+      errors.push(`limit must be a positive integer, got ${config.limit}`);
+    }
+  }
+
+  if (config.certainty !== undefined) {
+    if (typeof config.certainty !== 'number' || config.certainty < 0 || config.certainty > 1) {
+      errors.push(`certainty must be a number between 0 and 1, got ${config.certainty}`);
+    }
+  }
+
+  // Validate alpha (hybrid search balance: 0=vector only, 1=keyword only)
+  if (config.alpha !== undefined) {
+    if (typeof config.alpha !== 'number' || config.alpha < 0 || config.alpha > 1) {
+      errors.push(`alpha must be a number between 0 and 1, got ${config.alpha}`);
+    }
+  }
+
+  // Validate offset
+  if (config.offset !== undefined) {
+    if (!Number.isInteger(config.offset) || config.offset < 0) {
+      errors.push(`offset must be a non-negative integer, got ${config.offset}`);
+    }
+  }
+
+  // Validate array parameters
+  if (config.concepts !== undefined && !Array.isArray(config.concepts)) {
+    errors.push(`concepts must be an array, got ${typeof config.concepts}`);
+  }
+
+  if (config.returnProperties !== undefined && !Array.isArray(config.returnProperties)) {
+    errors.push(`returnProperties must be an array, got ${typeof config.returnProperties}`);
+  }
+
+  if (config.propertiesOverride !== undefined && !Array.isArray(config.propertiesOverride)) {
+    errors.push(`propertiesOverride must be an array, got ${typeof config.propertiesOverride}`);
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Invalid QueryConfig: ${errors.join('; ')}`);
+  }
+}
+
+/**
  * Process a template by replacing placeholders with actual values
  * @param template The template string or template name
  * @param collectionName The name of the collection
@@ -598,48 +1228,146 @@ export function processTemplate(
   template: string,
   collectionName: string,
   limit: number = 10,
-  schema?: { classes?: ClassSchema[] }
+  schema?: { classes?: ClassSchema[] },
+  config?: QueryConfig
 ): string {
-  // Find the class schema for the current collection
-  const classSchema = schema?.classes?.find((c) => c.class === collectionName);
+  try {
+    // Validate config parameters early to fail fast with clear errors
+    validateQueryConfig(config);
 
-  // Check if the template is a predefined template name
-  const predefinedTemplate = queryTemplates.find((t) => t.name === template);
-  if (predefinedTemplate) {
-    template = predefinedTemplate.template;
+    // Helpers to normalize various schema shapes (v1/v2)
+    const coerceToArray = (v: any): string[] =>
+      Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
+
+    const normalizeClassSchema = (input: any): ClassSchema | undefined => {
+      if (!input) {
+        return undefined;
+      }
+      const normalized: ClassSchema = {
+        class: input.class ?? input.name,
+        description: input.description,
+        properties: Array.isArray(input.properties)
+          ? input.properties.map((p: any) => ({
+              name: p.name,
+              dataType: coerceToArray(p.dataType),
+              description: p.description,
+              tokenization: p.tokenization,
+              indexSearchable: p.indexSearchable,
+              indexFilterable: p.indexFilterable,
+              moduleConfig: p.moduleConfig,
+              vectorizerConfig: p.vectorizerConfig,
+            }))
+          : [],
+        vectorizer: input.vectorizer,
+        moduleConfig: input.moduleConfig,
+        vectorizers: input.vectorizers,
+      };
+      return normalized;
+    };
+
+    // Find the class/collection definition across possible schema shapes
+    let classSchema: ClassSchema | undefined = undefined;
+    const classesAny = (schema as any)?.classes || (schema as any)?.collections;
+    const lc = (s: any) => (typeof s === 'string' ? s.toLowerCase() : '');
+    if (Array.isArray(classesAny)) {
+      let raw = classesAny.find(
+        (c: any) => lc(c.class) === lc(collectionName) || lc(c.name) === lc(collectionName)
+      );
+      if (!raw && classesAny.length === 1) {
+        raw = classesAny[0];
+      }
+      classSchema = normalizeClassSchema(raw);
+    } else if (
+      lc((schema as any)?.name) === lc(collectionName) ||
+      lc((schema as any)?.class) === lc(collectionName)
+    ) {
+      classSchema = normalizeClassSchema(schema);
+    }
+
+    // Check if the template is a predefined template name (queries only)
+    const predefinedTemplate = queryTemplates.find((t) => t.name === template);
+    if (predefinedTemplate) {
+      template = predefinedTemplate.template;
+    }
+
+    // Determine effective limit (config overrides param)
+    const effectiveLimit = config?.limit ?? limit;
+
+    // Replace placeholders with actual values using dynamic generation when possible
+    let query = template
+      .replace(
+        '{nearVectorQuery}',
+        classSchema
+          ? generateDynamicNearVectorQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateNearVectorQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{nearObjectQuery}',
+        generateNearObjectQuery(collectionName, undefined, effectiveLimit)
+      )
+      .replace(
+        '{nearTextQuery}',
+        classSchema
+          ? generateDynamicNearTextQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateNearTextQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{hybridQuery}',
+        classSchema
+          ? generateDynamicHybridQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateHybridQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{bm25Query}',
+        classSchema
+          ? generateDynamicBM25Query(collectionName, classSchema, effectiveLimit, config)
+          : generateBM25Query(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{generativeSearchQuery}',
+        classSchema
+          ? generateDynamicGenerativeSearchQuery(
+              collectionName,
+              classSchema,
+              effectiveLimit,
+              config
+            )
+          : generateGenerativeSearchQuery(collectionName, effectiveLimit, config?.returnProperties)
+      )
+      .replace(
+        '{groupByQuery}',
+        classSchema
+          ? generateDynamicGroupByQuery(collectionName, classSchema)
+          : generateGroupByQuery(collectionName)
+      )
+      .replace(
+        '{filterQuery}',
+        classSchema
+          ? generateDynamicFilterQuery(collectionName, classSchema, effectiveLimit, config)
+          : generateFilterQuery(collectionName, effectiveLimit)
+      )
+      .replace(
+        '{aggregationQuery}',
+        classSchema
+          ? generateDynamicAggregationQuery(collectionName, classSchema)
+          : generateAggregationQuery(collectionName)
+      )
+      .replace(
+        '{tenantQuery}',
+        generateTenantQuery(collectionName, config?.tenantName ?? 'tenant-name', effectiveLimit)
+      )
+      .replace('{exploreQuery}', generateExploreQuery(collectionName, effectiveLimit));
+
+    return query;
+  } catch (error) {
+    console.error('Error processing template:', error);
+    console.error('Template:', template);
+    console.error('Collection:', collectionName);
+    console.error('Schema:', schema);
+
+    // Return static fallback to ensure users always get a usable query
+    return generateStaticFallback(template, collectionName, limit);
   }
-
-  // Replace placeholders with actual values using dynamic generation when possible
-  let query = template
-    .replace(
-      '{nearVectorQuery}',
-      classSchema
-        ? generateDynamicNearVectorQuery(collectionName, classSchema, limit)
-        : generateNearVectorQuery(collectionName, limit)
-    )
-    .replace(
-      '{nearTextQuery}',
-      classSchema
-        ? generateDynamicNearTextQuery(collectionName, classSchema, limit)
-        : generateNearTextQuery(collectionName, limit)
-    )
-    .replace('{hybridQuery}', generateHybridQuery(collectionName, limit))
-    .replace(
-      '{filterQuery}',
-      classSchema
-        ? generateDynamicFilterQuery(collectionName, classSchema, limit)
-        : generateFilterQuery(collectionName, limit)
-    )
-    .replace(
-      '{aggregationQuery}',
-      classSchema
-        ? generateDynamicAggregationQuery(collectionName, classSchema)
-        : generateAggregationQuery(collectionName)
-    )
-    .replace('{relationshipQuery}', generateRelationshipQuery(collectionName, limit))
-    .replace('{exploreQuery}', generateExploreQuery(collectionName));
-
-  return query;
 }
 
 /**
@@ -675,6 +1403,7 @@ export function generateDynamicSampleQuery(
   const primitiveProps: PropertySchema[] = [];
   const referenceProps: PropertySchema[] = [];
   const geoProps: PropertySchema[] = [];
+  const nestedObjectProps: PropertySchema[] = [];
 
   properties.forEach((prop) => {
     const dataType = prop.dataType?.[0]?.toLowerCase() || '';
@@ -695,6 +1424,9 @@ export function generateDynamicSampleQuery(
       ].includes(dataType)
     ) {
       primitiveProps.push(prop);
+    } else if (dataType === 'object' && prop.nestedProperties && prop.nestedProperties.length > 0) {
+      // It's a nested object property with nested properties defined
+      nestedObjectProps.push(prop);
     } else {
       // It's likely a reference to another class
       referenceProps.push(prop);
@@ -718,8 +1450,27 @@ export function generateDynamicSampleQuery(
       }`);
   });
 
+  // Add nested object properties
+  const selectedNestedProps = nestedObjectProps.slice(0, 2);
+  selectedNestedProps.forEach((prop) => {
+    if (prop.nestedProperties && prop.nestedProperties.length > 0) {
+      // Generate inline fragment with the nested object type name
+      const nestedTypeName = `${collectionName}_${prop.name}_object`;
+      const nestedPropsStr = prop.nestedProperties
+        .slice(0, 3) // Limit to 3 nested properties for readability
+        .map((np) => `          ${np.name}`)
+        .join('\n');
+      propertyLines.push(`      ${prop.name} {
+        # WARNING: This may return many linked objects. Consider using a separate query.
+        ... on ${nestedTypeName} {
+${nestedPropsStr}
+        }
+      }`);
+    }
+  });
+
   // Add up to 2 reference properties with nested selection
-  const selectedReferenceProps = referenceProps.slice(0, 2);
+  const selectedReferenceProps = referenceProps.slice(0, 2 - selectedNestedProps.length);
   selectedReferenceProps.forEach((prop) => {
     const referencedClassName = prop.dataType?.[0] || 'Unknown';
     propertyLines.push(`      ${prop.name} {
@@ -758,25 +1509,41 @@ ${propertyLines.join('\n')}
 export function generateDynamicNearVectorQuery(
   collectionName: string,
   classSchema?: ClassSchema,
-  limit: number = 10
+  limit: number = 10,
+  config?: QueryConfig
 ): string {
   const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const vec = Array.isArray(config?.vector) ? config!.vector : [0.1, 0.2, 0.3];
+  const vectorStr = `[${vec.join(', ')}]`;
+  const distanceVal = typeof config?.distance === 'number' ? config!.distance : undefined;
+  const certaintyVal = typeof config?.certainty === 'number' ? config!.certainty : 0.7;
+  const thresholdLine =
+    typeof distanceVal === 'number'
+      ? `distance: ${distanceVal} # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)`
+      : `certainty: ${certaintyVal} # Minimum similarity threshold (0-1)`;
+
+  const additionalFields: string[] = ['id', 'distance', 'certainty'];
+  if (config?.includeVectors !== false) {
+    additionalFields.push('vector');
+  }
+
+  const dimsLabel = getVectorDimensions(classSchema);
+  const dimsText = /^\d+$/.test(dimsLabel)
+    ? `${dimsLabel} dimensions`
+    : 'match your vectorizer dimensions';
 
   return `{
   Get {
     ${collectionName}(
       nearVector: {
-        vector: [0.1, 0.2, 0.3] # Replace with your actual vector (${getVectorDimensions(classSchema)} dimensions)
-        certainty: 0.7 # Minimum similarity threshold (0-1)
+        vector: ${vectorStr} # Replace with your actual vector (${dimsText})
+        ${thresholdLine}
       }
       limit: ${limit}
     ) {
 ${properties.join('\n')}
       _additional {
-        id
-        distance
-        certainty
-        vector # Include the object's vector
+${additionalFields.map((f) => `        ${f}`).join('\n')}
       }
     }
   }
@@ -793,59 +1560,61 @@ ${properties.join('\n')}
 export function generateDynamicNearTextQuery(
   collectionName: string,
   classSchema?: ClassSchema,
-  limit: number = 10
+  limit: number = 10,
+  config?: QueryConfig
 ): string {
   const properties = getTopPropertiesForDisplay(classSchema, 3);
-  const textProperties = getTextProperties(classSchema);
 
-  // Check if the collection likely supports nearText based on vectorizer configuration
-  const hasTextVectorizer = hasTextVectorizerModule(classSchema);
+  const conceptsArr =
+    Array.isArray(config?.concepts) && config!.concepts.length > 0
+      ? `[${config!.concepts.map((c) => `"${String(c).replace(/"/g, '\\"')}"`).join(', ')}]`
+      : `["search terms", "semantic concepts"]`;
+  const distanceVal = typeof config?.distance === 'number' ? config!.distance : undefined;
+  const certaintyVal = typeof config?.certainty === 'number' ? config!.certainty : 0.7;
+  const thresholdLine =
+    typeof distanceVal === 'number'
+      ? `distance: ${distanceVal} # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)`
+      : `certainty: ${certaintyVal} # Minimum similarity threshold (0-1)`;
 
-  if (!hasTextVectorizer) {
-    // If no text vectorizer is detected, provide a nearVector alternative with instructions
-    return `{
-  # NOTE: This collection doesn't appear to have a text vectorizer configured.
-  # nearText searches require a text vectorizer module (like text2vec-openai, text2vec-cohere, etc.)
-  # Using nearVector instead - replace the vector with actual embeddings:
-  
-  Get {
-    ${collectionName}(
-      nearVector: {
-        vector: [0.1, 0.2, 0.3] # Replace with actual vector embeddings (${getVectorDimensions(classSchema)} dimensions)
-        certainty: 0.7 # Minimum similarity threshold (0-1)
-      }
-      limit: ${limit}
-    ) {
-${properties.join('\n')}
-      _additional {
-        id
-        distance
-        certainty
-        vector # Include to see the object's vector
-      }
-    }
-  }
-}
-
-# Alternative: If you want text-based search, configure a text vectorizer module for this collection
-# Examples: text2vec-openai, text2vec-cohere, text2vec-transformers, etc.`;
-  }
-
-  return `{
-  Get {
-    ${collectionName}(
-      nearText: {
-        concepts: ["search terms", "semantic concepts"]
-        certainty: 0.7 # Minimum similarity threshold (0-1)
-        ${textProperties.length > 0 ? `properties: [${textProperties.map((p) => `"${p}"`).join(', ')}] # Search in specific text fields` : ''}
-        moveAwayFrom: {
+  const moveAwayBlock =
+    config?.moveAwayFrom?.concepts && config.moveAwayFrom.concepts.length > 0
+      ? `        moveAwayFrom: {
+          concepts: [${config.moveAwayFrom.concepts.map((c) => `"${String(c).replace(/"/g, '\\"')}"`).join(', ')}]
+          ${typeof config.moveAwayFrom.force === 'number' ? `force: ${config.moveAwayFrom.force}` : ''}
+        }`
+      : `        moveAwayFrom: {
           concepts: ["unwanted terms"]
           force: 0.45
-        }
-        moveTo: {
+        }`;
+
+  const moveToBlock =
+    config?.moveTo?.concepts && config.moveTo.concepts.length > 0
+      ? `        moveTo: {
+          concepts: [${config.moveTo.concepts.map((c) => `"${String(c).replace(/"/g, '\\"')}"`).join(', ')}]
+          ${typeof config.moveTo.force === 'number' ? `force: ${config.moveTo.force}` : ''}
+        }`
+      : `        moveTo: {
           concepts: ["desired terms"]
           force: 0.85
-        }
+        }`;
+
+  const includeExplain = config?.includeExplainScore === false ? '' : '        explainScore';
+  const hasTextVec = hasTextVectorizerModule(classSchema);
+  const headerComment = hasTextVec
+    ? ''
+    : `  # NOTE: nearText requires a text vectorizer module (text2vec-openai, text2vec-cohere, etc.)
+  # If you get an "Unknown argument nearText" error, use nearVector instead or configure a text vectorizer
+
+`;
+
+  return `{
+${headerComment}  Get {
+    ${collectionName}(
+      nearText: {
+        concepts: ${conceptsArr}
+        ${thresholdLine}
+${moveAwayBlock}
+${moveToBlock}
       }
       limit: ${limit}
     ) {
@@ -854,7 +1623,7 @@ ${properties.join('\n')}
         id
         distance
         certainty
-        explainScore
+${includeExplain}
       }
     }
   }
@@ -871,16 +1640,18 @@ ${properties.join('\n')}
 export function generateDynamicFilterQuery(
   collectionName: string,
   classSchema?: ClassSchema,
-  limit: number = 10
+  limit: number = 10,
+  config?: QueryConfig
 ): string {
   const properties = getTopPropertiesForDisplay(classSchema, 3);
   const filterExamples = generateFilterExamples(classSchema);
+  const operator = config?.filterOperator ?? 'And';
 
   return `{
   Get {
     ${collectionName}(
       where: {
-        operator: And
+        operator: ${operator}
         operands: [
 ${filterExamples.join(',\n')}
         ]
@@ -923,6 +1694,221 @@ ${aggregationFields.join('\n')}
   }
 }`;
 }
+
+/**
+ * Generate a dynamic hybrid search query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateDynamicHybridQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10,
+  config?: QueryConfig
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const queryText =
+    typeof config?.searchQuery === 'string' && config!.searchQuery.length > 0
+      ? config!.searchQuery.replace(/"/g, '\\"')
+      : 'your search query here';
+  const alphaVal = typeof config?.alpha === 'number' ? config!.alpha : 0.5;
+
+  const propsOverride =
+    Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
+      ? config!.propertiesOverride
+      : getTextProperties(classSchema).slice(0, 3);
+
+  const vec = Array.isArray(config?.vector) ? `[${config!.vector.join(', ')}]` : `[0.1, 0.2, 0.3]`;
+
+  return `{
+  Get {
+    ${collectionName} (
+      hybrid: {
+        query: "${queryText}"
+        alpha: ${alphaVal} # Balance: 0=pure vector, 1=pure keyword search
+        vector: ${vec} # Optional: provide custom vector (ensure its length matches your embedding model's dimension)
+        properties: [${propsOverride.map((p) => `"${p}"`).join(', ')}] # Optional: limit search to specific properties
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        score
+        explainScore
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic BM25 search query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 10)
+ * @returns GraphQL query string
+ */
+export function generateDynamicBM25Query(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 10,
+  config?: QueryConfig
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const defaultTextProps = getTextProperties(classSchema);
+  const queryText =
+    typeof config?.searchQuery === 'string' && config!.searchQuery.length > 0
+      ? config!.searchQuery.replace(/"/g, '\\"')
+      : 'search keywords here';
+  const propsOverride =
+    Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
+      ? config!.propertiesOverride
+      : defaultTextProps.slice(0, 3);
+
+  return `{
+  Get {
+    ${collectionName} (
+      bm25: {
+        query: "${queryText}"
+        properties: [${propsOverride.map((p) => `"${p}"`).join(', ')}] # Optional: limit search to specific properties
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        score
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic generative search query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 5)
+ * @returns GraphQL query string
+ */
+export function generateDynamicGenerativeSearchQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  limit: number = 5,
+  config?: QueryConfig
+): string {
+  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const conceptsArr =
+    Array.isArray(config?.concepts) && config!.concepts.length > 0
+      ? `[${config!.concepts.map((c) => `"${String(c).replace(/"/g, '\\"')}"`).join(', ')}]`
+      : `["search terms"]`;
+  const distanceVal = typeof config?.distance === 'number' ? config!.distance : undefined;
+  const certaintyVal = typeof config?.certainty === 'number' ? config!.certainty : 0.7;
+  const thresholdLine =
+    typeof distanceVal === 'number'
+      ? `distance: ${distanceVal} # Max distance threshold (prefer distance in v1.14+; use certainty prior to v1.14)`
+      : `certainty: ${certaintyVal}`;
+  const taskText =
+    typeof config?.generativePrompt === 'string' && config!.generativePrompt.length > 0
+      ? config!.generativePrompt.replace(/"/g, '\\"')
+      : 'Summarize these results in 2-3 sentences';
+  const propsForGen =
+    Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
+      ? config!.propertiesOverride.slice(0, 2)
+      : getTextProperties(classSchema).slice(0, 2);
+
+  return `{
+  Get {
+    ${collectionName} (
+      nearText: {
+        concepts: ${conceptsArr}
+        ${thresholdLine}
+      }
+      limit: ${limit}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        generate(
+          groupedResult: {
+            task: "${taskText}"
+            properties: [${propsForGen.map((p) => `"${p}"`).join(', ')}]
+          }
+        ) {
+          groupedResult
+          error
+        }
+      }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic groupBy query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string
+ */
+export function generateDynamicGroupByQuery(
+  collectionName: string,
+  classSchema?: ClassSchema
+): string {
+  const groupByPath =
+    classSchema?.properties?.find((p) =>
+      ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || '')
+    )?.name || 'category';
+
+  return `{
+  Aggregate {
+    ${collectionName} (
+      groupBy: ["${groupByPath}"]
+      limit: 10
+    ) {
+      groupedBy {
+        value
+        path
+      }
+      meta {
+        count
+      }
+      # Add aggregations for grouped results
+      # ${getTextProperties(classSchema).slice(0, 1)[0] || 'property'} {
+      #   count
+      #   topOccurrences(limit: 3) {
+      #     value
+      #     occurs
+      #   }
+      # }
+    }
+  }
+}`;
+}
+
+/**
+ * Generate a dynamic relationship query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @param limit Optional limit for the query (default: 5)
+ * @returns GraphQL query string
+ */
+
+/**
+ * Generate a dynamic explore query based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL query string
+ */
+
+/**
+ * Generate a dynamic insert mutation based on schema
+ * @param collectionName The name of the collection
+ * @param classSchema The class schema definition
+ * @returns GraphQL mutation string
+ */
 
 /**
  * Helper function to get top properties for display
@@ -985,6 +1971,13 @@ function getTopPropertiesForDisplay(classSchema?: ClassSchema, maxCount: number 
       }`);
   });
 
+  // Fallback: if no properties were classified, include the first N properties as plain fields
+  if (result.length === 0 && Array.isArray(properties) && properties.length > 0) {
+    properties.slice(0, maxCount).forEach((prop) => {
+      result.push(`      ${prop.name}`);
+    });
+  }
+
   return result.length > 0 ? result : ['      # No properties found in schema'];
 }
 
@@ -1010,69 +2003,183 @@ function hasTextVectorizerModule(classSchema?: ClassSchema): boolean {
     return false;
   }
 
-  // Check for explicit vectorizer configuration
+  const textVectorizerPatterns = [
+    'text2vec',
+    'text-2-vec',
+    'text_to_vec',
+    'transformers',
+    'openai',
+    'cohere',
+    'huggingface',
+    'contextionary',
+    'gpt4all',
+    'palm',
+  ];
+
+  const candidates: string[] = [];
+
+  // Legacy v1-style class-level vectorizer string
   if (classSchema.vectorizer) {
-    const vectorizer = classSchema.vectorizer.toLowerCase();
-    // Common text vectorizer modules
-    const textVectorizers = [
-      'text2vec-openai',
-      'text2vec-cohere',
-      'text2vec-huggingface',
-      'text2vec-transformers',
-      'text2vec-contextionary',
-      'text2vec-gpt4all',
-      'text2vec-palm',
-    ];
-
-    return textVectorizers.some((tv) => vectorizer.includes(tv));
+    candidates.push(classSchema.vectorizer.toLowerCase());
   }
 
-  // Check module configuration for text vectorizer modules
+  // Legacy moduleConfig keys
   if (classSchema.moduleConfig) {
-    const moduleKeys = Object.keys(classSchema.moduleConfig);
-    const textVectorizerKeys = [
-      'text2vec-openai',
-      'text2vec-cohere',
-      'text2vec-huggingface',
-      'text2vec-transformers',
-      'text2vec-contextionary',
-      'text2vec-gpt4all',
-      'text2vec-palm',
-    ];
-
-    return moduleKeys.some((key) =>
-      textVectorizerKeys.some((tv) => key.toLowerCase().includes(tv))
-    );
+    Object.keys(classSchema.moduleConfig).forEach((k) => candidates.push(k.toLowerCase()));
   }
 
-  return false; // Conservative default - assume no text vectorizer
+  // v2-style vectorizers object (e.g., { default: { vectorizer: { name: 'text2vec-transformers', ... } } })
+  if (classSchema.vectorizers) {
+    const v: any = classSchema.vectorizers;
+    if (typeof v === 'object') {
+      const defaultName = v?.default?.vectorizer?.name;
+      if (typeof defaultName === 'string') {
+        candidates.push(String(defaultName).toLowerCase());
+      }
+      // Consider keys as candidates too (e.g., 'text2vec-transformers')
+      Object.keys(v).forEach((k) => candidates.push(k.toLowerCase()));
+    }
+  }
+
+  // Property-level vectorizerConfig (v2 per-property)
+  if (classSchema.properties && classSchema.properties.length > 0) {
+    classSchema.properties.forEach((p: any) => {
+      if (p?.vectorizerConfig && typeof p.vectorizerConfig === 'object') {
+        Object.keys(p.vectorizerConfig).forEach((k) => candidates.push(k.toLowerCase()));
+      }
+      if (p?.moduleConfig && typeof p.moduleConfig === 'object') {
+        Object.keys(p.moduleConfig).forEach((k) => candidates.push(k.toLowerCase()));
+      }
+    });
+  }
+
+  return candidates.some((c) => textVectorizerPatterns.some((pattern) => c.includes(pattern)));
+}
+
+/**
+ * Helper function to check if any vectorizer is configured (v1 or v2 schema)
+ */
+function hasAnyVectorizerConfigured(classSchema?: ClassSchema): boolean {
+  if (!classSchema) {
+    return false;
+  }
+
+  if (classSchema.vectorizer) {
+    return true;
+  }
+
+  if (classSchema.moduleConfig && Object.keys(classSchema.moduleConfig).length > 0) {
+    return true;
+  }
+
+  if (classSchema.vectorizers && Object.keys(classSchema.vectorizers).length > 0) {
+    return true;
+  }
+
+  if (
+    classSchema.properties?.some((p: any) => {
+      const hasPropVec =
+        (p?.vectorizerConfig && Object.keys(p.vectorizerConfig).length > 0) ||
+        (p?.moduleConfig && Object.keys(p.moduleConfig).length > 0);
+      return !!hasPropVec;
+    })
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
  * Helper function to estimate vector dimensions from schema
  */
 function getVectorDimensions(classSchema?: ClassSchema): string {
-  // Try to extract from vectorizer config
+  if (!classSchema) {
+    return 'match your vectorizer dimensions';
+  }
+
+  // Strategy 1: Try to extract from vectorizer config (v1 style)
   if (classSchema?.moduleConfig) {
     const configs = Object.values(classSchema.moduleConfig);
     for (const config of configs) {
       if (typeof config === 'object' && config && 'model' in config) {
-        // Common dimension sizes for popular models
-        const model = String(config.model).toLowerCase();
-        if (model.includes('openai') || model.includes('ada-002')) {
-          return '1536';
+        const dimension = inferDimensionFromModel(String(config.model));
+        if (dimension) {
+          return dimension;
         }
-        if (model.includes('sentence-transformers') || model.includes('all-mpnet')) {
-          return '768';
-        }
-        if (model.includes('cohere')) {
-          return '4096';
+      }
+      // Check for explicit vectorIndexConfig dimensions
+      if (typeof config === 'object' && config && 'vectorIndexConfig' in config) {
+        const vectorConfig = (config as any).vectorIndexConfig;
+        if (vectorConfig?.dimensions) {
+          return String(vectorConfig.dimensions);
         }
       }
     }
   }
 
+  // Strategy 2: Check v2-style vectorizers config
+  if (classSchema?.vectorizers) {
+    const v = classSchema.vectorizers as any;
+    if (typeof v === 'object') {
+      // Check default vectorizer
+      const defaultVectorizer = v?.default?.vectorizer;
+      if (defaultVectorizer?.name) {
+        const dimension = inferDimensionFromModel(String(defaultVectorizer.name));
+        if (dimension) {
+          return dimension;
+        }
+      }
+      // Check for model in config
+      if (defaultVectorizer?.model) {
+        const dimension = inferDimensionFromModel(String(defaultVectorizer.model));
+        if (dimension) {
+          return dimension;
+        }
+      }
+    }
+  }
+
+  // Strategy 3: Check legacy vectorizer field
+  if (classSchema?.vectorizer) {
+    const dimension = inferDimensionFromModel(String(classSchema.vectorizer));
+    if (dimension) {
+      return dimension;
+    }
+  }
+
+  // Fallback: generic message
   return 'match your vectorizer dimensions';
+}
+
+/**
+ * Infer vector dimensions from model name.
+ *
+ * Uses EMBEDDING_MODEL_DIMENSIONS constant for dimension lookups.
+ * Implements substring matching for flexible model name matching.
+ *
+ * @param modelName The name of the embedding model
+ * @returns The dimension size as a string, or null if not found
+ */
+function inferDimensionFromModel(modelName: string): string | null {
+  const model = modelName.toLowerCase();
+
+  // First, try exact match with known models (case-insensitive)
+  for (const [key, dimension] of Object.entries(EMBEDDING_MODEL_DIMENSIONS)) {
+    if (model === key.toLowerCase()) {
+      return String(dimension);
+    }
+  }
+
+  // Then, try substring matching for flexible matching
+  // (handles partial model names and versions)
+  for (const [key, dimension] of Object.entries(EMBEDDING_MODEL_DIMENSIONS)) {
+    if (model.includes(key.toLowerCase())) {
+      return String(dimension);
+    }
+  }
+
+  return null;
 }
 
 /**

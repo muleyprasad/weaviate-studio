@@ -497,6 +497,7 @@ describe('ConnectionManager', () => {
         httpSecure: false,
         grpcSecure: false,
         connectionVersion: '2',
+        autoConnect: false,
       };
 
       globalState.storage['weaviate-connections'] = [newConnection];

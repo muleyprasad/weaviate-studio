@@ -51,6 +51,10 @@ export class QueryEditorPanel {
   private static readonly panels = new Map<string, QueryEditorPanel>();
   private static activePanel: QueryEditorPanel | null = null;
   private static _outputChannel: vscode.OutputChannel | null = null;
+  // Standardized error messages for consistency
+  private static readonly CONNECTION_ERROR_MESSAGE =
+    'Not connected to Weaviate. Please reconnect from the Connections view.';
+  private static readonly CONNECTION_MISSING_MESSAGE = 'Not connected to Weaviate';
   private _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _options: QueryEditorOptions;
@@ -61,6 +65,8 @@ export class QueryEditorPanel {
   private _errorDetailsStore: Map<string, { text: string; ts: number }> = new Map();
   private _abortController: AbortController | null = null;
   private _inflightRequest: http.ClientRequest | null = null;
+  private _isConnectionActive: boolean = false;
+  private _connectionStateListener: vscode.Disposable | null = null;
 
   // Standard GraphQL introspection query
   private static readonly INTROSPECTION_QUERY = `
@@ -138,6 +144,36 @@ export class QueryEditorPanel {
     }
   `;
 
+  // Helper function to recursively map property schema including nested properties
+  private _mapPropertySchema(prop: PropertyConfig): {
+    name: string;
+    dataType: string[];
+    description?: string;
+    nestedProperties?: Array<{
+      name: string;
+      dataType: string[];
+      description?: string;
+      nestedProperties?: any[];
+    }>;
+  } {
+    const result: any = {
+      name: prop.name || '',
+      dataType: Array.isArray((prop as any).dataType)
+        ? ((prop as any).dataType as string[])
+        : [((prop as any).dataType as any) || 'string'],
+      description: (prop as any).description,
+    };
+
+    // Extract nested properties for object-type properties
+    if (result.dataType.includes('object') && (prop as any).nestedProperties) {
+      result.nestedProperties = ((prop as any).nestedProperties as PropertyConfig[]).map((nested) =>
+        this._mapPropertySchema(nested)
+      );
+    }
+
+    return result;
+  }
+
   // Minimal schema types for webview compatibility
   private async _fetchSchema(): Promise<{
     classes: Array<{
@@ -147,11 +183,18 @@ export class QueryEditorPanel {
         name: string;
         dataType: string[];
         description?: string;
+        nestedProperties?: any[];
       }>;
     }>;
   }> {
+    // Check if connection is still active (state is maintained by the listener)
+    // No need to refresh here - listener keeps state synchronized
+    if (!this._isConnectionActive) {
+      throw new Error(QueryEditorPanel.CONNECTION_ERROR_MESSAGE);
+    }
+
     if (!this._weaviateClient) {
-      throw new Error('Not connected to Weaviate');
+      throw new Error(QueryEditorPanel.CONNECTION_MISSING_MESSAGE);
     }
 
     // Use Weaviate v3 collections API and adapt to legacy schema shape expected by webview
@@ -160,15 +203,49 @@ export class QueryEditorPanel {
       classes: (collections || []).map((collection: CollectionConfig) => ({
         class: collection.name || '',
         description: (collection as any).description,
-        properties: (collection.properties || []).map((prop: PropertyConfig) => ({
-          name: prop.name || '',
-          dataType: Array.isArray((prop as any).dataType)
-            ? ((prop as any).dataType as string[])
-            : [((prop as any).dataType as any) || 'string'],
-          description: (prop as any).description,
-        })),
+        properties: (collection.properties || []).map((prop: PropertyConfig) =>
+          this._mapPropertySchema(prop)
+        ),
       })),
     };
+  }
+
+  /**
+   * Updates the connection state by checking if the connection is still connected
+   * and notifies the webview of the status change
+   */
+  private _updateConnectionState(): void {
+    const connectionId = this._options.connectionId;
+    if (!connectionId) {
+      this._isConnectionActive = false;
+      this._notifyConnectionStatus(false);
+      return;
+    }
+
+    const connection = this._connectionManager?.getConnection?.(connectionId);
+    const wasConnected = this._isConnectionActive;
+    const isNowConnected = connection?.status === 'connected';
+
+    this._isConnectionActive = isNowConnected;
+
+    // Only notify the webview if the connection state changed
+    if (wasConnected !== isNowConnected) {
+      this._notifyConnectionStatus(isNowConnected);
+    }
+  }
+
+  /**
+   * Sends the current connection status to the webview
+   */
+  private _notifyConnectionStatus(isConnected: boolean): void {
+    try {
+      this._panel.webview.postMessage({
+        type: 'connectionStatusChanged',
+        isConnected,
+      });
+    } catch (error) {
+      console.warn('Failed to notify webview of connection status change:', error);
+    }
   }
 
   private _getActiveConnection(): WeaviateConnection | null {
@@ -393,6 +470,23 @@ export class QueryEditorPanel {
     this._panel = panel;
     this._context = context;
     this._connectionManager = ConnectionManager.getInstance(context);
+
+    // Check initial connection state
+    this._updateConnectionState();
+
+    // Subscribe to connection changes from the ConnectionManager.
+    // When a connection is disconnected in the tree view, this listener ensures
+    // that all query windows using that connection are immediately notified.
+    // This maintains UI consistency across all open query editor panels.
+    if (this._connectionManager?.onConnectionsChanged) {
+      this._connectionStateListener = this._connectionManager.onConnectionsChanged(() => {
+        this._updateConnectionState();
+      });
+      if (this._connectionStateListener) {
+        this._disposables.push(this._connectionStateListener);
+      }
+    }
+
     // Some test mocks may not implement these event registration helpers
     // Guard against missing functions to make tests more robust.
     try {
@@ -455,9 +549,17 @@ export class QueryEditorPanel {
               data: { message: 'Select a collection from the Weaviate Explorer' },
             });
           }
+          // Always send current connection status
+          this._notifyConnectionStatus(this._isConnectionActive);
           break;
 
         case 'runQuery':
+          // Check if connection is still active before executing query
+          if (!this._isConnectionActive) {
+            const errorMsg = QueryEditorPanel.CONNECTION_ERROR_MESSAGE;
+            this._sendErrorToWebview(errorMsg);
+            break;
+          }
           const query = message.query;
           const queryOptions: QueryRunOptions = {
             distanceMetric: message.distanceMetric || 'cosine',
@@ -483,6 +585,12 @@ export class QueryEditorPanel {
           break;
 
         case 'explainPlan':
+          // Check if connection is still active before explaining plan
+          if (!this._isConnectionActive) {
+            const errorMsg = QueryEditorPanel.CONNECTION_ERROR_MESSAGE;
+            this._sendErrorToWebview(errorMsg);
+            break;
+          }
           await this._explainQueryPlan(message.query);
           break;
 
@@ -492,6 +600,12 @@ export class QueryEditorPanel {
           break;
 
         case 'requestSampleQuery':
+          // Check if connection is still active before generating sample query
+          if (!this._isConnectionActive) {
+            const errorMsg = QueryEditorPanel.CONNECTION_ERROR_MESSAGE;
+            this._sendErrorToWebview(errorMsg);
+            break;
+          }
           const collectionName = message.collection || this._options.collectionName;
           if (collectionName) {
             this._sendSampleQuery(collectionName);
@@ -641,9 +755,18 @@ export class QueryEditorPanel {
     options: QueryRunOptions,
     signal?: AbortSignal
   ): Promise<void> {
+    // Update and check connection status before executing query
+    this._updateConnectionState();
+    if (!this._isConnectionActive) {
+      const errorMsg = QueryEditorPanel.CONNECTION_ERROR_MESSAGE;
+      vscode.window.showErrorMessage(errorMsg);
+      this._sendErrorToWebview(errorMsg);
+      return;
+    }
+
     // Early validation
     if (!this._weaviateClient) {
-      const errorMsg = 'Not connected to Weaviate';
+      const errorMsg = QueryEditorPanel.CONNECTION_MISSING_MESSAGE;
       vscode.window.showErrorMessage(errorMsg);
       this._sendErrorToWebview(errorMsg);
       return;
@@ -832,6 +955,9 @@ export class QueryEditorPanel {
     return htmlContent;
   }
   private async _sendInitialData() {
+    // Update connection state before attempting operations
+    this._updateConnectionState();
+
     if (!this._weaviateClient) {
       const connected = await this._connectToWeaviate();
       if (!connected) {
@@ -841,7 +967,7 @@ export class QueryEditorPanel {
 
     try {
       if (!this._weaviateClient) {
-        throw new Error('Not connected to Weaviate');
+        throw new Error(QueryEditorPanel.CONNECTION_MISSING_MESSAGE);
       }
       const schema = await this._fetchSchema();
       // Try to fetch real GraphQL introspection for schema-aware editor features
@@ -946,10 +1072,20 @@ export class QueryEditorPanel {
    * @param collectionName Collection to generate query for
    */
   private async _sendSampleQuery(collectionName: string) {
+    // Update and check connection status before generating sample query
+    this._updateConnectionState();
+    if (!this._isConnectionActive) {
+      this._panel.webview.postMessage({
+        type: 'queryError',
+        error: QueryEditorPanel.CONNECTION_ERROR_MESSAGE,
+      });
+      return;
+    }
+
     if (!this._weaviateClient) {
       this._panel.webview.postMessage({
         type: 'queryError',
-        error: 'Not connected to Weaviate',
+        error: QueryEditorPanel.CONNECTION_MISSING_MESSAGE,
       });
       return;
     }
@@ -994,8 +1130,15 @@ export class QueryEditorPanel {
   }
 
   private async _explainQueryPlan(query: string) {
+    // Update and check connection status before explaining query plan
+    this._updateConnectionState();
+    if (!this._isConnectionActive) {
+      vscode.window.showErrorMessage(QueryEditorPanel.CONNECTION_ERROR_MESSAGE);
+      return;
+    }
+
     if (!this._weaviateClient) {
-      vscode.window.showErrorMessage('Not connected to Weaviate');
+      vscode.window.showErrorMessage(QueryEditorPanel.CONNECTION_MISSING_MESSAGE);
       return;
     }
 

@@ -3,6 +3,10 @@ import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTre
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
+import { BackupPanel } from './views/BackupPanel';
+import { BackupRestorePanel } from './views/BackupRestorePanel';
+import { ClusterPanel } from './views/ClusterPanel';
+import type { BackupArgs, BackupConfigCreate, BackupItem } from './types';
 
 /**
  * Handles opening of .weaviate files
@@ -147,16 +151,31 @@ export function activate(context: vscode.ExtensionContext) {
     if (item.itemType === 'connection' && item.connectionId) {
       const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
 
-      // If disconnected, show dialog asking to connect
+      // If disconnected, check autoConnect setting
       if (connection && connection.status !== 'connected') {
-        const result = await vscode.window.showInformationMessage(
-          `The connection "${connection.name}" is disconnected. Would you like to connect now?`,
-          { modal: true },
-          'Connect'
-        );
-
-        if (result === 'Connect') {
+        // If autoConnect is enabled, connect automatically without showing dialog
+        if (connection.autoConnect) {
           await weaviateTreeDataProvider.connect(item.connectionId);
+        } else {
+          // Show dialog asking to connect with option to enable auto-connect
+          const result = await vscode.window.showInformationMessage(
+            `The connection "${connection.name}" is disconnected. Would you like to connect now?`,
+            { modal: true },
+            'Connect',
+            'Connect & Auto Connect for This Cluster'
+          );
+
+          if (result === 'Connect') {
+            await weaviateTreeDataProvider.connect(item.connectionId);
+          } else if (result === 'Connect & Auto Connect for This Cluster') {
+            // Enable auto-connect for this connection
+            const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+            await connectionManager.updateConnection(item.connectionId, { autoConnect: true });
+            await weaviateTreeDataProvider.connect(item.connectionId);
+            vscode.window.showInformationMessage(
+              `Auto Connect enabled for "${connection.name}". This cluster will now connect automatically when expanded.`
+            );
+          }
         }
       }
     }
@@ -601,6 +620,566 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to refresh statistics: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Refresh backups command
+    vscode.commands.registerCommand('weaviate.refreshBackups', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh backups: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // View cluster information command
+    vscode.commands.registerCommand('weaviate.viewClusterInfo', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get node status data
+        const nodeStatusData = await client.cluster.nodes({ output: 'verbose' });
+
+        // Get connection to access openClusterViewOnConnect setting
+        const connection = connectionManager.getConnection(item.connectionId);
+
+        // Open cluster panel
+        ClusterPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          nodeStatusData,
+          connection?.name || 'Unknown',
+          async (message, postMessage) => {
+            if (message.command === 'refresh') {
+              // Refresh node status data
+              const updatedData = await client.cluster.nodes({ output: 'verbose' });
+              const updatedConnection = connectionManager.getConnection(item.connectionId);
+              postMessage({
+                command: 'updateData',
+                nodeStatusData: updatedData,
+                openClusterViewOnConnect: updatedConnection?.openClusterViewOnConnect,
+              });
+            } else if (message.command === 'toggleAutoOpen') {
+              // Update connection openClusterViewOnConnect setting
+              try {
+                const currentConnection = connectionManager.getConnection(item.connectionId);
+                if (currentConnection) {
+                  await connectionManager.updateConnection(item.connectionId, {
+                    openClusterViewOnConnect: message.value,
+                  });
+                  vscode.window.showInformationMessage(
+                    message.value
+                      ? 'Cluster view will now open automatically on connect'
+                      : 'Cluster view auto-open disabled'
+                  );
+                }
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to update setting: ${errorMessage}`);
+              }
+            } else if (message.command === 'updateShardStatus') {
+              // Update shard status
+              try {
+                const collection = client.collections.get(message.collection);
+                const shardNames = message.shardNames || [message.shardName]; // Support both array and single
+
+                // updateShards accepts string or string[]
+                await collection.config.updateShards(message.newStatus, shardNames);
+
+                // Show success message
+                const shardText =
+                  shardNames.length === 1
+                    ? `Shard ${shardNames[0]}`
+                    : `${shardNames.length} shards`;
+                vscode.window.showInformationMessage(
+                  `${shardText} status updated to ${message.newStatus}`
+                );
+
+                // Refresh the data
+                const updatedData = await client.cluster.nodes({ output: 'verbose' });
+                postMessage({
+                  command: 'updateData',
+                  nodeStatusData: updatedData,
+                });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to update shard status: ${errorMessage}`);
+              }
+            }
+          },
+          connection?.openClusterViewOnConnect
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to get cluster information: ${errorMessage}`);
+      }
+    }),
+
+    // Create backup command
+    vscode.commands.registerCommand('weaviate.createBackup', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Get available modules
+        const meta = await client.getMeta();
+        const availableModules = meta.modules || {};
+
+        // Open backup panel
+        const panel = BackupPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          collectionNames,
+          availableModules,
+          async (backupData) => {
+            // Create backup with waitForCompletion: false
+            const backupConfig: BackupArgs<BackupConfigCreate> = {
+              backupId: backupData.backupId,
+              backend: backupData.backend,
+              waitForCompletion: false,
+              includeCollections: backupData.includeCollections,
+              excludeCollections: backupData.excludeCollections,
+            };
+
+            // Add optional config parameters if provided
+            if (backupData.cpuPercentage !== undefined) {
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.cpuPercentage = backupData.cpuPercentage;
+            }
+            if (backupData.chunkSize !== undefined) {
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.chunkSize = backupData.chunkSize;
+            }
+            if (backupData.compressionLevel) {
+              backupConfig.config = backupConfig.config || {};
+              backupConfig.config.compressionLevel = backupData.compressionLevel;
+            }
+
+            await client.backup.create(backupConfig);
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchBackups') {
+              try {
+                // Fetch all backups from all backends
+                const backupModules = Object.keys(availableModules).filter((key) =>
+                  key.startsWith('backup-')
+                );
+
+                const allBackups: BackupItem[] = [];
+
+                for (const moduleName of backupModules) {
+                  const backend = moduleName.replace('backup-', '') as any;
+                  try {
+                    const backupsResponse = await client.backup.list(backend);
+
+                    if (backupsResponse && Array.isArray(backupsResponse)) {
+                      const backupsWithBackend = backupsResponse.map((b: any) => {
+                        // Calculate duration if startedAt and completedAt are present
+                        let duration = undefined;
+                        if (b.startedAt && b.completedAt) {
+                          try {
+                            const start = new Date(b.startedAt).getTime();
+                            const end = new Date(b.completedAt).getTime();
+                            const diffMs = end - start;
+
+                            if (diffMs >= 0 && !isNaN(diffMs)) {
+                              const seconds = Math.floor(diffMs / 1000);
+                              const minutes = Math.floor(seconds / 60);
+                              const hours = Math.floor(minutes / 60);
+                              const days = Math.floor(hours / 24);
+
+                              const parts: string[] = [];
+
+                              if (days > 0) {
+                                parts.push(`${days}d`);
+                              }
+                              if (hours % 24 > 0) {
+                                parts.push(`${hours % 24}h`);
+                              }
+                              if (minutes % 60 > 0) {
+                                parts.push(`${minutes % 60}m`);
+                              }
+                              if (seconds % 60 > 0 && hours === 0) {
+                                parts.push(`${seconds % 60}s`);
+                              }
+
+                              duration = parts.length > 0 ? parts.join(' ') : '0s';
+                            }
+                          } catch (error) {
+                            // Duration calculation failed, leave it undefined
+                          }
+                        }
+
+                        return {
+                          id: b.id,
+                          backend: backend,
+                          status: b.status,
+                          error: b.error,
+                          path: b.path,
+                          collections: b.collections || [],
+                          duration: duration,
+                        };
+                      });
+                      allBackups.push(...backupsWithBackend);
+                    }
+                  } catch (err) {
+                    console.error(`Failed to fetch backups from ${backend}:`, err);
+                  }
+                }
+
+                postMessage({
+                  command: 'backupsList',
+                  backups: allBackups,
+                });
+
+                // Refresh the tree view backups
+                await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            } else if (message.command === 'cancelBackup') {
+              try {
+                const { backupId, backend } = message;
+                const cancelStatus = await client.backup.cancel({
+                  backupId: backupId,
+                  backend: backend,
+                });
+
+                postMessage({
+                  command: 'backupCancelled',
+                  backupId: backupId,
+                  status: cancelStatus,
+                });
+
+                // Refresh the tree view backups
+                await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            } else if (message.command === 'viewBackup') {
+              try {
+                const { backupId, backend } = message;
+
+                // Get backup details from the backend
+                const backupsResponse = await client.backup.list(backend);
+                const backupDetails = backupsResponse?.find((b: any) => b.id === backupId);
+
+                if (!backupDetails) {
+                  postMessage({
+                    command: 'error',
+                    message: 'Backup not found',
+                  });
+                  return;
+                }
+
+                // Open BackupRestorePanel
+                await BackupRestorePanel.createOrShow(
+                  context.extensionUri,
+                  item.connectionId,
+                  backupId,
+                  backend,
+                  collectionNames,
+                  { ...backupDetails, backend },
+                  async (restoreData) => {
+                    try {
+                      const restoreConfig: any = {
+                        backupId: restoreData.backupId,
+                        backend: restoreData.backend,
+                      };
+
+                      if (restoreData.waitForCompletion !== undefined) {
+                        restoreConfig.waitForCompletion = restoreData.waitForCompletion;
+                      }
+                      if (
+                        restoreData.includeCollections &&
+                        restoreData.includeCollections.length > 0
+                      ) {
+                        restoreConfig.includeCollections = restoreData.includeCollections;
+                      }
+                      if (
+                        restoreData.excludeCollections &&
+                        restoreData.excludeCollections.length > 0
+                      ) {
+                        restoreConfig.excludeCollections = restoreData.excludeCollections;
+                      }
+                      if (restoreData.cpuPercentage !== undefined) {
+                        restoreConfig.cpuPercentage = restoreData.cpuPercentage;
+                      }
+                      if (restoreData.path) {
+                        restoreConfig.path = restoreData.path;
+                      }
+                      if (restoreData.rolesOptions) {
+                        restoreConfig.rolesOptions = restoreData.rolesOptions;
+                      }
+                      if (restoreData.usersOptions) {
+                        restoreConfig.usersOptions = restoreData.usersOptions;
+                      }
+
+                      const result = await client.backup.restore(restoreConfig);
+
+                      vscode.window.showInformationMessage(
+                        `Backup restore initiated. Status: ${result.status}`
+                      );
+
+                      setTimeout(async () => {
+                        await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                      }, 2000);
+                    } catch (error) {
+                      throw error;
+                    }
+                  },
+                  async (msg, postMsg) => {
+                    if (msg.command === 'fetchRestoreStatus') {
+                      try {
+                        const restoreStatus = await client.backup.getRestoreStatus({
+                          backend: msg.backend,
+                          backupId: msg.backupId,
+                        });
+
+                        postMsg({
+                          command: 'restoreStatus',
+                          status: restoreStatus,
+                        });
+
+                        await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                      } catch (error) {
+                        postMsg({
+                          command: 'error',
+                          message: error instanceof Error ? error.message : String(error),
+                        });
+                      }
+                    }
+                  }
+                );
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to open backup panel: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Restore backup command
+    vscode.commands.registerCommand('weaviate.restoreBackup', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or backup information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get backup details from cache
+        const backupDetails = weaviateTreeDataProvider.getBackupDetails(
+          item.connectionId,
+          item.itemId
+        );
+
+        if (!backupDetails) {
+          vscode.window.showErrorMessage('Backup details not found');
+          return;
+        }
+
+        // Only allow restore for SUCCESS backups
+        if (backupDetails.status !== 'SUCCESS') {
+          vscode.window.showWarningMessage(
+            `Cannot restore backup with status: ${backupDetails.status}. Only SUCCESS backups can be restored.`
+          );
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Open restore panel
+        const panel = BackupRestorePanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          backupDetails.id,
+          backupDetails.backend,
+          collectionNames,
+          backupDetails,
+          async (restoreData) => {
+            try {
+              // Restore backup - build config object
+              const restoreConfig: any = {
+                backupId: restoreData.backupId,
+                backend: restoreData.backend,
+              };
+
+              // Add waitForCompletion
+              if (restoreData.waitForCompletion !== undefined) {
+                restoreConfig.waitForCompletion = restoreData.waitForCompletion;
+              }
+
+              // Add optional parameters only if they have values
+              if (restoreData.includeCollections && restoreData.includeCollections.length > 0) {
+                restoreConfig.includeCollections = restoreData.includeCollections;
+              }
+              if (restoreData.excludeCollections && restoreData.excludeCollections.length > 0) {
+                restoreConfig.excludeCollections = restoreData.excludeCollections;
+              }
+              if (restoreData.cpuPercentage !== undefined) {
+                restoreConfig.cpuPercentage = restoreData.cpuPercentage;
+              }
+              if (restoreData.path) {
+                restoreConfig.path = restoreData.path;
+              }
+              if (restoreData.rolesOptions) {
+                restoreConfig.rolesOptions = restoreData.rolesOptions;
+              }
+              if (restoreData.usersOptions) {
+                restoreConfig.usersOptions = restoreData.usersOptions;
+              }
+              console.log('calling backup.restore with config:', restoreConfig);
+              const result = await client.backup.restore(restoreConfig);
+
+              vscode.window.showInformationMessage(
+                `Backup restore initiated. Status: ${result.status}`
+              );
+
+              // Refresh collections after restore
+              setTimeout(async () => {
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+              }, 2000);
+            } catch (error) {
+              throw error; // Re-throw to be handled by the panel
+            }
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchRestoreStatus') {
+              try {
+                const { backupId, backend } = message;
+
+                const restoreStatus = await client.backup.getRestoreStatus({ backend, backupId });
+
+                postMessage({
+                  command: 'restoreStatus',
+                  status: restoreStatus,
+                });
+
+                // Refresh collections after each status check
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to restore backup: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Refresh collections command
+    vscode.commands.registerCommand('weaviate.refreshCollections', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh collections: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Refresh nodes command
+    vscode.commands.registerCommand('weaviate.refreshNodes', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshNodes(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh nodes: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
+    // Refresh metadata command
+    vscode.commands.registerCommand('weaviate.refreshMetadata', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshMetadata(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh metadata: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }),

@@ -8,7 +8,7 @@ This guide covers the complete process for releasing the Weaviate Studio extensi
 
 - [ ] All tests passing (`npm test`)
 - [ ] Linting passes (`npm run lint`)
-- [ ] Extension builds successfully (`npm run compile && npm run build:webview && npm run build:add-collection`)
+- [ ] Extension builds successfully (`npm install && npm run compile && npm run build:webview && npm run build:add-collection`)
 - [ ] Manual testing completed across supported VS Code versions
 - [ ] All features working as expected
 

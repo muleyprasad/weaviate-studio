@@ -1,0 +1,316 @@
+/* Backup-specific styles - reuses theme.css for base styles */
+
+.backup-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.backup-header {
+  margin-bottom: 20px;
+}
+
+.backup-header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.new-backup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.new-backup-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.error-message {
+  padding: 10px;
+  margin-bottom: 20px;
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 3px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+}
+
+.form-section {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+.collections-section-title {
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.collections-hint {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.radio-group {
+  margin-bottom: 10px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.radio-input {
+  margin-right: 8px;
+}
+
+.collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.collections-empty {
+  font-style: italic;
+}
+
+.collection-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 2px;
+  transition: background-color 0.1s ease;
+}
+
+.collection-checkbox:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.collection-checkbox input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.collection-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.collection-name {
+  margin-left: 8px;
+}
+
+/* Collapsible header */
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 10px;
+}
+
+.collapsible-header:hover {
+  opacity: 0.8;
+}
+
+.collapsible-header:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.collapse-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 5px;
+  font-size: 0.8em;
+}
+
+.collapse-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* Advanced configuration grid */
+.advanced-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  padding: 10px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label-small {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.form-input-small {
+  padding: 6px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-family: var(--vscode-font-family);
+  font-size: 13px;
+}
+
+.form-input-small:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.form-input-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--vscode-panel-border);
+  margin: 30px 0;
+}
+
+input[type="text"]:focus,
+select:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+input[type="text"]:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.backups-status-section {
+  margin-top: 30px;
+}
+
+.backups-status-section.expanded {
+  margin-top: 0;
+}
+
+.backups-status-section.expanded .status-title {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.backups-status-section.expanded .theme-table {
+  font-size: 16px;
+}
+
+.backups-status-section.expanded .theme-table-cell {
+  padding: 16px;
+}
+
+.backups-status-section.expanded .status-badge {
+  font-size: 1.1em;
+  padding: 6px 12px;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.status-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.status-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auto-refresh-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.auto-refresh-label input {
+  cursor: pointer;
+}
+
+.refresh-interval-select {
+  padding: 4px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.backups-empty {
+  font-style: italic;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Status badge styles */
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.status-success {
+  background-color: rgba(0, 128, 0, 0.2);
+  color: var(--vscode-terminal-ansiGreen, #4caf50);
+}
+
+.status-failed {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: var(--vscode-errorForeground, #f44336);
+}
+
+.status-started,
+.status-transferring {
+  background-color: rgba(255, 165, 0, 0.2);
+  color: var(--vscode-notificationsWarningIcon-foreground, #ff9800);
+}

@@ -27,6 +27,8 @@ export class GraphQLEditor {
   private disposables: monaco.IDisposable[] = [];
   private currentCollectionName: string = 'Article';
   private schemaConfigRetryHandle: number | null = null;
+  private schemaConfigRetryCount: number = 0;
+  private readonly MAX_SCHEMA_CONFIG_RETRIES = 10;
 
   // Event listener management
   private changeListeners: Array<(value: string) => void> = [];
@@ -368,17 +370,44 @@ export class GraphQLEditor {
   }
 
   /**
-   * Configure GraphQL language support with schema
+   * Configure GraphQL language support with schema.
+   *
+   * RETRY LOGIC RATIONALE:
+   * The monaco-graphql language service requires initialization that happens asynchronously.
+   * When configureGraphQLLanguage is called shortly after editor creation, the GraphQL API
+   * may not be ready yet. Rather than failing silently, we implement bounded retries to:
+   *
+   * 1. Wait for the GraphQL language service to initialize (max 10 attempts, 100ms apart)
+   * 2. Provide clear progress logging for debugging connection issues
+   * 3. Fail gracefully with a clear error message after max retries
+   * 4. Ensure users still get a functional editor even if language features are unavailable
+   *
+   * This prevents browser hangs (bounded by MAX_SCHEMA_CONFIG_RETRIES) while maximizing
+   * the chance that schema-aware features (autocomplete, diagnostics) become available.
    */
   public async configureGraphQLLanguage(schemaConfig: GraphQLSchema): Promise<void> {
     this.schemaConfig = schemaConfig;
     try {
       const api = (monaco.languages as any).graphql?.api;
       if (!api || typeof api.setSchemaConfig !== 'function') {
+        // Retry limit check: prevent infinite retry loops
+        if (this.schemaConfigRetryCount >= this.MAX_SCHEMA_CONFIG_RETRIES) {
+          console.error(
+            `Failed to configure GraphQL language service after ${this.MAX_SCHEMA_CONFIG_RETRIES} retries. Schema features may not work correctly.`
+          );
+          return;
+        }
+
         if (this.schemaConfigRetryHandle) {
           window.clearTimeout(this.schemaConfigRetryHandle);
         }
-        console.warn('GraphQL language service not ready; retrying schema configuration...');
+
+        this.schemaConfigRetryCount++;
+        console.warn(
+          `GraphQL language service not ready; retrying schema configuration (attempt ${this.schemaConfigRetryCount}/${this.MAX_SCHEMA_CONFIG_RETRIES})...`
+        );
+
+        // Wait 100ms before retrying to give the language service time to initialize
         this.schemaConfigRetryHandle = window.setTimeout(() => {
           this.schemaConfigRetryHandle = null;
           if (this.schemaConfig) {
@@ -387,6 +416,9 @@ export class GraphQLEditor {
         }, 100);
         return;
       }
+
+      // Language service ready: reset retry counter for future attempts
+      this.schemaConfigRetryCount = 0;
 
       if (schemaConfig?.introspectionJSON) {
         // Associate the schema to the model via fileMatch and uri
@@ -506,6 +538,30 @@ export class GraphQLEditor {
         markers.push({
           severity: monaco.MarkerSeverity.Error,
           message: `Invalid certainty value (${certainty}). Must be between 0 and 1.`,
+          startLineNumber,
+          startColumn,
+          endLineNumber,
+          endColumn,
+        });
+      }
+    }
+
+    // Soft warn for distance thresholds (metric-dependent)
+    const distanceRegex = /distance:\s*([0-9]*\.?[0-9]+)/gi;
+    while ((match = distanceRegex.exec(value)) !== null) {
+      const distance = parseFloat(match[1]);
+      const startLineNumber = model.getPositionAt(match.index).lineNumber;
+      const startColumn = model.getPositionAt(match.index).column;
+      const endLineNumber = model.getPositionAt(match.index + match[0].length).lineNumber;
+      const endColumn = model.getPositionAt(match.index + match[0].length).column;
+
+      // Do not hard error; ranges depend on the distance metric (cosine, dot, euclidean).
+      // Warn on obviously invalid negatives and unusually high thresholds.
+      if (distance < 0 || distance > 10) {
+        markers.push({
+          severity: monaco.MarkerSeverity.Warning,
+          message:
+            'Distance thresholds are metric-dependent (e.g., cosine typically ~0-2). Lower values are stricter. Verify the metric and tune accordingly.',
           startLineNumber,
           startColumn,
           endLineNumber,
