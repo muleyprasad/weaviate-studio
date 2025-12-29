@@ -93,6 +93,13 @@ describe('Add Collection', () => {
     capturedOnMessage = undefined;
     postMessageSpy = jest.fn();
 
+    // Garante que getClient sempre retorna um mock completo
+    mockConnectionManager.getClient.mockImplementation(() => ({
+      alias: { listAll: jest.fn().mockResolvedValue([]) },
+      getMeta: jest.fn().mockResolvedValue({}),
+      cluster: { nodes: jest.fn().mockResolvedValue({ nodes: [] }) },
+    }));
+
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
 
     // Mock fetchCollectionsData to prevent real network calls
