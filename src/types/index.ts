@@ -213,7 +213,14 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       | 'generativeConfig'
       | 'rerankerConfig'
       | 'connectionLinks'
-      | 'connectionLink',
+      | 'connectionLink'
+      | 'rbacGroup'
+      | 'rbacRoles'
+      | 'rbacRole'
+      | 'rbacUsers'
+      | 'rbacUser'
+      | 'rbacGroups'
+      | 'rbacGroupItem',
     public readonly connectionId?: string,
     public readonly collectionName?: string,
     public readonly itemId?: string,

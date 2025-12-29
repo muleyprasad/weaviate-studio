@@ -124,6 +124,47 @@ async function handleWeaviateFile(
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
+  // RBAC: Context commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('weaviate.rbac.addRole', async (item) => {
+      vscode.window.showInformationMessage('Add Role (implement UI/form)');
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.editRole', async (item) => {
+      vscode.window.showInformationMessage(`Edit Role: ${item?.label} (implement UI/form)`);
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.deleteRole', async (item) => {
+      vscode.window.showInformationMessage(
+        `Delete Role: ${item?.label} (implement confirmation and deletion)`
+      );
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.addUser', async (item) => {
+      vscode.window.showInformationMessage('Add User (implement UI/form)');
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.editUser', async (item) => {
+      vscode.window.showInformationMessage(`Edit User: ${item?.label} (implement UI/form)`);
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.deleteUser', async (item) => {
+      vscode.window.showInformationMessage(
+        `Delete User: ${item?.label} (implement confirmation and deletion)`
+      );
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.rotateUserApiKey', async (item) => {
+      vscode.window.showInformationMessage(
+        `Rotate User API Key: ${item?.label} (implement action)`
+      );
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.addGroup', async (item) => {
+      vscode.window.showInformationMessage('Add Group (implement UI/form)');
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.editGroup', async (item) => {
+      vscode.window.showInformationMessage(`Edit Group: ${item?.label} (implement UI/form)`);
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.deleteGroup', async (item) => {
+      vscode.window.showInformationMessage(
+        `Delete Group: ${item?.label} (implement confirmation and deletion)`
+      );
+    })
+  );
   console.log('"Weaviate Studio" extension is now active');
 
   // Create and register the TreeDataProvider
