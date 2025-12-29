@@ -6,7 +6,8 @@ import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviat
 import { BackupPanel } from './views/BackupPanel';
 import { BackupRestorePanel } from './views/BackupRestorePanel';
 import { ClusterPanel } from './views/ClusterPanel';
-import type { BackupArgs, BackupConfigCreate, BackupItem } from './types';
+import { AliasPanel } from './views/AliasPanel';
+import type { BackupArgs, BackupConfigCreate, BackupItem, AliasItem } from './types';
 
 /**
  * Handles opening of .weaviate files
@@ -640,6 +641,22 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
 
+    // Refresh aliases command
+    vscode.commands.registerCommand('weaviate.refreshAliases', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshAliases(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh aliases: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
     // View cluster information command
     vscode.commands.registerCommand('weaviate.viewClusterInfo', async (item) => {
       if (!item?.connectionId) {
@@ -1006,6 +1023,229 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(
           `Failed to open backup panel: ${error instanceof Error ? error.message : String(error)}`
         );
+      }
+    }),
+
+    // Manage aliases command (create new alias)
+    vscode.commands.registerCommand('weaviate.manageAliases', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Open alias panel in create mode
+        const panel = AliasPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          collectionNames,
+          'create', // mode
+          undefined, // aliasToEdit
+          async (aliasData) => {
+            // Create alias
+            await client.alias.create({
+              alias: aliasData.alias,
+              collection: aliasData.collection,
+            });
+            // Refresh aliases in tree view after creation
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (aliasData) => {
+            // Update alias
+            await client.alias.update({
+              alias: aliasData.alias,
+              newTargetCollection: aliasData.newTargetCollection,
+            });
+            // Refresh aliases in tree view after update
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (alias: string) => {
+            // Delete alias
+            await client.alias.delete(alias);
+            // Refresh aliases in tree view after deletion
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchAliases') {
+              try {
+                // Fetch all aliases
+                const aliasesResponse = await client.alias.listAll();
+                const aliases: AliasItem[] = aliasesResponse
+                  ? (aliasesResponse as any[]).map((aliasObj: any) => ({
+                      alias: aliasObj.alias,
+                      collection: aliasObj.collection,
+                    }))
+                  : [];
+
+                postMessage({
+                  command: 'aliasesData',
+                  aliases,
+                });
+
+                // Refresh aliases in tree view
+                await weaviateTreeDataProvider.refreshAliases(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to open alias management: ${errorMessage}`);
+      }
+    }),
+
+    // Edit alias command
+    vscode.commands.registerCommand('weaviate.editAlias', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing alias information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get collections
+        const collections = await client.collections.listAll();
+        const collectionNames = Object.keys(collections).map(
+          (key: string) => (collections as any)[key].name
+        );
+
+        // Get alias details
+        const aliasesResponse = await client.alias.listAll();
+        const aliases: AliasItem[] = aliasesResponse
+          ? (aliasesResponse as any[]).map((aliasObj: any) => ({
+              alias: aliasObj.alias,
+              collection: aliasObj.collection,
+            }))
+          : [];
+
+        const aliasToEdit = aliases.find((a) => a.alias === item.itemId);
+
+        // Open alias panel in edit mode
+        const panel = AliasPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          collectionNames,
+          'edit', // mode
+          aliasToEdit, // aliasToEdit
+          async (aliasData) => {
+            // Create alias
+            await client.alias.create({
+              alias: aliasData.alias,
+              collection: aliasData.collection,
+            });
+            // Refresh aliases in tree view after creation
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (aliasData) => {
+            // Update alias
+            await client.alias.update({
+              alias: aliasData.alias,
+              newTargetCollection: aliasData.newTargetCollection,
+            });
+            // Refresh aliases in tree view after update
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (alias: string) => {
+            // Delete alias
+            await client.alias.delete(alias);
+            // Refresh aliases in tree view after deletion
+            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+          },
+          async (message, postMessage) => {
+            // Handle additional messages
+            if (message.command === 'fetchAliases') {
+              try {
+                // Fetch all aliases
+                const aliasesResponse = await client.alias.listAll();
+                const aliases: AliasItem[] = aliasesResponse
+                  ? (aliasesResponse as any[]).map((aliasObj: any) => ({
+                      alias: aliasObj.alias,
+                      collection: aliasObj.collection,
+                    }))
+                  : [];
+
+                postMessage({
+                  command: 'aliasesData',
+                  aliases,
+                });
+
+                // Refresh aliases in tree view
+                await weaviateTreeDataProvider.refreshAliases(item.connectionId);
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to edit alias: ${errorMessage}`);
+      }
+    }),
+
+    // Delete alias command
+    vscode.commands.registerCommand('weaviate.deleteAlias', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing alias information');
+        return;
+      }
+
+      try {
+        const confirmation = await vscode.window.showWarningMessage(
+          `Are you sure you want to delete the alias "${item.itemId}"?`,
+          { modal: true },
+          'Delete'
+        );
+
+        if (confirmation !== 'Delete') {
+          return;
+        }
+
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        await client.alias.delete(item.itemId);
+
+        await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
+        vscode.window.showInformationMessage(`Alias "${item.itemId}" deleted successfully`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Failed to delete alias: ${errorMessage}`);
       }
     }),
 

@@ -39,6 +39,12 @@ export interface BackupItem {
   classes?: string[]; // Legacy field, use 'collections' instead
 }
 
+// Alias item representing a collection alias
+export interface AliasItem {
+  alias: string;
+  collection: string;
+}
+
 // Available modules type
 export interface AvailableModules {
   [key: string]: {
@@ -179,6 +185,8 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       | 'backup'
       | 'backups'
       | 'backupItem'
+      | 'aliases'
+      | 'aliasItem'
       | 'serverInfo'
       | 'clusterHealth'
       | 'modules'
