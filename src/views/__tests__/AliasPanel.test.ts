@@ -30,7 +30,9 @@ describe('AliasPanel', () => {
         }),
         cspSource: 'csp',
       },
-      onDidDispose: jest.fn(),
+      onDidDispose: jest.fn((callback) => {
+        return { dispose: jest.fn() };
+      }),
       reveal: jest.fn(),
       dispose: jest.fn(),
       viewColumn: 1,
@@ -39,6 +41,8 @@ describe('AliasPanel', () => {
         return '';
       },
     };
+    // Mocka vscode.window.createWebviewPanel para retornar mockPanel
+    jest.spyOn(vscode.window, 'createWebviewPanel').mockImplementation(() => mockPanel);
     mockExtensionUri = { fsPath: '/mock/uri' };
     mockOnCreate = jest.fn().mockResolvedValue(undefined);
     mockOnUpdate = jest.fn().mockResolvedValue(undefined);
@@ -51,9 +55,8 @@ describe('AliasPanel', () => {
   });
   it('should handle error in onCreateCallback and post error', async () => {
     mockOnCreate.mockRejectedValueOnce(new Error('fail-create'));
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'create',
@@ -73,9 +76,8 @@ describe('AliasPanel', () => {
 
   it('should handle error in onUpdateCallback and post error', async () => {
     mockOnUpdate.mockRejectedValueOnce(new Error('fail-update'));
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'edit',
@@ -95,9 +97,8 @@ describe('AliasPanel', () => {
 
   it('should handle error in onDeleteCallback and post error', async () => {
     mockOnDelete.mockRejectedValueOnce(new Error('fail-delete'));
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'edit',
@@ -115,9 +116,8 @@ describe('AliasPanel', () => {
   });
 
   it('should send initData on ready command', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
@@ -138,9 +138,8 @@ describe('AliasPanel', () => {
   });
 
   it('should dispose panel on cancel command', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
@@ -156,9 +155,8 @@ describe('AliasPanel', () => {
   });
 
   it('should call postMessage method', () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
@@ -176,9 +174,8 @@ describe('AliasPanel', () => {
     fsMock.readFileSync.mockImplementationOnce(() => {
       throw new Error('fail');
     });
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
@@ -198,9 +195,8 @@ describe('AliasPanel', () => {
   });
 
   it('should create a new AliasPanel and set currentPanel', () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'create',
@@ -214,9 +210,8 @@ describe('AliasPanel', () => {
   });
 
   it('should call onCreateCallback and post aliasCreated', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'create',
@@ -236,9 +231,8 @@ describe('AliasPanel', () => {
   });
 
   it('should call onUpdateCallback and post aliasUpdated', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'edit',
@@ -258,9 +252,8 @@ describe('AliasPanel', () => {
   });
 
   it('should call onDeleteCallback and post aliasDeleted', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'edit',
@@ -279,9 +272,8 @@ describe('AliasPanel', () => {
   });
 
   it('should dispose and clear currentPanel', () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
@@ -297,9 +289,8 @@ describe('AliasPanel', () => {
   });
 
   it('should delegate unknown command to onMessageCallback', async () => {
-    const panel = new AliasPanel(
-      mockPanel as any,
-      mockExtensionUri,
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
       connectionId,
       collections,
       'list',
