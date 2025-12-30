@@ -70,6 +70,14 @@
         "title": "Delete User"
       },
       {
+        "command": "weaviate.rbac.activateUser",
+        "title": "Activate User"
+      },
+      {
+        "command": "weaviate.rbac.deactivateUser",
+        "title": "Deactivate User"
+      },
+      {
         "command": "weaviate.rbac.rotateUserApiKey",
         "title": "Rotate User API Key"
       },
@@ -194,6 +202,11 @@
       {
         "command": "weaviate.refreshMetadata",
         "title": "Refresh Metadata",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "weaviate.refreshRbac",
+        "title": "Refresh RBAC",
         "icon": "$(refresh)"
       },
       {
@@ -331,6 +344,11 @@
       ],
       "view/item/context": [
         {
+          "command": "weaviate.refreshRbac",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacGroup",
+          "group": "inline@1"
+        },
+        {
           "command": "weaviate.rbac.addRole",
           "when": "view == weaviateConnectionsView && viewItem == weaviateRbacRoles",
           "group": "rbac@1"
@@ -352,18 +370,28 @@
         },
         {
           "command": "weaviate.rbac.editUser",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacUser",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateRbacUserActive || viewItem == weaviateRbacUserInactive || viewItem == weaviateRbacUserActive_DbEnvUser || viewItem == weaviateRbacUserInactive_DbEnvUser)",
           "group": "rbac@2"
         },
         {
           "command": "weaviate.rbac.deleteUser",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacUser",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateRbacUserActive || viewItem == weaviateRbacUserInactive) && viewItem != weaviateRbacUserActive_DbEnvUser && viewItem != weaviateRbacUserInactive_DbEnvUser",
           "group": "rbac@3"
         },
         {
-          "command": "weaviate.rbac.rotateUserApiKey",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacUser",
+          "command": "weaviate.rbac.activateUser",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacUserInactive",
           "group": "rbac@4"
+        },
+        {
+          "command": "weaviate.rbac.deactivateUser",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacUserActive",
+          "group": "rbac@5"
+        },
+        {
+          "command": "weaviate.rbac.rotateUserApiKey",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateRbacUserActive || viewItem == weaviateRbacUserInactive) && viewItem != weaviateRbacUserActive_DbEnvUser && viewItem != weaviateRbacUserInactive_DbEnvUser",
+          "group": "rbac@6"
         },
         {
           "command": "weaviate.rbac.addGroup",

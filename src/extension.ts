@@ -133,9 +133,38 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(`Edit Role: ${item?.label} (implement UI/form)`);
     }),
     vscode.commands.registerCommand('weaviate.rbac.deleteRole', async (item) => {
-      vscode.window.showInformationMessage(
-        `Delete Role: ${item?.label} (implement confirmation and deletion)`
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or role information');
+        return;
+      }
+
+      const roleName = item.itemId;
+      const confirmation = await vscode.window.showWarningMessage(
+        `Are you sure you want to delete role "${roleName}"? This action cannot be undone.`,
+        { modal: true },
+        'Delete'
       );
+
+      if (confirmation !== 'Delete') {
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+
+        await client.roles.delete(roleName);
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        vscode.window.showInformationMessage(`Role "${roleName}" deleted successfully`);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to delete role: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.addUser', async (item) => {
       vscode.window.showInformationMessage('Add User (implement UI/form)');
@@ -144,14 +173,141 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(`Edit User: ${item?.label} (implement UI/form)`);
     }),
     vscode.commands.registerCommand('weaviate.rbac.deleteUser', async (item) => {
-      vscode.window.showInformationMessage(
-        `Delete User: ${item?.label} (implement confirmation and deletion)`
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or user information');
+        return;
+      }
+
+      const userId = item.itemId;
+      const confirmation = await vscode.window.showWarningMessage(
+        `Are you sure you want to delete user "${userId}"? This action cannot be undone.`,
+        { modal: true },
+        'Delete'
       );
+
+      if (confirmation !== 'Delete') {
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+
+        const result = await client.users.db.delete(userId);
+
+        // Check if deletion was successful
+        if (result === false) {
+          vscode.window.showErrorMessage(
+            `Failed to delete user "${userId}". The operation was not successful.`
+          );
+          return;
+        }
+
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        vscode.window.showInformationMessage(`User "${userId}" deleted successfully`);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to delete user: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.activateUser', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or user information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+
+        const userId = item.itemId;
+        await client.users.db.activate(userId);
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        vscode.window.showInformationMessage(`User "${userId}" activated successfully`);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to activate user: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+    vscode.commands.registerCommand('weaviate.rbac.deactivateUser', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or user information');
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+
+        const userId = item.itemId;
+        await client.users.db.deactivate(userId);
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        vscode.window.showInformationMessage(`User "${userId}" deactivated successfully`);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to deactivate user: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.rotateUserApiKey', async (item) => {
-      vscode.window.showInformationMessage(
-        `Rotate User API Key: ${item?.label} (implement action)`
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or user information');
+        return;
+      }
+
+      const userId = item.itemId;
+      const confirmation = await vscode.window.showWarningMessage(
+        `Are you sure you want to rotate the API key for user "${userId}"? The current API key will be invalidated.`,
+        { modal: true },
+        'Rotate'
       );
+
+      if (confirmation !== 'Rotate') {
+        return;
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+
+        const newApiKey = await client.users.db.rotateKey(userId);
+
+        // Show the new API key to the user with a warning
+        const action = await vscode.window.showWarningMessage(
+          `API key rotated successfully for user "${userId}".\n\n⚠️ This is the ONLY time this API key will be displayed:\n\n${newApiKey}\n\nMake sure to copy and save it securely.`,
+          { modal: true },
+          'Copy to Clipboard'
+        );
+
+        if (action === 'Copy to Clipboard') {
+          await vscode.env.clipboard.writeText(newApiKey);
+          vscode.window.showInformationMessage('API key copied to clipboard');
+        }
+
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to rotate API key: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.addGroup', async (item) => {
       vscode.window.showInformationMessage('Add Group (implement UI/form)');
@@ -163,6 +319,20 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(
         `Delete Group: ${item?.label} (implement confirmation and deletion)`
       );
+    }),
+    vscode.commands.registerCommand('weaviate.refreshRbac', async (item) => {
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+
+      try {
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to refresh RBAC: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     })
   );
   console.log('"Weaviate Studio" extension is now active');

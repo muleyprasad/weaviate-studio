@@ -149,6 +149,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
+   * Generates a safe unique ID from a string by encoding it to base64.
+   * This avoids issues with special characters like hyphens in identifiers.
+   * @param input - The string to encode
+   * @returns A URL-safe base64 encoded string
+   */
+  private generateSafeId(input: string): string {
+    return Buffer.from(input)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
+
+  /**
    * Gets the parent of a tree element (required for TreeView.reveal API)
    * @param element - The tree element to get the parent for
    * @returns The parent element or undefined if it's a root element
@@ -433,6 +447,190 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * - Collection level: Shows metadata, properties, and vector configurations
    */
   async getChildren(element?: WeaviateTreeItem): Promise<WeaviateTreeItem[]> {
+    // RBAC: Role Details - Show permissions for a specific role
+    if (element?.itemType === 'rbacRole' && element.connectionId && element.itemId) {
+      const roles = this.rbacCache[element.connectionId]?.roles || [];
+      const role = roles.find((r: any) => r.name === element.itemId);
+
+      if (!role) {
+        return [];
+      }
+
+      const permissionGroups: WeaviateTreeItem[] = [];
+
+      // Helper to count non-empty permissions
+      const getPermissionCount = (perms: any[]): number => perms?.length || 0;
+
+      // Add each permission type as a collapsible group
+      const permissionTypes = [
+        { key: 'aliasPermissions', label: 'Alias Permissions', icon: 'symbol-namespace' },
+        { key: 'backupsPermissions', label: 'Backups Permissions', icon: 'database' },
+        { key: 'clusterPermissions', label: 'Cluster Permissions', icon: 'server' },
+        { key: 'collectionsPermissions', label: 'Collections Permissions', icon: 'folder-library' },
+        { key: 'dataPermissions', label: 'Data Permissions', icon: 'file' },
+        { key: 'groupsPermissions', label: 'Groups Permissions', icon: 'organization' },
+        { key: 'nodesPermissions', label: 'Nodes Permissions', icon: 'circuit-board' },
+        { key: 'replicatePermissions', label: 'Replicate Permissions', icon: 'sync' },
+        { key: 'rolesPermissions', label: 'Roles Permissions', icon: 'shield' },
+        { key: 'tenantsPermissions', label: 'Tenants Permissions', icon: 'group-by-ref-type' },
+        { key: 'usersPermissions', label: 'Users Permissions', icon: 'account' },
+      ];
+
+      for (const permType of permissionTypes) {
+        const permissions = role[permType.key];
+        const count = getPermissionCount(permissions);
+
+        if (count > 0) {
+          const safeId = this.generateSafeId(`${element.itemId}-${permType.key}`);
+          permissionGroups.push(
+            new WeaviateTreeItem(
+              `${permType.label} (${count})`,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'rbacRolePermissionsGroup',
+              element.connectionId,
+              undefined,
+              safeId,
+              new vscode.ThemeIcon(permType.icon),
+              'weaviateRbacRolePermissionsGroup',
+              undefined
+            )
+          );
+        }
+      }
+
+      return permissionGroups;
+    }
+
+    // RBAC: Role Permission Details - Show fields of a specific permission
+    if (element?.itemType === 'rbacRolePermission' && element.connectionId && element.itemId) {
+      // Decode the safe ID to get role name, permission type, and index
+      const decodedId = Buffer.from(
+        element.itemId.replace(/-/g, '+').replace(/_/g, '/'),
+        'base64'
+      ).toString();
+      const parts = decodedId.split('-');
+      const index = parseInt(parts.pop() || '0', 10);
+      const permissionKey = parts.pop() || '';
+      const roleName = parts.join('-');
+
+      const roles = this.rbacCache[element.connectionId]?.roles || [];
+      const role = roles.find((r: any) => r.name === roleName);
+
+      if (!role || !role[permissionKey] || !role[permissionKey][index]) {
+        return [];
+      }
+
+      const perm = role[permissionKey][index];
+      const details: WeaviateTreeItem[] = [];
+
+      // Add each field as a tree item
+      const fieldMapping = [
+        { key: 'collection', label: 'Collection', icon: 'folder-library' },
+        { key: 'tenant', label: 'Tenant', icon: 'group-by-ref-type' },
+        { key: 'role', label: 'Role', icon: 'shield' },
+        { key: 'users', label: 'Users', icon: 'account' },
+        { key: 'groupType', label: 'Group Type', icon: 'organization' },
+        { key: 'groupID', label: 'Group ID', icon: 'tag' },
+        { key: 'alias', label: 'Alias', icon: 'symbol-namespace' },
+        { key: 'shard', label: 'Shard', icon: 'database' },
+        { key: 'verbosity', label: 'Verbosity', icon: 'output' },
+        { key: 'actions', label: 'Actions', icon: 'list-unordered' },
+      ];
+
+      fieldMapping.forEach((field) => {
+        if (perm[field.key] !== undefined && perm[field.key] !== null) {
+          const value = Array.isArray(perm[field.key])
+            ? perm[field.key].join(', ')
+            : String(perm[field.key]);
+          const safeId = this.generateSafeId(`${roleName}-${permissionKey}-${index}-${field.key}`);
+
+          details.push(
+            new WeaviateTreeItem(
+              `${field.label}: ${value}`,
+              vscode.TreeItemCollapsibleState.None,
+              'rbacRolePermissionDetail',
+              element.connectionId,
+              undefined,
+              safeId,
+              new vscode.ThemeIcon(field.icon),
+              'weaviateRbacRolePermissionDetail',
+              undefined
+            )
+          );
+        }
+      });
+
+      return details;
+    }
+
+    // RBAC: Role Permission Group Details - Show individual permissions
+    if (
+      element?.itemType === 'rbacRolePermissionsGroup' &&
+      element.connectionId &&
+      element.itemId
+    ) {
+      // Decode the safe ID to get role name and permission type
+      const decodedId = Buffer.from(
+        element.itemId.replace(/-/g, '+').replace(/_/g, '/'),
+        'base64'
+      ).toString();
+      const lastDashIndex = decodedId.lastIndexOf('-');
+      const roleName = decodedId.substring(0, lastDashIndex);
+      const permissionKey = decodedId.substring(lastDashIndex + 1);
+
+      const roles = this.rbacCache[element.connectionId]?.roles || [];
+      const role = roles.find((r: any) => r.name === roleName);
+
+      if (!role || !role[permissionKey]) {
+        return [];
+      }
+
+      const permissions = role[permissionKey];
+      return permissions.map((perm: any, index: number) => {
+        const safeId = this.generateSafeId(`${roleName}-${permissionKey}-${index}`);
+
+        // Create a concise label for the permission
+        let label = `Permission ${index + 1}`;
+
+        // Add key identifying info to the label
+        const keyFields = [];
+        if (perm.collection) {
+          keyFields.push(perm.collection);
+        }
+        if (perm.tenant && perm.tenant !== perm.collection) {
+          keyFields.push(perm.tenant);
+        }
+        if (perm.role) {
+          keyFields.push(perm.role);
+        }
+        if (perm.users) {
+          keyFields.push(perm.users);
+        }
+        if (perm.alias) {
+          keyFields.push(perm.alias);
+        }
+        if (perm.groupID) {
+          keyFields.push(perm.groupID);
+        }
+
+        if (keyFields.length > 0) {
+          label = keyFields.join(' | ');
+        }
+
+        return new WeaviateTreeItem(
+          label,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'rbacRolePermission',
+          element.connectionId,
+          undefined,
+          safeId,
+          new vscode.ThemeIcon('key'),
+          'weaviateRbacRolePermission',
+          perm.actions?.join(', ')
+        );
+      });
+    }
+
     // RBAC: Roles
     if (element?.itemType === 'rbacRoles' && element.connectionId) {
       const client = this.connectionManager.getClient(element.connectionId);
@@ -459,20 +657,163 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       }
       const roles = this.rbacCache[element.connectionId]?.roles || [];
-      return roles.map(
-        (role: any) =>
+      return roles
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+        .map(
+          (role: any) =>
+            new WeaviateTreeItem(
+              role.name,
+              vscode.TreeItemCollapsibleState.Collapsed,
+              'rbacRole',
+              element.connectionId,
+              undefined,
+              role.name,
+              new vscode.ThemeIcon('shield'),
+              'weaviateRbacRole',
+              undefined
+            )
+        );
+    }
+
+    // RBAC: User Details - Show details for a specific user
+    if (element?.itemType === 'rbacUser' && element.connectionId && element.itemId) {
+      const users = this.rbacCache[element.connectionId]?.users || [];
+      const user = users.find((u: any) => u.id === element.itemId);
+
+      if (!user) {
+        return [];
+      }
+
+      const details: WeaviateTreeItem[] = [];
+
+      // User Type
+      details.push(
+        new WeaviateTreeItem(
+          `Type: ${user.userType}`,
+          vscode.TreeItemCollapsibleState.None,
+          'rbacUserDetail',
+          element.connectionId,
+          undefined,
+          this.generateSafeId(`${user.id}-userType`),
+          new vscode.ThemeIcon('tag'),
+          'weaviateRbacUserDetail',
+          undefined
+        )
+      );
+
+      // Active Status
+      details.push(
+        new WeaviateTreeItem(
+          `Status: ${user.active ? 'Active' : 'Inactive'}`,
+          vscode.TreeItemCollapsibleState.None,
+          'rbacUserDetail',
+          element.connectionId,
+          undefined,
+          this.generateSafeId(`${user.id}-active`),
+          new vscode.ThemeIcon(user.active ? 'pass' : 'circle-slash'),
+          'weaviateRbacUserDetail',
+          undefined
+        )
+      );
+
+      // Created At (if available)
+      if (user.createdAt) {
+        details.push(
           new WeaviateTreeItem(
-            role.name,
+            `Created: ${new Date(user.createdAt).toLocaleString()}`,
             vscode.TreeItemCollapsibleState.None,
-            'rbacRole',
+            'rbacUserDetail',
             element.connectionId,
             undefined,
-            role.name,
-            new vscode.ThemeIcon('shield'),
-            'weaviateRbacRole',
+            this.generateSafeId(`${user.id}-createdAt`),
+            new vscode.ThemeIcon('calendar'),
+            'weaviateRbacUserDetail',
             undefined
           )
-      );
+        );
+      }
+
+      // API Key First Letters (if available)
+      if (user.apiKeyFirstLetters) {
+        details.push(
+          new WeaviateTreeItem(
+            `API Key: ${user.apiKeyFirstLetters}...`,
+            vscode.TreeItemCollapsibleState.None,
+            'rbacUserDetail',
+            element.connectionId,
+            undefined,
+            this.generateSafeId(`${user.id}-apiKey`),
+            new vscode.ThemeIcon('key'),
+            'weaviateRbacUserDetail',
+            undefined
+          )
+        );
+      }
+
+      // Roles
+      if (user.roleNames && user.roleNames.length > 0) {
+        details.push(
+          new WeaviateTreeItem(
+            `Roles (${user.roleNames.length})`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'rbacUserDetails',
+            element.connectionId,
+            undefined,
+            this.generateSafeId(`${user.id}-roles`),
+            new vscode.ThemeIcon('shield'),
+            'weaviateRbacUserDetails',
+            user.roleNames.join(', ')
+          )
+        );
+      } else {
+        details.push(
+          new WeaviateTreeItem(
+            'No roles assigned',
+            vscode.TreeItemCollapsibleState.None,
+            'rbacUserDetail',
+            element.connectionId,
+            undefined,
+            this.generateSafeId(`${user.id}-noroles`),
+            new vscode.ThemeIcon('shield'),
+            'weaviateRbacUserDetail',
+            undefined
+          )
+        );
+      }
+
+      return details;
+    }
+
+    // RBAC: User Details - Roles list
+    if (element?.itemType === 'rbacUserDetails' && element.connectionId && element.itemId) {
+      // Decode the safe ID to get user ID
+      const decodedId = Buffer.from(
+        element.itemId.replace(/-/g, '+').replace(/_/g, '/'),
+        'base64'
+      ).toString();
+      const userId = decodedId.substring(0, decodedId.lastIndexOf('-roles'));
+
+      const users = this.rbacCache[element.connectionId]?.users || [];
+      const user = users.find((u: any) => u.id === userId);
+
+      if (!user || !user.roleNames) {
+        return [];
+      }
+
+      return user.roleNames.map((roleName: string, index: number) => {
+        const safeId = this.generateSafeId(`${userId}-role-${index}`);
+        return new WeaviateTreeItem(
+          roleName,
+          vscode.TreeItemCollapsibleState.None,
+          'rbacUserDetail',
+          element.connectionId,
+          undefined,
+          safeId,
+          new vscode.ThemeIcon('shield'),
+          'weaviateRbacUserDetail',
+          undefined
+        );
+      });
     }
 
     // RBAC: Users
@@ -501,20 +842,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       }
       const users = this.rbacCache[element.connectionId]?.users || [];
-      return users.map(
-        (user) =>
-          new WeaviateTreeItem(
+      return users
+        .sort((a: any, b: any) => a.id.localeCompare(b.id))
+        .map((user) => {
+          // Build contextValue based on active status and userType
+          let contextValue = user.active ? 'weaviateRbacUserActive' : 'weaviateRbacUserInactive';
+          if (user.userType === 'db_env_user') {
+            contextValue += '_DbEnvUser';
+          }
+
+          // Choose icon based on userType
+          let icon: vscode.ThemeIcon;
+          if (user.userType === 'db_env_user') {
+            // Special icon for db_env_user with color
+            icon = new vscode.ThemeIcon(
+              'lock',
+              user.active
+                ? new vscode.ThemeColor('charts.green')
+                : new vscode.ThemeColor('charts.red')
+            );
+          } else {
+            // Regular icon for other users
+            icon = new vscode.ThemeIcon(
+              user.active ? 'circle-filled' : 'error',
+              user.active
+                ? new vscode.ThemeColor('charts.green')
+                : new vscode.ThemeColor('charts.red')
+            );
+          }
+
+          return new WeaviateTreeItem(
             user.id,
-            vscode.TreeItemCollapsibleState.None,
+            vscode.TreeItemCollapsibleState.Collapsed,
             'rbacUser',
             element.connectionId,
             undefined,
             user.id,
-            new vscode.ThemeIcon('account'),
-            'weaviateRbacUser',
+            icon,
+            contextValue,
             user.active ? 'Active' : 'Inactive'
-          )
-      );
+          );
+        });
     }
 
     // RBAC: Groups
@@ -543,20 +911,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       }
       const groups = this.rbacCache[element.connectionId]?.groups || [];
-      return groups.map(
-        (group: any) =>
-          new WeaviateTreeItem(
-            group,
-            vscode.TreeItemCollapsibleState.None,
-            'rbacGroupItem',
-            element.connectionId,
-            undefined,
-            group,
-            new vscode.ThemeIcon('organization'),
-            'weaviateRbacGroupItem',
-            undefined
-          )
-      );
+      return groups
+        .sort((a: any, b: any) => a.localeCompare(b))
+        .map(
+          (group: any) =>
+            new WeaviateTreeItem(
+              group,
+              vscode.TreeItemCollapsibleState.None,
+              'rbacGroupItem',
+              element.connectionId,
+              undefined,
+              group,
+              new vscode.ThemeIcon('organization'),
+              'weaviateRbacGroupItem',
+              undefined
+            )
+        );
     }
     // Helper function to map property types to icons
     const getPropertyTypeIcon = (dataType: any): vscode.ThemeIcon => {
@@ -3222,11 +3592,31 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       await this.refreshNodes(connectionId).catch(() => {});
       await this.refreshCollections(connectionId).catch(() => {});
       await this.refreshBackups(connectionId).catch(() => {});
+      await this.refreshRbac(connectionId).catch(() => {});
 
       this.refresh();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to refresh connection info: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes RBAC data (roles, users, groups) for a connection
+   * @param connectionId - The ID of the connection
+   */
+  async refreshRbac(connectionId: string): Promise<void> {
+    try {
+      // Clear RBAC cache for this connection
+      delete this.rbacCache[connectionId];
+
+      // Refresh the tree view
+      this.refresh();
+
+      vscode.window.showInformationMessage('RBAC data refreshed successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      vscode.window.showWarningMessage(`RBAC refresh completed with issues: ${errorMessage}`);
     }
   }
 
