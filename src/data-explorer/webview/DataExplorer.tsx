@@ -4,9 +4,11 @@ import type {
   DataExplorerAction,
   ExtensionMessage,
   WebviewMessage,
+  Filter,
 } from '../types';
 import { DataTable } from './components/DataBrowser/DataTable';
 import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
+import { FilterBuilder } from './components/Filters/FilterBuilder';
 
 // Import shared theme for design consistency
 import '../webview/theme.css';
@@ -36,6 +38,8 @@ const initialState: DataExplorerState = {
   error: null,
   currentPage: 0,
   pageSize: 20,
+  filters: [],
+  activeFilters: [],
   visibleColumns: [],
   pinnedColumns: [],
   sortBy: null,
@@ -121,6 +125,34 @@ function dataExplorerReducer(
     case 'TOGGLE_DETAIL_PANEL':
       return { ...state, showDetailPanel: action.payload };
 
+    case 'ADD_FILTER':
+      return { ...state, filters: [...state.filters, action.payload] };
+
+    case 'UPDATE_FILTER': {
+      const updatedFilters = state.filters.map((filter) =>
+        filter.id === action.payload.id
+          ? { ...filter, ...action.payload.filter }
+          : filter
+      );
+      return { ...state, filters: updatedFilters };
+    }
+
+    case 'REMOVE_FILTER':
+      return {
+        ...state,
+        filters: state.filters.filter((filter) => filter.id !== action.payload),
+      };
+
+    case 'CLEAR_FILTERS':
+      return { ...state, filters: [], activeFilters: [], currentPage: 0 };
+
+    case 'APPLY_FILTERS':
+      return {
+        ...state,
+        activeFilters: [...state.filters],
+        currentPage: 0, // Reset to first page when applying filters
+      };
+
     default:
       return state;
   }
@@ -171,10 +203,11 @@ export function DataExplorer() {
           limit: state.pageSize,
           offset: targetPage * state.pageSize,
           sortBy: state.sortBy,
+          filters: state.activeFilters,
         },
       });
     },
-    [state.collectionName, state.currentPage, state.pageSize, state.sortBy]
+    [state.collectionName, state.currentPage, state.pageSize, state.sortBy, state.activeFilters]
   );
 
   /**
@@ -225,6 +258,13 @@ export function DataExplorer() {
             if (message.data.preferences.sortBy) {
               dispatch({ type: 'SET_SORT', payload: message.data.preferences.sortBy });
             }
+            if (message.data.preferences.filters) {
+              message.data.preferences.filters.forEach((filter: Filter) => {
+                dispatch({ type: 'ADD_FILTER', payload: filter });
+              });
+              // Auto-apply saved filters
+              dispatch({ type: 'APPLY_FILTERS' });
+            }
           }
           break;
 
@@ -251,13 +291,13 @@ export function DataExplorer() {
   }, []);
 
   /**
-   * Fetch objects when page changes
+   * Fetch objects when page, sort, or filters change
    */
   useEffect(() => {
     if (state.collectionName && state.schema) {
       fetchObjects();
     }
-  }, [state.currentPage, state.pageSize, state.sortBy]);
+  }, [state.currentPage, state.pageSize, state.sortBy, state.activeFilters]);
 
   /**
    * Save preferences when they change
@@ -273,11 +313,12 @@ export function DataExplorer() {
             pinnedColumns: state.pinnedColumns,
             pageSize: state.pageSize,
             sortBy: state.sortBy,
+            filters: state.activeFilters,
           },
         },
       });
     }
-  }, [state.visibleColumns, state.pinnedColumns, state.pageSize, state.sortBy, state.collectionName, state.schema]);
+  }, [state.visibleColumns, state.pinnedColumns, state.pageSize, state.sortBy, state.activeFilters, state.collectionName, state.schema]);
 
   /**
    * Context value (memoized to prevent unnecessary re-renders)
@@ -324,6 +365,9 @@ export function DataExplorer() {
             </span>
           </h2>
         </div>
+
+        {/* Filter panel */}
+        <FilterBuilder />
 
         <div className="explorer-content">
           {state.loading && !state.objects.length ? (

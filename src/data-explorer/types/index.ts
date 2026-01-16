@@ -22,6 +22,10 @@ export interface DataExplorerState {
   currentPage: number;
   pageSize: number;
 
+  // Filters
+  filters: Filter[];
+  activeFilters: Filter[];
+
   // UI
   visibleColumns: string[];
   pinnedColumns: string[];
@@ -94,6 +98,81 @@ export interface SortConfig {
 }
 
 /**
+ * Filter operators for different data types
+ */
+export type FilterOperator =
+  // Equality
+  | 'equals'
+  | 'notEquals'
+  // Numeric comparisons
+  | 'greaterThan'
+  | 'lessThan'
+  | 'greaterThanEqual'
+  | 'lessThanEqual'
+  | 'between'
+  // Text operations
+  | 'contains'
+  | 'startsWith'
+  | 'endsWith'
+  // Array operations
+  | 'in'
+  | 'notIn'
+  // Null checks
+  | 'isNull'
+  | 'isNotNull'
+  // Geo operations
+  | 'withinDistance'
+  | 'withinPolygon';
+
+/**
+ * Filter configuration for a property
+ */
+export interface Filter {
+  id: string;
+  property: string;
+  operator: FilterOperator;
+  value: FilterValue;
+  dataType: PropertyDataType;
+}
+
+/**
+ * Filter value types (union of all possible value types)
+ */
+export type FilterValue =
+  | string
+  | number
+  | boolean
+  | Date
+  | string[]
+  | number[]
+  | { min: number; max: number }
+  | { lat: number; lon: number; distance: number }
+  | null;
+
+/**
+ * Weaviate WHERE filter structure
+ */
+export interface WhereFilter {
+  operator: 'And' | 'Or' | 'Not';
+  operands?: WhereFilter[];
+  path?: string[];
+  valueText?: string;
+  valueInt?: number;
+  valueNumber?: number;
+  valueBoolean?: boolean;
+  valueDate?: string;
+  valueGeoRange?: {
+    geoCoordinates: {
+      latitude: number;
+      longitude: number;
+    };
+    distance: {
+      max: number;
+    };
+  };
+}
+
+/**
  * Parameters for fetching objects
  */
 export interface FetchParams {
@@ -102,6 +181,7 @@ export interface FetchParams {
   offset: number;
   properties?: string[];
   sortBy?: SortConfig;
+  filters?: Filter[];
 }
 
 /**
@@ -150,7 +230,12 @@ export type DataExplorerAction =
   | { type: 'UNPIN_COLUMN'; payload: string }
   | { type: 'SET_SORT'; payload: SortConfig | null }
   | { type: 'SELECT_OBJECT'; payload: string | null }
-  | { type: 'TOGGLE_DETAIL_PANEL'; payload: boolean };
+  | { type: 'TOGGLE_DETAIL_PANEL'; payload: boolean }
+  | { type: 'ADD_FILTER'; payload: Filter }
+  | { type: 'UPDATE_FILTER'; payload: { id: string; filter: Partial<Filter> } }
+  | { type: 'REMOVE_FILTER'; payload: string }
+  | { type: 'CLEAR_FILTERS' }
+  | { type: 'APPLY_FILTERS' };
 
 /**
  * Message types for webview communication
@@ -160,6 +245,7 @@ export type WebviewMessageCommand =
   | 'fetchObjects'
   | 'getSchema'
   | 'selectObject'
+  | 'savePreferences'
   | 'error';
 
 export interface WebviewMessage {
@@ -191,6 +277,7 @@ export interface DataExplorerPreferences {
     pinnedColumns?: string[];
     pageSize?: number;
     sortBy?: SortConfig;
+    filters?: Filter[];
   };
 }
 

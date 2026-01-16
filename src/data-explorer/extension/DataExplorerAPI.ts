@@ -10,7 +10,10 @@ import type {
   PropertySchema,
   PropertyDataType,
   VectorizerConfig,
+  WhereFilter,
+  Filter,
 } from '../types';
+import { buildWhereFilter } from '../utils/filterUtils';
 
 export class DataExplorerAPI {
   constructor(private client: WeaviateClient) {}
@@ -32,6 +35,7 @@ export class DataExplorerAPI {
           path: string;
           order: 'asc' | 'desc';
         };
+        where?: WhereFilter;
       }
 
       const queryOptions: QueryOptions = {
@@ -53,11 +57,19 @@ export class DataExplorerAPI {
         };
       }
 
+      // Add filters if specified
+      if (params.filters && params.filters.length > 0) {
+        const whereFilter = buildWhereFilter(params.filters);
+        if (whereFilter) {
+          queryOptions.where = whereFilter;
+        }
+      }
+
       // Execute query
       const result = await collection.query.fetchObjects(queryOptions as any); // Weaviate client types are complex
 
-      // Get total count
-      const totalCount = await this.getTotalCount(params.collectionName);
+      // Get total count (with filters if specified)
+      const totalCount = await this.getTotalCount(params.collectionName, params.filters);
 
       return {
         objects: result.objects || [],
@@ -70,11 +82,24 @@ export class DataExplorerAPI {
   }
 
   /**
-   * Get total count of objects in a collection
+   * Get total count of objects in a collection (optionally filtered)
    */
-  async getTotalCount(collectionName: string): Promise<number> {
+  async getTotalCount(collectionName: string, filters?: Filter[]): Promise<number> {
     try {
       const collection = this.client.collections.get(collectionName);
+
+      // If we have filters, use aggregate with where clause
+      if (filters && filters.length > 0) {
+        const whereFilter = buildWhereFilter(filters);
+        if (whereFilter) {
+          const result = await collection.aggregate.overAll({
+            where: whereFilter,
+          } as any);
+          return result.totalCount || 0;
+        }
+      }
+
+      // No filters - get total count
       const result = await collection.aggregate.overAll({});
       return result.totalCount || 0;
     } catch (error) {

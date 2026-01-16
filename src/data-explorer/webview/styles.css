@@ -107,3 +107,278 @@
     opacity: 0.5;
   }
 }
+
+/* ============================================
+   Filter Builder Styles
+   ============================================ */
+
+.filter-builder {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editor-background);
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.filter-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.filter-match-mode {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Filter list */
+.filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-empty-state {
+  padding: 16px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Filter rule row */
+.filter-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+}
+
+.filter-rule:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Property selector */
+.property-selector {
+  flex: 0 0 180px;
+  padding: 4px 8px;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.property-selector:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Operator selector */
+.operator-selector {
+  flex: 0 0 150px;
+  padding: 4px 8px;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.operator-selector:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Value input */
+.value-input {
+  flex: 1;
+  padding: 4px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.value-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+  border-color: var(--vscode-focusBorder);
+}
+
+.value-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.value-input-placeholder {
+  flex: 1;
+  padding: 4px 8px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* Range input (for between operator) */
+.range-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-min,
+.range-max {
+  flex: 1;
+  min-width: 80px;
+}
+
+.range-separator {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Geo input (for withinDistance operator) */
+.geo-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.geo-lat,
+.geo-lon,
+.geo-distance {
+  flex: 1;
+  min-width: 70px;
+}
+
+/* Filter rule remove button */
+.filter-rule-remove {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+  border-radius: 3px;
+}
+
+.filter-rule-remove:hover {
+  opacity: 1;
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.filter-rule-remove:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Filter actions */
+.filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filter-add-button {
+  padding: 6px 12px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filter-add-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.filter-add-button:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.filter-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-clear-button {
+  padding: 6px 12px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filter-clear-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.filter-apply-button {
+  padding: 6px 16px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filter-apply-button:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.filter-apply-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter-apply-button:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Filter status */
+.filter-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.filter-status-icon {
+  font-size: 14px;
+}
+
+.filter-status-text {
+  font-weight: 500;
+}
