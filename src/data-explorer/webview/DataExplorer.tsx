@@ -11,7 +11,7 @@ import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
 import { FilterBuilder } from './components/Filters/FilterBuilder';
 
 // Import shared theme for design consistency
-import '../webview/theme.css';
+import '../../webview/theme.css';
 import './styles.css';
 
 /**
