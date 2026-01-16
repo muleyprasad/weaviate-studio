@@ -266,6 +266,108 @@ export class DataExplorerAPI {
   }
 
   /**
+   * Perform vector search using nearText
+   */
+  async vectorSearchText(params: {
+    collectionName: string;
+    searchText: string;
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: any = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty
+      if (params.distance !== undefined) {
+        queryOptions.distance = params.distance;
+      } else if (params.certainty !== undefined) {
+        queryOptions.certainty = params.certainty;
+      }
+
+      // Execute nearText query
+      const result = await collection.query.nearText(params.searchText, queryOptions);
+
+      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+    } catch (error) {
+      console.error('Error in vector search (text):', error);
+      throw new Error(`Vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Perform vector search using nearObject
+   */
+  async vectorSearchObject(params: {
+    collectionName: string;
+    referenceObjectId: string;
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: any = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty
+      if (params.distance !== undefined) {
+        queryOptions.distance = params.distance;
+      } else if (params.certainty !== undefined) {
+        queryOptions.certainty = params.certainty;
+      }
+
+      // Execute nearObject query
+      const result = await collection.query.nearObject(params.referenceObjectId, queryOptions);
+
+      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+    } catch (error) {
+      console.error('Error in vector search (object):', error);
+      throw new Error(`Vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Perform vector search using nearVector
+   */
+  async vectorSearchVector(params: {
+    collectionName: string;
+    vector: number[];
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: any = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty
+      if (params.distance !== undefined) {
+        queryOptions.distance = params.distance;
+      } else if (params.certainty !== undefined) {
+        queryOptions.certainty = params.certainty;
+      }
+
+      // Execute nearVector query
+      const result = await collection.query.nearVector(params.vector, queryOptions);
+
+      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+    } catch (error) {
+      console.error('Error in vector search (vector):', error);
+      throw new Error(`Vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Check if client is connected
    */
   async isConnected(): Promise<boolean> {

@@ -26,6 +26,9 @@ export interface DataExplorerState {
   filters: Filter[];
   activeFilters: Filter[];
 
+  // Vector Search
+  vectorSearch: VectorSearchState;
+
   // UI
   visibleColumns: string[];
   pinnedColumns: string[];
@@ -260,7 +263,13 @@ export type DataExplorerAction =
   | { type: 'UPDATE_FILTER'; payload: { id: string; filter: Partial<Filter> } }
   | { type: 'REMOVE_FILTER'; payload: string }
   | { type: 'CLEAR_FILTERS' }
-  | { type: 'APPLY_FILTERS' };
+  | { type: 'APPLY_FILTERS' }
+  | { type: 'SET_VECTOR_SEARCH_CONFIG'; payload: Partial<VectorSearchConfig> }
+  | { type: 'SET_VECTOR_SEARCH_ACTIVE'; payload: boolean }
+  | { type: 'SET_VECTOR_SEARCH_RESULTS'; payload: VectorSearchResult[] }
+  | { type: 'SET_VECTOR_SEARCH_LOADING'; payload: boolean }
+  | { type: 'SET_VECTOR_SEARCH_ERROR'; payload: string | null }
+  | { type: 'CLEAR_VECTOR_SEARCH' };
 
 /**
  * Message types for webview communication
@@ -271,6 +280,7 @@ export type WebviewMessageCommand =
   | 'getSchema'
   | 'selectObject'
   | 'savePreferences'
+  | 'vectorSearch'
   | 'error';
 
 export interface WebviewMessage {
@@ -286,6 +296,7 @@ export type ExtensionMessageCommand =
   | 'schemaLoaded'
   | 'objectsLoaded'
   | 'objectSelected'
+  | 'vectorSearchResults'
   | 'error';
 
 export interface ExtensionMessage {
@@ -318,4 +329,53 @@ export interface ObjectMetadata {
   score?: number;
   explainScore?: string;
   vector?: number[];
+}
+
+/**
+ * Vector search mode
+ */
+export type VectorSearchMode = 'text' | 'object' | 'vector';
+
+/**
+ * Distance metric for vector search
+ */
+export type DistanceMetric = 'cosine' | 'euclidean' | 'manhattan' | 'dot';
+
+/**
+ * Vector search configuration
+ */
+export interface VectorSearchConfig {
+  mode: VectorSearchMode;
+  // Text search (nearText)
+  searchText?: string;
+  // Object search (nearObject)
+  referenceObjectId?: string;
+  // Vector search (nearVector)
+  vectorInput?: number[];
+  // Common options
+  limit: number;
+  distance?: number;
+  certainty?: number;
+  useDistance: boolean; // true = distance, false = certainty
+}
+
+/**
+ * Vector search result
+ */
+export interface VectorSearchResult {
+  object: WeaviateObject<Record<string, unknown>, string>;
+  distance?: number;
+  certainty?: number;
+  score?: number;
+}
+
+/**
+ * Vector search state
+ */
+export interface VectorSearchState {
+  isActive: boolean;
+  config: VectorSearchConfig;
+  results: VectorSearchResult[];
+  loading: boolean;
+  error: string | null;
 }
