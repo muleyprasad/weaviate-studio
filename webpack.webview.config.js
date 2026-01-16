@@ -41,6 +41,7 @@ module.exports = {
     backup: './src/webview/Backup.tsx',
     'backup-restore': './src/webview/BackupRestore.tsx',
     cluster: './src/webview/ClusterPanel.tsx',
+    dataExplorer: './src/data-explorer/webview/index.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),

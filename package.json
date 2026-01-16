@@ -83,6 +83,11 @@
         "icon": "$(table)"
       },
       {
+        "command": "weaviate.openDataExplorer",
+        "title": "Open Data Explorer",
+        "icon": "$(database)"
+      },
+      {
         "command": "weaviate.deleteCollection",
         "title": "Delete Collection"
       },
@@ -357,10 +362,21 @@
           "group": "1_actions@3"
         },
         {
+          "command": "weaviate.openDataExplorer",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@4"
+        },
+        {
           "command": "weaviate.queryCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "inline@1",
           "icon": "$(edit)"
+        },
+        {
+          "command": "weaviate.openDataExplorer",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "inline@2",
+          "icon": "$(database)"
         },
         {
           "command": "weaviate.addCollection",
