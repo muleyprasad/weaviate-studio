@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { CellRenderer } from './CellRenderer';
 import { Pagination } from './Pagination';
 import { ColumnManager } from './ColumnManager';
 import type { PropertyDataType } from '../../../types';
+import type { WeaviateObject } from 'weaviate-client';
 
 /**
  * Main data table component
@@ -15,14 +16,16 @@ export function DataTable() {
     return <div className="no-schema">Loading schema...</div>;
   }
 
-  // Get ordered columns: pinned first, then visible
-  const pinnedColumns = state.pinnedColumns.filter((col) =>
-    state.visibleColumns.includes(col)
-  );
-  const unpinnedColumns = state.visibleColumns.filter(
-    (col) => !state.pinnedColumns.includes(col)
-  );
-  const orderedColumns = [...pinnedColumns, ...unpinnedColumns];
+  // Get ordered columns: pinned first, then visible (memoized for performance)
+  const orderedColumns = useMemo(() => {
+    const pinnedColumns = state.pinnedColumns.filter((col) =>
+      state.visibleColumns.includes(col)
+    );
+    const unpinnedColumns = state.visibleColumns.filter(
+      (col) => !state.pinnedColumns.includes(col)
+    );
+    return [...pinnedColumns, ...unpinnedColumns];
+  }, [state.pinnedColumns, state.visibleColumns]);
 
   // Get property info for columns
   const getPropertyInfo = (columnName: string) => {
@@ -33,19 +36,27 @@ export function DataTable() {
     selectObject(objectId);
   };
 
-  const getObjectId = (obj: any): string => {
-    // Try different possible UUID locations
-    return obj.uuid || obj.id || obj._additional?.id || '';
+  const handleRowKeyPress = (e: React.KeyboardEvent, objectId: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRowClick(objectId);
+    }
   };
 
-  const getPropertyValue = (obj: any, propertyName: string): any => {
+  const getObjectId = (obj: WeaviateObject): string => {
+    // Try different possible UUID locations
+    return obj.uuid || (obj as any).id || (obj as any)._additional?.id || '';
+  };
+
+  const getPropertyValue = (obj: WeaviateObject, propertyName: string): unknown => {
     // First try direct property access
-    if (obj.properties && propertyName in obj.properties) {
-      return obj.properties[propertyName];
+    const objAny = obj as any;
+    if (objAny.properties && propertyName in objAny.properties) {
+      return objAny.properties[propertyName];
     }
     // Then try root level
-    if (propertyName in obj) {
-      return obj[propertyName];
+    if (propertyName in objAny) {
+      return objAny[propertyName];
     }
     return null;
   };
@@ -58,25 +69,27 @@ export function DataTable() {
       </div>
 
       <div className="data-table-wrapper">
-        <table className="data-table">
+        <table className="data-table" role="grid" aria-label="Data objects table">
           <thead>
-            <tr>
-              <th className="row-number-header">#</th>
-              <th className="uuid-header">UUID</th>
+            <tr role="row">
+              <th role="columnheader" className="row-number-header">#</th>
+              <th role="columnheader" className="uuid-header">UUID</th>
               {orderedColumns.map((columnName) => {
                 const isPinned = state.pinnedColumns.includes(columnName);
                 const property = getPropertyInfo(columnName);
                 return (
                   <th
                     key={columnName}
+                    role="columnheader"
                     className={`column-header ${isPinned ? 'pinned' : ''}`}
                     title={property?.description || columnName}
+                    aria-sort="none"
                   >
                     <span className="column-name">{columnName}</span>
                     {property && (
                       <span className="column-type-badge">{property.dataType}</span>
                     )}
-                    {isPinned && <span className="pin-indicator">📌</span>}
+                    {isPinned && <span className="pin-indicator" aria-label="Pinned column">📌</span>}
                   </th>
                 );
               })}
@@ -85,8 +98,8 @@ export function DataTable() {
 
           <tbody>
             {state.objects.length === 0 ? (
-              <tr>
-                <td colSpan={orderedColumns.length + 2} className="no-data">
+              <tr role="row">
+                <td colSpan={orderedColumns.length + 2} className="no-data" role="cell">
                   {state.loading ? 'Loading objects...' : 'No objects found'}
                 </td>
               </tr>
@@ -99,18 +112,16 @@ export function DataTable() {
                 return (
                   <tr
                     key={objectId || index}
+                    role="row"
                     className={`data-row ${isSelected ? 'selected' : ''}`}
                     onClick={() => handleRowClick(objectId)}
-                    role="button"
                     tabIndex={0}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        handleRowClick(objectId);
-                      }
-                    }}
+                    onKeyPress={(e) => handleRowKeyPress(e, objectId)}
+                    aria-selected={isSelected}
+                    aria-label={`Object ${rowNumber}, UUID ${objectId.substring(0, 8)}`}
                   >
-                    <td className="row-number">{rowNumber}</td>
-                    <td className="uuid-cell">
+                    <td role="cell" className="row-number">{rowNumber}</td>
+                    <td role="cell" className="uuid-cell">
                       <CellRenderer
                         value={objectId}
                         dataType="uuid"
@@ -124,7 +135,7 @@ export function DataTable() {
                       const dataType = (property?.dataType || 'text') as PropertyDataType;
 
                       return (
-                        <td key={columnName} className="data-cell">
+                        <td key={columnName} role="cell" className="data-cell">
                           <CellRenderer
                             value={value}
                             dataType={dataType}

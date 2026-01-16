@@ -22,8 +22,19 @@ export class DataExplorerAPI {
     try {
       const collection = this.client.collections.get(params.collectionName);
 
-      // Build query options
-      const queryOptions: any = {
+      // Build query options with proper types
+      interface QueryOptions {
+        limit: number;
+        offset: number;
+        returnMetadata: string[];
+        returnProperties?: string[];
+        sort?: {
+          path: string;
+          order: 'asc' | 'desc';
+        };
+      }
+
+      const queryOptions: QueryOptions = {
         limit: params.limit,
         offset: params.offset,
         returnMetadata: ['uuid', 'creationTimeUnix', 'lastUpdateTimeUnix', 'vector'],
@@ -43,7 +54,7 @@ export class DataExplorerAPI {
       }
 
       // Execute query
-      const result = await collection.query.fetchObjects(queryOptions);
+      const result = await collection.query.fetchObjects(queryOptions as any); // Weaviate client types are complex
 
       // Get total count
       const totalCount = await this.getTotalCount(params.collectionName);
@@ -137,12 +148,12 @@ export class DataExplorerAPI {
   /**
    * Get a single object by UUID
    */
-  async getObjectByUuid(collectionName: string, uuid: string): Promise<any> {
+  async getObjectByUuid(collectionName: string, uuid: string): Promise<unknown> {
     try {
       const collection = this.client.collections.get(collectionName);
       const result = await collection.query.fetchObjectById(uuid, {
         returnMetadata: ['uuid', 'creationTimeUnix', 'lastUpdateTimeUnix', 'vector'],
-      });
+      } as any); // Weaviate client fetchObjectById types are complex
       return result;
     } catch (error) {
       console.error('Error fetching object by UUID:', error);
@@ -151,21 +162,21 @@ export class DataExplorerAPI {
   }
 
   /**
-   * Convert Weaviate property to our PropertySchema format
+   * Convert Weaviate property config to our PropertySchema format
    */
-  private convertProperty(prop: any): PropertySchema {
+  private convertProperty(prop: Record<string, unknown>): PropertySchema {
     const property: PropertySchema = {
-      name: prop.name,
+      name: prop.name as string,
       dataType: this.normalizeDataType(prop.dataType),
-      description: prop.description,
-      indexFilterable: prop.indexFilterable,
-      indexSearchable: prop.indexSearchable,
-      tokenization: prop.tokenization,
+      description: prop.description as string | undefined,
+      indexFilterable: prop.indexFilterable as boolean | undefined,
+      indexSearchable: prop.indexSearchable as boolean | undefined,
+      tokenization: prop.tokenization as string | undefined,
     };
 
     // Handle nested properties for object types
     if (prop.nestedProperties && Array.isArray(prop.nestedProperties)) {
-      property.nestedProperties = prop.nestedProperties.map((nested: any) =>
+      property.nestedProperties = prop.nestedProperties.map((nested: Record<string, unknown>) =>
         this.convertProperty(nested)
       );
     }
@@ -176,7 +187,7 @@ export class DataExplorerAPI {
   /**
    * Normalize data type to our standard format
    */
-  private normalizeDataType(dataType: any): PropertyDataType {
+  private normalizeDataType(dataType: unknown): PropertyDataType {
     // Handle array notation
     if (Array.isArray(dataType)) {
       const baseType = dataType[0];

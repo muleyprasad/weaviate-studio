@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { CellRendererProps } from '../../../types';
 
 /**
@@ -30,7 +30,7 @@ export function CellRenderer({ value, dataType, propertyName, objectId }: CellRe
       return renderDateCell(value);
 
     case 'uuid':
-      return renderUuidCell(value);
+      return <UuidCell value={value} />;
 
     case 'geoCoordinates':
       return renderGeoCell(value);
@@ -126,13 +126,17 @@ function renderDateCell(value: string | number) {
 }
 
 /**
- * Render UUID cell with shortened display
+ * UUID cell component with copy functionality and feedback
  */
-function renderUuidCell(value: string) {
+function UuidCell({ value }: { value: string }) {
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const shortened = value.length > 13 ? value.substring(0, 8) + '...' + value.substring(value.length - 4) : value;
 
-  const copyToClipboard = () => {
+  const copyToClipboard = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row selection when clicking copy
     navigator.clipboard.writeText(value);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 2000);
   };
 
   return (
@@ -141,10 +145,10 @@ function renderUuidCell(value: string) {
       <button
         className="copy-button"
         onClick={copyToClipboard}
-        aria-label="Copy UUID"
-        title="Copy UUID"
+        aria-label={copyFeedback ? 'Copied!' : 'Copy UUID'}
+        title={copyFeedback ? 'Copied!' : 'Copy UUID'}
       >
-        📋
+        {copyFeedback ? '✓' : '📋'}
       </button>
     </span>
   );

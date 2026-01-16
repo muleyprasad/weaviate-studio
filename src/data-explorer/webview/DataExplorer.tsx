@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
 import type {
   DataExplorerState,
   DataExplorerAction,
@@ -8,13 +8,17 @@ import type {
 import { DataTable } from './components/DataBrowser/DataTable';
 import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
 
+// Import shared theme for design consistency
+import '../webview/theme.css';
+import './styles.css';
+
 /**
  * VS Code API type
  */
 declare const acquireVsCodeApi: () => {
   postMessage: (message: WebviewMessage) => void;
-  getState: () => any;
-  setState: (state: any) => void;
+  getState: () => unknown;
+  setState: (state: unknown) => void;
 };
 
 // Create VS Code API instance
@@ -256,18 +260,48 @@ export function DataExplorer() {
   }, [state.currentPage, state.pageSize, state.sortBy]);
 
   /**
-   * Context value
+   * Save preferences when they change
    */
-  const contextValue: DataExplorerContextType = {
-    state,
-    dispatch,
-    fetchObjects,
-    selectObject,
-  };
+  useEffect(() => {
+    if (state.collectionName && state.schema) {
+      vscode.postMessage({
+        command: 'savePreferences',
+        data: {
+          collectionName: state.collectionName,
+          preferences: {
+            visibleColumns: state.visibleColumns,
+            pinnedColumns: state.pinnedColumns,
+            pageSize: state.pageSize,
+            sortBy: state.sortBy,
+          },
+        },
+      });
+    }
+  }, [state.visibleColumns, state.pinnedColumns, state.pageSize, state.sortBy, state.collectionName, state.schema]);
+
+  /**
+   * Context value (memoized to prevent unnecessary re-renders)
+   */
+  const contextValue = useMemo<DataExplorerContextType>(
+    () => ({
+      state,
+      dispatch,
+      fetchObjects,
+      selectObject,
+    }),
+    [state, fetchObjects, selectObject]
+  );
 
   return (
     <DataExplorerContext.Provider value={contextValue}>
       <div className="data-explorer">
+        {/* Screen reader announcements */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {state.loading && 'Loading data...'}
+          {!state.loading && state.objects.length > 0 && `Loaded ${state.totalCount} objects`}
+          {!state.loading && state.objects.length === 0 && 'No objects found'}
+        </div>
+
         {state.error && (
           <div className="error-banner" role="alert">
             <span className="error-icon">⚠️</span>

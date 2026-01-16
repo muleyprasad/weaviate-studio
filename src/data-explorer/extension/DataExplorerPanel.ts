@@ -41,6 +41,8 @@ export class DataExplorerPanel {
   public static readonly viewType = 'weaviate.dataExplorer';
   private static readonly panels = new Map<string, DataExplorerPanel>();
   private static readonly PREFERENCES_KEY = 'dataExplorerPreferences';
+  private static readonly CONNECTION_ERROR_MESSAGE =
+    'Connection lost. Please reconnect from the Connections view.';
 
   private _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -49,6 +51,8 @@ export class DataExplorerPanel {
   private _api: DataExplorerAPI | null = null;
   private _context: vscode.ExtensionContext;
   private _connectionManager: ConnectionManager;
+  private _isConnectionActive: boolean = false;
+  private _connectionStateListener: vscode.Disposable | null = null;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -73,6 +77,21 @@ export class DataExplorerPanel {
       null,
       this._disposables
     );
+
+    // Check initial connection state
+    this._updateConnectionState();
+
+    // Subscribe to connection changes
+    // When a connection is disconnected in the tree view, this ensures all data explorer
+    // panels using that connection are immediately notified
+    if (this._connectionManager.onConnectionsChanged) {
+      this._connectionStateListener = this._connectionManager.onConnectionsChanged(() => {
+        this._updateConnectionState();
+      });
+      if (this._connectionStateListener) {
+        this._disposables.push(this._connectionStateListener);
+      }
+    }
 
     // Initialize connection
     this._initializeConnection();
@@ -169,6 +188,10 @@ export class DataExplorerPanel {
           await this._handleSelectObject(message.data);
           break;
 
+        case 'savePreferences':
+          await this._savePreferences(message.data.collectionName, message.data.preferences);
+          break;
+
         case 'error':
           vscode.window.showErrorMessage(message.data.message);
           break;
@@ -235,9 +258,44 @@ export class DataExplorerPanel {
   }
 
   /**
+   * Update connection state and notify webview if changed
+   */
+  private _updateConnectionState(): void {
+    const connectionId = this._options.connectionId;
+    if (!connectionId) {
+      this._isConnectionActive = false;
+      this._notifyConnectionStatus(false);
+      return;
+    }
+
+    const connection = this._connectionManager.getConnection?.(connectionId);
+    const wasConnected = this._isConnectionActive;
+    const isNowConnected = connection?.status === 'connected';
+
+    this._isConnectionActive = isNowConnected;
+
+    // Only notify webview if state changed
+    if (wasConnected !== isNowConnected) {
+      this._notifyConnectionStatus(isNowConnected);
+    }
+  }
+
+  /**
+   * Notify webview of connection status
+   */
+  private _notifyConnectionStatus(isConnected: boolean): void {
+    this._postMessage({
+      command: 'error',
+      data: {
+        message: isConnected ? '' : DataExplorerPanel.CONNECTION_ERROR_MESSAGE,
+      },
+    });
+  }
+
+  /**
    * Get preferences for a collection
    */
-  private _getPreferences(collectionName: string): any {
+  private _getPreferences(collectionName: string): Record<string, unknown> {
     const allPreferences =
       this._context.globalState.get<DataExplorerPreferences>(DataExplorerPanel.PREFERENCES_KEY) || {};
     return allPreferences[collectionName] || {};
@@ -246,7 +304,7 @@ export class DataExplorerPanel {
   /**
    * Save preferences for a collection
    */
-  private async _savePreferences(collectionName: string, preferences: any) {
+  private async _savePreferences(collectionName: string, preferences: Record<string, unknown>): Promise<void> {
     const allPreferences =
       this._context.globalState.get<DataExplorerPreferences>(DataExplorerPanel.PREFERENCES_KEY) || {};
     allPreferences[collectionName] = preferences;
