@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { WeaviateClient } from 'weaviate-client';
 import { ConnectionManager } from '../../services/ConnectionManager';
 import { DataExplorerAPI } from './DataExplorerAPI';
@@ -262,42 +263,39 @@ export class DataExplorerPanel {
   /**
    * Update the webview content
    */
-  private _update() {
+  private async _update() {
     const webview = this._panel.webview;
-    this._panel.webview.html = this._getHtmlForWebview(webview);
+    this._panel.webview.html = await this._getHtmlForWebview(webview);
   }
 
   /**
-   * Generate HTML for webview
+   * Generate HTML for webview by reading the built HTML file
    */
-  private _getHtmlForWebview(webview: vscode.Webview): string {
-    // Get the local path to main script run in the webview
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._context.extensionUri, 'dist', 'webview', 'dataExplorer.bundle.js')
+  private async _getHtmlForWebview(webview: vscode.Webview): Promise<string> {
+    // Read the built HTML file from webpack output
+    const webviewHtmlPath = vscode.Uri.joinPath(
+      this._context.extensionUri,
+      'dist',
+      'webview',
+      'dataExplorer.html'
     );
+    let htmlContent = await fs.promises.readFile(webviewHtmlPath.fsPath, 'utf-8');
 
-    // Get the local path to css
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._context.extensionUri, 'media', 'dataExplorer.css')
-    );
-
-    // Use a nonce to only allow specific scripts to be run
+    // Generate nonce for CSP
     const nonce = getNonce();
+    htmlContent = htmlContent.replace(/{{nonce}}/g, nonce);
+    htmlContent = htmlContent.replace(/{{cspSource}}/g, webview.cspSource);
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="${styleUri}" rel="stylesheet">
-  <title>Data Explorer</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+    // Calculate baseHref for the <base> tag
+    const webviewDistPath = vscode.Uri.joinPath(this._context.extensionUri, 'dist', 'webview');
+    const baseHrefUri = webview.asWebviewUri(webviewDistPath);
+    let baseHrefString = baseHrefUri.toString();
+    if (!baseHrefString.endsWith('/')) {
+      baseHrefString += '/';
+    }
+    htmlContent = htmlContent.replace(/{{baseHref}}/g, baseHrefString);
+
+    return htmlContent;
   }
 
   /**

@@ -135,6 +135,14 @@ module.exports = {
       scriptLoading: 'defer',
       minify: isProduction,
     }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/dataExplorer.html',
+      filename: 'dataExplorer.html',
+      chunks: ['dataExplorer'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
     // Attach the nonce placeholder to every injected script tag.
     new WebviewNoncePlugin(),
     new MiniCssExtractPlugin({
