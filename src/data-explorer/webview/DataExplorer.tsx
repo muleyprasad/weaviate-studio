@@ -9,6 +9,7 @@ import type {
 import { DataTable } from './components/DataBrowser/DataTable';
 import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
 import { FilterBuilder } from './components/Filters/FilterBuilder';
+import { VectorSearchPanel } from './components/VectorSearch/VectorSearchPanel';
 
 // Import shared theme for design consistency
 import '../../webview/theme.css';
@@ -40,6 +41,19 @@ const initialState: DataExplorerState = {
   pageSize: 20,
   filters: [],
   activeFilters: [],
+  vectorSearch: {
+    isActive: false,
+    config: {
+      mode: 'text',
+      limit: 10,
+      useDistance: true,
+      distance: 0.5,
+      certainty: 0.7,
+    },
+    results: [],
+    loading: false,
+    error: null,
+  },
   visibleColumns: [],
   pinnedColumns: [],
   sortBy: null,
@@ -153,6 +167,68 @@ function dataExplorerReducer(
         currentPage: 0, // Reset to first page when applying filters
       };
 
+    case 'SET_VECTOR_SEARCH_CONFIG':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          config: {
+            ...state.vectorSearch.config,
+            ...action.payload,
+          },
+        },
+      };
+
+    case 'SET_VECTOR_SEARCH_ACTIVE':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          isActive: action.payload,
+        },
+      };
+
+    case 'SET_VECTOR_SEARCH_RESULTS':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          results: action.payload,
+          loading: false,
+          error: null,
+        },
+      };
+
+    case 'SET_VECTOR_SEARCH_LOADING':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          loading: action.payload,
+        },
+      };
+
+    case 'SET_VECTOR_SEARCH_ERROR':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          error: action.payload,
+          loading: false,
+        },
+      };
+
+    case 'CLEAR_VECTOR_SEARCH':
+      return {
+        ...state,
+        vectorSearch: {
+          ...state.vectorSearch,
+          results: [],
+          loading: false,
+          error: null,
+        },
+      };
+
     default:
       return state;
   }
@@ -166,6 +242,7 @@ interface DataExplorerContextType {
   dispatch: React.Dispatch<DataExplorerAction>;
   fetchObjects: (page?: number) => void;
   selectObject: (uuid: string | null) => void;
+  postMessage: (message: WebviewMessage) => void;
 }
 
 const DataExplorerContext = createContext<DataExplorerContextType | null>(null);
@@ -280,6 +357,10 @@ export function DataExplorer() {
           // Object details loaded - handled by ObjectDetailPanel
           break;
 
+        case 'vectorSearchResults':
+          dispatch({ type: 'SET_VECTOR_SEARCH_RESULTS', payload: message.data.results });
+          break;
+
         case 'error':
           dispatch({ type: 'SET_ERROR', payload: message.data.message });
           break;
@@ -321,6 +402,13 @@ export function DataExplorer() {
   }, [state.visibleColumns, state.pinnedColumns, state.pageSize, state.sortBy, state.activeFilters, state.collectionName, state.schema]);
 
   /**
+   * Post message to extension
+   */
+  const postMessage = useCallback((message: WebviewMessage) => {
+    vscode.postMessage(message);
+  }, []);
+
+  /**
    * Context value (memoized to prevent unnecessary re-renders)
    */
   const contextValue = useMemo<DataExplorerContextType>(
@@ -329,8 +417,9 @@ export function DataExplorer() {
       dispatch,
       fetchObjects,
       selectObject,
+      postMessage,
     }),
-    [state, fetchObjects, selectObject]
+    [state, fetchObjects, selectObject, postMessage]
   );
 
   return (
@@ -364,10 +453,22 @@ export function DataExplorer() {
               {state.loading ? '...' : `${state.totalCount} objects`}
             </span>
           </h2>
+
+          {/* Toggle Vector Search button */}
+          <button
+            className="vector-search-toggle"
+            onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
+            title={state.vectorSearch.isActive ? 'Close Vector Search' : 'Open Vector Search'}
+          >
+            {state.vectorSearch.isActive ? '✕ Close' : '🔮 Vector Search'}
+          </button>
         </div>
 
         {/* Filter panel */}
         <FilterBuilder />
+
+        {/* Vector Search panel */}
+        {state.vectorSearch.isActive && <VectorSearchPanel />}
 
         <div className="explorer-content">
           {state.loading && !state.objects.length ? (

@@ -192,6 +192,10 @@ export class DataExplorerPanel {
           await this._savePreferences(message.data.collectionName, message.data.preferences);
           break;
 
+        case 'vectorSearch':
+          await this._handleVectorSearch(message.data);
+          break;
+
         case 'error':
           vscode.window.showErrorMessage(message.data.message);
           break;
@@ -254,6 +258,67 @@ export class DataExplorerPanel {
     this._postMessage({
       command: 'objectSelected',
       data: object,
+    });
+  }
+
+  /**
+   * Handle vector search request
+   */
+  private async _handleVectorSearch(params: any) {
+    if (!this._api) {
+      throw new Error('API not initialized');
+    }
+
+    const collectionName = this._options.collectionName;
+    let objects: any[] = [];
+
+    // Call appropriate API method based on search mode
+    switch (params.mode) {
+      case 'text':
+        objects = await this._api.vectorSearchText({
+          collectionName,
+          searchText: params.searchText,
+          limit: params.limit,
+          distance: params.distance,
+          certainty: params.certainty,
+        });
+        break;
+
+      case 'object':
+        objects = await this._api.vectorSearchObject({
+          collectionName,
+          referenceObjectId: params.referenceObjectId,
+          limit: params.limit,
+          distance: params.distance,
+          certainty: params.certainty,
+        });
+        break;
+
+      case 'vector':
+        objects = await this._api.vectorSearchVector({
+          collectionName,
+          vector: params.vectorInput,
+          limit: params.limit,
+          distance: params.distance,
+          certainty: params.certainty,
+        });
+        break;
+
+      default:
+        throw new Error(`Unknown vector search mode: ${params.mode}`);
+    }
+
+    // Transform objects to results with similarity scores
+    const results = objects.map((obj: any) => ({
+      object: obj,
+      distance: obj.distance,
+      certainty: obj.certainty,
+      score: obj.score,
+    }));
+
+    this._postMessage({
+      command: 'vectorSearchResults',
+      data: { results },
     });
   }
 
