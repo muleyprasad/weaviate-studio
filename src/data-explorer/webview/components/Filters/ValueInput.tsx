@@ -210,7 +210,7 @@ function DateRangeInput({
   onChange: (value: FilterValue) => void;
   disabled: boolean;
 }) {
-  const rangeValue = typeof value === 'object' && value !== null && 'min' in value
+  const rangeValue = typeof value === 'object' && value !== null && 'min' in value && value.min instanceof Date
     ? (value as { min: Date; max: Date })
     : { min: new Date(), max: new Date() };
 

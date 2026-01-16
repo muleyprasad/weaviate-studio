@@ -43,12 +43,12 @@ export function DataTable() {
     }
   };
 
-  const getObjectId = (obj: WeaviateObject): string => {
+  const getObjectId = (obj: WeaviateObject<Record<string, unknown>, string>): string => {
     // Try different possible UUID locations
     return obj.uuid || (obj as any).id || (obj as any)._additional?.id || '';
   };
 
-  const getPropertyValue = (obj: WeaviateObject, propertyName: string): unknown => {
+  const getPropertyValue = (obj: WeaviateObject<Record<string, unknown>, string>, propertyName: string): unknown => {
     // First try direct property access
     const objAny = obj as any;
     if (objAny.properties && propertyName in objAny.properties) {

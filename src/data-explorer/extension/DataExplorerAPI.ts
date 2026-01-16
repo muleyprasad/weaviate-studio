@@ -135,13 +135,17 @@ export class DataExplorerAPI {
       // Extract vectorizer information
       const vectorizers: VectorizerConfig[] = [];
 
-      // Check for vectorizer config
-      if (config.vectorizer) {
-        vectorizers.push({
-          name: 'default',
-          vectorizer: typeof config.vectorizer === 'string' ? config.vectorizer : config.vectorizer.toString(),
-          dimensions: this.extractVectorDimensions(config),
-        });
+      // Check for vectorizers config (v4+ API)
+      if (config.vectorizers && typeof config.vectorizers === 'object') {
+        for (const [name, vectorizerConfig] of Object.entries(config.vectorizers)) {
+          if (vectorizerConfig && typeof vectorizerConfig === 'object') {
+            vectorizers.push({
+              name,
+              vectorizer: (vectorizerConfig as any).vectorizer?.name || 'unknown',
+              dimensions: (vectorizerConfig as any).vectorIndexConfig?.dimensions,
+            });
+          }
+        }
       }
 
       // Check for named vectors

@@ -133,7 +133,7 @@ export class DataExplorerPanel {
    */
   private async _initializeConnection() {
     try {
-      this._client = this._connectionManager.getClient(this._options.connectionId);
+      this._client = this._connectionManager.getClient(this._options.connectionId) || null;
 
       if (!this._client) {
         throw new Error('Failed to get Weaviate client');

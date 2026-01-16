@@ -13,7 +13,7 @@ export interface DataExplorerState {
   schema: CollectionSchema | null;
 
   // Data
-  objects: WeaviateObject[];
+  objects: WeaviateObject<Record<string, unknown>, string>[];
   totalCount: number;
   loading: boolean;
   error: string | null;
@@ -146,6 +146,7 @@ export type FilterValue =
   | string[]
   | number[]
   | { min: number; max: number }
+  | { min: Date; max: Date }
   | { lat: number; lon: number; distance: number }
   | null;
 
@@ -212,7 +213,7 @@ export interface FetchParams {
  * Result from fetching objects
  */
 export interface FetchResult {
-  objects: WeaviateObject[];
+  objects: WeaviateObject<Record<string, unknown>, string>[];
   totalCount: number;
 }
 
