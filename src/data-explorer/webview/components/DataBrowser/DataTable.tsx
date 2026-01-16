@@ -10,7 +10,7 @@ import type { WeaviateObject } from 'weaviate-client';
  * Main data table component
  */
 export function DataTable() {
-  const { state, selectObject } = useDataExplorer();
+  const { state, selectObject, dispatch, postMessage } = useDataExplorer();
 
   if (!state.schema) {
     return <div className="no-schema">Loading schema...</div>;
@@ -43,6 +43,38 @@ export function DataTable() {
     }
   };
 
+  const handleFindSimilar = (e: React.MouseEvent, objectId: string) => {
+    e.stopPropagation(); // Prevent row selection
+
+    // Activate vector search panel
+    dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: true });
+
+    // Set config to object mode with this object
+    dispatch({
+      type: 'SET_VECTOR_SEARCH_CONFIG',
+      payload: {
+        mode: 'object' as const,
+        referenceObjectId: objectId,
+      },
+    });
+
+    // Trigger vector search
+    postMessage({
+      command: 'vectorSearch',
+      data: {
+        mode: 'object',
+        referenceObjectId: objectId,
+        limit: state.vectorSearch.config.limit,
+        distance: state.vectorSearch.config.useDistance
+          ? state.vectorSearch.config.distance
+          : undefined,
+        certainty: !state.vectorSearch.config.useDistance
+          ? state.vectorSearch.config.certainty
+          : undefined,
+      },
+    });
+  };
+
   const getObjectId = (obj: WeaviateObject<Record<string, unknown>, string>): string => {
     // Try different possible UUID locations
     return obj.uuid || (obj as any).id || (obj as any)._additional?.id || '';
@@ -73,6 +105,7 @@ export function DataTable() {
           <thead>
             <tr role="row">
               <th role="columnheader" className="row-number-header">#</th>
+              <th role="columnheader" className="actions-header">Actions</th>
               <th role="columnheader" className="uuid-header">UUID</th>
               {orderedColumns.map((columnName) => {
                 const isPinned = state.pinnedColumns.includes(columnName);
@@ -99,7 +132,7 @@ export function DataTable() {
           <tbody>
             {state.objects.length === 0 ? (
               <tr role="row">
-                <td colSpan={orderedColumns.length + 2} className="no-data" role="cell">
+                <td colSpan={orderedColumns.length + 3} className="no-data" role="cell">
                   {state.loading ? 'Loading objects...' : 'No objects found'}
                 </td>
               </tr>
@@ -121,6 +154,16 @@ export function DataTable() {
                     aria-label={`Object ${rowNumber}, UUID ${objectId.substring(0, 8)}`}
                   >
                     <td role="cell" className="row-number">{rowNumber}</td>
+                    <td role="cell" className="actions-cell">
+                      <button
+                        className="action-button find-similar"
+                        onClick={(e) => handleFindSimilar(e, objectId)}
+                        title="Find similar objects"
+                        aria-label="Find similar objects"
+                      >
+                        🔗
+                      </button>
+                    </td>
                     <td role="cell" className="uuid-cell">
                       <CellRenderer
                         value={objectId}
