@@ -13,8 +13,7 @@ export function ObjectDetailPanel() {
   useEffect(() => {
     if (state.selectedObjectId && state.objects.length > 0) {
       const obj = state.objects.find((o) => {
-        const id = o.uuid || o.id || o._additional?.id;
-        return id === state.selectedObjectId;
+        return o.uuid === state.selectedObjectId;
       });
       setSelectedObject(obj || null);
     }
@@ -28,9 +27,17 @@ export function ObjectDetailPanel() {
     return null;
   }
 
-  const objectId = selectedObject.uuid || selectedObject.id || selectedObject._additional?.id || '';
+  const objectId = selectedObject.uuid || '';
   const properties = selectedObject.properties || selectedObject;
-  const metadata = selectedObject._additional || {};
+  // In Weaviate v4, metadata fields are directly on the object, not in _additional
+  const metadata = {
+    creationTimeUnix: selectedObject.creationTimeUnix,
+    lastUpdateTimeUnix: selectedObject.lastUpdateTimeUnix,
+    distance: selectedObject.distance,
+    certainty: selectedObject.certainty,
+    score: selectedObject.score,
+    vector: selectedObject.vector,
+  };
 
   return (
     <div className="object-detail-panel">

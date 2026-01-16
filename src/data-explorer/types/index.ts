@@ -244,7 +244,7 @@ export interface CellRendererProps {
 export type DataExplorerAction =
   | { type: 'SET_COLLECTION'; payload: string }
   | { type: 'SET_SCHEMA'; payload: CollectionSchema }
-  | { type: 'SET_DATA'; payload: { objects: WeaviateObject[]; totalCount: number } }
+  | { type: 'SET_DATA'; payload: { objects: WeaviateObject<Record<string, unknown>, string>[]; totalCount: number } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_PAGE'; payload: number }

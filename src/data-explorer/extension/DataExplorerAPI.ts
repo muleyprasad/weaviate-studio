@@ -2,7 +2,7 @@
  * API service for Data Explorer to interact with Weaviate client
  */
 
-import type { WeaviateClient } from 'weaviate-client';
+import type { WeaviateClient, WeaviateObject } from 'weaviate-client';
 import type {
   FetchParams,
   FetchResult,
@@ -72,7 +72,7 @@ export class DataExplorerAPI {
       const totalCount = await this.getTotalCount(params.collectionName, params.filters);
 
       return {
-        objects: result.objects || [],
+        objects: (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[],
         totalCount,
       };
     } catch (error) {
