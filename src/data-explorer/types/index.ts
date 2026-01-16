@@ -150,10 +150,34 @@ export type FilterValue =
   | null;
 
 /**
+ * Weaviate operator types
+ */
+export type WeaviateOperator =
+  // Logical operators
+  | 'And'
+  | 'Or'
+  | 'Not'
+  // Comparison operators
+  | 'Equal'
+  | 'NotEqual'
+  | 'GreaterThan'
+  | 'LessThan'
+  | 'GreaterThanEqual'
+  | 'LessThanEqual'
+  // Text operators
+  | 'Like'
+  // Array operators
+  | 'ContainsAny'
+  // Null check
+  | 'IsNull'
+  // Geo operators
+  | 'WithinGeoRange';
+
+/**
  * Weaviate WHERE filter structure
  */
 export interface WhereFilter {
-  operator: 'And' | 'Or' | 'Not';
+  operator: WeaviateOperator;
   operands?: WhereFilter[];
   path?: string[];
   valueText?: string;

@@ -91,7 +91,13 @@ export function ValueInput({
         type="date"
         className="value-input"
         value={dateValue}
-        onChange={(e) => onChange(new Date(e.target.value))}
+        onChange={(e) => {
+          const date = new Date(e.target.value);
+          // Only update if the date is valid
+          if (!isNaN(date.getTime()) && e.target.value) {
+            onChange(date);
+          }
+        }}
         disabled={disabled}
         aria-label="Filter value"
       />
@@ -217,9 +223,13 @@ function DateRangeInput({
         type="date"
         className="value-input range-min"
         value={minDate}
-        onChange={(e) =>
-          onChange({ ...rangeValue, min: new Date(e.target.value) })
-        }
+        onChange={(e) => {
+          const date = new Date(e.target.value);
+          // Only update if the date is valid
+          if (!isNaN(date.getTime()) && e.target.value) {
+            onChange({ ...rangeValue, min: date });
+          }
+        }}
         disabled={disabled}
         aria-label="Start date"
       />
@@ -228,9 +238,13 @@ function DateRangeInput({
         type="date"
         className="value-input range-max"
         value={maxDate}
-        onChange={(e) =>
-          onChange({ ...rangeValue, max: new Date(e.target.value) })
-        }
+        onChange={(e) => {
+          const date = new Date(e.target.value);
+          // Only update if the date is valid
+          if (!isNaN(date.getTime()) && e.target.value) {
+            onChange({ ...rangeValue, max: date });
+          }
+        }}
         disabled={disabled}
         aria-label="End date"
       />

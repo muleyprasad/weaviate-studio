@@ -8,6 +8,7 @@ import type {
   FilterValue,
   PropertyDataType,
   WhereFilter,
+  WeaviateOperator,
 } from '../types';
 
 /**
@@ -145,7 +146,7 @@ function buildFilterOperand(filter: Filter): WhereFilter {
   const formattedValue = formatFilterValue(filter.value, filter.operator, filter.dataType);
 
   const baseFilter: WhereFilter = {
-    operator: weaviateOperator as 'And' | 'Or' | 'Not',
+    operator: weaviateOperator as WeaviateOperator,
     path: [filter.property],
   };
 
@@ -160,7 +161,59 @@ function buildFilterOperand(filter: Filter): WhereFilter {
       : nullFilter;
   }
 
-  if (filter.operator === 'notIn' || filter.operator === 'notEquals') {
+  // Handle 'in' operator - create OR combination of Equal conditions
+  if (filter.operator === 'in' && Array.isArray(formattedValue) && formattedValue.length > 0) {
+    if (formattedValue.length === 1) {
+      // Single value - just use Equal
+      const singleFilter: WhereFilter = {
+        operator: 'Equal' as WeaviateOperator,
+        path: [filter.property],
+      };
+      addValueToFilter(singleFilter, formattedValue[0], filter.dataType);
+      return singleFilter;
+    }
+    // Multiple values - create OR combination
+    return {
+      operator: 'Or',
+      operands: (formattedValue as (string | number)[]).map((val) => {
+        const equalFilter: WhereFilter = {
+          operator: 'Equal' as WeaviateOperator,
+          path: [filter.property],
+        };
+        addValueToFilter(equalFilter, val, filter.dataType);
+        return equalFilter;
+      }),
+    };
+  }
+
+  // Handle 'notIn' operator - wrap 'in' logic in NOT
+  if (filter.operator === 'notIn' && Array.isArray(formattedValue) && formattedValue.length > 0) {
+    if (formattedValue.length === 1) {
+      // Single value - just use NotEqual
+      const singleFilter: WhereFilter = {
+        operator: 'NotEqual' as WeaviateOperator,
+        path: [filter.property],
+      };
+      addValueToFilter(singleFilter, formattedValue[0], filter.dataType);
+      return singleFilter;
+    }
+    // Multiple values - NOT(OR(Equal, Equal, ...))
+    const orFilter: WhereFilter = {
+      operator: 'Or',
+      operands: (formattedValue as (string | number)[]).map((val) => {
+        const equalFilter: WhereFilter = {
+          operator: 'Equal' as WeaviateOperator,
+          path: [filter.property],
+        };
+        addValueToFilter(equalFilter, val, filter.dataType);
+        return equalFilter;
+      }),
+    };
+    return { operator: 'Not', operands: [orFilter] };
+  }
+
+  // Handle 'notEquals' operator
+  if (filter.operator === 'notEquals') {
     const positiveFilter = { ...baseFilter };
     addValueToFilter(positiveFilter, formattedValue, filter.dataType);
     return { operator: 'Not', operands: [positiveFilter] };
@@ -172,12 +225,12 @@ function buildFilterOperand(filter: Filter): WhereFilter {
       operator: 'And',
       operands: [
         {
-          operator: 'GreaterThanEqual' as 'And' | 'Or' | 'Not',
+          operator: 'GreaterThanEqual' as WeaviateOperator,
           path: [filter.property],
           ...(filter.dataType.includes('int') ? { valueInt: min } : { valueNumber: min }),
         },
         {
-          operator: 'LessThanEqual' as 'And' | 'Or' | 'Not',
+          operator: 'LessThanEqual' as WeaviateOperator,
           path: [filter.property],
           ...(filter.dataType.includes('int') ? { valueInt: max } : { valueNumber: max }),
         },
@@ -188,7 +241,7 @@ function buildFilterOperand(filter: Filter): WhereFilter {
   if (filter.operator === 'withinDistance' && typeof formattedValue === 'object' && formattedValue !== null && 'lat' in formattedValue) {
     const { lat, lon, distance } = formattedValue as { lat: number; lon: number; distance: number };
     return {
-      operator: 'WithinGeoRange' as 'And' | 'Or' | 'Not',
+      operator: 'WithinGeoRange' as WeaviateOperator,
       path: [filter.property],
       valueGeoRange: {
         geoCoordinates: {
