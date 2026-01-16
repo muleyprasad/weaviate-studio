@@ -382,3 +382,570 @@
 .filter-status-text {
   font-weight: 500;
 }
+
+/* ========================================
+   VECTOR SEARCH STYLES
+   ======================================== */
+
+/* Vector Search Toggle Button */
+.vector-search-toggle {
+  padding: 6px 12px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  transition: background-color 0.1s;
+}
+
+.vector-search-toggle:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.vector-search-toggle:active {
+  transform: translateY(1px);
+}
+
+/* Vector Search Panel */
+.vector-search-panel {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.vector-search-header {
+  margin-bottom: 16px;
+}
+
+.vector-search-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--vscode-editor-foreground);
+}
+
+.vector-search-subtitle {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0;
+}
+
+/* Search Mode Tabs */
+.search-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding-bottom: 8px;
+}
+
+.mode-tab {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  transition: all 0.1s;
+}
+
+.mode-tab:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.mode-tab.active {
+  border-bottom-color: var(--vscode-focusBorder);
+  color: var(--vscode-focusBorder);
+  font-weight: 500;
+}
+
+/* Search Mode Content */
+.search-mode-content {
+  padding: 16px 0;
+}
+
+/* Search Input Sections */
+.search-input-section {
+  margin-bottom: 16px;
+}
+
+.search-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--vscode-editor-foreground);
+}
+
+.search-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.search-input,
+.search-textarea,
+.vector-textarea {
+  width: 100%;
+  padding: 6px 8px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  resize: vertical;
+}
+
+.search-textarea {
+  min-height: 60px;
+}
+
+.vector-textarea {
+  min-height: 120px;
+  font-family: var(--vscode-editor-fontFamily);
+  font-size: 12px;
+}
+
+.search-input:focus,
+.search-textarea:focus,
+.vector-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.search-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 4px;
+}
+
+.paste-example-button {
+  padding: 4px 8px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--vscode-font-family);
+}
+
+.paste-example-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* Vector Status */
+.vector-status {
+  margin-top: 8px;
+  min-height: 20px;
+}
+
+.status-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+.status-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-testing-iconPassed);
+  font-size: 12px;
+}
+
+/* Object Preview */
+.object-preview {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-left: 3px solid var(--vscode-focusBorder);
+  padding: 12px;
+  margin: 12px 0;
+  border-radius: 3px;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+
+.preview-content {
+  font-size: 12px;
+}
+
+.preview-text {
+  margin-bottom: 6px;
+  color: var(--vscode-editor-foreground);
+}
+
+.preview-uuid {
+  font-size: 11px;
+  font-family: var(--vscode-editor-fontFamily);
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Search Config Controls */
+.search-config-controls {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.config-section {
+  margin-bottom: 12px;
+}
+
+.config-section:last-child {
+  margin-bottom: 0;
+}
+
+.config-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--vscode-editor-foreground);
+}
+
+.config-value {
+  font-weight: 600;
+  color: var(--vscode-focusBorder);
+}
+
+/* Metric Toggle */
+.metric-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-button {
+  flex: 1;
+  padding: 6px 12px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  transition: all 0.1s;
+}
+
+.toggle-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.toggle-button.active {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font-weight: 500;
+}
+
+/* Config Slider */
+.config-slider {
+  width: 100%;
+  height: 6px;
+  background: var(--vscode-input-background);
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.config-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--vscode-focusBorder);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.config-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--vscode-focusBorder);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.config-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 4px;
+}
+
+.config-select {
+  padding: 4px 8px;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  cursor: pointer;
+}
+
+.config-select:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* Search Actions */
+.search-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.search-button {
+  padding: 6px 16px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  transition: all 0.1s;
+}
+
+.search-button.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.search-button.primary:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.search-button.secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.search-button.secondary:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.search-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Search Results */
+.vector-search-results {
+  margin-top: 20px;
+  border-top: 1px solid var(--vscode-panel-border);
+  padding-top: 16px;
+}
+
+.results-header {
+  margin-bottom: 12px;
+}
+
+.results-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--vscode-editor-foreground);
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Result Item */
+.result-item {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  padding: 12px;
+  transition: all 0.1s;
+}
+
+.result-item:hover {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Result Score */
+.result-score {
+  margin-bottom: 12px;
+}
+
+.score-percentage {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--vscode-editor-foreground);
+}
+
+.score-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--vscode-input-background);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--vscode-testing-iconFailed) 0%,
+    var(--vscode-charts-yellow) 50%,
+    var(--vscode-testing-iconPassed) 100%
+  );
+  transition: width 0.3s ease;
+}
+
+.score-details {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Result Preview */
+.result-preview {
+  margin-bottom: 12px;
+}
+
+/* Result Actions */
+.result-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.result-action-button {
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--vscode-font-family);
+  transition: all 0.1s;
+}
+
+.result-action-button.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.result-action-button.primary:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.result-action-button.secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.result-action-button.secondary:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* Loading & Error States */
+.vector-search-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--vscode-input-background);
+  border-top-color: var(--vscode-focusBorder);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vector-search-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 3px;
+  margin-top: 12px;
+}
+
+.error-icon {
+  font-size: 16px;
+}
+
+.error-message {
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+/* Actions Column in Data Table */
+.actions-header {
+  width: 60px;
+  text-align: center;
+}
+
+.actions-cell {
+  text-align: center;
+  padding: 4px !important;
+}
+
+.action-button {
+  padding: 4px 8px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.1s;
+}
+
+.action-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  transform: scale(1.1);
+}
+
+.action-button:active {
+  transform: scale(0.95);
+}
