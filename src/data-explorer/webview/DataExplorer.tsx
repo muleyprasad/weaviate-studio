@@ -13,6 +13,7 @@ import { VectorSearchPanel } from './components/VectorSearch/VectorSearchPanel';
 import { QuickInsightsPanel } from './components/Insights/QuickInsightsPanel';
 import { ExportDialog } from './components/Export/ExportDialog';
 import { SchemaVisualizer } from './components/Schema/SchemaVisualizer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Import shared theme for design consistency
 import '../../webview/theme.css';
@@ -690,16 +691,28 @@ export function DataExplorer() {
         </div>
 
         {/* Schema Visualizer - Phase 5: Always visible for immediate schema reference */}
-        {state.schema && <SchemaVisualizer schema={state.schema} />}
+        {state.schema && (
+          <ErrorBoundary featureName="Schema Visualizer">
+            <SchemaVisualizer schema={state.schema} />
+          </ErrorBoundary>
+        )}
 
         {/* Quick Insights Panel - Phase 5: Always visible for collection overview */}
-        <QuickInsightsPanel />
+        <ErrorBoundary featureName="Quick Insights">
+          <QuickInsightsPanel />
+        </ErrorBoundary>
 
         {/* Filter panel */}
-        <FilterBuilder />
+        <ErrorBoundary featureName="Filter Builder">
+          <FilterBuilder />
+        </ErrorBoundary>
 
         {/* Vector Search panel */}
-        {state.vectorSearch.isActive && <VectorSearchPanel />}
+        {state.vectorSearch.isActive && (
+          <ErrorBoundary featureName="Vector Search">
+            <VectorSearchPanel />
+          </ErrorBoundary>
+        )}
 
         <div className="explorer-content">
           {state.loading && !state.objects.length ? (
@@ -710,14 +723,22 @@ export function DataExplorer() {
             </div>
           ) : (
             <>
-              <DataTable />
-              {state.showDetailPanel && state.selectedObjectId && <ObjectDetailPanel />}
+              <ErrorBoundary featureName="Data Table">
+                <DataTable />
+              </ErrorBoundary>
+              {state.showDetailPanel && state.selectedObjectId && (
+                <ErrorBoundary featureName="Object Detail Panel">
+                  <ObjectDetailPanel />
+                </ErrorBoundary>
+              )}
             </>
           )}
         </div>
 
         {/* Export Dialog */}
-        <ExportDialog />
+        <ErrorBoundary featureName="Export Dialog">
+          <ExportDialog />
+        </ErrorBoundary>
       </div>
     </DataExplorerContext.Provider>
   );

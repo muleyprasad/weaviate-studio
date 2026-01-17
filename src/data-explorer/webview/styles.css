@@ -2568,3 +2568,111 @@
 .action-button:active {
   transform: translateY(1px);
 }
+
+/* ========================================================================
+   Error Boundary Styles
+   ======================================================================== */
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.error-boundary-content {
+  max-width: 600px;
+  text-align: center;
+}
+
+.error-boundary-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-boundary-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vscode-errorForeground);
+  margin: 0 0 12px 0;
+}
+
+.error-boundary-message {
+  font-size: 14px;
+  color: var(--vscode-foreground);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.error-boundary-details {
+  margin: 20px 0;
+  text-align: left;
+}
+
+.error-boundary-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  padding: 8px;
+  background-color: var(--vscode-input-background);
+  border-radius: 3px;
+}
+
+.error-boundary-details summary:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.error-boundary-stack {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--vscode-textCodeBlock-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-editor-foreground);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.error-boundary-button {
+  padding: 8px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  font-weight: 500;
+  transition: all 0.1s;
+  border: none;
+}
+
+.error-boundary-button.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.error-boundary-button.primary:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.error-boundary-button.secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border);
+}
+
+.error-boundary-button.secondary:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
