@@ -3,6 +3,7 @@
  */
 
 import type { WeaviateClient, WeaviateObject } from 'weaviate-client';
+import { VECTOR_SEARCH_DEFAULTS } from '../constants';
 import type {
   FetchParams,
   FetchResult,
@@ -268,7 +269,7 @@ export class DataExplorerAPI {
 
   /**
    * Helper method to add similarity metric to query options
-   * Ensures at least one metric is set (defaults to distance: 0.5)
+   * Ensures at least one metric is set (defaults to configured distance)
    */
   private addSimilarityMetric(
     queryOptions: VectorSearchOptions,
@@ -281,7 +282,7 @@ export class DataExplorerAPI {
       queryOptions.certainty = certainty;
     } else {
       // Default to distance metric if neither is provided
-      queryOptions.distance = 0.5;
+      queryOptions.distance = VECTOR_SEARCH_DEFAULTS.DISTANCE;
     }
   }
 

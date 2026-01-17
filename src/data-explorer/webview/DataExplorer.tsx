@@ -458,9 +458,14 @@ export function DataExplorer() {
           <button
             className="vector-search-toggle"
             onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
+            aria-label={state.vectorSearch.isActive ? 'Close Vector Search Panel' : 'Open Vector Search Panel'}
+            aria-expanded={state.vectorSearch.isActive}
             title={state.vectorSearch.isActive ? 'Close Vector Search' : 'Open Vector Search'}
           >
-            {state.vectorSearch.isActive ? '✕ Close' : '🔮 Vector Search'}
+            <span aria-hidden="true">
+              {state.vectorSearch.isActive ? '✕' : '🔮'}
+            </span>
+            {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
           </button>
         </div>
 

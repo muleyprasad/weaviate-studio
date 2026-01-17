@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { SearchConfigControls } from './SearchConfigControls';
+import { VECTOR_CONFIG } from '../../../constants';
 
 /**
  * Vector Search Mode - Search using raw vector embeddings
@@ -83,11 +84,17 @@ export function VectorSearchMode() {
   };
 
   const handlePasteExample = () => {
-    // Create a simple example vector
-    const exampleVector = Array.from({ length: expectedDimensions || 384 }, () =>
-      (Math.random() * 2 - 1).toFixed(4)
+    // Create a normalized random vector
+    const dimensions = expectedDimensions || VECTOR_CONFIG.DEFAULT_DIMENSIONS;
+    const rawVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
+
+    // Normalize to unit length (magnitude = 1)
+    const magnitude = Math.sqrt(rawVector.reduce((sum, val) => sum + val * val, 0));
+    const normalizedVector = rawVector.map((val) =>
+      parseFloat((val / magnitude).toFixed(4))
     );
-    setVectorInput(JSON.stringify(exampleVector));
+
+    setVectorInput(JSON.stringify(normalizedVector));
   };
 
   return (

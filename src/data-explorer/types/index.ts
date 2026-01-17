@@ -337,11 +337,6 @@ export interface ObjectMetadata {
 export type VectorSearchMode = 'text' | 'object' | 'vector';
 
 /**
- * Distance metric for vector search
- */
-export type DistanceMetric = 'cosine' | 'euclidean' | 'manhattan' | 'dot';
-
-/**
  * Vector search configuration
  */
 export interface VectorSearchConfig {

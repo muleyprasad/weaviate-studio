@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { SearchConfigControls } from './SearchConfigControls';
+import { TEXT_SEARCH_LIMITS } from '../../../constants';
 
 /**
  * Text Search Mode - Semantic search using natural language
@@ -26,10 +27,19 @@ export function TextSearchMode() {
     }
 
     // Validate minimum length
-    if (text.length < 3) {
+    if (text.length < TEXT_SEARCH_LIMITS.MIN_LENGTH) {
       dispatch({
         type: 'SET_VECTOR_SEARCH_ERROR',
-        payload: 'Search text must be at least 3 characters',
+        payload: `[Text Search] Search text must be at least ${TEXT_SEARCH_LIMITS.MIN_LENGTH} characters`,
+      });
+      return;
+    }
+
+    // Validate maximum length
+    if (text.length > TEXT_SEARCH_LIMITS.MAX_LENGTH) {
+      dispatch({
+        type: 'SET_VECTOR_SEARCH_ERROR',
+        payload: `[Text Search] Search text must not exceed ${TEXT_SEARCH_LIMITS.MAX_LENGTH} characters`,
       });
       return;
     }

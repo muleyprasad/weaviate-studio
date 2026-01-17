@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { SearchConfigControls } from './SearchConfigControls';
+import { getShortPreviewText } from '../../../utils/previewUtils';
 
 /**
  * Object Search Mode - Find objects similar to a reference object
@@ -35,7 +36,7 @@ export function ObjectSearchMode() {
     if (!isValidUUID(id)) {
       dispatch({
         type: 'SET_VECTOR_SEARCH_ERROR',
-        payload: 'Invalid UUID format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        payload: '[Object Search] Invalid UUID format. Expected: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
       });
       return;
     }
@@ -61,36 +62,8 @@ export function ObjectSearchMode() {
 
   // Find the reference object in current data for preview
   const referenceObject = objects.find((obj) => obj.uuid === objectId);
-  const hasPreview = referenceObject && referenceObject.properties;
-
-  // Get a preview string from the reference object
-  const getPreviewText = () => {
-    if (!referenceObject || !referenceObject.properties) {
-      return null;
-    }
-
-    // Try common text properties
-    const props = referenceObject.properties as Record<string, unknown>;
-    const textProps = ['title', 'name', 'description', 'content', 'text'];
-
-    for (const prop of textProps) {
-      if (props[prop] && typeof props[prop] === 'string') {
-        const text = props[prop] as string;
-        return text.length > 100 ? text.substring(0, 100) + '...' : text;
-      }
-    }
-
-    // Fallback: show first property
-    const firstProp = Object.entries(props)[0];
-    if (firstProp) {
-      const [key, value] = firstProp;
-      return `${key}: ${String(value).substring(0, 50)}...`;
-    }
-
-    return null;
-  };
-
-  const previewText = getPreviewText();
+  const previewText = getShortPreviewText(referenceObject);
+  const hasPreview = !!previewText;
 
   return (
     <div className="object-search-mode">

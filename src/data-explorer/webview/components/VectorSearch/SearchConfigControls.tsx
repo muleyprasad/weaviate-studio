@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDataExplorer } from '../../DataExplorer';
+import { DISTANCE_THRESHOLDS, CERTAINTY_THRESHOLDS } from '../../../constants';
 
 /**
  * Search Configuration Controls - Common settings for all vector search modes
@@ -84,11 +85,16 @@ export function SearchConfigControls() {
             id="distance-slider"
             type="range"
             className="config-slider"
-            min="0"
-            max="2"
-            step="0.01"
+            min={DISTANCE_THRESHOLDS.MIN}
+            max={DISTANCE_THRESHOLDS.MAX}
+            step={DISTANCE_THRESHOLDS.STEP}
             value={config.distance || 0.5}
             onChange={(e) => handleDistanceChange(parseFloat(e.target.value))}
+            aria-label={`Maximum distance threshold: ${(config.distance || 0.5).toFixed(2)}`}
+            aria-valuemin={DISTANCE_THRESHOLDS.MIN}
+            aria-valuemax={DISTANCE_THRESHOLDS.MAX}
+            aria-valuenow={config.distance || 0.5}
+            aria-valuetext={`${(config.distance || 0.5).toFixed(2)} - Objects with distance greater than this will be excluded`}
           />
           <div className="slider-labels">
             <span>0.0 (identical)</span>
@@ -108,11 +114,16 @@ export function SearchConfigControls() {
             id="certainty-slider"
             type="range"
             className="config-slider"
-            min="0"
-            max="1"
-            step="0.01"
+            min={CERTAINTY_THRESHOLDS.MIN}
+            max={CERTAINTY_THRESHOLDS.MAX}
+            step={CERTAINTY_THRESHOLDS.STEP}
             value={config.certainty || 0.7}
             onChange={(e) => handleCertaintyChange(parseFloat(e.target.value))}
+            aria-label={`Minimum certainty threshold: ${(config.certainty || 0.7).toFixed(2)}`}
+            aria-valuemin={CERTAINTY_THRESHOLDS.MIN}
+            aria-valuemax={CERTAINTY_THRESHOLDS.MAX}
+            aria-valuenow={config.certainty || 0.7}
+            aria-valuetext={`${(config.certainty || 0.7).toFixed(2)} - Objects with certainty lower than this will be excluded`}
           />
           <div className="slider-labels">
             <span>0.0 (low confidence)</span>

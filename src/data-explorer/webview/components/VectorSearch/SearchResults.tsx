@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDataExplorer } from '../../DataExplorer';
+import { getObjectPreviewText } from '../../../utils/previewUtils';
 
 /**
  * Search Results - Display vector search results with similarity scores
@@ -59,29 +60,6 @@ export function SearchResults() {
     }
   };
 
-  const getPreviewText = (obj: any): string => {
-    const props = obj.properties as Record<string, unknown>;
-    if (!props) {
-      return 'No preview available';
-    }
-
-    // Try common text properties
-    const textProps = ['title', 'name', 'description', 'content', 'text', 'summary'];
-
-    for (const prop of textProps) {
-      if (props[prop] && typeof props[prop] === 'string') {
-        const text = props[prop] as string;
-        return text.length > 150 ? text.substring(0, 150) + '...' : text;
-      }
-    }
-
-    // Fallback: show first few properties
-    const entries = Object.entries(props).slice(0, 3);
-    return entries
-      .map(([key, value]) => `${key}: ${String(value).substring(0, 30)}`)
-      .join(' | ');
-  };
-
   return (
     <div className="vector-search-results">
       <div className="results-header">
@@ -94,7 +72,7 @@ export function SearchResults() {
         {results.map((result, index) => {
           const matchPercentage = calculateMatchPercentage(result);
           const objectId = result.object.uuid || '';
-          const previewText = getPreviewText(result.object);
+          const previewText = getObjectPreviewText(result.object);
 
           return (
             <div key={objectId || index} className="result-item">

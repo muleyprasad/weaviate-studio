@@ -51,32 +51,41 @@ export function VectorSearchPanel() {
       </div>
 
       {/* Search Mode Tabs */}
-      <div className="search-mode-tabs">
+      <div className="search-mode-tabs" role="tablist" aria-label="Vector search modes">
         <button
           className={`mode-tab ${activeMode === 'text' ? 'active' : ''}`}
           onClick={() => handleModeChange('text')}
+          role="tab"
+          aria-selected={activeMode === 'text'}
+          aria-controls="search-mode-content"
           title="Search by text using semantic understanding"
         >
-          📝 Text (Semantic)
+          <span aria-hidden="true">📝</span> Text (Semantic)
         </button>
         <button
           className={`mode-tab ${activeMode === 'object' ? 'active' : ''}`}
           onClick={() => handleModeChange('object')}
+          role="tab"
+          aria-selected={activeMode === 'object'}
+          aria-controls="search-mode-content"
           title="Find objects similar to a reference object"
         >
-          🔗 Similar Object
+          <span aria-hidden="true">🔗</span> Similar Object
         </button>
         <button
           className={`mode-tab ${activeMode === 'vector' ? 'active' : ''}`}
           onClick={() => handleModeChange('vector')}
+          role="tab"
+          aria-selected={activeMode === 'vector'}
+          aria-controls="search-mode-content"
           title="Search using raw vector embeddings"
         >
-          🎯 Raw Vector
+          <span aria-hidden="true">🎯</span> Raw Vector
         </button>
       </div>
 
       {/* Search Mode Content */}
-      <div className="search-mode-content">
+      <div className="search-mode-content" id="search-mode-content" role="tabpanel">
         {activeMode === 'text' && <TextSearchMode />}
         {activeMode === 'object' && <ObjectSearchMode />}
         {activeMode === 'vector' && <VectorModeComponent />}
@@ -87,16 +96,16 @@ export function VectorSearchPanel() {
 
       {/* Loading State */}
       {vectorSearch.loading && (
-        <div className="vector-search-loading">
-          <div className="loading-spinner"></div>
+        <div className="vector-search-loading" role="status" aria-live="polite">
+          <div className="loading-spinner" aria-hidden="true"></div>
           <p>Searching for similar objects...</p>
         </div>
       )}
 
       {/* Error State */}
       {vectorSearch.error && (
-        <div className="vector-search-error">
-          <span className="error-icon">⚠️</span>
+        <div className="vector-search-error" role="alert" aria-live="assertive">
+          <span className="error-icon" aria-hidden="true">⚠️</span>
           <span className="error-message">{vectorSearch.error}</span>
         </div>
       )}
