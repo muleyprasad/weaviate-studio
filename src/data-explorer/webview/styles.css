@@ -2676,3 +2676,230 @@
 .error-boundary-button.secondary:hover {
   background-color: var(--vscode-button-secondaryHoverBackground);
 }
+
+/* ========================================================================
+   Empty State Styles
+   ======================================================================== */
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  min-height: 400px;
+}
+
+.empty-state-content {
+  max-width: 500px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.8;
+}
+
+.empty-state-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin: 0 0 12px 0;
+}
+
+.empty-state-message {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.empty-state-suggestions {
+  margin: 24px 0;
+  text-align: left;
+}
+
+.suggestions-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin: 0 0 12px 0;
+}
+
+.suggestions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.suggestion-item {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  padding: 6px 0 6px 20px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.suggestion-item::before {
+  content: '•';
+  position: absolute;
+  left: 8px;
+  color: var(--vscode-focusBorder);
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.empty-state-button {
+  padding: 8px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  font-weight: 500;
+  transition: all 0.1s;
+  border: none;
+}
+
+.empty-state-button.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.empty-state-button.primary:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.empty-state-button.secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border);
+}
+
+.empty-state-button.secondary:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* ========================================================================
+   Connection Error Styles
+   ======================================================================== */
+
+.connection-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border: 2px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 6px;
+  margin: 16px;
+}
+
+.connection-error-content {
+  max-width: 600px;
+  text-align: center;
+}
+
+.connection-error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.9;
+}
+
+.connection-error-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vscode-errorForeground);
+  margin: 0 0 12px 0;
+}
+
+.connection-error-message {
+  font-size: 14px;
+  color: var(--vscode-foreground);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.connection-error-details {
+  margin: 20px 0;
+  text-align: left;
+}
+
+.connection-error-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  padding: 8px;
+  background-color: var(--vscode-input-background);
+  border-radius: 3px;
+  border: 1px solid var(--vscode-input-border);
+}
+
+.connection-error-details summary:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.error-details-text {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--vscode-textCodeBlock-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-editor-foreground);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.connection-error-suggestions {
+  margin: 24px 0;
+  text-align: left;
+}
+
+.connection-error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.connection-error-button {
+  padding: 8px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  font-weight: 500;
+  transition: all 0.1s;
+  border: none;
+}
+
+.connection-error-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.connection-error-button.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.connection-error-button.primary:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.connection-error-button.secondary {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid var(--vscode-button-border);
+}
+
+.connection-error-button.secondary:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, useRef } from 'react';
 import type {
   DataExplorerState,
   DataExplorerAction,
@@ -14,6 +14,8 @@ import { QuickInsightsPanel } from './components/Insights/QuickInsightsPanel';
 import { ExportDialog } from './components/Export/ExportDialog';
 import { SchemaVisualizer } from './components/Schema/SchemaVisualizer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { EmptyState } from './components/EmptyState';
+import { ConnectionError } from './components/ConnectionError';
 
 // Import shared theme for design consistency
 import '../../webview/theme.css';
@@ -582,12 +584,42 @@ export function DataExplorer() {
 
   /**
    * Fetch objects when page, sort, or filters change
+   * Debounce filter changes to avoid excessive API calls
    */
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    if (state.collectionName && state.schema) {
+    if (!state.collectionName || !state.schema) {
+      return;
+    }
+
+    // Clear existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Immediate fetch for page/pageSize changes (user-initiated navigation)
+    // Debounced fetch for filter/sort changes (allow user to finish editing)
+    const isFilterOrSortChange =
+      state.activeFilters.length > 0 || state.sortBy !== null;
+
+    if (isFilterOrSortChange) {
+      // Debounce filter and sort changes (300ms)
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchObjects();
+      }, 300);
+    } else {
+      // Immediate fetch for pagination
       fetchObjects();
     }
-  }, [state.currentPage, state.pageSize, state.sortBy, state.activeFilters]);
+
+    // Cleanup timeout on unmount or dependency change
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [state.currentPage, state.pageSize, state.sortBy, state.activeFilters, state.collectionName, state.schema, fetchObjects]);
 
   /**
    * Save preferences when they change
@@ -721,6 +753,24 @@ export function DataExplorer() {
               <div className="skeleton-row"></div>
               <div className="skeleton-row"></div>
             </div>
+          ) : !state.loading && state.objects.length === 0 ? (
+            <EmptyState
+              type="no-results"
+              actions={[
+                {
+                  label: 'Clear Filters',
+                  onClick: () => {
+                    dispatch({ type: 'CLEAR_FILTERS' });
+                    dispatch({ type: 'CLEAR_FILTER_GROUP' });
+                  },
+                  primary: true,
+                },
+                {
+                  label: 'Refresh',
+                  onClick: () => fetchObjects(),
+                },
+              ]}
+            />
           ) : (
             <>
               <ErrorBoundary featureName="Data Table">
