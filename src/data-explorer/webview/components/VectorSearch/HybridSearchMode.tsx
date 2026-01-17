@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { SearchConfigControls } from './SearchConfigControls';
-import {
-  TEXT_SEARCH_LIMITS,
-  HYBRID_SEARCH_DEFAULTS,
-  ALPHA_THRESHOLDS,
-} from '../../../constants';
+import { TEXT_SEARCH_LIMITS, HYBRID_SEARCH_DEFAULTS, ALPHA_THRESHOLDS } from '../../../constants';
 
 /**
  * Hybrid Search Mode - Combine keyword (BM25) and semantic (vector) search
@@ -57,9 +53,7 @@ export function HybridSearchMode() {
   const textProperties =
     schema?.properties.filter(
       (prop) =>
-        prop.dataType === 'text' ||
-        prop.dataType === 'text[]' ||
-        (prop.indexSearchable !== false && prop.dataType === 'string')
+        prop.dataType === 'text' || prop.dataType === 'text[]' || prop.indexSearchable !== false
     ) || [];
 
   const handleAlphaChange = (value: number) => {
@@ -146,9 +140,7 @@ export function HybridSearchMode() {
         searchProperties: selectedProperties.length > 0 ? selectedProperties : undefined,
         enableQueryRewriting: queryRewriting,
         limit: vectorSearch.config.limit,
-        distance: vectorSearch.config.useDistanceMetric
-          ? vectorSearch.config.distance
-          : undefined,
+        distance: vectorSearch.config.useDistanceMetric ? vectorSearch.config.distance : undefined,
         certainty: !vectorSearch.config.useDistanceMetric
           ? vectorSearch.config.certainty
           : undefined,
@@ -186,9 +178,7 @@ export function HybridSearchMode() {
           onKeyDown={handleKeyDown}
           rows={3}
         />
-        <div className="search-hint">
-          Combines keyword (BM25) and semantic (vector) search
-        </div>
+        <div className="search-hint">Combines keyword (BM25) and semantic (vector) search</div>
       </div>
 
       {/* Alpha Slider - Balance between keyword and semantic */}
@@ -198,12 +188,8 @@ export function HybridSearchMode() {
         </label>
         <div className="alpha-balance-display">
           <div className="balance-labels">
-            <span className="balance-label keyword">
-              Keyword (BM25): {keywordPercentage}%
-            </span>
-            <span className="balance-label semantic">
-              Semantic (Vector): {semanticPercentage}%
-            </span>
+            <span className="balance-label keyword">Keyword (BM25): {keywordPercentage}%</span>
+            <span className="balance-label semantic">Semantic (Vector): {semanticPercentage}%</span>
           </div>
           <input
             id="alpha-slider"
@@ -231,11 +217,7 @@ export function HybridSearchMode() {
       {/* Query Rewriting Toggle */}
       <div className="config-section">
         <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={queryRewriting}
-            onChange={handleQueryRewritingToggle}
-          />
+          <input type="checkbox" checked={queryRewriting} onChange={handleQueryRewritingToggle} />
           <span>Enable query rewriting (improve semantic understanding)</span>
         </label>
       </div>
@@ -249,9 +231,7 @@ export function HybridSearchMode() {
             aria-expanded={showPropertySelector}
           >
             Search in properties:{' '}
-            {selectedProperties.length === 0
-              ? 'All'
-              : `${selectedProperties.length} selected`}
+            {selectedProperties.length === 0 ? 'All' : `${selectedProperties.length} selected`}
             <span className="toggle-icon">{showPropertySelector ? '▼' : '▶'}</span>
           </button>
           {showPropertySelector && (

@@ -195,13 +195,13 @@ function processObjectForExport(
   // Metadata (UUID, timestamps, etc.)
   if (options.includeMetadata) {
     result._id = obj.uuid;
-    if (obj.creationTimeUnix) {
-      result._createdAt = new Date(obj.creationTimeUnix).toISOString();
+    if (obj.metadata?.creationTime) {
+      result._createdAt = new Date(obj.metadata.creationTime).toISOString();
     }
-    if (obj.lastUpdateTimeUnix) {
-      result._updatedAt = new Date(obj.lastUpdateTimeUnix).toISOString();
+    if (obj.metadata?.updateTime) {
+      result._updatedAt = new Date(obj.metadata.updateTime).toISOString();
     }
-    if (obj.vector) {
+    if (obj.vectors && Object.keys(obj.vectors).length > 0) {
       result._vectorExists = true;
     }
   }
@@ -212,8 +212,8 @@ function processObjectForExport(
   }
 
   // Vectors
-  if (options.includeVectors && obj.vector) {
-    result._vector = obj.vector;
+  if (options.includeVectors && obj.vectors && Object.keys(obj.vectors).length > 0) {
+    result._vectors = obj.vectors;
   }
 
   // References (as UUIDs)
@@ -236,10 +236,7 @@ function processObjectForExport(
  * @param prefix - Key prefix for recursion
  * @returns Flattened object
  */
-function flattenObject(
-  obj: any,
-  prefix: string = ''
-): Record<string, any> {
+function flattenObject(obj: any, prefix: string = ''): Record<string, any> {
   const flattened: Record<string, any> = {};
 
   Object.entries(obj).forEach(([key, value]) => {
@@ -249,9 +246,9 @@ function flattenObject(
       flattened[newKey] = value;
     } else if (Array.isArray(value)) {
       // Arrays as comma-separated values
-      flattened[newKey] = value.map((v) =>
-        typeof v === 'object' ? JSON.stringify(v) : String(v)
-      ).join(', ');
+      flattened[newKey] = value
+        .map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v)))
+        .join(', ');
     } else if (typeof value === 'object' && !(value instanceof Date)) {
       // Recursively flatten nested objects
       Object.assign(flattened, flattenObject(value, newKey));

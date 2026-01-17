@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import type {
   DataExplorerState,
   DataExplorerAction,
@@ -173,9 +181,7 @@ function dataExplorerReducer(
 
     case 'UPDATE_FILTER': {
       const updatedFilters = state.filters.map((filter) =>
-        filter.id === action.payload.id
-          ? { ...filter, ...action.payload.filter }
-          : filter
+        filter.id === action.payload.id ? { ...filter, ...action.payload.filter } : filter
       );
       return { ...state, filters: updatedFilters };
     }
@@ -208,7 +214,7 @@ function dataExplorerReducer(
 
     case 'ADD_GROUP_TO_GROUP': {
       if (!state.filterGroup) return state;
-      const { addGroupToGroup } = require('../../utils/filterGroupUtils');
+      const { addGroupToGroup } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: addGroupToGroup(
@@ -221,7 +227,7 @@ function dataExplorerReducer(
 
     case 'ADD_FILTER_TO_GROUP': {
       if (!state.filterGroup) return state;
-      const { addFilterToGroup } = require('../../utils/filterGroupUtils');
+      const { addFilterToGroup } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: addFilterToGroup(
@@ -234,7 +240,7 @@ function dataExplorerReducer(
 
     case 'REMOVE_FILTER_FROM_GROUP': {
       if (!state.filterGroup) return state;
-      const { removeFilterFromGroup } = require('../../utils/filterGroupUtils');
+      const { removeFilterFromGroup } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: removeFilterFromGroup(
@@ -247,7 +253,7 @@ function dataExplorerReducer(
 
     case 'REMOVE_GROUP_FROM_GROUP': {
       if (!state.filterGroup) return state;
-      const { removeGroupFromGroup } = require('../../utils/filterGroupUtils');
+      const { removeGroupFromGroup } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: removeGroupFromGroup(
@@ -260,7 +266,7 @@ function dataExplorerReducer(
 
     case 'UPDATE_GROUP_OPERATOR': {
       if (!state.filterGroup) return state;
-      const { updateGroupOperator } = require('../../utils/filterGroupUtils');
+      const { updateGroupOperator } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: updateGroupOperator(
@@ -301,7 +307,7 @@ function dataExplorerReducer(
     case 'LOAD_FILTER_TEMPLATE': {
       const template = state.filterTemplates.find((t) => t.id === action.payload);
       if (!template) return state;
-      const { cloneFilterGroup } = require('../../utils/filterGroupUtils');
+      const { cloneFilterGroup } = require('../utils/filterGroupUtils');
       return {
         ...state,
         filterGroup: cloneFilterGroup(template.group),
@@ -615,8 +621,7 @@ export function DataExplorer() {
 
     // Immediate fetch for page/pageSize changes (user-initiated navigation)
     // Debounced fetch for filter/sort changes (allow user to finish editing)
-    const isFilterOrSortChange =
-      state.activeFilters.length > 0 || state.sortBy !== null;
+    const isFilterOrSortChange = state.activeFilters.length > 0 || state.sortBy !== null;
 
     if (isFilterOrSortChange) {
       // Debounce filter and sort changes (300ms)
@@ -634,7 +639,15 @@ export function DataExplorer() {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [state.currentPage, state.pageSize, state.sortBy, state.activeFilters, state.collectionName, state.schema, fetchObjects]);
+  }, [
+    state.currentPage,
+    state.pageSize,
+    state.sortBy,
+    state.activeFilters,
+    state.collectionName,
+    state.schema,
+    fetchObjects,
+  ]);
 
   /**
    * Save preferences when they change
@@ -793,12 +806,7 @@ export function DataExplorer() {
     <DataExplorerContext.Provider value={contextValue}>
       <div className="data-explorer" role="main" aria-label="Data Explorer">
         {/* Screen reader announcements */}
-        <div
-          aria-live="polite"
-          aria-atomic="true"
-          className="sr-only"
-          role="status"
-        >
+        <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">
           {state.loading && 'Loading data...'}
           {!state.loading && state.objects.length > 0 && `Loaded ${state.totalCount} objects`}
           {!state.loading && state.objects.length === 0 && 'No objects found'}
@@ -820,7 +828,9 @@ export function DataExplorer() {
 
         {state.error && (
           <div className="error-banner" role="alert" aria-live="assertive">
-            <span className="error-icon" aria-hidden="true">⚠️</span>
+            <span className="error-icon" aria-hidden="true">
+              ⚠️
+            </span>
             <span className="error-message">{state.error}</span>
             <button
               className="error-dismiss"
@@ -856,7 +866,12 @@ export function DataExplorer() {
             {/* Toggle Vector Search button */}
             <button
               className="action-button"
-              onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
+              onClick={() =>
+                dispatch({
+                  type: 'SET_VECTOR_SEARCH_ACTIVE',
+                  payload: !state.vectorSearch.isActive,
+                })
+              }
               aria-label={
                 state.vectorSearch.isActive
                   ? 'Close Vector Search Panel (Control+K)'
@@ -864,12 +879,14 @@ export function DataExplorer() {
               }
               aria-expanded={state.vectorSearch.isActive}
               aria-controls="vector-search-panel"
-              title={state.vectorSearch.isActive ? 'Close Vector Search (Ctrl+K)' : 'Open Vector Search (Ctrl+K)'}
+              title={
+                state.vectorSearch.isActive
+                  ? 'Close Vector Search (Ctrl+K)'
+                  : 'Open Vector Search (Ctrl+K)'
+              }
               type="button"
             >
-              <span aria-hidden="true">
-                {state.vectorSearch.isActive ? '✕' : '🔮'}
-              </span>
+              <span aria-hidden="true">{state.vectorSearch.isActive ? '✕' : '🔮'}</span>
               {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
             </button>
           </nav>
