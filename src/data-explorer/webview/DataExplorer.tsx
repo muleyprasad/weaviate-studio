@@ -10,6 +10,9 @@ import { DataTable } from './components/DataBrowser/DataTable';
 import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
 import { FilterBuilder } from './components/Filters/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch/VectorSearchPanel';
+import { QuickInsightsPanel } from './components/Insights/QuickInsightsPanel';
+import { ExportDialog } from './components/Export/ExportDialog';
+import { SchemaVisualizer } from './components/Schema/SchemaVisualizer';
 
 // Import shared theme for design consistency
 import '../../webview/theme.css';
@@ -59,6 +62,22 @@ const initialState: DataExplorerState = {
     loading: false,
     error: null,
   },
+  insights: {
+    loading: false,
+    error: null,
+    totalCount: 0,
+    categoricalAggregations: [],
+    numericAggregations: [],
+    dateAggregations: [],
+    config: {
+      categoricalProperties: [],
+      numericProperties: [],
+      dateProperties: [],
+      autoRefresh: false,
+    },
+    lastRefreshed: null,
+  },
+  showExportDialog: false,
   visibleColumns: [],
   pinnedColumns: [],
   sortBy: null,
@@ -346,6 +365,78 @@ function dataExplorerReducer(
         },
       };
 
+    case 'SET_INSIGHTS_LOADING':
+      return {
+        ...state,
+        insights: {
+          ...state.insights,
+          loading: action.payload,
+        },
+      };
+
+    case 'SET_INSIGHTS_ERROR':
+      return {
+        ...state,
+        insights: {
+          ...state.insights,
+          error: action.payload,
+          loading: false,
+        },
+      };
+
+    case 'SET_INSIGHTS_DATA':
+      return {
+        ...state,
+        insights: {
+          ...state.insights,
+          totalCount: action.payload.totalCount,
+          categoricalAggregations: action.payload.categoricalAggregations,
+          numericAggregations: action.payload.numericAggregations,
+          dateAggregations: action.payload.dateAggregations,
+          loading: false,
+          error: null,
+          lastRefreshed: new Date(),
+        },
+      };
+
+    case 'UPDATE_INSIGHTS_CONFIG':
+      return {
+        ...state,
+        insights: {
+          ...state.insights,
+          config: {
+            ...state.insights.config,
+            ...action.payload,
+          },
+        },
+      };
+
+    case 'REFRESH_INSIGHTS':
+      // Trigger insights refresh (handled by effect)
+      return {
+        ...state,
+        insights: {
+          ...state.insights,
+          loading: true,
+        },
+      };
+
+    case 'TOGGLE_EXPORT_DIALOG':
+      return {
+        ...state,
+        showExportDialog: action.payload,
+      };
+
+    case 'START_EXPORT':
+      // Export started (handled by effect or component)
+      return state;
+
+    case 'EXPORT_SUCCESS':
+      return state;
+
+    case 'EXPORT_ERROR':
+      return state;
+
     default:
       return state;
   }
@@ -571,20 +662,38 @@ export function DataExplorer() {
             </span>
           </h2>
 
-          {/* Toggle Vector Search button */}
-          <button
-            className="vector-search-toggle"
-            onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
-            aria-label={state.vectorSearch.isActive ? 'Close Vector Search Panel' : 'Open Vector Search Panel'}
-            aria-expanded={state.vectorSearch.isActive}
-            title={state.vectorSearch.isActive ? 'Close Vector Search' : 'Open Vector Search'}
-          >
-            <span aria-hidden="true">
-              {state.vectorSearch.isActive ? '✕' : '🔮'}
-            </span>
-            {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
-          </button>
+          <div className="explorer-actions">
+            {/* Export button */}
+            <button
+              className="action-button"
+              onClick={() => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true })}
+              aria-label="Export data"
+              title="Export data"
+            >
+              💾 Export
+            </button>
+
+            {/* Toggle Vector Search button */}
+            <button
+              className="action-button"
+              onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
+              aria-label={state.vectorSearch.isActive ? 'Close Vector Search Panel' : 'Open Vector Search Panel'}
+              aria-expanded={state.vectorSearch.isActive}
+              title={state.vectorSearch.isActive ? 'Close Vector Search' : 'Open Vector Search'}
+            >
+              <span aria-hidden="true">
+                {state.vectorSearch.isActive ? '✕' : '🔮'}
+              </span>
+              {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
+            </button>
+          </div>
         </div>
+
+        {/* Schema Visualizer */}
+        {state.schema && <SchemaVisualizer schema={state.schema} />}
+
+        {/* Quick Insights Panel */}
+        <QuickInsightsPanel />
 
         {/* Filter panel */}
         <FilterBuilder />
@@ -606,6 +715,9 @@ export function DataExplorer() {
             </>
           )}
         </div>
+
+        {/* Export Dialog */}
+        <ExportDialog />
       </div>
     </DataExplorerContext.Provider>
   );

@@ -32,6 +32,12 @@ export interface DataExplorerState {
   // Vector Search
   vectorSearch: VectorSearchState;
 
+  // Insights
+  insights: InsightsState;
+
+  // Export
+  showExportDialog: boolean;
+
   // UI
   visibleColumns: string[];
   pinnedColumns: string[];
@@ -312,7 +318,16 @@ export type DataExplorerAction =
   | { type: 'CLEAR_FILTER_GROUP' }
   | { type: 'SAVE_FILTER_TEMPLATE'; payload: FilterTemplate }
   | { type: 'DELETE_FILTER_TEMPLATE'; payload: string }
-  | { type: 'LOAD_FILTER_TEMPLATE'; payload: string };
+  | { type: 'LOAD_FILTER_TEMPLATE'; payload: string }
+  | { type: 'SET_INSIGHTS_LOADING'; payload: boolean }
+  | { type: 'SET_INSIGHTS_ERROR'; payload: string | null }
+  | { type: 'SET_INSIGHTS_DATA'; payload: { totalCount: number; categoricalAggregations: CategoricalAggregation[]; numericAggregations: NumericAggregation[]; dateAggregations: DateAggregation[] } }
+  | { type: 'UPDATE_INSIGHTS_CONFIG'; payload: Partial<InsightsConfig> }
+  | { type: 'REFRESH_INSIGHTS' }
+  | { type: 'TOGGLE_EXPORT_DIALOG'; payload: boolean }
+  | { type: 'START_EXPORT'; payload: ExportOptions }
+  | { type: 'EXPORT_SUCCESS'; payload: { format: ExportFormat; scope: ExportScope; objectCount: number } }
+  | { type: 'EXPORT_ERROR'; payload: string };
 
 /**
  * Message types for webview communication
@@ -447,5 +462,120 @@ export interface VectorSearchParams {
   limit: number;
   distance?: number;
   certainty?: number;
+}
+
+/**
+ * Aggregation metric types
+ */
+export type AggregationMetric =
+  | 'topOccurrences'
+  | 'sum'
+  | 'min'
+  | 'max'
+  | 'mean'
+  | 'median'
+  | 'mode'
+  | 'count';
+
+/**
+ * Categorical aggregation result (for text/enum properties)
+ */
+export interface CategoricalAggregation {
+  property: string;
+  topOccurrences: Array<{
+    value: string;
+    count: number;
+    percentage?: number;
+  }>;
+}
+
+/**
+ * Numeric aggregation result (for numeric properties)
+ */
+export interface NumericAggregation {
+  property: string;
+  count: number;
+  sum?: number;
+  min?: number;
+  max?: number;
+  mean?: number;
+  median?: number;
+  mode?: number;
+  distribution?: Array<{
+    range: string;
+    count: number;
+    percentage: number;
+  }>;
+}
+
+/**
+ * Date aggregation result (for date properties)
+ */
+export interface DateAggregation {
+  property: string;
+  earliest?: Date;
+  latest?: Date;
+  count: number;
+}
+
+/**
+ * Insights configuration - which properties to analyze
+ */
+export interface InsightsConfig {
+  categoricalProperties: string[];
+  numericProperties: string[];
+  dateProperties: string[];
+  autoRefresh: boolean;
+  refreshInterval?: number; // seconds
+}
+
+/**
+ * Insights state
+ */
+export interface InsightsState {
+  loading: boolean;
+  error: string | null;
+  totalCount: number;
+  categoricalAggregations: CategoricalAggregation[];
+  numericAggregations: NumericAggregation[];
+  dateAggregations: DateAggregation[];
+  config: InsightsConfig;
+  lastRefreshed: Date | null;
+}
+
+/**
+ * Export format types
+ */
+export type ExportFormat = 'json' | 'csv' | 'xlsx' | 'parquet';
+
+/**
+ * Export scope - what data to export
+ */
+export type ExportScope = 'page' | 'filtered' | 'all';
+
+/**
+ * Export options
+ */
+export interface ExportOptions {
+  format: ExportFormat;
+  scope: ExportScope;
+  includeProperties: boolean;
+  includeVectors: boolean;
+  includeMetadata: boolean;
+  includeReferences: boolean;
+}
+
+/**
+ * Export state
+ */
+export interface ExportState {
+  exporting: boolean;
+  error: string | null;
+  lastExport: {
+    format: ExportFormat;
+    scope: ExportScope;
+    objectCount: number;
+    timestamp: Date;
+  } | null;
 }
 
