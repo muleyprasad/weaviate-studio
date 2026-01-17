@@ -16,18 +16,18 @@ export function SearchConfigControls() {
   const { config } = vectorSearch;
 
   // Local state for debounced slider values
-  const [localDistance, setLocalDistance] = useState(config.distance || 0.5);
-  const [localCertainty, setLocalCertainty] = useState(config.certainty || 0.7);
+  const [localDistance, setLocalDistance] = useState(config.distance ?? 0.5);
+  const [localCertainty, setLocalCertainty] = useState(config.certainty ?? 0.7);
   const distanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const certaintyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync local state with config when it changes externally
   useEffect(() => {
-    setLocalDistance(config.distance || 0.5);
+    setLocalDistance(config.distance ?? 0.5);
   }, [config.distance]);
 
   useEffect(() => {
-    setLocalCertainty(config.certainty || 0.7);
+    setLocalCertainty(config.certainty ?? 0.7);
   }, [config.certainty]);
 
   // Cleanup timeouts on unmount

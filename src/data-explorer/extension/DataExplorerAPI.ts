@@ -21,6 +21,41 @@ export class DataExplorerAPI {
   constructor(private client: WeaviateClient) {}
 
   /**
+   * Type guard to validate if an unknown value is a valid Weaviate object
+   *
+   * @param obj - Unknown value to validate
+   * @returns True if obj is a valid WeaviateObject, false otherwise
+   */
+  private isValidWeaviateObject(
+    obj: unknown
+  ): obj is WeaviateObject<Record<string, unknown>, string> {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'uuid' in obj &&
+      typeof (obj as any).uuid === 'string' &&
+      'properties' in obj
+    );
+  }
+
+  /**
+   * Safely converts query results to typed Weaviate objects
+   *
+   * Filters out any invalid objects that don't match the expected structure.
+   *
+   * @param objects - Array of objects from Weaviate query result
+   * @returns Array of validated WeaviateObject instances
+   */
+  private toWeaviateObjects(
+    objects: unknown[] | undefined
+  ): WeaviateObject<Record<string, unknown>, string>[] {
+    if (!objects || !Array.isArray(objects)) {
+      return [];
+    }
+    return objects.filter(this.isValidWeaviateObject.bind(this));
+  }
+
+  /**
    * Fetch objects from a collection with pagination and sorting
    */
   async fetchObjects(params: FetchParams): Promise<FetchResult> {
@@ -74,7 +109,7 @@ export class DataExplorerAPI {
       const totalCount = await this.getTotalCount(params.collectionName, params.filters);
 
       return {
-        objects: (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[],
+        objects: this.toWeaviateObjects(result.objects),
         totalCount,
       };
     } catch (error) {
@@ -268,8 +303,20 @@ export class DataExplorerAPI {
   }
 
   /**
-   * Helper method to add similarity metric to query options
-   * Ensures at least one metric is set (defaults to configured distance)
+   * Adds similarity metric to vector search query options
+   *
+   * Ensures at least one similarity metric (distance or certainty) is set
+   * for the vector search query. Falls back to default distance if neither
+   * is provided.
+   *
+   * @param queryOptions - Query options object to modify
+   * @param distance - Optional distance threshold (0-2, where 0 = identical)
+   * @param certainty - Optional certainty threshold (0-1, where 1 = identical)
+   *
+   * @remarks
+   * Priority order: distance > certainty > default (0.5)
+   * This prevents queries without any similarity metric which could
+   * return unpredictable or all results.
    */
   private addSimilarityMetric(
     queryOptions: VectorSearchOptions,
@@ -309,7 +356,7 @@ export class DataExplorerAPI {
       // Execute nearText query
       const result = await collection.query.nearText(params.searchText, queryOptions);
 
-      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+      return this.toWeaviateObjects(result.objects);
     } catch (error) {
       console.error('Error in text vector search:', error);
       throw new Error(`Text vector search failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -339,7 +386,7 @@ export class DataExplorerAPI {
       // Execute nearObject query
       const result = await collection.query.nearObject(params.referenceObjectId, queryOptions);
 
-      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+      return this.toWeaviateObjects(result.objects);
     } catch (error) {
       console.error('Error in object vector search:', error);
       throw new Error(`Object vector search failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -369,7 +416,7 @@ export class DataExplorerAPI {
       // Execute nearVector query
       const result = await collection.query.nearVector(params.vector, queryOptions);
 
-      return (result.objects || []) as unknown as WeaviateObject<Record<string, unknown>, string>[];
+      return this.toWeaviateObjects(result.objects);
     } catch (error) {
       console.error('Error in raw vector search:', error);
       throw new Error(`Raw vector search failed: ${error instanceof Error ? error.message : String(error)}`);

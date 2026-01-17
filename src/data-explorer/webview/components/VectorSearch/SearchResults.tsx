@@ -48,14 +48,27 @@ export function SearchResults() {
     });
   };
 
+  /**
+   * Calculates match percentage from vector search similarity scores
+   *
+   * Converts raw similarity metrics (distance or certainty) to a percentage
+   * for easier user comprehension.
+   *
+   * @param result - Vector search result with distance/certainty scores
+   * @returns Match percentage from 0-100
+   *
+   * @remarks
+   * - Distance metric: 0 = 100% match, 2 = 0% match (inverse relationship)
+   * - Certainty metric: 0 = 0% match, 1 = 100% match (direct relationship)
+   */
   const calculateMatchPercentage = (result: typeof results[0]): number => {
     if (config.useDistanceMetric) {
       // Distance: 0 = 100% match, 2 = 0% match
-      const distance = result.distance || 0;
+      const distance = result.distance ?? 0;
       return Math.max(0, Math.min(100, 100 - (distance / 2) * 100));
     } else {
       // Certainty: 0 = 0% match, 1 = 100% match
-      const certainty = result.certainty || 0;
+      const certainty = result.certainty ?? 0;
       return certainty * 100;
     }
   };
@@ -75,7 +88,12 @@ export function SearchResults() {
           const previewText = getObjectPreviewText(result.object);
 
           return (
-            <div key={objectId || index} className="result-item">
+            <div
+              key={objectId || index}
+              className="result-item"
+              role="article"
+              aria-label={`Search result ${index + 1}: ${matchPercentage.toFixed(0)}% match`}
+            >
               {/* Match Score */}
               <div className="result-score">
                 <div className="score-percentage">
@@ -110,16 +128,18 @@ export function SearchResults() {
                 <button
                   className="result-action-button primary"
                   onClick={() => handleViewObject(objectId)}
+                  aria-label="View full object details"
                   title="View full object details"
                 >
-                  👁️ View Object
+                  <span aria-hidden="true">👁️</span> View Object
                 </button>
                 <button
                   className="result-action-button secondary"
                   onClick={() => handleFindSimilar(objectId)}
+                  aria-label="Find objects similar to this one"
                   title="Find objects similar to this one"
                 >
-                  🔗 Find Similar to This
+                  <span aria-hidden="true">🔗</span> Find Similar to This
                 </button>
               </div>
             </div>

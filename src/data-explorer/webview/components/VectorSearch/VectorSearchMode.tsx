@@ -16,7 +16,7 @@ export function VectorSearchMode() {
   const [parseError, setParseError] = useState<string | null>(null);
 
   // Expected dimensions from schema
-  const expectedDimensions = schema?.vectorizers?.[0]?.dimensions || 0;
+  const expectedDimensions = schema?.vectorizers?.[0]?.dimensions ?? 0;
 
   // Parse vector input on change (debounced to avoid parsing on every keystroke)
   useEffect(() => {
@@ -89,6 +89,18 @@ export function VectorSearchMode() {
     });
   };
 
+  /**
+   * Generates and inserts a normalized random example vector
+   *
+   * Creates a random vector with values in range [-1, 1], then normalizes
+   * it to unit length (magnitude = 1) for valid vector search operations.
+   *
+   * @remarks
+   * - Uses schema dimensions if available, otherwise defaults to 384
+   * - Normalization formula: v_normalized = v / ||v|| where ||v|| is Euclidean magnitude
+   * - Values rounded to 4 decimal places for readability
+   * - Example useful for testing vector search without real embeddings
+   */
   const handlePasteExample = () => {
     // Create a normalized random vector
     const dimensions = expectedDimensions || VECTOR_CONFIG.DEFAULT_DIMENSIONS;
