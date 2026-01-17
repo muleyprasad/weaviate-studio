@@ -689,10 +689,10 @@ export function DataExplorer() {
           </div>
         </div>
 
-        {/* Schema Visualizer */}
+        {/* Schema Visualizer - Phase 5: Always visible for immediate schema reference */}
         {state.schema && <SchemaVisualizer schema={state.schema} />}
 
-        {/* Quick Insights Panel */}
+        {/* Quick Insights Panel - Phase 5: Always visible for collection overview */}
         <QuickInsightsPanel />
 
         {/* Filter panel */}
