@@ -49,6 +49,9 @@ export function DataTable() {
     // Activate vector search panel
     dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: true });
 
+    // Clear previous results and errors
+    dispatch({ type: 'CLEAR_VECTOR_SEARCH' });
+
     // Set config to object mode with this object
     dispatch({
       type: 'SET_VECTOR_SEARCH_CONFIG',
@@ -57,6 +60,9 @@ export function DataTable() {
         referenceObjectId: objectId,
       },
     });
+
+    // Set loading state
+    dispatch({ type: 'SET_VECTOR_SEARCH_LOADING', payload: true });
 
     // Trigger vector search
     postMessage({

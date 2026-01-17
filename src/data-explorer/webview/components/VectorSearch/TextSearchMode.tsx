@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { SearchConfigControls } from './SearchConfigControls';
 
@@ -8,21 +8,44 @@ import { SearchConfigControls } from './SearchConfigControls';
  * Uses nearText query with the collection's configured vectorizer
  */
 export function TextSearchMode() {
-  const { state, postMessage } = useDataExplorer();
+  const { state, postMessage, dispatch } = useDataExplorer();
   const { schema, vectorSearch } = state;
   const [searchText, setSearchText] = useState(vectorSearch.config.searchText || '');
 
+  // Sync input with config when it changes externally
+  useEffect(() => {
+    if (vectorSearch.config.searchText && vectorSearch.config.searchText !== searchText) {
+      setSearchText(vectorSearch.config.searchText);
+    }
+  }, [vectorSearch.config.searchText]);
+
   const handleSearch = () => {
-    if (!searchText.trim()) {
+    const text = searchText.trim();
+    if (!text) {
       return;
     }
+
+    // Validate minimum length
+    if (text.length < 3) {
+      dispatch({
+        type: 'SET_VECTOR_SEARCH_ERROR',
+        payload: 'Search text must be at least 3 characters',
+      });
+      return;
+    }
+
+    // Clear any previous errors and results
+    dispatch({ type: 'CLEAR_VECTOR_SEARCH' });
+
+    // Set loading state
+    dispatch({ type: 'SET_VECTOR_SEARCH_LOADING', payload: true });
 
     // Send vector search request to extension
     postMessage({
       command: 'vectorSearch',
       data: {
         mode: 'text',
-        searchText: searchText.trim(),
+        searchText: text,
         limit: vectorSearch.config.limit,
         distance: vectorSearch.config.useDistance ? vectorSearch.config.distance : undefined,
         certainty: !vectorSearch.config.useDistance ? vectorSearch.config.certainty : undefined,
@@ -30,7 +53,7 @@ export function TextSearchMode() {
     });
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSearch();
@@ -53,7 +76,7 @@ export function TextSearchMode() {
           placeholder="e.g., artificial intelligence in healthcare"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           rows={3}
         />
         <div className="search-hint">

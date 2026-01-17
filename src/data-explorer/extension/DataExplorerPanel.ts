@@ -7,6 +7,8 @@ import type {
   WebviewMessage,
   ExtensionMessage,
   DataExplorerPreferences,
+  VectorSearchParams,
+  VectorSearchResult,
 } from '../types';
 
 // Helper function to generate a nonce
@@ -264,17 +266,20 @@ export class DataExplorerPanel {
   /**
    * Handle vector search request
    */
-  private async _handleVectorSearch(params: any) {
+  private async _handleVectorSearch(params: VectorSearchParams) {
     if (!this._api) {
       throw new Error('API not initialized');
     }
 
     const collectionName = this._options.collectionName;
-    let objects: any[] = [];
+    let objects = [];
 
     // Call appropriate API method based on search mode
     switch (params.mode) {
       case 'text':
+        if (!params.searchText) {
+          throw new Error('Search text is required for text search');
+        }
         objects = await this._api.vectorSearchText({
           collectionName,
           searchText: params.searchText,
@@ -285,6 +290,9 @@ export class DataExplorerPanel {
         break;
 
       case 'object':
+        if (!params.referenceObjectId) {
+          throw new Error('Reference object ID is required for object search');
+        }
         objects = await this._api.vectorSearchObject({
           collectionName,
           referenceObjectId: params.referenceObjectId,
@@ -295,6 +303,9 @@ export class DataExplorerPanel {
         break;
 
       case 'vector':
+        if (!params.vectorInput || params.vectorInput.length === 0) {
+          throw new Error('Vector input is required for vector search');
+        }
         objects = await this._api.vectorSearchVector({
           collectionName,
           vector: params.vectorInput,
@@ -309,12 +320,17 @@ export class DataExplorerPanel {
     }
 
     // Transform objects to results with similarity scores
-    const results = objects.map((obj: any) => ({
-      object: obj,
-      distance: obj.distance,
-      certainty: obj.certainty,
-      score: obj.score,
-    }));
+    // Weaviate v4 might have metadata in different locations
+    const results: VectorSearchResult[] = objects.map((obj) => {
+      const metadata = (obj as any).metadata || (obj as any)._additional || {};
+
+      return {
+        object: obj,
+        distance: metadata.distance ?? (obj as any).distance ?? undefined,
+        certainty: metadata.certainty ?? (obj as any).certainty ?? undefined,
+        score: metadata.score ?? (obj as any).score ?? undefined,
+      };
+    });
 
     this._postMessage({
       command: 'vectorSearchResults',

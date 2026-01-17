@@ -379,3 +379,26 @@ export interface VectorSearchState {
   loading: boolean;
   error: string | null;
 }
+
+/**
+ * Vector search query options for API
+ */
+export interface VectorSearchOptions {
+  limit: number;
+  distance?: number;
+  certainty?: number;
+}
+
+/**
+ * Vector search parameters for webview messages
+ */
+export interface VectorSearchParams {
+  mode: VectorSearchMode;
+  searchText?: string;
+  referenceObjectId?: string;
+  vectorInput?: number[];
+  limit: number;
+  distance?: number;
+  certainty?: number;
+}
+

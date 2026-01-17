@@ -8,7 +8,7 @@ import { SearchConfigControls } from './SearchConfigControls';
  * Uses nearVector query with a manually provided vector array
  */
 export function VectorSearchMode() {
-  const { state, postMessage } = useDataExplorer();
+  const { state, postMessage, dispatch } = useDataExplorer();
   const { schema, vectorSearch } = state;
   const [vectorInput, setVectorInput] = useState('');
   const [parsedVector, setParsedVector] = useState<number[] | null>(null);
@@ -62,6 +62,12 @@ export function VectorSearchMode() {
     if (!parsedVector) {
       return;
     }
+
+    // Clear any previous errors and results
+    dispatch({ type: 'CLEAR_VECTOR_SEARCH' });
+
+    // Set loading state
+    dispatch({ type: 'SET_VECTOR_SEARCH_LOADING', payload: true });
 
     // Send vector search request to extension
     postMessage({
