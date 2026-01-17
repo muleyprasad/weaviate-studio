@@ -41,6 +41,9 @@ const initialState: DataExplorerState = {
   pageSize: 20,
   filters: [],
   activeFilters: [],
+  filterGroup: null,
+  activeFilterGroup: null,
+  filterTemplates: [],
   vectorSearch: {
     isActive: false,
     config: {
@@ -168,6 +171,118 @@ function dataExplorerReducer(
         activeFilters: [...state.filters],
         currentPage: 0, // Reset to first page when applying filters
       };
+
+    case 'SET_FILTER_GROUP':
+      return { ...state, filterGroup: action.payload };
+
+    case 'UPDATE_FILTER_GROUP':
+      if (!state.filterGroup) return state;
+      return {
+        ...state,
+        filterGroup: { ...state.filterGroup, ...action.payload },
+      };
+
+    case 'ADD_GROUP_TO_GROUP': {
+      if (!state.filterGroup) return state;
+      const { addGroupToGroup } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: addGroupToGroup(
+          state.filterGroup,
+          action.payload.parentId,
+          action.payload.group
+        ),
+      };
+    }
+
+    case 'ADD_FILTER_TO_GROUP': {
+      if (!state.filterGroup) return state;
+      const { addFilterToGroup } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: addFilterToGroup(
+          state.filterGroup,
+          action.payload.groupId,
+          action.payload.filter
+        ),
+      };
+    }
+
+    case 'REMOVE_FILTER_FROM_GROUP': {
+      if (!state.filterGroup) return state;
+      const { removeFilterFromGroup } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: removeFilterFromGroup(
+          state.filterGroup,
+          action.payload.groupId,
+          action.payload.filterId
+        ),
+      };
+    }
+
+    case 'REMOVE_GROUP_FROM_GROUP': {
+      if (!state.filterGroup) return state;
+      const { removeGroupFromGroup } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: removeGroupFromGroup(
+          state.filterGroup,
+          action.payload.parentId,
+          action.payload.groupId
+        ),
+      };
+    }
+
+    case 'UPDATE_GROUP_OPERATOR': {
+      if (!state.filterGroup) return state;
+      const { updateGroupOperator } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: updateGroupOperator(
+          state.filterGroup,
+          action.payload.groupId,
+          action.payload.operator
+        ),
+      };
+    }
+
+    case 'APPLY_FILTER_GROUP':
+      return {
+        ...state,
+        activeFilterGroup: state.filterGroup,
+        currentPage: 0,
+      };
+
+    case 'CLEAR_FILTER_GROUP':
+      return {
+        ...state,
+        filterGroup: null,
+        activeFilterGroup: null,
+        currentPage: 0,
+      };
+
+    case 'SAVE_FILTER_TEMPLATE':
+      return {
+        ...state,
+        filterTemplates: [...state.filterTemplates, action.payload],
+      };
+
+    case 'DELETE_FILTER_TEMPLATE':
+      return {
+        ...state,
+        filterTemplates: state.filterTemplates.filter((t) => t.id !== action.payload),
+      };
+
+    case 'LOAD_FILTER_TEMPLATE': {
+      const template = state.filterTemplates.find((t) => t.id === action.payload);
+      if (!template) return state;
+      const { cloneFilterGroup } = require('../../utils/filterGroupUtils');
+      return {
+        ...state,
+        filterGroup: cloneFilterGroup(template.group),
+      };
+    }
 
     case 'SET_VECTOR_SEARCH_CONFIG':
       return {

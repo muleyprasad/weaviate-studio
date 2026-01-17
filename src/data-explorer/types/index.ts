@@ -25,6 +25,9 @@ export interface DataExplorerState {
   // Filters
   filters: Filter[];
   activeFilters: Filter[];
+  filterGroup: FilterGroup | null;
+  activeFilterGroup: FilterGroup | null;
+  filterTemplates: FilterTemplate[];
 
   // Vector Search
   vectorSearch: VectorSearchState;
@@ -136,6 +139,34 @@ export interface Filter {
   operator: FilterOperator;
   value: FilterValue;
   dataType: PropertyDataType;
+}
+
+/**
+ * Logical operators for filter groups
+ */
+export type FilterGroupOperator = 'AND' | 'OR' | 'NOT';
+
+/**
+ * Filter group - combines filters and other groups with logical operators
+ */
+export interface FilterGroup {
+  id: string;
+  operator: FilterGroupOperator;
+  filters: Filter[];
+  groups: FilterGroup[];
+}
+
+/**
+ * Filter template - saved filter configuration
+ */
+export interface FilterTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  collectionName: string;
+  group: FilterGroup;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -269,7 +300,19 @@ export type DataExplorerAction =
   | { type: 'SET_VECTOR_SEARCH_RESULTS'; payload: VectorSearchResult[] }
   | { type: 'SET_VECTOR_SEARCH_LOADING'; payload: boolean }
   | { type: 'SET_VECTOR_SEARCH_ERROR'; payload: string | null }
-  | { type: 'CLEAR_VECTOR_SEARCH' };
+  | { type: 'CLEAR_VECTOR_SEARCH' }
+  | { type: 'SET_FILTER_GROUP'; payload: FilterGroup | null }
+  | { type: 'UPDATE_FILTER_GROUP'; payload: Partial<FilterGroup> }
+  | { type: 'ADD_GROUP_TO_GROUP'; payload: { parentId: string; group: FilterGroup } }
+  | { type: 'ADD_FILTER_TO_GROUP'; payload: { groupId: string; filter: Filter } }
+  | { type: 'REMOVE_FILTER_FROM_GROUP'; payload: { groupId: string; filterId: string } }
+  | { type: 'REMOVE_GROUP_FROM_GROUP'; payload: { parentId: string; groupId: string } }
+  | { type: 'UPDATE_GROUP_OPERATOR'; payload: { groupId: string; operator: FilterGroupOperator } }
+  | { type: 'APPLY_FILTER_GROUP' }
+  | { type: 'CLEAR_FILTER_GROUP' }
+  | { type: 'SAVE_FILTER_TEMPLATE'; payload: FilterTemplate }
+  | { type: 'DELETE_FILTER_TEMPLATE'; payload: string }
+  | { type: 'LOAD_FILTER_TEMPLATE'; payload: string };
 
 /**
  * Message types for webview communication

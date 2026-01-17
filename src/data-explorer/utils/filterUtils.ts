@@ -140,8 +140,15 @@ function formatFilterValue(
 
 /**
  * Build a single WHERE filter operand
+ *
+ * @param filter - Filter to convert to WHERE operand
+ * @returns WhereFilter operand
+ *
+ * @remarks
+ * Exported for use in filterGroupToWhereFilter. Handles all filter operators
+ * including special cases like isNull, notNull, in, notIn, between, etc.
  */
-function buildFilterOperand(filter: Filter): WhereFilter {
+export function buildFilterOperand(filter: Filter): WhereFilter {
   const weaviateOperator = mapOperatorToWeaviate(filter.operator);
   const formattedValue = formatFilterValue(filter.value, filter.operator, filter.dataType);
 
