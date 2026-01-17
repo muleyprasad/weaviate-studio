@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTreeDataProvider';
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
+import { DataExplorerPanel } from './data-explorer/extension/DataExplorerPanel';
 import { WeaviateConnection } from './services/ConnectionManager';
 import { parseWeaviateFile, generateUniqueConnectionName } from './utils/weaviateFileHandler';
 import { BackupPanel } from './views/BackupPanel';
@@ -521,6 +522,32 @@ export function activate(context: vscode.ExtensionContext) {
 
       // Always create a new tab by not providing a tabId (will auto-generate)
       QueryEditorPanel.createOrShow(context, { connectionId, collectionName });
+    }),
+
+    // Open Data Explorer for a collection
+    vscode.commands.registerCommand('weaviate.openDataExplorer', (arg1: any, arg2?: string) => {
+      let connectionId: string;
+      let collectionName: string;
+
+      if (typeof arg1 === 'string' && arg2) {
+        connectionId = arg1;
+        collectionName = arg2;
+      } else if (arg1?.connectionId && (arg1.label || arg1.collectionName)) {
+        connectionId = arg1.connectionId;
+        collectionName = arg1.label || arg1.collectionName || '';
+      } else {
+        console.error('Invalid arguments for weaviate.openDataExplorer:', arg1, arg2);
+        return;
+      }
+
+      // Get the connection manager to pass to DataExplorerPanel
+      const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+
+      // Open the Data Explorer with the selected collection
+      DataExplorerPanel.createOrShow(context, connectionManager, {
+        connectionId,
+        collectionName,
+      });
     }),
 
     // Refresh the tree view

@@ -41,6 +41,7 @@ module.exports = {
     backup: './src/webview/Backup.tsx',
     'backup-restore': './src/webview/BackupRestore.tsx',
     cluster: './src/webview/ClusterPanel.tsx',
+    dataExplorer: './src/data-explorer/webview/index.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -130,6 +131,14 @@ module.exports = {
       template: './src/webview/cluster.html',
       filename: 'cluster.html',
       chunks: ['cluster'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/dataExplorer.html',
+      filename: 'dataExplorer.html',
+      chunks: ['dataExplorer'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,

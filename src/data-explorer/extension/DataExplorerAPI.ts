@@ -1,0 +1,500 @@
+/**
+ * API service for Data Explorer to interact with Weaviate client
+ */
+
+import type { WeaviateClient, WeaviateObject } from 'weaviate-client';
+import { VECTOR_SEARCH_DEFAULTS } from '../constants';
+import type {
+  FetchParams,
+  FetchResult,
+  CollectionSchema,
+  PropertySchema,
+  PropertyDataType,
+  VectorizerConfig,
+  WhereFilter,
+  Filter,
+  VectorSearchOptions,
+} from '../types';
+import { buildWhereFilter } from '../utils/filterUtils';
+
+export class DataExplorerAPI {
+  constructor(private client: WeaviateClient) {}
+
+  /**
+   * Type guard to validate if an unknown value is a valid Weaviate object
+   *
+   * @param obj - Unknown value to validate
+   * @returns True if obj is a valid WeaviateObject, false otherwise
+   */
+  private isValidWeaviateObject(
+    obj: unknown
+  ): obj is WeaviateObject<Record<string, unknown>, string> {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'uuid' in obj &&
+      typeof (obj as any).uuid === 'string' &&
+      'properties' in obj
+    );
+  }
+
+  /**
+   * Safely converts query results to typed Weaviate objects
+   *
+   * Filters out any invalid objects that don't match the expected structure.
+   *
+   * @param objects - Array of objects from Weaviate query result
+   * @returns Array of validated WeaviateObject instances
+   */
+  private toWeaviateObjects(
+    objects: unknown[] | undefined
+  ): WeaviateObject<Record<string, unknown>, string>[] {
+    if (!objects || !Array.isArray(objects)) {
+      return [];
+    }
+    return objects.filter(this.isValidWeaviateObject.bind(this));
+  }
+
+  /**
+   * Fetch objects from a collection with pagination and sorting
+   */
+  async fetchObjects(params: FetchParams): Promise<FetchResult> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      // Build query options with proper types
+      interface QueryOptions {
+        limit: number;
+        offset: number;
+        returnMetadata: string[];
+        returnProperties?: string[];
+        sort?: {
+          path: string;
+          order: 'asc' | 'desc';
+        };
+        where?: WhereFilter;
+      }
+
+      const queryOptions: QueryOptions = {
+        limit: params.limit,
+        offset: params.offset,
+        returnMetadata: ['uuid', 'creationTimeUnix', 'lastUpdateTimeUnix', 'vector'],
+      };
+
+      // Add properties if specified
+      if (params.properties && params.properties.length > 0) {
+        queryOptions.returnProperties = params.properties;
+      }
+
+      // Add sorting if specified
+      if (params.sortBy) {
+        queryOptions.sort = {
+          path: params.sortBy.field,
+          order: params.sortBy.direction,
+        };
+      }
+
+      // Add filters if specified
+      if (params.filters && params.filters.length > 0) {
+        const whereFilter = buildWhereFilter(params.filters);
+        if (whereFilter) {
+          queryOptions.where = whereFilter;
+        }
+      }
+
+      // Execute query
+      const result = await collection.query.fetchObjects(queryOptions as any); // Weaviate client types are complex
+
+      // Get total count (with filters if specified)
+      const totalCount = await this.getTotalCount(params.collectionName, params.filters);
+
+      return {
+        objects: this.toWeaviateObjects(result.objects),
+        totalCount,
+      };
+    } catch (error) {
+      console.error('Error fetching objects:', error);
+      throw new Error(`Failed to fetch objects: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get total count of objects in a collection (optionally filtered)
+   */
+  async getTotalCount(collectionName: string, filters?: Filter[]): Promise<number> {
+    try {
+      const collection = this.client.collections.get(collectionName);
+
+      // If we have filters, use aggregate with where clause
+      if (filters && filters.length > 0) {
+        const whereFilter = buildWhereFilter(filters);
+        if (whereFilter) {
+          const result = await collection.aggregate.overAll({
+            where: whereFilter,
+          } as any);
+          return result.totalCount || 0;
+        }
+      }
+
+      // No filters - get total count
+      const result = await collection.aggregate.overAll({});
+      return result.totalCount || 0;
+    } catch (error) {
+      console.error('Error getting total count:', error);
+      // Fallback: try to get count from a fetch with limit 0
+      try {
+        const collection = this.client.collections.get(collectionName);
+        const result = await collection.query.fetchObjects({ limit: 0 });
+        return 0; // Can't determine count without aggregate
+      } catch {
+        return 0;
+      }
+    }
+  }
+
+  /**
+   * Get collection schema
+   */
+  async getSchema(collectionName: string): Promise<CollectionSchema> {
+    try {
+      const collection = this.client.collections.get(collectionName);
+      const config = await collection.config.get();
+
+      // Extract properties
+      const properties: PropertySchema[] = [];
+
+      if (config.properties) {
+        for (const prop of config.properties) {
+          properties.push(this.convertProperty(prop));
+        }
+      }
+
+      // Extract vectorizer information
+      const vectorizers: VectorizerConfig[] = [];
+
+      // Check for vectorizers config (v4+ API)
+      if (config.vectorizers && typeof config.vectorizers === 'object') {
+        for (const [name, vectorizerConfig] of Object.entries(config.vectorizers)) {
+          if (vectorizerConfig && typeof vectorizerConfig === 'object') {
+            vectorizers.push({
+              name,
+              vectorizer: (vectorizerConfig as any).vectorizer?.name || 'unknown',
+              dimensions: (vectorizerConfig as any).vectorIndexConfig?.dimensions,
+            });
+          }
+        }
+      }
+
+      // Check for named vectors
+      if ((config as any).vectorConfig) {
+        const vectorConfig = (config as any).vectorConfig;
+        for (const [name, vectorCfg] of Object.entries(vectorConfig)) {
+          if (typeof vectorCfg === 'object' && vectorCfg !== null) {
+            vectorizers.push({
+              name,
+              vectorizer: (vectorCfg as any).vectorizer?.vectorizer || 'unknown',
+              dimensions: (vectorCfg as any).vectorIndexConfig?.dimensions,
+            });
+          }
+        }
+      }
+
+      return {
+        name: config.name,
+        properties,
+        vectorizers,
+        description: config.description,
+      };
+    } catch (error) {
+      console.error('Error getting schema:', error);
+      throw new Error(`Failed to get schema: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get a single object by UUID
+   */
+  async getObjectByUuid(collectionName: string, uuid: string): Promise<unknown> {
+    try {
+      const collection = this.client.collections.get(collectionName);
+      const result = await collection.query.fetchObjectById(uuid, {
+        returnMetadata: ['uuid', 'creationTimeUnix', 'lastUpdateTimeUnix', 'vector'],
+      } as any); // Weaviate client fetchObjectById types are complex
+      return result;
+    } catch (error) {
+      console.error('Error fetching object by UUID:', error);
+      throw new Error(`Failed to fetch object: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Convert Weaviate property config to our PropertySchema format
+   */
+  private convertProperty(prop: Record<string, unknown>): PropertySchema {
+    const property: PropertySchema = {
+      name: prop.name as string,
+      dataType: this.normalizeDataType(prop.dataType),
+      description: prop.description as string | undefined,
+      indexFilterable: prop.indexFilterable as boolean | undefined,
+      indexSearchable: prop.indexSearchable as boolean | undefined,
+      tokenization: prop.tokenization as string | undefined,
+    };
+
+    // Handle nested properties for object types
+    if (prop.nestedProperties && Array.isArray(prop.nestedProperties)) {
+      property.nestedProperties = prop.nestedProperties.map((nested: Record<string, unknown>) =>
+        this.convertProperty(nested)
+      );
+    }
+
+    return property;
+  }
+
+  /**
+   * Normalize data type to our standard format
+   */
+  private normalizeDataType(dataType: unknown): PropertyDataType {
+    // Handle array notation
+    if (Array.isArray(dataType)) {
+      const baseType = dataType[0];
+      return `${this.normalizeDataType(baseType)}[]` as PropertyDataType;
+    }
+
+    // Convert string to lowercase and handle common variations
+    const typeStr = String(dataType).toLowerCase();
+
+    // Map Weaviate types to our types
+    const typeMap: Record<string, PropertyDataType> = {
+      'text': 'text',
+      'string': 'text',
+      'int': 'int',
+      'integer': 'int',
+      'number': 'number',
+      'float': 'number',
+      'double': 'number',
+      'boolean': 'boolean',
+      'bool': 'boolean',
+      'date': 'date',
+      'uuid': 'uuid',
+      'geocoordinates': 'geoCoordinates',
+      'phonenumber': 'phoneNumber',
+      'blob': 'blob',
+      'object': 'object',
+    };
+
+    return typeMap[typeStr] || 'text';
+  }
+
+  /**
+   * Extract vector dimensions from config
+   */
+  private extractVectorDimensions(config: any): number | undefined {
+    // Try to get from vectorIndexConfig
+    if (config.vectorIndexConfig?.dimensions) {
+      return config.vectorIndexConfig.dimensions;
+    }
+
+    // Try to infer from vectorIndexType
+    if (config.vectorIndexType === 'hnsw' && config.vectorIndexConfig) {
+      return config.vectorIndexConfig.dimensions;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Adds similarity metric to vector search query options
+   *
+   * Ensures at least one similarity metric (distance or certainty) is set
+   * for the vector search query. Falls back to default distance if neither
+   * is provided.
+   *
+   * @param queryOptions - Query options object to modify
+   * @param distance - Optional distance threshold (0-2, where 0 = identical)
+   * @param certainty - Optional certainty threshold (0-1, where 1 = identical)
+   *
+   * @remarks
+   * Priority order: distance > certainty > default (0.5)
+   * This prevents queries without any similarity metric which could
+   * return unpredictable or all results.
+   */
+  private addSimilarityMetric(
+    queryOptions: VectorSearchOptions,
+    distance?: number,
+    certainty?: number
+  ): void {
+    if (distance !== undefined) {
+      queryOptions.distance = distance;
+    } else if (certainty !== undefined) {
+      queryOptions.certainty = certainty;
+    } else {
+      // Default to distance metric if neither is provided
+      queryOptions.distance = VECTOR_SEARCH_DEFAULTS.DISTANCE;
+    }
+  }
+
+  /**
+   * Perform vector search using nearText
+   */
+  async vectorSearchText(params: {
+    collectionName: string;
+    searchText: string;
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: VectorSearchOptions = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty with default
+      this.addSimilarityMetric(queryOptions, params.distance, params.certainty);
+
+      // Execute nearText query
+      const result = await collection.query.nearText(params.searchText, queryOptions);
+
+      return this.toWeaviateObjects(result.objects);
+    } catch (error) {
+      console.error('Error in text vector search:', error);
+      throw new Error(`Text vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Perform vector search using nearObject
+   */
+  async vectorSearchObject(params: {
+    collectionName: string;
+    referenceObjectId: string;
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: VectorSearchOptions = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty with default
+      this.addSimilarityMetric(queryOptions, params.distance, params.certainty);
+
+      // Execute nearObject query
+      const result = await collection.query.nearObject(params.referenceObjectId, queryOptions);
+
+      return this.toWeaviateObjects(result.objects);
+    } catch (error) {
+      console.error('Error in object vector search:', error);
+      throw new Error(`Object vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Perform vector search using nearVector
+   */
+  async vectorSearchVector(params: {
+    collectionName: string;
+    vector: number[];
+    limit?: number;
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: VectorSearchOptions = {
+        limit: params.limit || 10,
+      };
+
+      // Add distance or certainty with default
+      this.addSimilarityMetric(queryOptions, params.distance, params.certainty);
+
+      // Execute nearVector query
+      const result = await collection.query.nearVector(params.vector, queryOptions);
+
+      return this.toWeaviateObjects(result.objects);
+    } catch (error) {
+      console.error('Error in raw vector search:', error);
+      throw new Error(`Raw vector search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Perform hybrid search (combines keyword BM25 and semantic vector search)
+   *
+   * @param params - Hybrid search parameters
+   * @param params.collectionName - Name of the collection to search
+   * @param params.query - Search query text
+   * @param params.alpha - Balance between keyword (0) and semantic (1). Default: 0.75
+   * @param params.limit - Maximum number of results. Default: 10
+   * @param params.properties - Optional list of properties to search in
+   * @param params.fusionType - How to combine results. Default: 'rankedFusion'
+   * @param params.distance - Optional distance threshold
+   * @param params.certainty - Optional certainty threshold
+   *
+   * @returns Array of search results with hybrid scores
+   *
+   * @remarks
+   * Alpha parameter:
+   * - 0.0 = Pure keyword (BM25) search
+   * - 1.0 = Pure semantic (vector) search
+   * - 0.75 = Default balanced hybrid (75% semantic, 25% keyword)
+   */
+  async vectorSearchHybrid(params: {
+    collectionName: string;
+    query: string;
+    alpha?: number;
+    limit?: number;
+    properties?: string[];
+    fusionType?: 'rankedFusion' | 'relativeScoreFusion';
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: any = {
+        limit: params.limit || 10,
+        alpha: params.alpha ?? 0.75,
+        fusionType: params.fusionType || 'rankedFusion',
+        returnMetadata: ['score', 'explainScore'],
+      };
+
+      // Add optional properties filter
+      if (params.properties && params.properties.length > 0) {
+        queryOptions.properties = params.properties;
+      }
+
+      // Add distance or certainty if provided (optional for hybrid search)
+      if (params.distance !== undefined) {
+        queryOptions.distance = params.distance;
+      } else if (params.certainty !== undefined) {
+        queryOptions.certainty = params.certainty;
+      }
+
+      // Execute hybrid query
+      const result = await collection.query.hybrid(params.query, queryOptions);
+
+      return this.toWeaviateObjects(result.objects);
+    } catch (error) {
+      console.error('Error in hybrid search:', error);
+      throw new Error(`Hybrid search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Check if client is connected
+   */
+  async isConnected(): Promise<boolean> {
+    try {
+      await this.client.collections.listAll();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}

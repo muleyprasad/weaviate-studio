@@ -1,0 +1,717 @@
+/**
+ * Data Explorer Styles
+ */
+
+:root {
+  --background: var(--vscode-editor-background);
+  --foreground: var(--vscode-editor-foreground);
+  --border: var(--vscode-panel-border);
+  --hover-background: var(--vscode-list-hoverBackground);
+  --active-background: var(--vscode-list-activeSelectionBackground);
+  --error-background: var(--vscode-inputValidation-errorBackground);
+  --error-foreground: var(--vscode-errorForeground);
+  --button-background: var(--vscode-button-background);
+  --button-foreground: var(--vscode-button-foreground);
+  --button-hover: var(--vscode-button-hoverBackground);
+  --input-background: var(--vscode-input-background);
+  --input-border: var(--vscode-input-border);
+  --badge-background: var(--vscode-badge-background);
+  --badge-foreground: var(--vscode-badge-foreground);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--foreground);
+  background: var(--background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Main container */
+.data-explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Error banner */
+.error-banner {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--error-background);
+  color: var(--error-foreground);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.error-icon {
+  font-size: 18px;
+}
+
+.error-message {
+  flex: 1;
+}
+
+.error-dismiss {
+  background: none;
+  border: none;
+  color: var(--error-foreground);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+
+/* Explorer header */
+.explorer-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.collection-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.object-count {
+  font-size: 14px;
+  font-weight: normal;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Explorer content */
+.explorer-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Loading skeleton */
+.loading-skeleton {
+  padding: 16px;
+}
+
+.skeleton-row {
+  height: 40px;
+  background: var(--hover-background);
+  margin-bottom: 8px;
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Data table container */
+.data-table-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Toolbar */
+.data-table-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Column Manager */
+.column-manager {
+  position: relative;
+}
+
+.column-manager-button {
+  padding: 6px 12px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.column-manager-button:hover {
+  background: var(--button-hover);
+}
+
+.column-manager-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  width: 300px;
+  max-height: 400px;
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.column-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-title {
+  font-weight: 600;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+}
+
+.column-manager-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.action-button {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--input-background);
+  color: var(--foreground);
+  border: 1px solid var(--input-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.action-button:hover {
+  background: var(--hover-background);
+}
+
+.column-list {
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.column-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+.column-item:hover {
+  background: var(--hover-background);
+}
+
+.column-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.column-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.column-type {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  padding: 2px 6px;
+  background: var(--badge-background);
+  color: var(--badge-foreground);
+  border-radius: 3px;
+}
+
+.pin-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.5;
+  padding: 2px 4px;
+}
+
+.pin-button:hover {
+  opacity: 1;
+}
+
+.pin-button.pinned {
+  opacity: 1;
+}
+
+/* Data table wrapper */
+.data-table-wrapper {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Data table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--background);
+  z-index: 10;
+}
+
+.data-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.column-header.pinned {
+  background: var(--hover-background);
+}
+
+.column-name {
+  flex: 1;
+}
+
+.column-type-badge {
+  font-size: 10px;
+  padding: 2px 4px;
+  background: var(--badge-background);
+  color: var(--badge-foreground);
+  border-radius: 3px;
+  font-weight: normal;
+}
+
+.pin-indicator {
+  font-size: 10px;
+}
+
+.row-number-header,
+.uuid-header {
+  width: 80px;
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-row {
+  cursor: pointer;
+}
+
+.data-row:hover {
+  background: var(--hover-background);
+}
+
+.data-row.selected {
+  background: var(--active-background);
+}
+
+.row-number {
+  color: var(--vscode-descriptionForeground);
+  text-align: right;
+}
+
+/* Cell types */
+.cell-null {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.cell-text {
+  color: var(--foreground);
+}
+
+.cell-number {
+  color: var(--vscode-debugTokenExpression-number);
+  text-align: right;
+  display: block;
+}
+
+.cell-boolean {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.cell-boolean.true {
+  color: var(--vscode-testing-iconPassed);
+}
+
+.cell-boolean.false {
+  color: var(--vscode-testing-iconFailed);
+}
+
+.cell-date {
+  color: var(--vscode-debugTokenExpression-string);
+}
+
+.cell-uuid {
+  font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-debugTokenExpression-string);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.cell-uuid:hover .copy-button {
+  opacity: 1;
+}
+
+.cell-geo,
+.cell-phone,
+.cell-blob,
+.cell-object,
+.cell-array {
+  color: var(--vscode-debugTokenExpression-name);
+}
+
+.object-preview,
+.array-preview {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-button {
+  padding: 6px 12px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-pages {
+  font-size: 13px;
+}
+
+.page-size-selector {
+  padding: 4px 8px;
+  background: var(--input-background);
+  color: var(--foreground);
+  border: 1px solid var(--input-border);
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.refresh-button {
+  padding: 4px 8px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+/* Object Detail Panel */
+.object-detail-panel {
+  width: 400px;
+  border-left: 1px solid var(--border);
+  background: var(--background);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-uuid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.uuid-label {
+  font-weight: 600;
+}
+
+.uuid-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.detail-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-button {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-button.active {
+  color: var(--foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.tab-button:hover {
+  background: var(--hover-background);
+}
+
+.detail-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Properties view */
+.properties-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.property-item {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.property-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.property-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.property-type {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--badge-background);
+  color: var(--badge-foreground);
+  border-radius: 3px;
+}
+
+.property-value {
+  font-size: 13px;
+  word-break: break-word;
+}
+
+/* Metadata view */
+.metadata-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metadata-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metadata-label {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.metadata-value {
+  font-size: 13px;
+}
+
+/* JSON view */
+.json-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.json-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.copy-json-button {
+  padding: 4px 12px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.copy-json-button:hover {
+  background: var(--button-hover);
+}
+
+.json-content {
+  background: var(--vscode-textCodeBlock-background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.json-content code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+/* Value rendering in detail panel */
+.value-null {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.value-boolean,
+.value-number,
+.value-string {
+  color: var(--foreground);
+}
+
+.value-array,
+.value-object {
+  margin-top: 8px;
+}
+
+.array-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.array-items {
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+}
+
+.array-item {
+  margin-bottom: 4px;
+}
+
+.array-index {
+  color: var(--vscode-descriptionForeground);
+  margin-right: 8px;
+}
+
+.object-property {
+  margin-bottom: 4px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+}
+
+.object-key {
+  font-weight: 600;
+  margin-right: 8px;
+}
