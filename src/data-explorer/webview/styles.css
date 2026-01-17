@@ -890,12 +890,34 @@
   border: 3px solid var(--vscode-input-background);
   border-top-color: var(--vscode-focusBorder);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+}
+
+/* Spinning animation for users who haven't requested reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .loading-spinner {
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+/* Simpler pulsing animation for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: pulse-opacity 1.5s ease-in-out infinite;
+  }
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 
@@ -943,9 +965,15 @@
 
 .action-button:hover {
   background-color: var(--vscode-button-secondaryHoverBackground);
-  transform: scale(1.1);
 }
 
-.action-button:active {
-  transform: scale(0.95);
+/* Only apply scale transforms if user hasn't requested reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .action-button:hover {
+    transform: scale(1.05); /* Reduced from 1.1 for subtler effect */
+  }
+
+  .action-button:active {
+    transform: scale(0.98); /* Reduced from 0.95 for subtler effect */
+  }
 }

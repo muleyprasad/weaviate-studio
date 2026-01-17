@@ -94,6 +94,27 @@ export function VectorSearchPanel() {
       {/* Search Results */}
       {vectorSearch.results.length > 0 && <SearchResults />}
 
+      {/* Empty State - No results found */}
+      {!vectorSearch.loading &&
+        !vectorSearch.error &&
+        vectorSearch.results.length === 0 &&
+        (vectorSearch.config.searchText ||
+          vectorSearch.config.referenceObjectId ||
+          vectorSearch.config.vectorInput) && (
+          <div className="vector-search-empty" role="status">
+            <div className="empty-icon">🔍</div>
+            <h4 className="empty-title">No similar objects found</h4>
+            <p className="empty-message">
+              Try adjusting your search parameters:
+            </p>
+            <ul className="empty-suggestions">
+              <li>Increase the {vectorSearch.config.useDistance ? 'distance' : 'certainty'} threshold</li>
+              <li>Increase the result limit</li>
+              <li>Try a different search query or object</li>
+            </ul>
+          </div>
+        )}
+
       {/* Loading State */}
       {vectorSearch.loading && (
         <div className="vector-search-loading" role="status" aria-live="polite">

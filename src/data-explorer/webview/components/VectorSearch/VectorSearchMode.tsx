@@ -18,7 +18,7 @@ export function VectorSearchMode() {
   // Expected dimensions from schema
   const expectedDimensions = schema?.vectorizers?.[0]?.dimensions || 0;
 
-  // Parse vector input on change
+  // Parse vector input on change (debounced to avoid parsing on every keystroke)
   useEffect(() => {
     if (!vectorInput.trim()) {
       setParsedVector(null);
@@ -26,37 +26,43 @@ export function VectorSearchMode() {
       return;
     }
 
-    try {
-      // Try to parse as JSON array
-      const parsed = JSON.parse(vectorInput);
+    // Debounce the parsing to improve performance with large vectors
+    const timeoutId = setTimeout(() => {
+      try {
+        // Try to parse as JSON array
+        const parsed = JSON.parse(vectorInput);
 
-      if (!Array.isArray(parsed)) {
-        setParseError('Vector must be an array');
+        if (!Array.isArray(parsed)) {
+          setParseError('Vector must be an array');
+          setParsedVector(null);
+          return;
+        }
+
+        if (!parsed.every((v) => typeof v === 'number')) {
+          setParseError('All vector values must be numbers');
+          setParsedVector(null);
+          return;
+        }
+
+        if (expectedDimensions > 0 && parsed.length !== expectedDimensions) {
+          setParseError(
+            `Expected ${expectedDimensions} dimensions, got ${parsed.length}`
+          );
+          setParsedVector(null);
+          return;
+        }
+
+        // Valid vector
+        setParsedVector(parsed);
+        setParseError(null);
+      } catch (err) {
+        setParseError('Invalid JSON format. Expected: [0.123, -0.456, ...]');
         setParsedVector(null);
-        return;
       }
+    }, 300); // 300ms debounce delay
 
-      if (!parsed.every((v) => typeof v === 'number')) {
-        setParseError('All vector values must be numbers');
-        setParsedVector(null);
-        return;
-      }
-
-      if (expectedDimensions > 0 && parsed.length !== expectedDimensions) {
-        setParseError(
-          `Expected ${expectedDimensions} dimensions, got ${parsed.length}`
-        );
-        setParsedVector(null);
-        return;
-      }
-
-      // Valid vector
-      setParsedVector(parsed);
-      setParseError(null);
-    } catch (err) {
-      setParseError('Invalid JSON format. Expected: [0.123, -0.456, ...]');
-      setParsedVector(null);
-    }
+    // Cleanup timeout on re-render or unmount
+    return () => clearTimeout(timeoutId);
   }, [vectorInput, expectedDimensions]);
 
   const handleSearch = () => {

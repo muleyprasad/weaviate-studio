@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDataExplorer } from '../../DataExplorer';
 import { DISTANCE_THRESHOLDS, CERTAINTY_THRESHOLDS } from '../../../constants';
 
@@ -15,6 +15,29 @@ export function SearchConfigControls() {
   const { vectorSearch } = state;
   const { config } = vectorSearch;
 
+  // Local state for debounced slider values
+  const [localDistance, setLocalDistance] = useState(config.distance || 0.5);
+  const [localCertainty, setLocalCertainty] = useState(config.certainty || 0.7);
+  const distanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const certaintyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync local state with config when it changes externally
+  useEffect(() => {
+    setLocalDistance(config.distance || 0.5);
+  }, [config.distance]);
+
+  useEffect(() => {
+    setLocalCertainty(config.certainty || 0.7);
+  }, [config.certainty]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (distanceTimeoutRef.current) clearTimeout(distanceTimeoutRef.current);
+      if (certaintyTimeoutRef.current) clearTimeout(certaintyTimeoutRef.current);
+    };
+  }, []);
+
   const handleDistanceCertaintyToggle = () => {
     dispatch({
       type: 'SET_VECTOR_SEARCH_CONFIG',
@@ -25,21 +48,41 @@ export function SearchConfigControls() {
   };
 
   const handleDistanceChange = (value: number) => {
-    dispatch({
-      type: 'SET_VECTOR_SEARCH_CONFIG',
-      payload: {
-        distance: value,
-      },
-    });
+    setLocalDistance(value); // Update local state immediately for responsive UI
+
+    // Clear existing timeout
+    if (distanceTimeoutRef.current) {
+      clearTimeout(distanceTimeoutRef.current);
+    }
+
+    // Dispatch update after debounce delay
+    distanceTimeoutRef.current = setTimeout(() => {
+      dispatch({
+        type: 'SET_VECTOR_SEARCH_CONFIG',
+        payload: {
+          distance: value,
+        },
+      });
+    }, 150); // 150ms debounce
   };
 
   const handleCertaintyChange = (value: number) => {
-    dispatch({
-      type: 'SET_VECTOR_SEARCH_CONFIG',
-      payload: {
-        certainty: value,
-      },
-    });
+    setLocalCertainty(value); // Update local state immediately for responsive UI
+
+    // Clear existing timeout
+    if (certaintyTimeoutRef.current) {
+      clearTimeout(certaintyTimeoutRef.current);
+    }
+
+    // Dispatch update after debounce delay
+    certaintyTimeoutRef.current = setTimeout(() => {
+      dispatch({
+        type: 'SET_VECTOR_SEARCH_CONFIG',
+        payload: {
+          certainty: value,
+        },
+      });
+    }, 150); // 150ms debounce
   };
 
   const handleLimitChange = (value: number) => {
@@ -79,7 +122,7 @@ export function SearchConfigControls() {
         <div className="config-section">
           <label htmlFor="distance-slider" className="config-label">
             Max Distance:
-            <span className="config-value">{config.distance?.toFixed(2) || '0.50'}</span>
+            <span className="config-value">{localDistance.toFixed(2)}</span>
           </label>
           <input
             id="distance-slider"
@@ -88,13 +131,13 @@ export function SearchConfigControls() {
             min={DISTANCE_THRESHOLDS.MIN}
             max={DISTANCE_THRESHOLDS.MAX}
             step={DISTANCE_THRESHOLDS.STEP}
-            value={config.distance || 0.5}
+            value={localDistance}
             onChange={(e) => handleDistanceChange(parseFloat(e.target.value))}
-            aria-label={`Maximum distance threshold: ${(config.distance || 0.5).toFixed(2)}`}
+            aria-label={`Maximum distance threshold: ${localDistance.toFixed(2)}`}
             aria-valuemin={DISTANCE_THRESHOLDS.MIN}
             aria-valuemax={DISTANCE_THRESHOLDS.MAX}
-            aria-valuenow={config.distance || 0.5}
-            aria-valuetext={`${(config.distance || 0.5).toFixed(2)} - Objects with distance greater than this will be excluded`}
+            aria-valuenow={localDistance}
+            aria-valuetext={`${localDistance.toFixed(2)} - Objects with distance greater than this will be excluded`}
           />
           <div className="slider-labels">
             <span>0.0 (identical)</span>
@@ -108,7 +151,7 @@ export function SearchConfigControls() {
         <div className="config-section">
           <label htmlFor="certainty-slider" className="config-label">
             Min Certainty:
-            <span className="config-value">{config.certainty?.toFixed(2) || '0.70'}</span>
+            <span className="config-value">{localCertainty.toFixed(2)}</span>
           </label>
           <input
             id="certainty-slider"
@@ -117,13 +160,13 @@ export function SearchConfigControls() {
             min={CERTAINTY_THRESHOLDS.MIN}
             max={CERTAINTY_THRESHOLDS.MAX}
             step={CERTAINTY_THRESHOLDS.STEP}
-            value={config.certainty || 0.7}
+            value={localCertainty}
             onChange={(e) => handleCertaintyChange(parseFloat(e.target.value))}
-            aria-label={`Minimum certainty threshold: ${(config.certainty || 0.7).toFixed(2)}`}
+            aria-label={`Minimum certainty threshold: ${localCertainty.toFixed(2)}`}
             aria-valuemin={CERTAINTY_THRESHOLDS.MIN}
             aria-valuemax={CERTAINTY_THRESHOLDS.MAX}
-            aria-valuenow={config.certainty || 0.7}
-            aria-valuetext={`${(config.certainty || 0.7).toFixed(2)} - Objects with certainty lower than this will be excluded`}
+            aria-valuenow={localCertainty}
+            aria-valuetext={`${localCertainty.toFixed(2)} - Objects with certainty lower than this will be excluded`}
           />
           <div className="slider-labels">
             <span>0.0 (low confidence)</span>
