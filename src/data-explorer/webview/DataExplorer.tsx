@@ -791,62 +791,89 @@ export function DataExplorer() {
 
   return (
     <DataExplorerContext.Provider value={contextValue}>
-      <div className="data-explorer">
+      <div className="data-explorer" role="main" aria-label="Data Explorer">
         {/* Screen reader announcements */}
-        <div aria-live="polite" aria-atomic="true" className="sr-only">
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+          role="status"
+        >
           {state.loading && 'Loading data...'}
           {!state.loading && state.objects.length > 0 && `Loaded ${state.totalCount} objects`}
           {!state.loading && state.objects.length === 0 && 'No objects found'}
         </div>
 
+        {/* Keyboard shortcuts help (for screen readers) */}
+        <div className="sr-only" role="region" aria-label="Keyboard shortcuts">
+          <h2>Available keyboard shortcuts:</h2>
+          <ul>
+            <li>Control+R: Refresh data</li>
+            <li>Control+E: Open export dialog</li>
+            <li>Control+K: Toggle vector search</li>
+            <li>Control+N: Next page</li>
+            <li>Control+P: Previous page</li>
+            <li>Control+Shift+Backspace: Clear all filters</li>
+            <li>Escape: Close modals and panels</li>
+          </ul>
+        </div>
+
         {state.error && (
-          <div className="error-banner" role="alert">
-            <span className="error-icon">⚠️</span>
+          <div className="error-banner" role="alert" aria-live="assertive">
+            <span className="error-icon" aria-hidden="true">⚠️</span>
             <span className="error-message">{state.error}</span>
             <button
               className="error-dismiss"
               onClick={() => dispatch({ type: 'SET_ERROR', payload: null })}
-              aria-label="Dismiss error"
+              aria-label="Dismiss error message"
+              type="button"
             >
               ✕
             </button>
           </div>
         )}
 
-        <div className="explorer-header">
-          <h2 className="collection-name">
+        <header className="explorer-header" role="banner">
+          <h1 className="collection-name">
             {state.collectionName}
-            <span className="object-count">
+            <span className="object-count" aria-label={`${state.totalCount} objects in collection`}>
               {state.loading ? '...' : `${state.totalCount} objects`}
             </span>
-          </h2>
+          </h1>
 
-          <div className="explorer-actions">
+          <nav className="explorer-actions" aria-label="Main actions">
             {/* Export button */}
             <button
               className="action-button"
               onClick={() => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true })}
-              aria-label="Export data"
-              title="Export data"
+              aria-label="Export data (Control+E)"
+              title="Export data (Ctrl+E)"
+              type="button"
             >
-              💾 Export
+              <span aria-hidden="true">💾</span> Export
             </button>
 
             {/* Toggle Vector Search button */}
             <button
               className="action-button"
               onClick={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: !state.vectorSearch.isActive })}
-              aria-label={state.vectorSearch.isActive ? 'Close Vector Search Panel' : 'Open Vector Search Panel'}
+              aria-label={
+                state.vectorSearch.isActive
+                  ? 'Close Vector Search Panel (Control+K)'
+                  : 'Open Vector Search Panel (Control+K)'
+              }
               aria-expanded={state.vectorSearch.isActive}
-              title={state.vectorSearch.isActive ? 'Close Vector Search' : 'Open Vector Search'}
+              aria-controls="vector-search-panel"
+              title={state.vectorSearch.isActive ? 'Close Vector Search (Ctrl+K)' : 'Open Vector Search (Ctrl+K)'}
+              type="button"
             >
               <span aria-hidden="true">
                 {state.vectorSearch.isActive ? '✕' : '🔮'}
               </span>
               {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
             </button>
-          </div>
-        </div>
+          </nav>
+        </header>
 
         {/* Schema Visualizer - Phase 5: Always visible for immediate schema reference */}
         {state.schema && (
