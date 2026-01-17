@@ -42,14 +42,14 @@ export function SearchResults() {
         mode: 'object',
         referenceObjectId: objectId,
         limit: config.limit,
-        distance: config.useDistance ? config.distance : undefined,
-        certainty: !config.useDistance ? config.certainty : undefined,
+        distance: config.useDistanceMetric ? config.distance : undefined,
+        certainty: !config.useDistanceMetric ? config.certainty : undefined,
       },
     });
   };
 
   const calculateMatchPercentage = (result: typeof results[0]): number => {
-    if (config.useDistance) {
+    if (config.useDistanceMetric) {
       // Distance: 0 = 100% match, 2 = 0% match
       const distance = result.distance || 0;
       return Math.max(0, Math.min(100, 100 - (distance / 2) * 100));
@@ -88,7 +88,7 @@ export function SearchResults() {
                   ></div>
                 </div>
                 <div className="score-details">
-                  {config.useDistance ? (
+                  {config.useDistanceMetric ? (
                     <span>Distance: {result.distance?.toFixed(4) || 'N/A'}</span>
                   ) : (
                     <span>Certainty: {result.certainty?.toFixed(4) || 'N/A'}</span>

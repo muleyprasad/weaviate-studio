@@ -351,7 +351,8 @@ export interface VectorSearchConfig {
   limit: number;
   distance?: number;
   certainty?: number;
-  useDistance: boolean; // true = distance, false = certainty
+  /** If true, use distance metric; if false, use certainty metric */
+  useDistanceMetric: boolean;
 }
 
 /**

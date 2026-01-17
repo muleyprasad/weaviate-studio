@@ -108,7 +108,7 @@ export function VectorSearchPanel() {
               Try adjusting your search parameters:
             </p>
             <ul className="empty-suggestions">
-              <li>Increase the {vectorSearch.config.useDistance ? 'distance' : 'certainty'} threshold</li>
+              <li>Increase the {vectorSearch.config.useDistanceMetric ? 'distance' : 'certainty'} threshold</li>
               <li>Increase the result limit</li>
               <li>Try a different search query or object</li>
             </ul>

@@ -83,8 +83,8 @@ export function VectorSearchMode() {
         mode: 'vector',
         vectorInput: parsedVector,
         limit: vectorSearch.config.limit,
-        distance: vectorSearch.config.useDistance ? vectorSearch.config.distance : undefined,
-        certainty: !vectorSearch.config.useDistance ? vectorSearch.config.certainty : undefined,
+        distance: vectorSearch.config.useDistanceMetric ? vectorSearch.config.distance : undefined,
+        certainty: !vectorSearch.config.useDistanceMetric ? vectorSearch.config.certainty : undefined,
       },
     });
   };

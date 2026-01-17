@@ -42,7 +42,7 @@ export function SearchConfigControls() {
     dispatch({
       type: 'SET_VECTOR_SEARCH_CONFIG',
       payload: {
-        useDistance: !config.useDistance,
+        useDistanceMetric: !config.useDistanceMetric,
       },
     });
   };
@@ -101,14 +101,14 @@ export function SearchConfigControls() {
         <label className="config-label">Similarity Metric:</label>
         <div className="metric-toggle">
           <button
-            className={`toggle-button ${config.useDistance ? 'active' : ''}`}
+            className={`toggle-button ${config.useDistanceMetric ? 'active' : ''}`}
             onClick={handleDistanceCertaintyToggle}
             title="Distance: 0 = identical, higher = more different"
           >
             Distance
           </button>
           <button
-            className={`toggle-button ${!config.useDistance ? 'active' : ''}`}
+            className={`toggle-button ${!config.useDistanceMetric ? 'active' : ''}`}
             onClick={handleDistanceCertaintyToggle}
             title="Certainty: 1 = identical, lower = less similar"
           >
@@ -118,7 +118,7 @@ export function SearchConfigControls() {
       </div>
 
       {/* Threshold Slider */}
-      {config.useDistance ? (
+      {config.useDistanceMetric ? (
         <div className="config-section">
           <label htmlFor="distance-slider" className="config-label">
             Max Distance:

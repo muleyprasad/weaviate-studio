@@ -54,8 +54,8 @@ export function ObjectSearchMode() {
         mode: 'object',
         referenceObjectId: id,
         limit: vectorSearch.config.limit,
-        distance: vectorSearch.config.useDistance ? vectorSearch.config.distance : undefined,
-        certainty: !vectorSearch.config.useDistance ? vectorSearch.config.certainty : undefined,
+        distance: vectorSearch.config.useDistanceMetric ? vectorSearch.config.distance : undefined,
+        certainty: !vectorSearch.config.useDistanceMetric ? vectorSearch.config.certainty : undefined,
       },
     });
   };

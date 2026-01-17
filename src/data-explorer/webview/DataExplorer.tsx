@@ -46,7 +46,7 @@ const initialState: DataExplorerState = {
     config: {
       mode: 'text',
       limit: 10,
-      useDistance: true,
+      useDistanceMetric: true,
       distance: 0.5,
       certainty: 0.7,
     },

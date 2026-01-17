@@ -71,10 +71,10 @@ export function DataTable() {
         mode: 'object',
         referenceObjectId: objectId,
         limit: state.vectorSearch.config.limit,
-        distance: state.vectorSearch.config.useDistance
+        distance: state.vectorSearch.config.useDistanceMetric
           ? state.vectorSearch.config.distance
           : undefined,
-        certainty: !state.vectorSearch.config.useDistance
+        certainty: !state.vectorSearch.config.useDistanceMetric
           ? state.vectorSearch.config.certainty
           : undefined,
       },
