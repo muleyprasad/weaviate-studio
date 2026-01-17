@@ -2903,3 +2903,250 @@
 .connection-error-button.secondary:hover {
   background-color: var(--vscode-button-secondaryHoverBackground);
 }
+
+/* ========================================================================
+   Loading Skeleton Styles
+   ======================================================================== */
+
+/* Base skeleton animation */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-input-background) 0%,
+    var(--vscode-list-hoverBackground) 50%,
+    var(--vscode-input-background) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 3px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Table Skeleton */
+.skeleton-table {
+  width: 100%;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.skeleton-table-header {
+  display: flex;
+  padding: 12px;
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  gap: 16px;
+}
+
+.skeleton-table-header-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.skeleton-table-row {
+  display: flex;
+  padding: 12px;
+  gap: 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: none;
+}
+
+.skeleton-table-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Filter Builder Skeleton */
+.skeleton-filter-builder {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.skeleton-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.skeleton-filter-rule {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--vscode-input-background);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.skeleton-filter-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Insights Skeleton */
+.skeleton-insights {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+}
+
+.skeleton-insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-insights-total {
+  margin-bottom: 16px;
+}
+
+.skeleton-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.skeleton-insights-card {
+  padding: 12px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+}
+
+/* Schema Skeleton */
+.skeleton-schema {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+}
+
+.skeleton-schema-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-schema-properties {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skeleton-schema-property {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 3px;
+}
+
+.skeleton-schema-property:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Object Detail Skeleton */
+.skeleton-object-detail {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  border-left: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-object-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.skeleton-object-detail-uuid {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-object-detail-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.skeleton-object-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-object-detail-property {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Vector Search Skeleton */
+.skeleton-vector-search {
+  padding: 16px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.skeleton-vector-search-header {
+  margin-bottom: 16px;
+}
+
+.skeleton-vector-search-mode {
+  margin-bottom: 16px;
+}
+
+.skeleton-vector-search-input {
+  margin-bottom: 16px;
+}
+
+.skeleton-vector-search-config {
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: var(--vscode-input-background);
+  border-radius: 4px;
+}
+
+.skeleton-vector-search-actions {
+  display: flex;
+  gap: 12px;
+}

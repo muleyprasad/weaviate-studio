@@ -16,6 +16,8 @@ import { SchemaVisualizer } from './components/Schema/SchemaVisualizer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
 import { ConnectionError } from './components/ConnectionError';
+import { TableSkeleton } from './components/LoadingSkeleton';
+import { useKeyboardShortcuts, type KeyboardShortcut } from './hooks/useKeyboardShortcuts';
 
 // Import shared theme for design consistency
 import '../../webview/theme.css';
@@ -553,6 +555,19 @@ export function DataExplorer() {
               // Auto-apply saved filters
               dispatch({ type: 'APPLY_FILTERS' });
             }
+            // Load filter templates
+            if (message.data.preferences.filterTemplates) {
+              message.data.preferences.filterTemplates.forEach((template: any) => {
+                dispatch({ type: 'SAVE_FILTER_TEMPLATE', payload: template });
+              });
+            }
+            // Load insights configuration
+            if (message.data.preferences.insightsConfig) {
+              dispatch({
+                type: 'UPDATE_INSIGHTS_CONFIG',
+                payload: message.data.preferences.insightsConfig,
+              });
+            }
           }
           break;
 
@@ -623,6 +638,7 @@ export function DataExplorer() {
 
   /**
    * Save preferences when they change
+   * Includes UI preferences, filters, and insights configuration
    */
   useEffect(() => {
     if (state.collectionName && state.schema) {
@@ -631,16 +647,33 @@ export function DataExplorer() {
         data: {
           collectionName: state.collectionName,
           preferences: {
+            // UI preferences
             visibleColumns: state.visibleColumns,
             pinnedColumns: state.pinnedColumns,
             pageSize: state.pageSize,
             sortBy: state.sortBy,
+
+            // Filter preferences
             filters: state.activeFilters,
+            filterTemplates: state.filterTemplates,
+
+            // Insights configuration
+            insightsConfig: state.insights.config,
           },
         },
       });
     }
-  }, [state.visibleColumns, state.pinnedColumns, state.pageSize, state.sortBy, state.activeFilters, state.collectionName, state.schema]);
+  }, [
+    state.visibleColumns,
+    state.pinnedColumns,
+    state.pageSize,
+    state.sortBy,
+    state.activeFilters,
+    state.filterTemplates,
+    state.insights.config,
+    state.collectionName,
+    state.schema,
+  ]);
 
   /**
    * Post message to extension
@@ -648,6 +681,99 @@ export function DataExplorer() {
   const postMessage = useCallback((message: WebviewMessage) => {
     vscode.postMessage(message);
   }, []);
+
+  /**
+   * Keyboard shortcuts
+   */
+  const shortcuts: KeyboardShortcut[] = useMemo(
+    () => [
+      // Refresh data (Ctrl+R)
+      {
+        key: 'r',
+        ctrl: true,
+        action: () => fetchObjects(),
+        description: 'Refresh data',
+      },
+      // Export dialog (Ctrl+E)
+      {
+        key: 'e',
+        ctrl: true,
+        action: () => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true }),
+        description: 'Open export dialog',
+      },
+      // Toggle vector search (Ctrl+K)
+      {
+        key: 'k',
+        ctrl: true,
+        action: () =>
+          dispatch({
+            type: 'SET_VECTOR_SEARCH_ACTIVE',
+            payload: !state.vectorSearch.isActive,
+          }),
+        description: 'Toggle vector search',
+      },
+      // Clear filters (Ctrl+Shift+Backspace)
+      {
+        key: 'Backspace',
+        ctrl: true,
+        shift: true,
+        action: () => {
+          dispatch({ type: 'CLEAR_FILTERS' });
+          dispatch({ type: 'CLEAR_FILTER_GROUP' });
+        },
+        description: 'Clear all filters',
+      },
+      // Close modals/panels (Escape)
+      {
+        key: 'Escape',
+        action: () => {
+          if (state.showExportDialog) {
+            dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: false });
+          } else if (state.showDetailPanel) {
+            dispatch({ type: 'SELECT_OBJECT', payload: null });
+          } else if (state.vectorSearch.isActive) {
+            dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: false });
+          }
+        },
+        description: 'Close modals, clear selection',
+        preventDefault: false, // Allow default behavior in inputs
+      },
+      // Next page (Ctrl+N)
+      {
+        key: 'n',
+        ctrl: true,
+        action: () => {
+          if (state.currentPage < Math.ceil(state.totalCount / state.pageSize) - 1) {
+            dispatch({ type: 'SET_PAGE', payload: state.currentPage + 1 });
+          }
+        },
+        description: 'Next page',
+      },
+      // Previous page (Ctrl+P)
+      {
+        key: 'p',
+        ctrl: true,
+        action: () => {
+          if (state.currentPage > 0) {
+            dispatch({ type: 'SET_PAGE', payload: state.currentPage - 1 });
+          }
+        },
+        description: 'Previous page',
+      },
+    ],
+    [
+      fetchObjects,
+      state.vectorSearch.isActive,
+      state.showExportDialog,
+      state.showDetailPanel,
+      state.currentPage,
+      state.totalCount,
+      state.pageSize,
+      dispatch,
+    ]
+  );
+
+  useKeyboardShortcuts(shortcuts);
 
   /**
    * Context value (memoized to prevent unnecessary re-renders)
@@ -748,11 +874,7 @@ export function DataExplorer() {
 
         <div className="explorer-content">
           {state.loading && !state.objects.length ? (
-            <div className="loading-skeleton">
-              <div className="skeleton-row"></div>
-              <div className="skeleton-row"></div>
-              <div className="skeleton-row"></div>
-            </div>
+            <TableSkeleton rows={10} columns={state.visibleColumns.length || 5} />
           ) : !state.loading && state.objects.length === 0 ? (
             <EmptyState
               type="no-results"
