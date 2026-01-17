@@ -315,6 +315,21 @@ export class DataExplorerPanel {
         });
         break;
 
+      case 'hybrid':
+        if (!params.searchText) {
+          throw new Error('Search text is required for hybrid search');
+        }
+        objects = await this._api.vectorSearchHybrid({
+          collectionName,
+          query: params.searchText,
+          alpha: params.alpha,
+          limit: params.limit,
+          properties: params.searchProperties,
+          distance: params.distance,
+          certainty: params.certainty,
+        });
+        break;
+
       default:
         throw new Error(`Unknown vector search mode: ${params.mode}`);
     }
@@ -329,6 +344,7 @@ export class DataExplorerPanel {
         distance: metadata.distance ?? (obj as any).distance ?? undefined,
         certainty: metadata.certainty ?? (obj as any).certainty ?? undefined,
         score: metadata.score ?? (obj as any).score ?? undefined,
+        explainScore: metadata.explainScore ?? (obj as any).explainScore ?? undefined,
       };
     });
 

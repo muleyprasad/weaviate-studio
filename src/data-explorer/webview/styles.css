@@ -977,3 +977,224 @@
     transform: scale(0.98); /* Reduced from 0.95 for subtler effect */
   }
 }
+
+/* ===========================
+   Hybrid Search Styles
+   =========================== */
+
+/* Hybrid Alpha Section */
+.hybrid-alpha-section {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.alpha-balance-display {
+  margin-top: 8px;
+}
+
+.balance-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.balance-label {
+  padding: 6px 12px;
+  border-radius: 4px;
+  background-color: var(--vscode-editor-background);
+}
+
+.balance-label.keyword {
+  color: var(--vscode-charts-orange);
+  border: 1px solid var(--vscode-charts-orange);
+}
+
+.balance-label.semantic {
+  color: var(--vscode-charts-blue);
+  border: 1px solid var(--vscode-charts-blue);
+}
+
+.alpha-slider {
+  margin-bottom: 8px;
+}
+
+.alpha-value {
+  font-weight: 600;
+  color: var(--vscode-focusBorder);
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* Checkbox Label */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--vscode-editor-foreground);
+}
+
+.checkbox-label input[type='checkbox'] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+/* Property Selector */
+.property-selector-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  text-align: left;
+  transition: all 0.1s;
+}
+
+.property-selector-toggle:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.toggle-icon {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  margin-left: 8px;
+}
+
+.property-selector-list {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.property-checkbox {
+  padding: 4px 0;
+}
+
+.property-checkbox:not(:last-child) {
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+/* ===========================
+   Hybrid Score Breakdown Styles
+   =========================== */
+
+.hybrid-score-breakdown {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.breakdown-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-item {
+  margin-bottom: 8px;
+}
+
+.breakdown-item:last-child {
+  margin-bottom: 0;
+}
+
+.breakdown-item.combined {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.breakdown-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--vscode-editor-foreground);
+}
+
+.breakdown-icon {
+  font-size: 14px;
+}
+
+.breakdown-icon.keyword {
+  color: var(--vscode-charts-orange);
+}
+
+.breakdown-icon.semantic {
+  color: var(--vscode-charts-blue);
+}
+
+.breakdown-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown-bar {
+  flex: 1;
+  height: 8px;
+  background-color: var(--vscode-input-background);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.breakdown-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.breakdown-fill.keyword {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-charts-orange) 0%,
+    var(--vscode-charts-yellow) 100%
+  );
+}
+
+.breakdown-fill.semantic {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-charts-blue) 0%,
+    var(--vscode-charts-purple) 100%
+  );
+}
+
+.breakdown-fill.combined {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-charts-green) 0%,
+    var(--vscode-charts-blue) 100%
+  );
+}
+
+.breakdown-value {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-editor-font-family);
+}

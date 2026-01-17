@@ -4,13 +4,14 @@ import type { VectorSearchMode } from '../../../types';
 import { TextSearchMode } from './TextSearchMode';
 import { ObjectSearchMode } from './ObjectSearchMode';
 import { VectorSearchMode as VectorModeComponent } from './VectorSearchMode';
+import { HybridSearchMode } from './HybridSearchMode';
 import { SearchResults } from './SearchResults';
 
 /**
  * Vector Search Panel - Main component for vector similarity search
  *
  * Features:
- * - Three search modes: Text (semantic), Similar Object, Raw Vector
+ * - Four search modes: Text (semantic), Hybrid, Similar Object, Raw Vector
  * - Distance/certainty configuration
  * - Results display with similarity scores
  */
@@ -63,6 +64,16 @@ export function VectorSearchPanel() {
           <span aria-hidden="true">📝</span> Text (Semantic)
         </button>
         <button
+          className={`mode-tab ${activeMode === 'hybrid' ? 'active' : ''}`}
+          onClick={() => handleModeChange('hybrid')}
+          role="tab"
+          aria-selected={activeMode === 'hybrid'}
+          aria-controls="search-mode-content"
+          title="Combine keyword (BM25) and semantic (vector) search"
+        >
+          <span aria-hidden="true">🎯</span> Hybrid
+        </button>
+        <button
           className={`mode-tab ${activeMode === 'object' ? 'active' : ''}`}
           onClick={() => handleModeChange('object')}
           role="tab"
@@ -80,13 +91,14 @@ export function VectorSearchPanel() {
           aria-controls="search-mode-content"
           title="Search using raw vector embeddings"
         >
-          <span aria-hidden="true">🎯</span> Raw Vector
+          <span aria-hidden="true">⚛️</span> Raw Vector
         </button>
       </div>
 
       {/* Search Mode Content */}
       <div className="search-mode-content" id="search-mode-content" role="tabpanel">
         {activeMode === 'text' && <TextSearchMode />}
+        {activeMode === 'hybrid' && <HybridSearchMode />}
         {activeMode === 'object' && <ObjectSearchMode />}
         {activeMode === 'vector' && <VectorModeComponent />}
       </div>

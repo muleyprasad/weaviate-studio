@@ -334,7 +334,7 @@ export interface ObjectMetadata {
 /**
  * Vector search mode
  */
-export type VectorSearchMode = 'text' | 'object' | 'vector';
+export type VectorSearchMode = 'text' | 'object' | 'vector' | 'hybrid';
 
 /**
  * Vector search configuration
@@ -347,6 +347,10 @@ export interface VectorSearchConfig {
   referenceObjectId?: string;
   // Vector search (nearVector)
   vectorInput?: number[];
+  // Hybrid search
+  alpha?: number; // 0-1: 0=pure keyword (BM25), 1=pure semantic (vector)
+  searchProperties?: string[]; // Properties to search in
+  enableQueryRewriting?: boolean; // Improve semantic understanding
   // Common options
   limit: number;
   distance?: number;
@@ -363,6 +367,7 @@ export interface VectorSearchResult {
   distance?: number;
   certainty?: number;
   score?: number;
+  explainScore?: string;
 }
 
 /**
@@ -393,6 +398,9 @@ export interface VectorSearchParams {
   searchText?: string;
   referenceObjectId?: string;
   vectorInput?: number[];
+  alpha?: number;
+  searchProperties?: string[];
+  enableQueryRewriting?: boolean;
   limit: number;
   distance?: number;
   certainty?: number;

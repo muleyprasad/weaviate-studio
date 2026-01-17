@@ -84,3 +84,25 @@ export const VECTOR_CONFIG = {
   /** Default vector dimensions if not specified by schema */
   DEFAULT_DIMENSIONS: 384,
 } as const;
+
+/**
+ * Hybrid search configuration
+ */
+export const HYBRID_SEARCH_DEFAULTS = {
+  /** Default alpha value (0=pure keyword BM25, 1=pure semantic vector) */
+  ALPHA: 0.75,
+  /** Enable query rewriting by default */
+  QUERY_REWRITING: true,
+} as const;
+
+/**
+ * Hybrid search alpha slider configuration
+ */
+export const ALPHA_THRESHOLDS = {
+  /** Minimum alpha value (0 = pure keyword BM25) */
+  MIN: 0.0,
+  /** Maximum alpha value (1 = pure semantic vector) */
+  MAX: 1.0,
+  /** Step size for slider adjustments */
+  STEP: 0.01,
+} as const;

@@ -49,6 +49,8 @@ const initialState: DataExplorerState = {
       useDistanceMetric: true,
       distance: 0.5,
       certainty: 0.7,
+      alpha: 0.75,
+      enableQueryRewriting: true,
     },
     results: [],
     loading: false,

@@ -424,6 +424,69 @@ export class DataExplorerAPI {
   }
 
   /**
+   * Perform hybrid search (combines keyword BM25 and semantic vector search)
+   *
+   * @param params - Hybrid search parameters
+   * @param params.collectionName - Name of the collection to search
+   * @param params.query - Search query text
+   * @param params.alpha - Balance between keyword (0) and semantic (1). Default: 0.75
+   * @param params.limit - Maximum number of results. Default: 10
+   * @param params.properties - Optional list of properties to search in
+   * @param params.fusionType - How to combine results. Default: 'rankedFusion'
+   * @param params.distance - Optional distance threshold
+   * @param params.certainty - Optional certainty threshold
+   *
+   * @returns Array of search results with hybrid scores
+   *
+   * @remarks
+   * Alpha parameter:
+   * - 0.0 = Pure keyword (BM25) search
+   * - 1.0 = Pure semantic (vector) search
+   * - 0.75 = Default balanced hybrid (75% semantic, 25% keyword)
+   */
+  async vectorSearchHybrid(params: {
+    collectionName: string;
+    query: string;
+    alpha?: number;
+    limit?: number;
+    properties?: string[];
+    fusionType?: 'rankedFusion' | 'relativeScoreFusion';
+    distance?: number;
+    certainty?: number;
+  }): Promise<WeaviateObject<Record<string, unknown>, string>[]> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      const queryOptions: any = {
+        limit: params.limit || 10,
+        alpha: params.alpha ?? 0.75,
+        fusionType: params.fusionType || 'rankedFusion',
+        returnMetadata: ['score', 'explainScore'],
+      };
+
+      // Add optional properties filter
+      if (params.properties && params.properties.length > 0) {
+        queryOptions.properties = params.properties;
+      }
+
+      // Add distance or certainty if provided (optional for hybrid search)
+      if (params.distance !== undefined) {
+        queryOptions.distance = params.distance;
+      } else if (params.certainty !== undefined) {
+        queryOptions.certainty = params.certainty;
+      }
+
+      // Execute hybrid query
+      const result = await collection.query.hybrid(params.query, queryOptions);
+
+      return this.toWeaviateObjects(result.objects);
+    } catch (error) {
+      console.error('Error in hybrid search:', error);
+      throw new Error(`Hybrid search failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Check if client is connected
    */
   async isConnected(): Promise<boolean> {

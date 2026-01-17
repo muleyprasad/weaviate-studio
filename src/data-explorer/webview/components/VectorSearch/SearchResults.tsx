@@ -15,6 +15,7 @@ export function SearchResults() {
   const { state, dispatch, postMessage } = useDataExplorer();
   const { vectorSearch } = state;
   const { results, config } = vectorSearch;
+  const isHybridSearch = config.mode === 'hybrid';
 
   if (results.length === 0) {
     return null;
@@ -73,6 +74,43 @@ export function SearchResults() {
     }
   };
 
+  /**
+   * Parses explainScore from hybrid search to extract component scores
+   *
+   * @param explainScore - Raw explainScore string from Weaviate
+   * @returns Object containing keyword and semantic scores, or null if parsing fails
+   *
+   * @remarks
+   * explainScore format varies by Weaviate version, but typically contains
+   * information about BM25 (keyword) and vector (semantic) components
+   */
+  const parseHybridScores = (
+    explainScore?: string
+  ): { keywordScore: number; semanticScore: number } | null => {
+    if (!explainScore) {
+      return null;
+    }
+
+    try {
+      // Try to extract numeric scores from explainScore
+      // Format may vary, but typically contains patterns like:
+      // "bm25: 0.82" or "vector: 0.91"
+      const bm25Match = explainScore.match(/bm25[:\s]+([0-9.]+)/i);
+      const vectorMatch = explainScore.match(/vector[:\s]+([0-9.]+)/i);
+
+      if (bm25Match && vectorMatch) {
+        return {
+          keywordScore: parseFloat(bm25Match[1]),
+          semanticScore: parseFloat(vectorMatch[1]),
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to parse explainScore:', error);
+    }
+
+    return null;
+  };
+
   return (
     <div className="vector-search-results">
       <div className="results-header">
@@ -86,6 +124,10 @@ export function SearchResults() {
           const matchPercentage = calculateMatchPercentage(result);
           const objectId = result.object.uuid || '';
           const previewText = getObjectPreviewText(result.object);
+          const hybridScores = isHybridSearch
+            ? parseHybridScores(result.explainScore)
+            : null;
+          const combinedScore = result.score ?? 0;
 
           return (
             <div
@@ -97,24 +139,101 @@ export function SearchResults() {
               {/* Match Score */}
               <div className="result-score">
                 <div className="score-percentage">
-                  {matchPercentage.toFixed(0)}% Match
+                  {isHybridSearch && result.score !== undefined
+                    ? `${(result.score * 100).toFixed(0)}% Match`
+                    : `${matchPercentage.toFixed(0)}% Match`}
                 </div>
                 <div className="score-bar">
                   <div
                     className="score-fill"
-                    style={{ width: `${matchPercentage}%` }}
+                    style={{
+                      width: `${
+                        isHybridSearch && result.score !== undefined
+                          ? result.score * 100
+                          : matchPercentage
+                      }%`,
+                    }}
                   ></div>
                 </div>
-                <div className="score-details">
-                  {config.useDistanceMetric ? (
-                    <span>Distance: {result.distance?.toFixed(4) || 'N/A'}</span>
-                  ) : (
-                    <span>Certainty: {result.certainty?.toFixed(4) || 'N/A'}</span>
-                  )}
-                  {result.score !== undefined && (
-                    <span> | Score: {result.score.toFixed(4)}</span>
-                  )}
-                </div>
+
+                {/* Hybrid Search Score Breakdown */}
+                {isHybridSearch && hybridScores && (
+                  <div className="hybrid-score-breakdown">
+                    <div className="breakdown-title">Match Breakdown:</div>
+                    <div className="breakdown-item">
+                      <div className="breakdown-label">
+                        <span className="breakdown-icon keyword">🔤</span>
+                        Keyword (BM25):
+                      </div>
+                      <div className="breakdown-bar-container">
+                        <div className="breakdown-bar">
+                          <div
+                            className="breakdown-fill keyword"
+                            style={{ width: `${hybridScores.keywordScore * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="breakdown-value">
+                          {(hybridScores.keywordScore * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="breakdown-item">
+                      <div className="breakdown-label">
+                        <span className="breakdown-icon semantic">🧠</span>
+                        Semantic:
+                      </div>
+                      <div className="breakdown-bar-container">
+                        <div className="breakdown-bar">
+                          <div
+                            className="breakdown-fill semantic"
+                            style={{ width: `${hybridScores.semanticScore * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="breakdown-value">
+                          {(hybridScores.semanticScore * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="breakdown-item combined">
+                      <div className="breakdown-label">
+                        <span className="breakdown-icon">⚡</span>
+                        Combined:
+                      </div>
+                      <div className="breakdown-bar-container">
+                        <div className="breakdown-bar">
+                          <div
+                            className="breakdown-fill combined"
+                            style={{ width: `${combinedScore * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="breakdown-value">
+                          {(combinedScore * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Score Details (non-hybrid) */}
+                {!isHybridSearch && (
+                  <div className="score-details">
+                    {config.useDistanceMetric ? (
+                      <span>Distance: {result.distance?.toFixed(4) || 'N/A'}</span>
+                    ) : (
+                      <span>Certainty: {result.certainty?.toFixed(4) || 'N/A'}</span>
+                    )}
+                    {result.score !== undefined && (
+                      <span> | Score: {result.score.toFixed(4)}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Hybrid Score (if no breakdown available) */}
+                {isHybridSearch && !hybridScores && result.score !== undefined && (
+                  <div className="score-details">
+                    <span>Combined Score: {result.score.toFixed(4)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Object Preview */}
