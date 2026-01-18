@@ -5,6 +5,15 @@
 import type { WeaviateObject } from 'weaviate-client';
 
 /**
+ * UI Panel visibility state
+ */
+export interface UIPanelState {
+  showFilters: boolean;
+  showInsights: boolean;
+  showSchema: boolean;
+}
+
+/**
  * Main state for the Data Explorer
  */
 export interface DataExplorerState {
@@ -44,6 +53,9 @@ export interface DataExplorerState {
   sortBy: SortConfig | null;
   selectedObjectId: string | null;
   showDetailPanel: boolean;
+
+  // UI Panel toggles (new for collapsible panels)
+  panels: UIPanelState;
 }
 
 /**
@@ -284,7 +296,10 @@ export interface CellRendererProps {
 export type DataExplorerAction =
   | { type: 'SET_COLLECTION'; payload: string }
   | { type: 'SET_SCHEMA'; payload: CollectionSchema }
-  | { type: 'SET_DATA'; payload: { objects: WeaviateObject<Record<string, unknown>, string>[]; totalCount: number } }
+  | {
+      type: 'SET_DATA';
+      payload: { objects: WeaviateObject<Record<string, unknown>, string>[]; totalCount: number };
+    }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_PAGE'; payload: number }
@@ -321,13 +336,28 @@ export type DataExplorerAction =
   | { type: 'LOAD_FILTER_TEMPLATE'; payload: string }
   | { type: 'SET_INSIGHTS_LOADING'; payload: boolean }
   | { type: 'SET_INSIGHTS_ERROR'; payload: string | null }
-  | { type: 'SET_INSIGHTS_DATA'; payload: { totalCount: number; categoricalAggregations: CategoricalAggregation[]; numericAggregations: NumericAggregation[]; dateAggregations: DateAggregation[] } }
+  | {
+      type: 'SET_INSIGHTS_DATA';
+      payload: {
+        totalCount: number;
+        categoricalAggregations: CategoricalAggregation[];
+        numericAggregations: NumericAggregation[];
+        dateAggregations: DateAggregation[];
+      };
+    }
   | { type: 'UPDATE_INSIGHTS_CONFIG'; payload: Partial<InsightsConfig> }
   | { type: 'REFRESH_INSIGHTS' }
   | { type: 'TOGGLE_EXPORT_DIALOG'; payload: boolean }
   | { type: 'START_EXPORT'; payload: ExportOptions }
-  | { type: 'EXPORT_SUCCESS'; payload: { format: ExportFormat; scope: ExportScope; objectCount: number } }
-  | { type: 'EXPORT_ERROR'; payload: string };
+  | {
+      type: 'EXPORT_SUCCESS';
+      payload: { format: ExportFormat; scope: ExportScope; objectCount: number };
+    }
+  | { type: 'EXPORT_ERROR'; payload: string }
+  // UI Panel toggles
+  | { type: 'TOGGLE_FILTERS_PANEL' }
+  | { type: 'TOGGLE_INSIGHTS_PANEL' }
+  | { type: 'TOGGLE_SCHEMA_PANEL' };
 
 /**
  * Message types for webview communication
@@ -578,4 +608,3 @@ export interface ExportState {
     timestamp: Date;
   } | null;
 }
-

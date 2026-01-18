@@ -15,6 +15,7 @@ import type {
   Filter,
 } from '../types';
 import { DataTable } from './components/DataBrowser/DataTable';
+import { Pagination } from './components/DataBrowser/Pagination';
 import { ObjectDetailPanel } from './components/ObjectDetail/ObjectDetailPanel';
 import { FilterBuilder } from './components/Filters/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch/VectorSearchPanel';
@@ -25,6 +26,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
 import { ConnectionError } from './components/ConnectionError';
 import { TableSkeleton } from './components/LoadingSkeleton';
+import { Toolbar } from './components/Toolbar';
+import { CollapsePanel } from './components/CollapsePanel';
 import { useKeyboardShortcuts, type KeyboardShortcut } from './hooks/useKeyboardShortcuts';
 
 // Import shared theme for design consistency
@@ -96,6 +99,12 @@ const initialState: DataExplorerState = {
   sortBy: null,
   selectedObjectId: null,
   showDetailPanel: false,
+  // UI Panel toggles - all collapsed by default for data-first experience
+  panels: {
+    showFilters: false,
+    showInsights: false,
+    showSchema: false,
+  },
 };
 
 /**
@@ -447,6 +456,33 @@ function dataExplorerReducer(
 
     case 'EXPORT_ERROR':
       return state;
+
+    case 'TOGGLE_FILTERS_PANEL':
+      return {
+        ...state,
+        panels: {
+          ...state.panels,
+          showFilters: !state.panels.showFilters,
+        },
+      };
+
+    case 'TOGGLE_INSIGHTS_PANEL':
+      return {
+        ...state,
+        panels: {
+          ...state.panels,
+          showInsights: !state.panels.showInsights,
+        },
+      };
+
+    case 'TOGGLE_SCHEMA_PANEL':
+      return {
+        ...state,
+        panels: {
+          ...state.panels,
+          showSchema: !state.panels.showSchema,
+        },
+      };
 
     default:
       return state;
@@ -801,10 +837,82 @@ export function DataExplorer() {
     }),
     [state, fetchObjects, selectObject, postMessage]
   );
+  // Toolbar buttons configuration
+  const toolbarButtons = useMemo(
+    () => [
+      {
+        id: 'filters',
+        icon: '🔍',
+        label: 'Filters',
+        isActive: state.panels.showFilters,
+        onClick: () => dispatch({ type: 'TOGGLE_FILTERS_PANEL' }),
+        ariaLabel: state.panels.showFilters ? 'Hide filters panel' : 'Show filters panel',
+      },
+      {
+        id: 'vector-search',
+        icon: '🔮',
+        label: 'Vector Search',
+        shortcut: 'Ctrl+K',
+        isActive: state.vectorSearch.isActive,
+        onClick: () =>
+          dispatch({
+            type: 'SET_VECTOR_SEARCH_ACTIVE',
+            payload: !state.vectorSearch.isActive,
+          }),
+        ariaLabel: state.vectorSearch.isActive
+          ? 'Close vector search panel'
+          : 'Open vector search panel',
+      },
+      {
+        id: 'insights',
+        icon: '📊',
+        label: 'Insights',
+        isActive: state.panels.showInsights,
+        onClick: () => dispatch({ type: 'TOGGLE_INSIGHTS_PANEL' }),
+        ariaLabel: state.panels.showInsights ? 'Hide insights panel' : 'Show insights panel',
+      },
+      {
+        id: 'schema',
+        icon: '📋',
+        label: 'Schema',
+        isActive: state.panels.showSchema,
+        onClick: () => dispatch({ type: 'TOGGLE_SCHEMA_PANEL' }),
+        ariaLabel: state.panels.showSchema ? 'Hide schema panel' : 'Show schema panel',
+      },
+      {
+        id: 'export',
+        icon: '📤',
+        label: 'Export',
+        shortcut: 'Ctrl+E',
+        onClick: () => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true }),
+        ariaLabel: 'Export data',
+      },
+      {
+        id: 'refresh',
+        icon: '⟳',
+        label: 'Refresh',
+        shortcut: 'Ctrl+R',
+        onClick: () => fetchObjects(),
+        ariaLabel: 'Refresh data',
+      },
+    ],
+    [
+      state.panels.showFilters,
+      state.panels.showInsights,
+      state.panels.showSchema,
+      state.vectorSearch.isActive,
+      dispatch,
+      fetchObjects,
+    ]
+  );
 
   return (
     <DataExplorerContext.Provider value={contextValue}>
-      <div className="data-explorer" role="main" aria-label="Data Explorer">
+      <div
+        className="data-explorer data-explorer-redesigned"
+        role="main"
+        aria-label="Data Explorer"
+      >
         {/* Screen reader announcements */}
         <div aria-live="polite" aria-atomic="true" className="sr-only" role="status">
           {state.loading && 'Loading data...'}
@@ -826,6 +934,7 @@ export function DataExplorer() {
           </ul>
         </div>
 
+        {/* Error banner */}
         {state.error && (
           <div className="error-banner" role="alert" aria-live="assertive">
             <span className="error-icon" aria-hidden="true">
@@ -843,113 +952,140 @@ export function DataExplorer() {
           </div>
         )}
 
+        {/* Header with collection name and toolbar */}
         <header className="explorer-header" role="banner">
-          <h1 className="collection-name">
-            {state.collectionName}
-            <span className="object-count" aria-label={`${state.totalCount} objects in collection`}>
-              {state.loading ? '...' : `${state.totalCount} objects`}
+          <div className="header-title">
+            <h1 className="collection-name">{state.collectionName}</h1>
+            <span
+              className="object-count-badge"
+              aria-label={`${state.totalCount} objects in collection`}
+            >
+              {state.loading ? '...' : state.totalCount.toLocaleString()}
             </span>
-          </h1>
-
-          <nav className="explorer-actions" aria-label="Main actions">
-            {/* Export button */}
-            <button
-              className="action-button"
-              onClick={() => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true })}
-              aria-label="Export data (Control+E)"
-              title="Export data (Ctrl+E)"
-              type="button"
-            >
-              <span aria-hidden="true">💾</span> Export
-            </button>
-
-            {/* Toggle Vector Search button */}
-            <button
-              className="action-button"
-              onClick={() =>
-                dispatch({
-                  type: 'SET_VECTOR_SEARCH_ACTIVE',
-                  payload: !state.vectorSearch.isActive,
-                })
-              }
-              aria-label={
-                state.vectorSearch.isActive
-                  ? 'Close Vector Search Panel (Control+K)'
-                  : 'Open Vector Search Panel (Control+K)'
-              }
-              aria-expanded={state.vectorSearch.isActive}
-              aria-controls="vector-search-panel"
-              title={
-                state.vectorSearch.isActive
-                  ? 'Close Vector Search (Ctrl+K)'
-                  : 'Open Vector Search (Ctrl+K)'
-              }
-              type="button"
-            >
-              <span aria-hidden="true">{state.vectorSearch.isActive ? '✕' : '🔮'}</span>
-              {state.vectorSearch.isActive ? ' Close' : ' Vector Search'}
-            </button>
-          </nav>
+          </div>
+          <Toolbar buttons={toolbarButtons} />
         </header>
 
-        {/* Schema Visualizer - Phase 5: Always visible for immediate schema reference */}
-        {state.schema && (
-          <ErrorBoundary featureName="Schema Visualizer">
-            <SchemaVisualizer schema={state.schema} />
-          </ErrorBoundary>
+        {/* Active filters indicator */}
+        {state.activeFilters.length > 0 && (
+          <div className="active-filters-bar">
+            <span className="active-filters-label">
+              🔍 {state.activeFilters.length} filter{state.activeFilters.length !== 1 ? 's' : ''}{' '}
+              active
+            </span>
+            <button
+              className="clear-filters-button"
+              onClick={() => {
+                dispatch({ type: 'CLEAR_FILTERS' });
+                dispatch({ type: 'CLEAR_FILTER_GROUP' });
+              }}
+              type="button"
+            >
+              Clear all
+            </button>
+          </div>
         )}
 
-        {/* Quick Insights Panel - Phase 5: Always visible for collection overview */}
-        <ErrorBoundary featureName="Quick Insights">
-          <QuickInsightsPanel />
-        </ErrorBoundary>
+        {/* Collapsible Panels Section */}
+        <div className="collapsible-panels">
+          {/* Filter Panel - Collapsible */}
+          <CollapsePanel
+            isOpen={state.panels.showFilters}
+            title="Filters"
+            icon="🔍"
+            onClose={() => dispatch({ type: 'TOGGLE_FILTERS_PANEL' })}
+            maxHeight="250px"
+            className="filter-collapse-panel"
+          >
+            <ErrorBoundary featureName="Filter Builder">
+              <FilterBuilder />
+            </ErrorBoundary>
+          </CollapsePanel>
 
-        {/* Filter panel */}
-        <ErrorBoundary featureName="Filter Builder">
-          <FilterBuilder />
-        </ErrorBoundary>
+          {/* Vector Search Panel - Collapsible */}
+          <CollapsePanel
+            isOpen={state.vectorSearch.isActive}
+            title="Vector Search"
+            icon="🔮"
+            onClose={() => dispatch({ type: 'SET_VECTOR_SEARCH_ACTIVE', payload: false })}
+            maxHeight="400px"
+            className="vector-search-collapse-panel"
+          >
+            <ErrorBoundary featureName="Vector Search">
+              <VectorSearchPanel />
+            </ErrorBoundary>
+          </CollapsePanel>
 
-        {/* Vector Search panel */}
-        {state.vectorSearch.isActive && (
-          <ErrorBoundary featureName="Vector Search">
-            <VectorSearchPanel />
-          </ErrorBoundary>
-        )}
+          {/* Insights Panel - Collapsible */}
+          <CollapsePanel
+            isOpen={state.panels.showInsights}
+            title="Quick Insights"
+            icon="📊"
+            onClose={() => dispatch({ type: 'TOGGLE_INSIGHTS_PANEL' })}
+            maxHeight="350px"
+            className="insights-collapse-panel"
+          >
+            <ErrorBoundary featureName="Quick Insights">
+              <QuickInsightsPanel />
+            </ErrorBoundary>
+          </CollapsePanel>
 
-        <div className="explorer-content">
-          {state.loading && !state.objects.length ? (
-            <TableSkeleton rows={10} columns={state.visibleColumns.length || 5} />
-          ) : !state.loading && state.objects.length === 0 ? (
-            <EmptyState
-              type="no-results"
-              actions={[
-                {
-                  label: 'Clear Filters',
-                  onClick: () => {
-                    dispatch({ type: 'CLEAR_FILTERS' });
-                    dispatch({ type: 'CLEAR_FILTER_GROUP' });
+          {/* Schema Panel - Collapsible */}
+          {state.schema && (
+            <CollapsePanel
+              isOpen={state.panels.showSchema}
+              title="Collection Schema"
+              icon="📋"
+              onClose={() => dispatch({ type: 'TOGGLE_SCHEMA_PANEL' })}
+              maxHeight="300px"
+              className="schema-collapse-panel"
+            >
+              <ErrorBoundary featureName="Schema Visualizer">
+                <SchemaVisualizer schema={state.schema} />
+              </ErrorBoundary>
+            </CollapsePanel>
+          )}
+        </div>
+
+        {/* Main content area - Data Table */}
+        <main className="explorer-main">
+          <div className="explorer-content">
+            {state.loading && !state.objects.length ? (
+              <TableSkeleton rows={10} columns={state.visibleColumns.length || 5} />
+            ) : !state.loading && state.objects.length === 0 ? (
+              <EmptyState
+                type="no-results"
+                actions={[
+                  {
+                    label: 'Clear Filters',
+                    onClick: () => {
+                      dispatch({ type: 'CLEAR_FILTERS' });
+                      dispatch({ type: 'CLEAR_FILTER_GROUP' });
+                    },
+                    primary: true,
                   },
-                  primary: true,
-                },
-                {
-                  label: 'Refresh',
-                  onClick: () => fetchObjects(),
-                },
-              ]}
-            />
-          ) : (
-            <>
+                  {
+                    label: 'Refresh',
+                    onClick: () => fetchObjects(),
+                  },
+                ]}
+              />
+            ) : (
               <ErrorBoundary featureName="Data Table">
                 <DataTable />
               </ErrorBoundary>
-              {state.showDetailPanel && state.selectedObjectId && (
-                <ErrorBoundary featureName="Object Detail Panel">
-                  <ObjectDetailPanel />
-                </ErrorBoundary>
-              )}
-            </>
+            )}
+          </div>
+
+          {/* Right Sidebar - Object Detail Panel */}
+          {state.showDetailPanel && state.selectedObjectId && (
+            <aside className="explorer-sidebar">
+              <ErrorBoundary featureName="Object Detail Panel">
+                <ObjectDetailPanel />
+              </ErrorBoundary>
+            </aside>
           )}
-        </div>
+        </main>
 
         {/* Export Dialog */}
         <ErrorBoundary featureName="Export Dialog">

@@ -58,7 +58,297 @@
   opacity: 1;
 }
 
-/* Explorer header */
+/* ========================================================================
+   REDESIGNED DATA EXPLORER UI - Data-First Layout
+   ======================================================================== */
+
+/* Explorer header - redesigned */
+.data-explorer-redesigned .explorer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editor-background);
+  flex-shrink: 0;
+}
+
+.data-explorer-redesigned .header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.data-explorer-redesigned .collection-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.data-explorer-redesigned .object-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--vscode-badge-background), var(--vscode-button-background));
+  color: var(--vscode-badge-foreground);
+  border-radius: 12px;
+  min-width: 32px;
+}
+
+/* ========================================================================
+   Toolbar Component Styles
+   ======================================================================== */
+
+.explorer-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  transition: all 0.15s ease;
+}
+
+.toolbar-button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.toolbar-button.active {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
+}
+
+.toolbar-button:focus {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.toolbar-button-icon {
+  font-size: 14px;
+}
+
+.toolbar-button-label {
+  font-weight: 500;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--vscode-panel-border);
+  margin: 0 8px;
+}
+
+/* ========================================================================
+   Active Filters Bar
+   ======================================================================== */
+
+.active-filters-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, 
+    var(--vscode-badge-background) 0%, 
+    transparent 100%
+  );
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-shrink: 0;
+}
+
+.active-filters-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vscode-badge-foreground);
+}
+
+.clear-filters-button {
+  padding: 4px 10px;
+  font-size: 12px;
+  background-color: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clear-filters-button:hover {
+  background-color: var(--vscode-button-secondaryBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+/* ========================================================================
+   Collapsible Panels
+   ======================================================================== */
+
+.collapsible-panels {
+  flex-shrink: 0;
+}
+
+.collapse-panel {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+.collapse-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--vscode-editorGroupHeader-tabsBackground);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.collapse-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-panel-title h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.collapse-panel-icon {
+  font-size: 14px;
+}
+
+.collapse-panel-close {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.7;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.collapse-panel-close:hover {
+  opacity: 1;
+  background-color: var(--vscode-button-secondaryBackground);
+}
+
+.collapse-panel-content {
+  padding: 12px 16px;
+  overflow-y: auto;
+}
+
+/* Panel-specific styles */
+.filter-collapse-panel .collapse-panel-content {
+  max-height: 200px;
+}
+
+.vector-search-collapse-panel .collapse-panel-content {
+  max-height: 350px;
+}
+
+.insights-collapse-panel .collapse-panel-content {
+  max-height: 300px;
+}
+
+.schema-collapse-panel .collapse-panel-content {
+  max-height: 250px;
+}
+
+/* ========================================================================
+   Main Content Layout - Data First
+   ======================================================================== */
+
+.data-explorer-redesigned .explorer-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0; /* Important for flex children to shrink */
+}
+
+.data-explorer-redesigned .explorer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0; /* Prevent horizontal overflow */
+}
+
+.data-explorer-redesigned .explorer-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--vscode-panel-border);
+  overflow-y: auto;
+  background-color: var(--vscode-sideBar-background);
+}
+
+/* Adjust table container for the new layout */
+.data-explorer-redesigned .data-table-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.data-explorer-redesigned .data-table-wrapper {
+  flex: 1;
+  overflow: auto;
+}
+
+.data-explorer-redesigned .data-table-toolbar {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editorGroupHeader-tabsBackground);
+}
+
+/* ========================================================================
+   Responsive Adjustments
+   ======================================================================== */
+
+@media (max-width: 800px) {
+  .data-explorer-redesigned .explorer-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .toolbar-buttons {
+    flex-wrap: wrap;
+  }
+  
+  .toolbar-button-label {
+    display: none;
+  }
+  
+  .data-explorer-redesigned .explorer-sidebar {
+    width: 320px;
+  }
+}
+
+/* Legacy styles maintained for compatibility */
 .explorer-header {
   padding: 16px;
   border-bottom: 1px solid var(--vscode-panel-border);
