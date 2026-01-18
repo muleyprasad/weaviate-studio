@@ -24,43 +24,46 @@ export function SchemaVisualizer({ schema }: SchemaVisualizerProps) {
   };
 
   return (
-    <div className="schema-visualizer" role="region" aria-label="Schema visualizer">
-      <div className="schema-header">
-        <h3 className="schema-title">📋 Collection Schema</h3>
-        <div className="schema-meta">
-          <span className="schema-name">{schema.name}</span>
-          {schema.description && (
-            <span className="schema-description">{schema.description}</span>
-          )}
-        </div>
+    <div
+      className="schema-visualizer schema-visualizer-compact"
+      role="region"
+      aria-label="Schema visualizer"
+    >
+      {/* Quick stats bar */}
+      <div className="schema-stats-bar">
+        <span className="stat-badge">{schema.properties.length} properties</span>
+        <span className="stat-badge">
+          {schema.properties.filter((p) => p.indexFilterable !== false).length} filterable
+        </span>
+        <span className="stat-badge">
+          {schema.properties.filter((p) => p.indexSearchable !== false).length} searchable
+        </span>
+        {schema.vectorizers && schema.vectorizers.length > 0 && (
+          <span className="stat-badge vectorizer">{schema.vectorizers.length} vectorizer(s)</span>
+        )}
       </div>
 
-      {/* Vectorizers Section */}
+      {/* Vectorizers Section - Collapsible */}
       {schema.vectorizers && schema.vectorizers.length > 0 && (
-        <div className="schema-section">
+        <div className="schema-section-compact">
           <button
-            className="schema-section-toggle"
+            className="schema-section-toggle-compact"
             onClick={() => setShowVectorizers(!showVectorizers)}
+            type="button"
           >
-            <span className={`toggle-icon ${showVectorizers ? 'expanded' : ''}`}>▶</span>
-            <span className="section-title">
-              Vectorizers ({schema.vectorizers.length})
-            </span>
+            <span className={`toggle-chevron ${showVectorizers ? 'expanded' : ''}`}>▶</span>
+            <span>Vectorizers</span>
           </button>
 
           {showVectorizers && (
-            <div className="vectorizers-list">
+            <div className="vectorizers-list-compact">
               {schema.vectorizers.map((vectorizer, index) => (
-                <div key={index} className="vectorizer-item">
-                  <div className="vectorizer-name">{vectorizer.name}</div>
-                  <div className="vectorizer-details">
-                    <span className="vectorizer-type">{vectorizer.vectorizer}</span>
-                    {vectorizer.dimensions && (
-                      <span className="vectorizer-dimensions">
-                        {vectorizer.dimensions} dimensions
-                      </span>
-                    )}
-                  </div>
+                <div key={index} className="vectorizer-item-compact">
+                  <span className="vectorizer-name">{vectorizer.name}</span>
+                  <span className="vectorizer-meta">
+                    {vectorizer.vectorizer}
+                    {vectorizer.dimensions && ` • ${vectorizer.dimensions}d`}
+                  </span>
                 </div>
               ))}
             </div>
@@ -68,46 +71,16 @@ export function SchemaVisualizer({ schema }: SchemaVisualizerProps) {
         </div>
       )}
 
-      {/* Properties Section */}
-      <div className="schema-section">
-        <div className="section-header">
-          <span className="section-title">
-            Properties ({schema.properties.length})
-          </span>
-        </div>
-
-        <div className="properties-list">
-          {schema.properties.map((property) => (
-            <PropertyItem
-              key={property.name}
-              property={property}
-              expanded={expandedProperties.has(property.name)}
-              onToggle={() => toggleProperty(property.name)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Schema Summary */}
-      <div className="schema-summary">
-        <div className="summary-stats">
-          <div className="stat-item">
-            <span className="stat-label">Total Properties:</span>
-            <span className="stat-value">{schema.properties.length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Filterable:</span>
-            <span className="stat-value">
-              {schema.properties.filter((p) => p.indexFilterable !== false).length}
-            </span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Searchable:</span>
-            <span className="stat-value">
-              {schema.properties.filter((p) => p.indexSearchable !== false).length}
-            </span>
-          </div>
-        </div>
+      {/* Properties List - Compact */}
+      <div className="properties-list-compact">
+        {schema.properties.map((property) => (
+          <PropertyItem
+            key={property.name}
+            property={property}
+            expanded={expandedProperties.has(property.name)}
+            onToggle={() => toggleProperty(property.name)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -124,8 +97,7 @@ interface PropertyItemProps {
 }
 
 function PropertyItem({ property, expanded, onToggle, depth = 0 }: PropertyItemProps) {
-  const hasNestedProperties =
-    property.nestedProperties && property.nestedProperties.length > 0;
+  const hasNestedProperties = property.nestedProperties && property.nestedProperties.length > 0;
 
   return (
     <div className="property-item" style={{ marginLeft: `${depth * 20}px` }}>
@@ -159,9 +131,7 @@ function PropertyItem({ property, expanded, onToggle, depth = 0 }: PropertyItemP
         </div>
       </div>
 
-      {property.description && (
-        <div className="property-description">{property.description}</div>
-      )}
+      {property.description && <div className="property-description">{property.description}</div>}
 
       {/* Nested properties */}
       {hasNestedProperties && expanded && (

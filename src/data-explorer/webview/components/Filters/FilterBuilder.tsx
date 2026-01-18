@@ -64,12 +64,12 @@ export function FilterBuilder() {
   const hasUnappliedChanges = JSON.stringify(state.filters) !== JSON.stringify(state.activeFilters);
 
   return (
-    <div className="filter-builder" role="region" aria-label="Filter builder">
-      <div className="filter-header">
-        <h3 className="filter-title">Filters</h3>
-        <span className="filter-match-mode">Match ALL of the following:</span>
-      </div>
-
+    <div
+      className="filter-builder filter-builder-compact"
+      role="region"
+      aria-label="Filter builder"
+    >
+      {/* Filter rules list */}
       <div className="filter-list">
         {state.filters.map((filter) => (
           <FilterRule
@@ -82,17 +82,20 @@ export function FilterBuilder() {
         ))}
 
         {state.filters.length === 0 && (
-          <div className="filter-empty-state">
-            No filters applied. Click "Add Filter" to get started.
+          <div className="filter-empty-state-compact">
+            <span className="filter-empty-icon">🔍</span>
+            <span>Click "Add Filter" to narrow down your results</span>
           </div>
         )}
       </div>
 
-      <div className="filter-actions">
+      {/* Actions */}
+      <div className="filter-actions-compact">
         <button
           className="filter-add-button"
           onClick={handleAddFilter}
           aria-label="Add new filter"
+          type="button"
         >
           + Add Filter
         </button>
@@ -103,29 +106,22 @@ export function FilterBuilder() {
               className="filter-clear-button"
               onClick={handleClearAll}
               aria-label="Clear all filters"
+              type="button"
             >
-              Clear All
+              Clear
             </button>
             <button
-              className="filter-apply-button primary"
+              className="filter-apply-button"
               onClick={handleApplyFilters}
               disabled={!hasUnappliedChanges}
               aria-label="Apply filters"
+              type="button"
             >
-              Apply Filters
+              Apply
             </button>
           </div>
         )}
       </div>
-
-      {state.activeFilters.length > 0 && (
-        <div className="filter-status" role="status" aria-live="polite">
-          <span className="filter-status-icon">🔍</span>
-          <span className="filter-status-text">
-            {state.activeFilters.length} filter{state.activeFilters.length !== 1 ? 's' : ''} active
-          </span>
-        </div>
-      )}
     </div>
   );
 }

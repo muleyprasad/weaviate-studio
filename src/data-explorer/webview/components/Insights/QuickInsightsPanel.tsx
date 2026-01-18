@@ -55,16 +55,13 @@ export function QuickInsightsPanel() {
     dispatch({ type: 'REFRESH_INSIGHTS' });
   };
 
-  const handleToggleProperty = (
-    type: 'categorical' | 'numeric' | 'date',
-    propertyName: string
-  ) => {
+  const handleToggleProperty = (type: 'categorical' | 'numeric' | 'date', propertyName: string) => {
     const configKey =
       type === 'categorical'
         ? 'categoricalProperties'
         : type === 'numeric'
-        ? 'numericProperties'
-        : 'dateProperties';
+          ? 'numericProperties'
+          : 'dateProperties';
 
     const currentList = state.insights.config[configKey];
     const newList = currentList.includes(propertyName)
@@ -87,33 +84,40 @@ export function QuickInsightsPanel() {
     state.insights.dateAggregations.length > 0;
 
   return (
-    <div className="insights-panel" role="region" aria-label="Quick insights panel">
-      <div className="insights-header">
-        <h3 className="insights-title">
-          📊 Collection Insights: {state.collectionName}
-        </h3>
-        <div className="insights-actions">
+    <div
+      className="insights-panel insights-panel-compact"
+      role="region"
+      aria-label="Quick insights panel"
+    >
+      {/* Compact action bar */}
+      <div className="insights-action-bar">
+        <span className="insights-total-compact">
+          <strong>{state.insights.totalCount.toLocaleString()}</strong> objects
+        </span>
+        <div className="insights-actions-compact">
           <button
-            className="insights-action-button"
+            className="insights-action-button-compact"
             onClick={() => setShowConfig(!showConfig)}
             aria-label="Configure metrics"
+            type="button"
           >
-            ⚙️ Configure
+            ⚙️
           </button>
           <button
-            className="insights-action-button primary"
+            className="insights-action-button-compact primary"
             onClick={handleRefresh}
             disabled={state.insights.loading}
             aria-label="Refresh insights"
+            type="button"
           >
-            {state.insights.loading ? '⟳ Loading...' : '↻ Refresh'}
+            {state.insights.loading ? '⟳' : '↻'}
           </button>
         </div>
       </div>
 
-      {/* Configuration Panel */}
+      {/* Configuration Panel - Collapsible */}
       {showConfig && (
-        <div className="insights-config">
+        <div className="insights-config-compact">
           <InsightsConfigPanel
             schema={state.schema}
             config={state.insights.config}
@@ -124,32 +128,26 @@ export function QuickInsightsPanel() {
 
       {/* Loading State */}
       {state.insights.loading && (
-        <div className="insights-loading">
-          <div className="loading-spinner"></div>
-          <p>Analyzing collection data...</p>
+        <div className="insights-loading-compact">
+          <div className="loading-spinner-small"></div>
+          <span>Analyzing...</span>
         </div>
       )}
 
       {/* Error State */}
       {state.insights.error && (
-        <div className="insights-error" role="alert">
-          <span className="error-icon">⚠️</span>
-          <span className="error-message">{state.insights.error}</span>
+        <div className="insights-error-compact" role="alert">
+          <span>⚠️ {state.insights.error}</span>
         </div>
       )}
 
       {/* Insights Data */}
       {!state.insights.loading && hasData && (
-        <div className="insights-content">
-          {/* Total Count */}
-          <div className="insights-total">
-            <strong>Total Objects:</strong> {state.insights.totalCount.toLocaleString()}
-          </div>
-
+        <div className="insights-content-compact">
           {/* Categorical Aggregations */}
           {state.insights.categoricalAggregations.length > 0 && (
-            <div className="insights-section">
-              <div className="insights-categorical-grid">
+            <div className="insights-section-compact">
+              <div className="insights-categorical-grid-compact">
                 {state.insights.categoricalAggregations.map((agg) => (
                   <CategoricalCard key={agg.property} aggregation={agg} />
                 ))}
@@ -159,7 +157,7 @@ export function QuickInsightsPanel() {
 
           {/* Numeric Aggregations */}
           {state.insights.numericAggregations.length > 0 && (
-            <div className="insights-section">
+            <div className="insights-section-compact">
               {state.insights.numericAggregations.map((agg) => (
                 <NumericCard key={agg.property} aggregation={agg} />
               ))}
@@ -168,17 +166,10 @@ export function QuickInsightsPanel() {
 
           {/* Date Aggregations */}
           {state.insights.dateAggregations.length > 0 && (
-            <div className="insights-section">
+            <div className="insights-section-compact">
               {state.insights.dateAggregations.map((agg) => (
                 <DateCard key={agg.property} aggregation={agg} />
               ))}
-            </div>
-          )}
-
-          {/* Last Refreshed */}
-          {state.insights.lastRefreshed && (
-            <div className="insights-meta">
-              Last refreshed: {new Date(state.insights.lastRefreshed).toLocaleString()}
             </div>
           )}
         </div>
@@ -186,9 +177,9 @@ export function QuickInsightsPanel() {
 
       {/* Empty State */}
       {!state.insights.loading && !hasData && !state.insights.error && (
-        <div className="insights-empty">
-          <p>Click "Refresh" to load collection insights.</p>
-          <p>Configure which properties to analyze using the "Configure" button.</p>
+        <div className="insights-empty-compact">
+          <span>📊</span>
+          <span>Click ↻ to load insights</span>
         </div>
       )}
     </div>
@@ -205,24 +196,15 @@ interface InsightsConfigPanelProps {
     numericProperties: string[];
     dateProperties: string[];
   };
-  onToggleProperty: (
-    type: 'categorical' | 'numeric' | 'date',
-    propertyName: string
-  ) => void;
+  onToggleProperty: (type: 'categorical' | 'numeric' | 'date', propertyName: string) => void;
 }
 
-function InsightsConfigPanel({
-  schema,
-  config,
-  onToggleProperty,
-}: InsightsConfigPanelProps) {
+function InsightsConfigPanel({ schema, config, onToggleProperty }: InsightsConfigPanelProps) {
   const categoricalProps = schema.properties.filter(
     (p) => p.dataType === 'text' && p.indexFilterable !== false
   );
   const numericProps = schema.properties.filter(
-    (p) =>
-      (p.dataType === 'int' || p.dataType === 'number') &&
-      p.indexFilterable !== false
+    (p) => (p.dataType === 'int' || p.dataType === 'number') && p.indexFilterable !== false
   );
   const dateProps = schema.properties.filter(
     (p) => p.dataType === 'date' && p.indexFilterable !== false
@@ -409,9 +391,7 @@ function DateCard({ aggregation }: DateCardProps) {
         {aggregation.latest && (
           <div className="date-item">
             <span className="date-label">Latest:</span>
-            <span className="date-value">
-              {new Date(aggregation.latest).toLocaleDateString()}
-            </span>
+            <span className="date-value">{new Date(aggregation.latest).toLocaleDateString()}</span>
           </div>
         )}
         <div className="date-item">

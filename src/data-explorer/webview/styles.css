@@ -168,10 +168,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  background: linear-gradient(90deg, 
-    var(--vscode-badge-background) 0%, 
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-badge-background) 0%,
+      transparent 100%);
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-shrink: 0;
 }
@@ -285,7 +284,8 @@
   display: flex;
   flex: 1;
   overflow: hidden;
-  min-height: 0; /* Important for flex children to shrink */
+  min-height: 0;
+  /* Important for flex children to shrink */
 }
 
 .data-explorer-redesigned .explorer-content {
@@ -293,7 +293,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 0; /* Prevent horizontal overflow */
+  min-width: 0;
+  /* Prevent horizontal overflow */
 }
 
 .data-explorer-redesigned .explorer-sidebar {
@@ -334,15 +335,15 @@
     gap: 12px;
     align-items: flex-start;
   }
-  
+
   .toolbar-buttons {
     flex-wrap: wrap;
   }
-  
+
   .toolbar-button-label {
     display: none;
   }
-  
+
   .data-explorer-redesigned .explorer-sidebar {
     width: 320px;
   }
@@ -390,9 +391,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -956,6 +960,7 @@
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .config-slider::-webkit-slider-thumb {
@@ -1108,12 +1113,10 @@
 
 .score-fill {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--vscode-testing-iconFailed) 0%,
-    var(--vscode-charts-yellow) 50%,
-    var(--vscode-testing-iconPassed) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-testing-iconFailed) 0%,
+      var(--vscode-charts-yellow) 50%,
+      var(--vscode-testing-iconPassed) 100%);
   transition: width 0.3s ease;
 }
 
@@ -1203,9 +1206,12 @@
 }
 
 @keyframes pulse-opacity {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -1260,11 +1266,13 @@
 /* Only apply scale transforms if user hasn't requested reduced motion */
 @media (prefers-reduced-motion: no-preference) {
   .action-button:hover {
-    transform: scale(1.05); /* Reduced from 1.1 for subtler effect */
+    transform: scale(1.05);
+    /* Reduced from 1.1 for subtler effect */
   }
 
   .action-button:active {
-    transform: scale(0.98); /* Reduced from 0.95 for subtler effect */
+    transform: scale(0.98);
+    /* Reduced from 0.95 for subtler effect */
   }
 }
 
@@ -1457,27 +1465,21 @@
 }
 
 .breakdown-fill.keyword {
-  background: linear-gradient(
-    90deg,
-    var(--vscode-charts-orange) 0%,
-    var(--vscode-charts-yellow) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-charts-orange) 0%,
+      var(--vscode-charts-yellow) 100%);
 }
 
 .breakdown-fill.semantic {
-  background: linear-gradient(
-    90deg,
-    var(--vscode-charts-blue) 0%,
-    var(--vscode-charts-purple) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-charts-blue) 0%,
+      var(--vscode-charts-purple) 100%);
 }
 
 .breakdown-fill.combined {
-  background: linear-gradient(
-    90deg,
-    var(--vscode-charts-green) 0%,
-    var(--vscode-charts-blue) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-charts-green) 0%,
+      var(--vscode-charts-blue) 100%);
 }
 
 .breakdown-value {
@@ -1927,6 +1929,7 @@
   color: var(--vscode-errorForeground);
   border-color: var(--vscode-errorForeground);
 }
+
 /* ========================================================================
    Insights Panel Styles
    ======================================================================== */
@@ -2263,11 +2266,9 @@
 
 .bucket-bar {
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--vscode-charts-blue) 0%,
-    var(--vscode-charts-green) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-charts-blue) 0%,
+      var(--vscode-charts-green) 100%);
   transition: width 0.3s ease;
 }
 
@@ -2448,7 +2449,7 @@
   line-height: 1.4;
 }
 
-.export-radio-option input[type="radio"]:disabled ~ .option-content {
+.export-radio-option input[type="radio"]:disabled~.option-content {
   opacity: 0.5;
 }
 
@@ -3200,21 +3201,22 @@
 
 /* Base skeleton animation */
 @keyframes skeleton-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
 }
 
 .skeleton-line {
-  background: linear-gradient(
-    90deg,
-    var(--vscode-input-background) 0%,
-    var(--vscode-list-hoverBackground) 50%,
-    var(--vscode-input-background) 100%
-  );
+  background: linear-gradient(90deg,
+      var(--vscode-input-background) 0%,
+      var(--vscode-list-hoverBackground) 50%,
+      var(--vscode-input-background) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: 3px;
@@ -3224,6 +3226,7 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -3474,6 +3477,7 @@ textarea:focus {
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
+
   button,
   input,
   select,
@@ -3493,6 +3497,7 @@ textarea:focus {
 
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -3543,9 +3548,7 @@ select:disabled {
 }
 
 /* Better keyboard navigation visual cues */
-.data-explorer:focus-within {
-  /* Container has keyboard focus somewhere */
-}
+/* Note: .data-explorer:focus-within is handled by child element styles */
 
 /* Ensure text is selectable for screen readers */
 .collection-name,
@@ -3569,18 +3572,11 @@ select:disabled {
   height: auto;
 }
 
-/* Role-based styling for better semantics */
-[role="alert"] {
-  /* Alerts are already styled */
-}
+/* Note: Role-based elements are styled by their containers */
 
-[role="status"] {
-  /* Status messages styled by their containers */
-}
 
-[role="main"] {
-  /* Main content area */
-}
+
+
 
 /* Focus trap for modals */
 .modal-overlay:focus {
@@ -3591,10 +3587,7 @@ select:disabled {
   outline: none;
 }
 
-/* Keyboard navigation hints */
-[title]:hover::after {
-  /* Tooltips handled by VS Code */
-}
+/* Note: Keyboard navigation hints and tooltips are handled by VS Code */
 
 /* Ensure proper heading hierarchy */
 h1 {
@@ -3625,7 +3618,470 @@ h3 {
   color: var(--vscode-editorWarning-foreground);
 }
 
-/* Ensure icons don't interfere with screen readers */
-[aria-hidden="true"] {
-  /* Icons are decorative only */
+/* Note: Elements with aria-hidden are decorative only and inherit visual styles */
+
+/* ========================================================================
+   COMPACT COMPONENT STYLES - Phase C
+   ======================================================================== */
+
+/* ========================================================================
+   Filter Builder Compact
+   ======================================================================== */
+
+.filter-builder-compact {
+  padding: 0;
+}
+
+.filter-builder-compact .filter-list {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.filter-empty-state-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}
+
+.filter-empty-icon {
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+.filter-actions-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.filter-actions-compact .filter-add-button {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.filter-actions-compact .filter-action-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-actions-compact .filter-clear-button,
+.filter-actions-compact .filter-apply-button {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-actions-compact .filter-clear-button {
+  background-color: transparent;
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-input-border);
+}
+
+.filter-actions-compact .filter-clear-button:hover {
+  background-color: var(--vscode-button-secondaryBackground);
+}
+
+.filter-actions-compact .filter-apply-button {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.filter-actions-compact .filter-apply-button:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.filter-actions-compact .filter-apply-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================================================
+   Schema Visualizer Compact
+   ======================================================================== */
+
+.schema-visualizer-compact {
+  padding: 0;
+}
+
+.schema-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 11px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border-radius: 10px;
+}
+
+.stat-badge.vectorizer {
+  background-color: var(--vscode-charts-purple);
+}
+
+.schema-section-compact {
+  margin-bottom: 10px;
+}
+
+.schema-section-toggle-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+}
+
+.schema-section-toggle-compact:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.toggle-chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.toggle-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.vectorizers-list-compact {
+  padding: 8px 0 8px 16px;
+}
+
+.vectorizer-item-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+.vectorizer-item-compact .vectorizer-name {
+  font-weight: 500;
+  color: var(--vscode-foreground);
+}
+
+.vectorizer-item-compact .vectorizer-meta {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.properties-list-compact {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.properties-list-compact .property-item {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.properties-list-compact .property-item:last-child {
+  border-bottom: none;
+}
+
+.properties-list-compact .property-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s ease;
+}
+
+.properties-list-compact .property-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.properties-list-compact .property-name {
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.properties-list-compact .property-type {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.properties-list-compact .property-badges {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.properties-list-compact .property-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* ========================================================================
+   Quick Insights Compact
+   ======================================================================== */
+
+.insights-panel-compact {
+  padding: 0;
+}
+
+.insights-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.insights-total-compact {
+  font-size: 13px;
+  color: var(--vscode-foreground);
+}
+
+.insights-total-compact strong {
+  font-size: 16px;
+  color: var(--vscode-charts-blue);
+}
+
+.insights-actions-compact {
+  display: flex;
+  gap: 6px;
+}
+
+.insights-action-button-compact {
+  padding: 4px 10px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.insights-action-button-compact:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.insights-action-button-compact.primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.insights-action-button-compact.primary:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.insights-action-button-compact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.insights-config-compact {
+  padding: 10px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.insights-loading-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--vscode-panel-border);
+  border-top-color: var(--vscode-focusBorder);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.insights-error-compact {
+  padding: 8px 12px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 3px;
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.insights-content-compact {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.insights-section-compact {
+  margin-bottom: 10px;
+}
+
+.insights-categorical-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.insights-empty-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}
+
+/* ========================================================================
+   Phase D: Visual Polish & Animations
+   ======================================================================== */
+
+/* Smooth panel transitions */
+@media (prefers-reduced-motion: no-preference) {
+  .collapse-panel {
+    animation: slideDown 0.2s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .toolbar-button {
+    transition: all 0.15s ease;
+  }
+
+  .toolbar-button:active {
+    transform: scale(0.97);
+  }
+
+  .data-row {
+    transition: background-color 0.1s ease;
+  }
+}
+
+/* Improved focus states */
+.toolbar-button:focus-visible,
+.filter-add-button:focus-visible,
+.filter-apply-button:focus-visible,
+.insights-action-button-compact:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+/* Button hover enhancement */
+.filter-add-button {
+  background: linear-gradient(135deg,
+      var(--vscode-button-background),
+      var(--vscode-button-hoverBackground));
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+  transition: background-position 0.3s ease;
+}
+
+.filter-add-button:hover {
+  background-position: 100% 100%;
+}
+
+/* Data table row selection enhancement */
+.data-row.selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  box-shadow: inset 3px 0 0 var(--vscode-focusBorder);
+}
+
+/* Improved typography for compact mode */
+.data-explorer-redesigned h1,
+.data-explorer-redesigned h2,
+.data-explorer-redesigned h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Badge glow effect */
+@media (prefers-reduced-motion: no-preference) {
+  .object-count-badge {
+    animation: subtlePulse 3s ease-in-out infinite;
+  }
+
+  @keyframes subtlePulse {
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+
+    50% {
+      box-shadow: 0 0 8px 0 var(--vscode-focusBorder);
+    }
+  }
+}
+
+/* Scrollbar styling for panels */
+.collapse-panel-content::-webkit-scrollbar,
+.properties-list-compact::-webkit-scrollbar,
+.insights-content-compact::-webkit-scrollbar {
+  width: 8px;
+}
+
+.collapse-panel-content::-webkit-scrollbar-track,
+.properties-list-compact::-webkit-scrollbar-track,
+.insights-content-compact::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.collapse-panel-content::-webkit-scrollbar-thumb,
+.properties-list-compact::-webkit-scrollbar-thumb,
+.insights-content-compact::-webkit-scrollbar-thumb {
+  background-color: var(--vscode-scrollbarSlider-background);
+  border-radius: 4px;
+}
+
+.collapse-panel-content::-webkit-scrollbar-thumb:hover,
+.properties-list-compact::-webkit-scrollbar-thumb:hover,
+.insights-content-compact::-webkit-scrollbar-thumb:hover {
+  background-color: var(--vscode-scrollbarSlider-hoverBackground);
 }
