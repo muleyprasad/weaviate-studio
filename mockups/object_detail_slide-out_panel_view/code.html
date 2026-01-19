@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Object Detail Slide-out Panel - Weaviate Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00bfff",
+                        "background-light": "#fafafa",
+                        "background-dark": "#1d1f20",
+                        "vscode-panel": "#252526",
+                        "vscode-border": "#333333",
+                        "vscode-sidebar": "#1e1e1e",
+                        "vscode-muted": "#8dbece",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333333; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #444444; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex justify-end">
+<!-- Backdrop (Simulating the rest of the editor) -->
+<div class="fixed inset-0 z-0 bg-black/20 pointer-events-none">
+<div class="p-8 opacity-10">
+<div class="h-8 w-64 bg-slate-400 mb-4 rounded"></div>
+<div class="grid grid-cols-4 gap-4">
+<div class="h-32 bg-slate-400 rounded"></div>
+<div class="h-32 bg-slate-400 rounded"></div>
+<div class="h-32 bg-slate-400 rounded"></div>
+<div class="h-32 bg-slate-400 rounded"></div>
+</div>
+</div>
+</div>
+<!-- Slide-out Panel -->
+<div class="relative z-10 w-full max-w-[520px] h-screen bg-vscode-sidebar border-l border-vscode-border flex flex-col shadow-2xl">
+<!-- Header -->
+<header class="flex flex-col gap-0 border-b border-vscode-border bg-vscode-panel/50 backdrop-blur-sm sticky top-0 z-20">
+<div class="flex items-center justify-between px-4 pt-4 pb-2">
+<div class="flex items-center gap-3 overflow-hidden">
+<span class="material-symbols-outlined text-primary text-sm">database</span>
+<h2 class="text-white text-sm font-bold leading-tight tracking-tight truncate mono">abc-123-def-456...</h2>
+</div>
+<div class="flex gap-1">
+<button class="p-1.5 hover:bg-vscode-border text-vscode-muted hover:text-white rounded transition-colors" title="Copy UUID">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+<button class="flex items-center justify-center rounded h-8 px-3 bg-vscode-border/50 hover:bg-vscode-border text-white text-xs font-medium transition-colors border border-white/5">
+                        Find Similar
+                    </button>
+<button class="flex items-center justify-center rounded h-8 px-3 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs font-medium transition-colors border border-red-500/20">
+                        Delete
+                    </button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex px-4 gap-6 overflow-x-auto custom-scrollbar">
+<a class="flex flex-col items-center justify-center border-b-2 border-primary text-white pb-2 pt-2" href="#">
+<p class="text-xs font-bold whitespace-nowrap">Properties</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-vscode-muted hover:text-white pb-2 pt-2 transition-colors" href="#">
+<p class="text-xs font-bold whitespace-nowrap">Metadata</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-vscode-muted hover:text-white pb-2 pt-2 transition-colors" href="#">
+<p class="text-xs font-bold whitespace-nowrap">Vectors</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-vscode-muted hover:text-white pb-2 pt-2 transition-colors" href="#">
+<p class="text-xs font-bold whitespace-nowrap">References</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-vscode-muted hover:text-white pb-2 pt-2 transition-colors" href="#">
+<p class="text-xs font-bold whitespace-nowrap">JSON</p>
+</a>
+</div>
+</header>
+<!-- Scrollable Content Container -->
+<div class="flex-1 overflow-y-auto custom-scrollbar bg-vscode-sidebar">
+<!-- Properties Tab Content -->
+<div class="p-4 space-y-6">
+<!-- Main Properties Grid -->
+<div class="grid grid-cols-[100px_1fr] gap-y-1 text-sm border border-vscode-border rounded overflow-hidden">
+<div class="bg-vscode-panel px-3 py-2 text-vscode-muted border-b border-vscode-border flex items-center mono text-[11px] uppercase tracking-wider">title</div>
+<div class="px-3 py-2 text-white border-b border-vscode-border bg-vscode-sidebar">Object Title Example</div>
+<div class="bg-vscode-panel px-3 py-2 text-vscode-muted border-b border-vscode-border flex items-center mono text-[11px] uppercase tracking-wider">content</div>
+<div class="px-3 py-2 text-white border-b border-vscode-border bg-vscode-sidebar leading-relaxed">
+                        This is the main content of the object. It contains several sentences describing the vector embeddings and metadata...
+                        <a class="text-primary hover:underline ml-1" href="#">[more]</a>
+</div>
+<div class="bg-vscode-panel px-3 py-2 text-vscode-muted border-b border-vscode-border flex items-center mono text-[11px] uppercase tracking-wider">category</div>
+<div class="px-3 py-2 text-white border-b border-vscode-border bg-vscode-sidebar">Technical Documentation</div>
+<div class="bg-vscode-panel px-3 py-2 text-vscode-muted flex items-center mono text-[11px] uppercase tracking-wider">published</div>
+<div class="px-3 py-2 text-white bg-vscode-sidebar italic text-vscode-muted">2 days ago</div>
+</div>
+<!-- Nested Author Object -->
+<div class="space-y-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-vscode-muted">person</span>
+<h3 class="text-white text-xs font-bold tracking-tight uppercase">Author Object</h3>
+</div>
+<div class="grid grid-cols-[100px_1fr] gap-y-1 text-sm border border-vscode-border rounded-lg bg-vscode-panel/30 p-1">
+<div class="px-3 py-2 text-vscode-muted mono text-[11px]">name</div>
+<div class="px-3 py-2 text-white font-medium">John Doe</div>
+<div class="px-3 py-2 text-vscode-muted mono text-[11px]">email</div>
+<div class="px-3 py-2 text-white underline decoration-vscode-border underline-offset-4">john@example.com</div>
+<div class="px-3 py-2 text-vscode-muted mono text-[11px]">verified</div>
+<div class="px-3 py-2 flex items-center gap-2">
+<span class="text-emerald-400">True</span>
+<span class="material-symbols-outlined text-[14px] text-emerald-400">verified</span>
+</div>
+</div>
+</div>
+<!-- Tags Array -->
+<div class="space-y-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-vscode-muted">label</span>
+<h3 class="text-white text-xs font-bold tracking-tight uppercase">Tags</h3>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-vscode-panel border border-vscode-border rounded text-[11px] text-vscode-muted mono">documentation</span>
+<span class="px-2 py-1 bg-vscode-panel border border-vscode-border rounded text-[11px] text-vscode-muted mono">vector-db</span>
+<span class="px-2 py-1 bg-vscode-panel border border-vscode-border rounded text-[11px] text-vscode-muted mono">tutorial</span>
+<span class="px-2 py-1 bg-vscode-panel border border-vscode-border rounded text-[11px] text-vscode-muted mono">weaviate-studio</span>
+<span class="px-2 py-1 bg-vscode-panel border border-vscode-border rounded text-[11px] text-vscode-muted mono">vscode-extension</span>
+</div>
+</div>
+<!-- Metadata Section -->
+<div class="pt-4 border-t border-vscode-border space-y-3">
+<div class="flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-vscode-muted">info</span>
+<h3 class="text-white text-xs font-bold tracking-tight uppercase">System Metadata</h3>
+</div>
+<span class="material-symbols-outlined text-[16px] text-vscode-muted group-hover:text-white">expand_less</span>
+</div>
+<div class="space-y-1 mono text-[12px]">
+<div class="flex justify-between py-1 px-2 hover:bg-vscode-panel transition-colors rounded">
+<span class="text-vscode-muted">Created</span>
+<span class="text-white">2023-10-24 14:22:10</span>
+</div>
+<div class="flex justify-between py-1 px-2 hover:bg-vscode-panel transition-colors rounded">
+<span class="text-vscode-muted">Last Updated</span>
+<span class="text-white">2023-11-01 09:15:44</span>
+</div>
+<div class="flex justify-between py-1 px-2 hover:bg-vscode-panel transition-colors rounded items-center">
+<span class="text-vscode-muted">Status</span>
+<span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+                                INDEXED
+                            </span>
+</div>
+</div>
+</div>
+<!-- Vectors Section -->
+<div class="pt-4 border-t border-vscode-border space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-vscode-muted">architecture</span>
+<h3 class="text-white text-xs font-bold tracking-tight uppercase">Vectors</h3>
+</div>
+<div class="flex gap-2">
+<button class="p-1 hover:bg-vscode-border rounded transition-colors text-vscode-muted hover:text-primary">
+<span class="material-symbols-outlined text-[16px]">download</span>
+</button>
+<button class="p-1 hover:bg-vscode-border rounded transition-colors text-vscode-muted hover:text-primary">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</div>
+<div class="flex gap-4 px-2 py-1 mono text-[11px]">
+<div class="flex gap-1.5"><span class="text-vscode-muted">Dims:</span><span class="text-primary">1536</span></div>
+<div class="flex gap-1.5"><span class="text-vscode-muted">Mag:</span><span class="text-primary">0.824</span></div>
+</div>
+<div class="bg-black/40 p-3 rounded-lg border border-vscode-border mono text-[12px] leading-relaxed text-blue-300">
+<div class="grid grid-cols-2 gap-x-4 gap-y-1 custom-scrollbar max-h-32 overflow-y-auto pr-2">
+<div>0: <span class="text-white">0.034211</span></div>
+<div>1: <span class="text-white">-0.01239</span></div>
+<div>2: <span class="text-white">0.055102</span></div>
+<div>3: <span class="text-white">0.009123</span></div>
+<div>4: <span class="text-white">-0.08821</span></div>
+<div>5: <span class="text-white">0.103492</span></div>
+<div>6: <span class="text-white">0.022311</span></div>
+<div>7: <span class="text-white">-0.00331</span></div>
+<div>8: <span class="text-white">0.044122</span></div>
+<div>9: <span class="text-white">-0.01290</span></div>
+</div>
+<div class="mt-2 text-center text-[10px] text-vscode-muted border-t border-vscode-border/50 pt-2">
+                            + 1526 more dimensions...
+                        </div>
+</div>
+</div>
+<!-- References Section -->
+<div class="pt-4 border-t border-vscode-border space-y-3 pb-8">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-vscode-muted">link</span>
+<h3 class="text-white text-xs font-bold tracking-tight uppercase">References</h3>
+</div>
+<div class="space-y-2">
+<a class="flex items-center justify-between p-2 rounded border border-vscode-border bg-vscode-panel/20 hover:bg-vscode-panel transition-all group" href="#">
+<div class="flex flex-col gap-1">
+<span class="text-xs text-white font-medium">Related Article: Vector Databases 101</span>
+<span class="mono text-[10px] text-vscode-muted">uuid: fa1-55b...</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-vscode-muted group-hover:text-primary transition-colors">open_in_new</span>
+</a>
+<a class="flex items-center justify-between p-2 rounded border border-vscode-border bg-vscode-panel/20 hover:bg-vscode-panel transition-all group" href="#">
+<div class="flex flex-col gap-1">
+<span class="text-xs text-white font-medium">Citation: Attention is All You Need</span>
+<span class="mono text-[10px] text-vscode-muted">uuid: d2e-99x...</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-vscode-muted group-hover:text-primary transition-colors">open_in_new</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Resizer Handle (Visual only) -->
+<div class="absolute left-0 top-0 w-1 h-full cursor-col-resize hover:bg-primary/50 transition-colors"></div>
+</div>
+</body></html>

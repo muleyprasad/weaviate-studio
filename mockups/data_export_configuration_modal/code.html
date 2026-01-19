@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Data Export Configuration Modal - Weaviate Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#478beb",
+                        "background-light": "#fafafa",
+                        "background-dark": "#1e1e1e",
+                        "modal-bg": "#252526",
+                        "vscode-border": "#333333",
+                        "vscode-text": "#cccccc",
+                        "vscode-subtext": "#808080",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: "Space Grotesk", sans-serif;
+        }
+        .vscode-radio-dot {
+            --radio-dot-svg: url('data:image/svg+xml,%3csvg viewBox=%270 0 16 16%27 fill=%27%23478beb%27 xmlns=%27http://www.w3.org/2000/svg%27%3e%3ccircle cx=%278%27 cy=%278%27 r=%273.5%27/%3e%3c/svg%3e');
+        }
+        .vscode-checkbox-tick {
+            --checkbox-tick-svg: url('data:image/svg+xml,%3csvg viewBox=%270 0 16 16%27 fill=%27white%27 xmlns=%27http://www.w3.org/2000/svg%27%3e%3cpath d=%27M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z%27/%3e%3c/svg%3e');
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center p-4">
+<!-- Modal Overlay Backdrop -->
+<div class="fixed inset-0 modal-overlay z-0"></div>
+<!-- Export Modal Container -->
+<div class="relative z-10 w-full max-w-[560px] bg-modal-bg border border-vscode-border rounded-lg shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+<!-- Header -->
+<div class="flex items-center justify-between px-6 py-4 border-b border-vscode-border">
+<h2 class="text-white text-xl font-bold tracking-tight">Export Data</h2>
+<button class="text-vscode-subtext hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<div class="overflow-y-auto max-h-[75vh] p-6 space-y-8">
+<!-- Export Format Section -->
+<section class="space-y-4">
+<h3 class="text-vscode-subtext text-[11px] font-bold tracking-widest uppercase">Export Format</h3>
+<div class="grid grid-cols-1 gap-2 vscode-radio-dot">
+<label class="flex items-center gap-3 p-3 rounded border border-vscode-border hover:bg-[#2a2d2e] cursor-pointer transition-colors group">
+<input class="h-4 w-4 border-vscode-border bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="format" type="radio"/>
+<span class="text-vscode-text text-sm group-hover:text-white">JSON (with metadata)</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded border border-primary bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors group">
+<input checked="" class="h-4 w-4 border-primary bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="format" type="radio"/>
+<span class="text-white text-sm font-medium">CSV (flattened)</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded border border-vscode-border hover:bg-[#2a2d2e] cursor-pointer transition-colors group">
+<input class="h-4 w-4 border-vscode-border bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="format" type="radio"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Excel (.xlsx)</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded border border-vscode-border hover:bg-[#2a2d2e] cursor-pointer transition-colors group">
+<input class="h-4 w-4 border-vscode-border bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="format" type="radio"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Parquet</span>
+</label>
+</div>
+</section>
+<!-- Include Section -->
+<section class="space-y-4">
+<h3 class="text-vscode-subtext text-[11px] font-bold tracking-widest uppercase">Include</h3>
+<div class="space-y-1 vscode-checkbox-tick">
+<label class="flex items-center gap-3 py-2 px-1 hover:bg-[#2a2d2e] rounded cursor-pointer group transition-colors">
+<input checked="" class="h-4 w-4 rounded-sm border-vscode-border border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Properties</span>
+</label>
+<label class="flex items-center gap-3 py-2 px-1 hover:bg-[#2a2d2e] rounded cursor-pointer group transition-colors">
+<input checked="" class="h-4 w-4 rounded-sm border-vscode-border border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Vectors</span>
+</label>
+<label class="flex items-center gap-3 py-2 px-1 hover:bg-[#2a2d2e] rounded cursor-pointer group transition-colors">
+<input checked="" class="h-4 w-4 rounded-sm border-vscode-border border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Metadata (_id, timestamps)</span>
+</label>
+<label class="flex items-center gap-3 py-2 px-1 hover:bg-[#2a2d2e] rounded cursor-pointer group transition-colors">
+<input class="h-4 w-4 rounded-sm border-vscode-border border-2 bg-transparent text-primary checked:bg-primary checked:border-primary checked:bg-[image:--checkbox-tick-svg] focus:ring-0 focus:ring-offset-0" type="checkbox"/>
+<span class="text-vscode-text text-sm group-hover:text-white">References (as UUIDs)</span>
+</label>
+</div>
+</section>
+<!-- Scope Section -->
+<section class="space-y-4">
+<h3 class="text-vscode-subtext text-[11px] font-bold tracking-widest uppercase">Scope</h3>
+<div class="space-y-1 vscode-radio-dot">
+<label class="flex items-center justify-between p-3 rounded border border-vscode-border hover:bg-[#2a2d2e] cursor-pointer transition-colors group">
+<div class="flex items-center gap-3">
+<input class="h-4 w-4 border-vscode-border bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="scope" type="radio"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Current Page</span>
+</div>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-[#333333] text-vscode-subtext font-mono group-hover:text-vscode-text">20 objects</span>
+</label>
+<label class="flex items-center justify-between p-3 rounded border border-primary bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors group">
+<div class="flex items-center gap-3">
+<input checked="" class="h-4 w-4 border-primary bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="scope" type="radio"/>
+<span class="text-white text-sm font-medium">All Filtered Results</span>
+</div>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-primary text-white font-mono">457 objects</span>
+</label>
+<label class="flex items-center justify-between p-3 rounded border border-vscode-border hover:bg-[#2a2d2e] cursor-pointer transition-colors group">
+<div class="flex items-center gap-3">
+<input class="h-4 w-4 border-vscode-border bg-transparent text-transparent checked:border-primary checked:bg-[image:--radio-dot-svg] focus:ring-0 focus:ring-offset-0" name="scope" type="radio"/>
+<span class="text-vscode-text text-sm group-hover:text-white">Entire Collection</span>
+</div>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-[#333333] text-vscode-subtext font-mono group-hover:text-vscode-text">12,457 objects</span>
+</label>
+</div>
+</section>
+</div>
+<!-- Footer -->
+<div class="px-6 py-4 bg-[#1e1e1e] border-t border-vscode-border flex justify-end gap-3">
+<button class="px-5 py-2 text-sm font-medium text-vscode-text hover:text-white hover:bg-[#3e3e42] rounded transition-all">
+                Cancel
+            </button>
+<button class="px-6 py-2 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded transition-all shadow-lg active:scale-95 flex items-center gap-2">
+<span>Export</span>
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+</body></html>
