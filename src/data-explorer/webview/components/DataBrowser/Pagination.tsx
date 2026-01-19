@@ -55,7 +55,10 @@ export function Pagination() {
           disabled={currentPage === 0 || state.loading}
           aria-label="Previous page"
         >
-          ← Previous
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M10 13L5 8l5-5z" />
+          </svg>
+          Previous
         </button>
 
         <span className="pagination-pages">
@@ -68,7 +71,10 @@ export function Pagination() {
           disabled={currentPage >= totalPages - 1 || state.loading}
           aria-label="Next page"
         >
-          Next →
+          Next
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 3l5 5-5 5z" />
+          </svg>
         </button>
 
         <select
@@ -91,7 +97,9 @@ export function Pagination() {
           aria-label="Refresh data"
           title="Refresh"
         >
-          🔄
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M13.5 3.5a6.5 6.5 0 11-11 4.5M13.5 3.5V1m0 2.5H11" />
+          </svg>
         </button>
       </div>
     </div>

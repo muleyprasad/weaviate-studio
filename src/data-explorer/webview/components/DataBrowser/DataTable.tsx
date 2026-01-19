@@ -18,9 +18,7 @@ export function DataTable() {
 
   // Get ordered columns: pinned first, then visible (memoized for performance)
   const orderedColumns = useMemo(() => {
-    const pinnedColumns = state.pinnedColumns.filter((col) =>
-      state.visibleColumns.includes(col)
-    );
+    const pinnedColumns = state.pinnedColumns.filter((col) => state.visibleColumns.includes(col));
     const unpinnedColumns = state.visibleColumns.filter(
       (col) => !state.pinnedColumns.includes(col)
     );
@@ -86,7 +84,10 @@ export function DataTable() {
     return obj.uuid || (obj as any).id || (obj as any)._additional?.id || '';
   };
 
-  const getPropertyValue = (obj: WeaviateObject<Record<string, unknown>, string>, propertyName: string): unknown => {
+  const getPropertyValue = (
+    obj: WeaviateObject<Record<string, unknown>, string>,
+    propertyName: string
+  ): unknown => {
     // First try direct property access
     const objAny = obj as any;
     if (objAny.properties && propertyName in objAny.properties) {
@@ -110,9 +111,15 @@ export function DataTable() {
         <table className="data-table" role="grid" aria-label="Data objects table">
           <thead>
             <tr role="row">
-              <th role="columnheader" className="row-number-header">#</th>
-              <th role="columnheader" className="actions-header">Actions</th>
-              <th role="columnheader" className="uuid-header">UUID</th>
+              <th role="columnheader" className="row-number-header">
+                #
+              </th>
+              <th role="columnheader" className="actions-header">
+                Actions
+              </th>
+              <th role="columnheader" className="uuid-header">
+                UUID
+              </th>
               {orderedColumns.map((columnName) => {
                 const isPinned = state.pinnedColumns.includes(columnName);
                 const property = getPropertyInfo(columnName);
@@ -125,10 +132,14 @@ export function DataTable() {
                     aria-sort="none"
                   >
                     <span className="column-name">{columnName}</span>
-                    {property && (
-                      <span className="column-type-badge">{property.dataType}</span>
+                    {property && <span className="column-type-badge">{property.dataType}</span>}
+                    {isPinned && (
+                      <span className="pin-indicator" aria-label="Pinned column">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M9.828.722a.5.5 0 01.354.146l4.95 4.95a.5.5 0 010 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a5.927 5.927 0 01.16 1.013c.046.702-.032 1.687-.72 2.375a.5.5 0 01-.707 0l-2.829-2.828-3.182 3.182c-.195.195-.42.195-.707 0L.172 13.172a.5.5 0 010-.707l3.182-3.182-2.828-2.829a.5.5 0 010-.707c.688-.688 1.673-.767 2.375-.72a5.922 5.922 0 011.013.16l3.134-3.134a2.772 2.772 0 01-.04-.461c0-.43.108-1.022.589-1.503a.5.5 0 01.353-.146z" />
+                        </svg>
+                      </span>
                     )}
-                    {isPinned && <span className="pin-indicator" aria-label="Pinned column">📌</span>}
                   </th>
                 );
               })}
@@ -159,7 +170,9 @@ export function DataTable() {
                     aria-selected={isSelected}
                     aria-label={`Object ${rowNumber}, UUID ${objectId.substring(0, 8)}`}
                   >
-                    <td role="cell" className="row-number">{rowNumber}</td>
+                    <td role="cell" className="row-number">
+                      {rowNumber}
+                    </td>
                     <td role="cell" className="actions-cell">
                       <button
                         className="action-button find-similar"
@@ -167,7 +180,10 @@ export function DataTable() {
                         title="Find similar objects"
                         aria-label="Find similar objects"
                       >
-                        🔗
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M4.715 6.542L3.343 7.914a3 3 0 104.243 4.243l1.828-1.829A3 3 0 008.586 5.5L8 6.086a1.002 1.002 0 00-.154.199 2 2 0 01.861 3.337L6.88 11.45a2 2 0 11-2.83-2.83l.793-.792a4.018 4.018 0 01-.128-1.287z" />
+                          <path d="M6.586 4.672A3 3 0 007.414 9.5l.775-.776a2 2 0 01-.896-3.346L9.12 3.55a2 2 0 112.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 10-4.243-4.243L6.586 4.672z" />
+                        </svg>
                       </button>
                     </td>
                     <td role="cell" className="uuid-cell">

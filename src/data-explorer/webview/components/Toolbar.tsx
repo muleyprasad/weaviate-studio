@@ -7,7 +7,7 @@ import React from 'react';
 
 interface ToolbarButton {
   id: string;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   shortcut?: string;
   isActive?: boolean;

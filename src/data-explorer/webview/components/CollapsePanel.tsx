@@ -52,7 +52,9 @@ export function CollapsePanel({
               aria-label={`Close ${title || 'panel'}`}
               type="button"
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 7.293l3.646-3.647.708.708L8.707 8l3.647 3.646-.708.708L8 8.707l-3.646 3.647-.708-.708L7.293 8 3.646 4.354l.708-.708L8 7.293z" />
+              </svg>
             </button>
           )}
         </div>

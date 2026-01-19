@@ -83,7 +83,11 @@ export function FilterBuilder() {
 
         {state.filters.length === 0 && (
           <div className="filter-empty-state-compact">
-            <span className="filter-empty-icon">🔍</span>
+            <span className="filter-empty-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6 10.5L1 3.5h14L10 10.5v4l-4 1.5v-5.5z" />
+              </svg>
+            </span>
             <span>Click "Add Filter" to narrow down your results</span>
           </div>
         )}

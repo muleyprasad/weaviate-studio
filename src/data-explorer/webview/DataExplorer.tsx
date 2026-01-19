@@ -336,12 +336,17 @@ function dataExplorerReducer(
       };
 
     case 'SET_VECTOR_SEARCH_ACTIVE':
+      // Accordion behavior: close other panels when opening vector search
       return {
         ...state,
         vectorSearch: {
           ...state.vectorSearch,
           isActive: action.payload,
         },
+        // Close other panels when opening this one
+        panels: action.payload
+          ? { showFilters: false, showInsights: false, showSchema: false }
+          : state.panels,
       };
 
     case 'SET_VECTOR_SEARCH_RESULTS':
@@ -457,32 +462,56 @@ function dataExplorerReducer(
     case 'EXPORT_ERROR':
       return state;
 
-    case 'TOGGLE_FILTERS_PANEL':
+    case 'TOGGLE_FILTERS_PANEL': {
+      const newShowFilters = !state.panels.showFilters;
+      // Accordion behavior: close other panels when opening this one
       return {
         ...state,
         panels: {
-          ...state.panels,
-          showFilters: !state.panels.showFilters,
+          showFilters: newShowFilters,
+          showInsights: newShowFilters ? false : state.panels.showInsights,
+          showSchema: newShowFilters ? false : state.panels.showSchema,
         },
+        // Also close vector search panel
+        vectorSearch: newShowFilters
+          ? { ...state.vectorSearch, isActive: false }
+          : state.vectorSearch,
       };
+    }
 
-    case 'TOGGLE_INSIGHTS_PANEL':
+    case 'TOGGLE_INSIGHTS_PANEL': {
+      const newShowInsights = !state.panels.showInsights;
+      // Accordion behavior: close other panels when opening this one
       return {
         ...state,
         panels: {
-          ...state.panels,
-          showInsights: !state.panels.showInsights,
+          showFilters: newShowInsights ? false : state.panels.showFilters,
+          showInsights: newShowInsights,
+          showSchema: newShowInsights ? false : state.panels.showSchema,
         },
+        // Also close vector search panel
+        vectorSearch: newShowInsights
+          ? { ...state.vectorSearch, isActive: false }
+          : state.vectorSearch,
       };
+    }
 
-    case 'TOGGLE_SCHEMA_PANEL':
+    case 'TOGGLE_SCHEMA_PANEL': {
+      const newShowSchema = !state.panels.showSchema;
+      // Accordion behavior: close other panels when opening this one
       return {
         ...state,
         panels: {
-          ...state.panels,
-          showSchema: !state.panels.showSchema,
+          showFilters: newShowSchema ? false : state.panels.showFilters,
+          showInsights: newShowSchema ? false : state.panels.showInsights,
+          showSchema: newShowSchema,
         },
+        // Also close vector search panel
+        vectorSearch: newShowSchema
+          ? { ...state.vectorSearch, isActive: false }
+          : state.vectorSearch,
       };
+    }
 
     default:
       return state;
@@ -842,7 +871,11 @@ export function DataExplorer() {
     () => [
       {
         id: 'filters',
-        icon: '🔍',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 10.5L1 3.5h14L10 10.5v4l-4 1.5v-5.5z" />
+          </svg>
+        ),
         label: 'Filters',
         isActive: state.panels.showFilters,
         onClick: () => dispatch({ type: 'TOGGLE_FILTERS_PANEL' }),
@@ -850,7 +883,12 @@ export function DataExplorer() {
       },
       {
         id: 'vector-search',
-        icon: '🔮',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" fill="none" strokeWidth="1.5" />
+            <circle cx="8" cy="8" r="2" fill="currentColor" />
+          </svg>
+        ),
         label: 'Vector Search',
         shortcut: 'Ctrl+K',
         isActive: state.vectorSearch.isActive,
@@ -865,7 +903,13 @@ export function DataExplorer() {
       },
       {
         id: 'insights',
-        icon: '📊',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="2" y="10" width="3" height="4" />
+            <rect x="6.5" y="6" width="3" height="8" />
+            <rect x="11" y="2" width="3" height="12" />
+          </svg>
+        ),
         label: 'Insights',
         isActive: state.panels.showInsights,
         onClick: () => dispatch({ type: 'TOGGLE_INSIGHTS_PANEL' }),
@@ -873,7 +917,14 @@ export function DataExplorer() {
       },
       {
         id: 'schema',
-        icon: '📋',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="2" y="2" width="5" height="5" stroke="currentColor" fill="none" />
+            <rect x="9" y="2" width="5" height="5" stroke="currentColor" fill="none" />
+            <rect x="2" y="9" width="5" height="5" stroke="currentColor" fill="none" />
+            <rect x="9" y="9" width="5" height="5" stroke="currentColor" fill="none" />
+          </svg>
+        ),
         label: 'Schema',
         isActive: state.panels.showSchema,
         onClick: () => dispatch({ type: 'TOGGLE_SCHEMA_PANEL' }),
@@ -881,7 +932,11 @@ export function DataExplorer() {
       },
       {
         id: 'export',
-        icon: '📤',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1v9M5 7l3 3 3-3M2 11v3h12v-3" />
+          </svg>
+        ),
         label: 'Export',
         shortcut: 'Ctrl+E',
         onClick: () => dispatch({ type: 'TOGGLE_EXPORT_DIALOG', payload: true }),
@@ -889,7 +944,11 @@ export function DataExplorer() {
       },
       {
         id: 'refresh',
-        icon: '⟳',
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M13.5 3.5a6.5 6.5 0 11-11 4.5M13.5 3.5V1m0 2.5H11" />
+          </svg>
+        ),
         label: 'Refresh',
         shortcut: 'Ctrl+R',
         onClick: () => fetchObjects(),
