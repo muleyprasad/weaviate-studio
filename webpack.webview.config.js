@@ -10,7 +10,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // requires a matching nonce value. The runtime extension code later replaces the placeholder with
 // the real nonce.
 class WebviewNoncePlugin {
-  apply (compiler) {
+  apply(compiler) {
     compiler.hooks.compilation.tap('WebviewNoncePlugin', (compilation) => {
       const HtmlWebpackPlugin = require('html-webpack-plugin');
 
@@ -41,6 +41,7 @@ module.exports = {
     backup: './src/webview/Backup.tsx',
     'backup-restore': './src/webview/BackupRestore.tsx',
     cluster: './src/webview/ClusterPanel.tsx',
+    'data-explorer': './src/data-explorer/webview/index.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -130,6 +131,14 @@ module.exports = {
       template: './src/webview/cluster.html',
       filename: 'cluster.html',
       chunks: ['cluster'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/data-explorer/webview/data-explorer.html',
+      filename: 'data-explorer.html',
+      chunks: ['data-explorer'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,
