@@ -44,4 +44,5 @@ export {
   type FilterCondition,
   type FilterOperator,
   type FilterPreset,
+  type FilterMatchMode,
 } from './FilterContext';

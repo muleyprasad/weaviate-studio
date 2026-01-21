@@ -11,9 +11,12 @@ import {
   useDataState,
   useUIState,
   useUIActions,
+  useFilterState,
+  useFilterActions,
 } from './context';
 import { DataTable } from './components/DataBrowser/DataTable';
 import { DetailPanel } from './components/ObjectDetail/DetailPanel';
+import { FilterPanel, FilterChips } from './components/FilterBuilder';
 import { useDataFetch } from './hooks/useDataFetch';
 
 // Get initial data from the window object (injected by the extension)
@@ -30,6 +33,8 @@ function DataExplorerContent() {
   const dataState = useDataState();
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const filterState = useFilterState();
+  const filterActions = useFilterActions();
   const { isLoading } = useDataFetch();
 
   // Handle opening detail panel
@@ -50,6 +55,9 @@ function DataExplorerContent() {
     ? dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId) || null
     : null;
 
+  // Get schema properties for filter builder
+  const schemaProperties = dataState.schema?.properties || [];
+
   return (
     <div className="data-explorer">
       {/* Header */}
@@ -62,6 +70,21 @@ function DataExplorerContent() {
           </div>
         </div>
         <div className="header-right">
+          {/* Filter button */}
+          <button
+            type="button"
+            className={`filter-toolbar-btn ${filterState.activeFilters.length > 0 ? 'active' : ''}`}
+            onClick={filterActions.toggleFilterPanel}
+            title="Open filter builder"
+            aria-label="Open filter builder"
+            aria-expanded={filterState.showFilterPanel}
+          >
+            <span className="codicon codicon-filter" aria-hidden="true"></span>
+            Filters
+            {filterState.activeFilters.length > 0 && (
+              <span className="filter-count-badge">{filterState.activeFilters.length}</span>
+            )}
+          </button>
           {!isLoading && (
             <span className="object-count-badge">
               {dataState.totalCount.toLocaleString()} objects
@@ -69,6 +92,14 @@ function DataExplorerContent() {
           )}
         </div>
       </header>
+
+      {/* Active filter chips */}
+      <FilterChips
+        filters={filterState.activeFilters}
+        onRemove={filterActions.removeFilter}
+        onClearAll={filterActions.clearAllFilters}
+        onChipClick={() => filterActions.openFilterPanel()}
+      />
 
       {/* Main content */}
       <main className="data-explorer-main">
@@ -88,6 +119,9 @@ function DataExplorerContent() {
       {uiState.showDetailPanel && (
         <DetailPanel object={selectedObject} onClose={handleCloseDetail} />
       )}
+
+      {/* Filter panel */}
+      <FilterPanel isOpen={filterState.showFilterPanel} properties={schemaProperties} />
     </div>
   );
 }

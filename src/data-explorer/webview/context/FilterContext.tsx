@@ -49,10 +49,15 @@ export interface FilterPreset {
 // State Interface
 // ============================================================================
 
+export type FilterMatchMode = 'AND' | 'OR';
+
 export interface FilterContextState {
   activeFilters: FilterCondition[];
+  pendingFilters: FilterCondition[]; // Filters being edited in panel before applying
   filterPresets: FilterPreset[];
   isApplying: boolean;
+  showFilterPanel: boolean;
+  matchMode: FilterMatchMode;
 }
 
 // ============================================================================
@@ -68,7 +73,16 @@ type FilterAction =
   | { type: 'SET_APPLYING'; isApplying: boolean }
   | { type: 'SAVE_PRESET'; preset: FilterPreset }
   | { type: 'DELETE_PRESET'; presetId: string }
-  | { type: 'LOAD_PRESET'; presetId: string };
+  | { type: 'LOAD_PRESET'; presetId: string }
+  | { type: 'TOGGLE_FILTER_PANEL' }
+  | { type: 'OPEN_FILTER_PANEL' }
+  | { type: 'CLOSE_FILTER_PANEL' }
+  | { type: 'SET_MATCH_MODE'; mode: FilterMatchMode }
+  | { type: 'ADD_PENDING_FILTER'; filter: FilterCondition }
+  | { type: 'REMOVE_PENDING_FILTER'; filterId: string }
+  | { type: 'UPDATE_PENDING_FILTER'; filterId: string; updates: Partial<FilterCondition> }
+  | { type: 'APPLY_PENDING_FILTERS' }
+  | { type: 'RESET_PENDING_FILTERS' };
 
 // ============================================================================
 // Reducer
@@ -76,8 +90,11 @@ type FilterAction =
 
 const initialState: FilterContextState = {
   activeFilters: [],
+  pendingFilters: [],
   filterPresets: [],
   isApplying: false,
+  showFilterPanel: false,
+  matchMode: 'AND',
 };
 
 function filterReducer(state: FilterContextState, action: FilterAction): FilterContextState {
@@ -141,6 +158,66 @@ function filterReducer(state: FilterContextState, action: FilterAction): FilterC
       };
     }
 
+    case 'TOGGLE_FILTER_PANEL':
+      return {
+        ...state,
+        showFilterPanel: !state.showFilterPanel,
+        // When opening, copy active filters to pending
+        pendingFilters: !state.showFilterPanel ? [...state.activeFilters] : state.pendingFilters,
+      };
+
+    case 'OPEN_FILTER_PANEL':
+      return {
+        ...state,
+        showFilterPanel: true,
+        pendingFilters: [...state.activeFilters],
+      };
+
+    case 'CLOSE_FILTER_PANEL':
+      return {
+        ...state,
+        showFilterPanel: false,
+      };
+
+    case 'SET_MATCH_MODE':
+      return {
+        ...state,
+        matchMode: action.mode,
+      };
+
+    case 'ADD_PENDING_FILTER':
+      return {
+        ...state,
+        pendingFilters: [...state.pendingFilters, action.filter],
+      };
+
+    case 'REMOVE_PENDING_FILTER':
+      return {
+        ...state,
+        pendingFilters: state.pendingFilters.filter((f) => f.id !== action.filterId),
+      };
+
+    case 'UPDATE_PENDING_FILTER':
+      return {
+        ...state,
+        pendingFilters: state.pendingFilters.map((f) =>
+          f.id === action.filterId ? { ...f, ...action.updates } : f
+        ),
+      };
+
+    case 'APPLY_PENDING_FILTERS':
+      return {
+        ...state,
+        activeFilters: [...state.pendingFilters],
+        showFilterPanel: false,
+      };
+
+    case 'RESET_PENDING_FILTERS':
+      return {
+        ...state,
+        pendingFilters: [...state.activeFilters],
+      };
+
     default:
       return state;
   }
@@ -160,6 +237,17 @@ export interface FilterContextActions {
   savePreset: (name: string) => void;
   deletePreset: (presetId: string) => void;
   loadPreset: (presetId: string) => void;
+  // Filter panel actions
+  toggleFilterPanel: () => void;
+  openFilterPanel: () => void;
+  closeFilterPanel: () => void;
+  setMatchMode: (mode: FilterMatchMode) => void;
+  // Pending filter actions (for panel editing)
+  addPendingFilter: (filter: FilterCondition) => void;
+  removePendingFilter: (filterId: string) => void;
+  updatePendingFilter: (filterId: string, updates: Partial<FilterCondition>) => void;
+  applyPendingFilters: () => void;
+  resetPendingFilters: () => void;
 }
 
 // ============================================================================
@@ -227,6 +315,44 @@ export function FilterProvider({ children }: FilterProviderProps) {
 
       loadPreset: (presetId: string) => {
         dispatch({ type: 'LOAD_PRESET', presetId });
+      },
+
+      // Filter panel actions
+      toggleFilterPanel: () => {
+        dispatch({ type: 'TOGGLE_FILTER_PANEL' });
+      },
+
+      openFilterPanel: () => {
+        dispatch({ type: 'OPEN_FILTER_PANEL' });
+      },
+
+      closeFilterPanel: () => {
+        dispatch({ type: 'CLOSE_FILTER_PANEL' });
+      },
+
+      setMatchMode: (mode: FilterMatchMode) => {
+        dispatch({ type: 'SET_MATCH_MODE', mode });
+      },
+
+      // Pending filter actions
+      addPendingFilter: (filter: FilterCondition) => {
+        dispatch({ type: 'ADD_PENDING_FILTER', filter });
+      },
+
+      removePendingFilter: (filterId: string) => {
+        dispatch({ type: 'REMOVE_PENDING_FILTER', filterId });
+      },
+
+      updatePendingFilter: (filterId: string, updates: Partial<FilterCondition>) => {
+        dispatch({ type: 'UPDATE_PENDING_FILTER', filterId, updates });
+      },
+
+      applyPendingFilters: () => {
+        dispatch({ type: 'APPLY_PENDING_FILTERS' });
+      },
+
+      resetPendingFilters: () => {
+        dispatch({ type: 'RESET_PENDING_FILTERS' });
       },
     }),
     [state.activeFilters]
