@@ -4,6 +4,7 @@
  */
 
 import type { WeaviateClient } from 'weaviate-client';
+import { Filters } from 'weaviate-client';
 import type {
   WeaviateObject,
   CollectionConfig,
@@ -12,6 +13,8 @@ import type {
   PropertyConfig,
   FilterCondition,
   FilterOperator,
+  FilterMatchMode,
+  VectorSearchParams,
 } from '../types';
 
 /**
@@ -24,55 +27,87 @@ export class DataExplorerAPI {
   constructor(private client: WeaviateClient) {}
 
   /**
-   * Fetches objects from a collection with pagination, sorting, and filtering support
+   * Fetches objects from a collection with pagination, sorting, filtering, and vector search support
+   * Supports three query modes:
+   * 1. Boolean-only (default): Uses fetchObjects for standard pagination/filtering
+   * 2. nearText: Semantic search using text query
+   * 3. nearVector: Similarity search using vector embedding
    */
   async fetchObjects(params: FetchObjectsParams): Promise<FetchObjectsResponse> {
     try {
       const collection = this.client.collections.get(params.collectionName);
 
-      // Build query options
-      const queryOptions: any = {
+      // Build common query options - using interface for type safety
+      interface BaseQueryOptions {
+        limit: number;
+        offset?: number;
+        returnMetadata: string[];
+        returnProperties?: string[];
+        sort?: Array<{ path: string[]; order: string }>;
+        filters?: unknown; // Weaviate filter type is complex, kept as unknown
+      }
+
+      const baseOptions: BaseQueryOptions = {
         limit: params.limit,
-        offset: params.offset,
-        returnMetadata: ['creationTime', 'updateTime'],
+        returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'],
       };
+
+      // Add offset for non-vector search queries (vector search uses limit only)
+      if (!params.vectorSearch || params.vectorSearch.type === 'none') {
+        baseOptions.offset = params.offset;
+      }
 
       // Add properties if specified
       if (params.properties && params.properties.length > 0) {
-        queryOptions.returnProperties = params.properties;
+        baseOptions.returnProperties = params.properties;
       }
 
-      // Add sorting if specified
-      if (params.sortBy) {
-        queryOptions.sort = [{ path: [params.sortBy.field], order: params.sortBy.direction }];
+      // Add sorting if specified (only for boolean queries, not vector search)
+      if (params.sortBy && (!params.vectorSearch || params.vectorSearch.type === 'none')) {
+        baseOptions.sort = [{ path: [params.sortBy.field], order: params.sortBy.direction }];
       }
 
-      // Add filters if specified
+      // Add filters if specified (works with all query types)
       if (params.where && params.where.length > 0) {
-        const filter = this.buildWhereFilter(collection, params.where);
+        const filter = this.buildWhereFilter(collection, params.where, params.matchMode || 'AND');
         if (filter) {
-          queryOptions.filters = filter;
+          baseOptions.filters = filter;
         }
       }
 
-      const result = await collection.query.fetchObjects(queryOptions);
+      // Execute appropriate query based on vector search type
+      const result = await this.executeQuery(collection, baseOptions, params.vectorSearch);
 
       // Transform result to our format
-      const objects: WeaviateObject[] = result.objects.map((obj) => ({
-        uuid: obj.uuid,
-        properties: this._validateProperties(obj.properties),
-        metadata: {
+      const objects: WeaviateObject[] = result.objects.map(
+        (obj: {
+          uuid: string;
+          properties: unknown;
+          metadata?: {
+            creationTime?: Date;
+            updateTime?: Date;
+            distance?: number;
+            certainty?: number;
+          };
+          vectors?: Record<string, number[]>;
+        }) => ({
           uuid: obj.uuid,
-          creationTime: obj.metadata?.creationTime?.toISOString(),
-          lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
-        },
-      }));
+          properties: this._validateProperties(obj.properties),
+          metadata: {
+            uuid: obj.uuid,
+            creationTime: obj.metadata?.creationTime?.toISOString(),
+            lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
+            distance: obj.metadata?.distance,
+            certainty: obj.metadata?.certainty,
+          },
+        })
+      );
 
       // Get total count using cached aggregate (with filter consideration)
       let total = 0;
       const hasFilters = params.where && params.where.length > 0;
       const cacheKey = hasFilters
-        ? `${params.collectionName}:filtered:${JSON.stringify(params.where)}`
+        ? `${params.collectionName}:filtered:${JSON.stringify(params.where)}:${params.matchMode || 'AND'}`
         : params.collectionName;
       const cached = this.countCache.get(cacheKey);
       const now = Date.now();
@@ -81,22 +116,15 @@ export class DataExplorerAPI {
         // Use cached count
         total = cached.count;
       } else {
-        // Fetch fresh count
+        // Fetch fresh count using aggregation (more efficient than fetching objects)
         try {
-          if (hasFilters) {
-            // For filtered queries, we need to count with the same filter
-            // Note: This is a workaround - ideally we'd use aggregate with filters
-            // but for now, we estimate based on the result set
-            const countResult = await collection.query.fetchObjects({
-              limit: 10000, // Get up to 10k to estimate
-              offset: 0,
-              filters: queryOptions.filters,
+          if (hasFilters && baseOptions.filters) {
+            // Use aggregate with filters for efficient counting
+
+            const aggregateResult = await collection.aggregate.overAll({
+              filters: baseOptions.filters as any,
             });
-            total = countResult.objects.length;
-            // If we hit the limit, indicate there are more
-            if (total === 10000) {
-              total = 10000; // Show "10000+" in UI
-            }
+            total = aggregateResult.totalCount ?? objects.length;
           } else {
             const aggregateResult = await collection.aggregate.overAll();
             total = aggregateResult.totalCount ?? objects.length;
@@ -112,21 +140,110 @@ export class DataExplorerAPI {
       return { objects, total };
     } catch (error) {
       console.error('Error fetching objects:', error);
+
+      // Provide better error messages for common issues
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('stopwords')) {
+        throw new Error(
+          'Filter contains only stopwords (common words like "the", "a", "is"). ' +
+            'Please use more specific terms or try the "Equal" operator instead of "Like".'
+        );
+      }
+
       throw error;
     }
   }
 
   /**
-   * Builds a Weaviate filter from FilterCondition array
-   * Combines multiple conditions with AND logic
+   * Executes the appropriate query based on vector search type
+   * @param collection - The Weaviate collection to query
+   * @param options - Base query options (limit, filters, etc.)
+   * @param vectorSearch - Optional vector search parameters
+   * @returns Query result with objects array
    */
-  private buildWhereFilter(collection: any, conditions: FilterCondition[]): any {
+
+  private async executeQuery(
+    collection: any,
+    options: {
+      limit: number;
+      offset?: number;
+      returnMetadata: string[];
+      returnProperties?: string[];
+      sort?: Array<{ path: string[]; order: string }>;
+      filters?: unknown;
+    },
+    vectorSearch?: VectorSearchParams
+  ): Promise<{ objects: any[] }> {
+    // Determine query mode
+    if (!vectorSearch || vectorSearch.type === 'none') {
+      // Boolean-only query mode (default)
+      return collection.query.fetchObjects(options);
+    }
+
+    // Build vector search options
+
+    const vectorOptions: any = {
+      limit: options.limit,
+      returnMetadata: options.returnMetadata,
+    };
+
+    if (options.returnProperties) {
+      vectorOptions.returnProperties = options.returnProperties;
+    }
+
+    if (options.filters) {
+      vectorOptions.filters = options.filters;
+    }
+
+    // Add distance/certainty constraints
+    if (vectorSearch.certainty !== undefined) {
+      vectorOptions.certainty = vectorSearch.certainty;
+    }
+    if (vectorSearch.distance !== undefined) {
+      vectorOptions.distance = vectorSearch.distance;
+    }
+
+    // Add target vector for named vectors
+    if (vectorSearch.targetVector) {
+      vectorOptions.targetVector = vectorSearch.targetVector;
+    }
+
+    // Execute appropriate vector search
+    if (vectorSearch.type === 'nearText') {
+      if (!vectorSearch.text) {
+        throw new Error('nearText search requires a text query');
+      }
+      return collection.query.nearText(vectorSearch.text, vectorOptions);
+    }
+
+    if (vectorSearch.type === 'nearVector') {
+      if (!vectorSearch.vector || vectorSearch.vector.length === 0) {
+        throw new Error('nearVector search requires a vector');
+      }
+      return collection.query.nearVector(vectorSearch.vector, vectorOptions);
+    }
+
+    // Fallback to standard fetch
+    return collection.query.fetchObjects(options);
+  }
+
+  /**
+   * Builds a Weaviate filter from FilterCondition array
+   * Combines multiple conditions with AND or OR logic based on matchMode
+   */
+
+  private buildWhereFilter(
+    collection: any,
+    conditions: FilterCondition[],
+    matchMode: FilterMatchMode = 'AND'
+  ): unknown {
     if (!conditions || conditions.length === 0) {
       return null;
     }
 
     // Build individual filters
-    const filters = conditions
+
+    const filters: any[] = conditions
       .map((condition) => this.buildSingleFilter(collection, condition))
       .filter(Boolean);
 
@@ -138,20 +255,19 @@ export class DataExplorerAPI {
       return filters[0];
     }
 
-    // Combine multiple filters with AND using the Filters.and method
-    // In v3 client, we need to chain filters with .and()
-    let combinedFilter = filters[0];
-    for (let i = 1; i < filters.length; i++) {
-      combinedFilter = combinedFilter.and(filters[i]);
+    // Combine multiple filters using Filters.and() or Filters.or()
+    if (matchMode === 'OR') {
+      return Filters.or(...filters);
+    } else {
+      return Filters.and(...filters);
     }
-
-    return combinedFilter;
   }
 
   /**
    * Builds a single filter condition for Weaviate
    */
-  private buildSingleFilter(collection: any, condition: FilterCondition): any {
+
+  private buildSingleFilter(collection: any, condition: FilterCondition): unknown {
     try {
       const { path, operator, value, valueType } = condition;
 
@@ -167,16 +283,16 @@ export class DataExplorerAPI {
           return filterBuilder.notEqual(this.coerceValue(value, valueType));
 
         case 'GreaterThan':
-          return filterBuilder.greaterThan(this.coerceValue(value, valueType));
+          return filterBuilder.greaterThan(this.coerceValue(value, valueType) as number | Date);
 
         case 'GreaterThanEqual':
-          return filterBuilder.greaterOrEqual(this.coerceValue(value, valueType));
+          return filterBuilder.greaterOrEqual(this.coerceValue(value, valueType) as number | Date);
 
         case 'LessThan':
-          return filterBuilder.lessThan(this.coerceValue(value, valueType));
+          return filterBuilder.lessThan(this.coerceValue(value, valueType) as number | Date);
 
         case 'LessThanEqual':
-          return filterBuilder.lessOrEqual(this.coerceValue(value, valueType));
+          return filterBuilder.lessOrEqual(this.coerceValue(value, valueType) as number | Date);
 
         case 'Like':
           // Like uses wildcard patterns

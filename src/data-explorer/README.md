@@ -146,13 +146,34 @@ src/data-explorer/
     └── index.ts                  # TypeScript interfaces
 ```
 
-## Next Steps for Phase 2 (Filtering)
+## Phase 2 (Filtering) - ✅ Complete
 
-1. Add FilterBuilder component
-2. Implement filter operators (equals, contains, greater than, etc.)
-3. Add filter persistence in URL/state
-4. Server-side filtering via Weaviate queries
-5. Filter presets/saved filters
+1. ✅ Visual Filter Builder panel with slide-in animation
+2. ✅ Filter operators (Equal, NotEqual, GreaterThan, LessThan, Like, ContainsAny, ContainsAll, IsNull, IsNotNull)
+3. ✅ AND/OR match mode for combining filters
+4. ✅ Server-side filtering via Weaviate queries
+5. ✅ Filter chips for quick visibility of active filters
+6. ✅ Debounced input to prevent excessive re-renders
+7. ✅ Pending/Active filter separation to prevent unnecessary API calls
+
+## Next Steps for Phase 3 (Vector Search)
+
+The API is **ready for vector search integration**. The following features are prepared:
+
+1. `VectorSearchParams` type defined with `nearText` and `nearVector` support
+2. `DataExplorerAPI.fetchObjects()` accepts `vectorSearch` parameter
+3. `executeQuery()` method handles three query modes:
+   - **Boolean-only** (default): Standard `fetchObjects` with filters
+   - **nearText**: Semantic search using text query
+   - **nearVector**: Similarity search using vector embedding
+4. Filters work seamlessly with vector search queries
+5. Distance/certainty metadata returned in results
+
+**To implement Phase 3 UI:**
+
+1. Add VectorSearchPanel component with text input
+2. Add VectorSearchContext for managing search state
+3. Wire up vector search parameters to useDataFetch hook
 
 ## Architecture Notes
 
@@ -161,14 +182,15 @@ src/data-explorer/
 - Uses React Context + useReducer pattern with **three separate contexts**:
   - **DataContext** - Data fetching & objects (schema, objects, loading, error)
   - **UIContext** - UI state (columns, pagination, sorting, selection, panels)
-  - **FilterContext** - Filter state (for Phase 2 filtering)
+  - **FilterContext** - Filter state (activeFilters, pendingFilters, matchMode)
 - No external state libraries required
 - Split contexts prevent unnecessary re-renders for better performance
+- **Pending/Active filter pattern**: UI edits update pending state, only Apply triggers API calls
 
 ### Message Passing
 
 - Extension → Webview: `postMessage({ command: 'objectsLoaded', objects, total })`
-- Webview → Extension: `vscode.postMessage({ command: 'fetchObjects', limit, offset })`
+- Webview → Extension: `vscode.postMessage({ command: 'fetchObjects', limit, offset, where, matchMode })`
 
 ### Performance Considerations
 
@@ -176,3 +198,7 @@ src/data-explorer/
 - Skeleton loading prevents layout shifts
 - Client-side sorting avoids API calls for small datasets
 - Debounced page changes prevent rapid API calls
+- **Debounced filter inputs** (300ms) prevent excessive re-renders
+- **Efficient aggregate counting** with filters for total count
+- **Request cancellation** prevents stale responses
+- **Filters cleared on collection switch** prevents invalid queries

@@ -4,7 +4,13 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { useDataState, useDataActions, useUIState, useFilterState } from '../context';
+import {
+  useDataState,
+  useDataActions,
+  useUIState,
+  useFilterState,
+  useFilterActions,
+} from '../context';
 import type { VSCodeAPI, ExtensionMessage, WebviewMessage, SortState } from '../../types';
 
 // Get VS Code API (singleton)
@@ -22,10 +28,12 @@ export function useDataFetch() {
   const dataActions = useDataActions();
   const uiState = useUIState();
   const filterState = useFilterState();
+  const filterActions = useFilterActions();
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const currentRequestIdRef = useRef<string | null>(null); // Track current request ID
+  const previousCollectionRef = useRef<string | null>(null); // Track collection changes
 
   // Post message to extension
   const postMessage = useCallback((message: WebviewMessage) => {
@@ -48,6 +56,14 @@ export function useDataFetch() {
         case 'init':
         case 'schemaLoaded':
           if (message.schema && message.collectionName) {
+            // Clear filters when switching to a different collection
+            if (
+              previousCollectionRef.current &&
+              previousCollectionRef.current !== message.collectionName
+            ) {
+              filterActions.clearAllFilters();
+            }
+            previousCollectionRef.current = message.collectionName;
             dataActions.setCollection(message.collectionName);
             dataActions.setSchema(message.schema);
           }
@@ -74,7 +90,7 @@ export function useDataFetch() {
           break;
       }
     },
-    [dataActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
+    [dataActions, filterActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
   );
 
   // Fetch objects with current pagination
@@ -99,11 +115,18 @@ export function useDataFetch() {
         limit: pageSize,
         offset,
         sortBy,
-        where: filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined, // Include filters
-        requestId, // Include request ID
+        where: filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined,
+        matchMode: filterState.matchMode, // Include AND/OR logic
+        requestId,
       });
     },
-    [postMessage, dataState.collectionName, dataActions, filterState.activeFilters]
+    [
+      postMessage,
+      dataState.collectionName,
+      dataActions,
+      filterState.activeFilters,
+      filterState.matchMode,
+    ]
   );
 
   // Initialize - fetch schema and first page of objects

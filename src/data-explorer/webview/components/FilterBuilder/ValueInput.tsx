@@ -1,9 +1,10 @@
 /**
  * ValueInput - Type-specific value input component
  * Renders appropriate input control based on property data type
+ * Uses debouncing to prevent excessive re-renders
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 
 interface ValueInputProps {
   value: unknown;
@@ -11,6 +12,7 @@ interface ValueInputProps {
   onChange: (value: unknown) => void;
   disabled?: boolean;
   placeholder?: string;
+  debounceMs?: number;
 }
 
 export function ValueInput({
@@ -19,30 +21,88 @@ export function ValueInput({
   onChange,
   disabled = false,
   placeholder = 'Enter value...',
+  debounceMs = 300,
 }: ValueInputProps) {
-  // Handle text input change
-  const handleTextChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(e.target.value);
+  // Local state for immediate UI feedback
+  const [localValue, setLocalValue] = useState<string>(() => {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (valueType === 'date') {
+      return formatDateForInput(value);
+    }
+    return String(value);
+  });
+
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
+
+  // Sync local value with prop when prop changes externally
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const newLocalValue =
+      value === null || value === undefined
+        ? ''
+        : valueType === 'date'
+          ? formatDateForInput(value)
+          : String(value);
+
+    setLocalValue(newLocalValue);
+  }, [value, valueType]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced onChange for text/number inputs
+  const debouncedOnChange = useCallback(
+    (newValue: unknown) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        onChange(newValue);
+      }, debounceMs);
     },
-    [onChange]
+    [onChange, debounceMs]
   );
 
-  // Handle number input change
+  // Handle text input change with debouncing
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setLocalValue(val);
+      debouncedOnChange(val);
+    },
+    [debouncedOnChange]
+  );
+
+  // Handle number input change with debouncing
   const handleNumberChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
+      setLocalValue(val);
+
       if (val === '') {
-        onChange('');
+        debouncedOnChange('');
       } else {
         const num = parseFloat(val);
-        onChange(isNaN(num) ? val : num);
+        debouncedOnChange(isNaN(num) ? val : num);
       }
     },
-    [onChange]
+    [debouncedOnChange]
   );
 
-  // Handle boolean select change
+  // Handle boolean select change (no debounce needed)
   const handleBooleanChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const val = e.target.value;
@@ -57,10 +117,12 @@ export function ValueInput({
     [onChange]
   );
 
-  // Handle date input change
+  // Handle date input change (no debounce needed)
   const handleDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
+      setLocalValue(val);
+
       if (val) {
         // Convert to ISO string for API
         const date = new Date(val);
@@ -71,22 +133,6 @@ export function ValueInput({
     },
     [onChange]
   );
-
-  // Format date value for input (YYYY-MM-DD)
-  const formatDateForInput = (val: unknown): string => {
-    if (!val) {
-      return '';
-    }
-    try {
-      const date = new Date(String(val));
-      if (isNaN(date.getTime())) {
-        return '';
-      }
-      return date.toISOString().split('T')[0];
-    } catch {
-      return '';
-    }
-  };
 
   // Render based on value type
   switch (valueType) {
@@ -109,7 +155,7 @@ export function ValueInput({
         <input
           type="number"
           className="filter-value-input"
-          value={value !== null && value !== undefined ? String(value) : ''}
+          value={localValue}
           onChange={handleNumberChange}
           disabled={disabled}
           placeholder={placeholder}
@@ -122,7 +168,7 @@ export function ValueInput({
         <input
           type="date"
           className="filter-value-input filter-date-input"
-          value={formatDateForInput(value)}
+          value={localValue}
           onChange={handleDateChange}
           disabled={disabled}
         />
@@ -134,11 +180,27 @@ export function ValueInput({
         <input
           type="text"
           className="filter-value-input"
-          value={value !== null && value !== undefined ? String(value) : ''}
+          value={localValue}
           onChange={handleTextChange}
           disabled={disabled}
           placeholder={placeholder}
         />
       );
+  }
+}
+
+// Helper function to format date for input (YYYY-MM-DD)
+function formatDateForInput(val: unknown): string {
+  if (!val) {
+    return '';
+  }
+  try {
+    const date = new Date(String(val));
+    if (isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toISOString().split('T')[0];
+  } catch {
+    return '';
   }
 }

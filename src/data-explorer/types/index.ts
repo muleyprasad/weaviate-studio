@@ -147,6 +147,24 @@ export interface FilterCondition {
   valueType?: 'text' | 'number' | 'boolean' | 'date';
 }
 
+// Filter match mode for combining filters
+export type FilterMatchMode = 'AND' | 'OR';
+
+// Vector search types for Phase 3
+export type VectorSearchType = 'none' | 'nearText' | 'nearVector';
+
+export interface VectorSearchParams {
+  type: VectorSearchType;
+  // nearText parameters
+  text?: string;
+  // nearVector parameters
+  vector?: number[];
+  // Common parameters
+  certainty?: number; // 0-1, higher means more similar
+  distance?: number; // 0-2, lower means more similar
+  targetVector?: string; // For named vectors
+}
+
 // Fetch params for API
 export interface FetchObjectsParams {
   collectionName: string;
@@ -155,6 +173,8 @@ export interface FetchObjectsParams {
   properties?: string[];
   sortBy?: SortState;
   where?: FilterCondition[]; // Phase 2: Filter support
+  matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
+  vectorSearch?: VectorSearchParams; // Phase 3: Vector search support
 }
 
 // Fetch response type
@@ -201,6 +221,7 @@ export interface WebviewMessage {
   properties?: string[];
   sortBy?: SortState;
   where?: FilterCondition[]; // Phase 2: Filter conditions
+  matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
   requestId?: string; // For tracking and cancelling requests
 }
 
