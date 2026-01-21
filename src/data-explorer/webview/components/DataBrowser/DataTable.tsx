@@ -8,7 +8,7 @@ import { TableHeader } from './TableHeader';
 import { TableRow } from './TableRow';
 import { Pagination } from './Pagination';
 import { ColumnManager } from './ColumnManager';
-import { useDataExplorer } from '../../context/DataExplorerContext';
+import { useDataState, useUIState, useUIActions } from '../../context';
 import { useDataFetch } from '../../hooks/useDataFetch';
 
 interface DataTableProps {
@@ -16,26 +16,53 @@ interface DataTableProps {
 }
 
 export function DataTable({ onOpenDetail }: DataTableProps) {
-  const { state, actions, sortedObjects, isAllSelected, displayedColumns } = useDataExplorer();
+  const dataState = useDataState();
+  const uiState = useUIState();
+  const uiActions = useUIActions();
   const { refresh, isLoading } = useDataFetch();
 
+  // Get displayed columns from schema
+  const displayedColumns = useMemo(() => {
+    if (!dataState.schema) return [];
+
+    const allColumns = ['uuid', ...(dataState.schema.properties || []).map((p) => p.name)];
+
+    // If no custom visible columns set, show all
+    if (uiState.visibleColumns.length === 0) {
+      return allColumns;
+    }
+
+    // Filter to only visible columns
+    return allColumns.filter((col) => uiState.visibleColumns.includes(col));
+  }, [dataState.schema, uiState.visibleColumns]);
+
+  // Calculate if all rows are selected
+  const isAllSelected = useMemo(() => {
+    return dataState.objects.length > 0 && uiState.selectedRows.size === dataState.objects.length;
+  }, [dataState.objects.length, uiState.selectedRows.size]);
+
   // Calculate if some but not all are selected
-  const isSomeSelected = state.selectedRows.size > 0 && !isAllSelected;
+  const isSomeSelected = uiState.selectedRows.size > 0 && !isAllSelected;
 
   // Handle select all
   const handleSelectAll = useCallback(
     (selected: boolean) => {
-      actions.selectAllRows(selected);
+      if (selected) {
+        const allUuids = dataState.objects.map((obj) => obj.uuid);
+        uiActions.selectAll(allUuids);
+      } else {
+        uiActions.clearSelection();
+      }
     },
-    [actions]
+    [dataState.objects, uiActions]
   );
 
   // Handle row selection
   const handleSelectRow = useCallback(
     (uuid: string) => {
-      actions.toggleRowSelection(uuid);
+      uiActions.toggleRowSelection(uuid);
     },
-    [actions]
+    [uiActions]
   );
 
   // Handle row click (open detail panel)
@@ -48,55 +75,54 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
 
   // Toggle column manager
   const toggleColumnManager = useCallback(() => {
-    actions.toggleColumnManager();
-  }, [actions]);
+    uiActions.toggleColumnManager();
+  }, [uiActions]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!sortedObjects.length) return;
+      if (!dataState.objects.length) return;
 
-      const currentIndex = state.selectedObjectId
-        ? sortedObjects.findIndex((obj) => obj.uuid === state.selectedObjectId)
+      const currentIndex = uiState.selectedObjectId
+        ? dataState.objects.findIndex((obj) => obj.uuid === uiState.selectedObjectId)
         : -1;
 
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          if (currentIndex < sortedObjects.length - 1) {
-            const nextUuid = sortedObjects[currentIndex + 1].uuid;
-            actions.selectObject(nextUuid);
+          if (currentIndex < dataState.objects.length - 1) {
+            const nextUuid = dataState.objects[currentIndex + 1].uuid;
+            uiActions.openDetailPanel(nextUuid);
           }
           break;
 
         case 'ArrowUp':
           e.preventDefault();
           if (currentIndex > 0) {
-            const prevUuid = sortedObjects[currentIndex - 1].uuid;
-            actions.selectObject(prevUuid);
+            const prevUuid = dataState.objects[currentIndex - 1].uuid;
+            uiActions.openDetailPanel(prevUuid);
           }
           break;
 
         case 'Enter':
-          if (state.selectedObjectId) {
-            onOpenDetail(state.selectedObjectId);
+          if (uiState.selectedObjectId) {
+            onOpenDetail(uiState.selectedObjectId);
           }
           break;
 
         case 'Escape':
-          actions.selectObject(null);
-          actions.toggleDetailPanel(false);
+          uiActions.closeDetailPanel();
           break;
 
         case ' ':
           e.preventDefault();
-          if (state.selectedObjectId) {
-            actions.toggleRowSelection(state.selectedObjectId);
+          if (uiState.selectedObjectId) {
+            uiActions.toggleRowSelection(uiState.selectedObjectId);
           }
           break;
       }
     },
-    [sortedObjects, state.selectedObjectId, actions, onOpenDetail]
+    [dataState.objects, uiState.selectedObjectId, uiActions, onOpenDetail]
   );
 
   // Render loading skeleton
@@ -146,7 +172,7 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
           <div className="error-state" role="alert">
             <div className="error-icon">⚠️</div>
             <h3>Error loading data</h3>
-            <p>{state.error}</p>
+            <p>{dataState.error}</p>
             <button className="retry-btn" onClick={refresh}>
               🔄 Retry
             </button>
@@ -181,12 +207,12 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
         </div>
 
         <div className="toolbar-right">
-          {state.selectedRows.size > 0 && (
+          {uiState.selectedRows.size > 0 && (
             <span className="selection-info">
-              {state.selectedRows.size} selected
+              {uiState.selectedRows.size} selected
               <button
                 className="clear-selection-btn"
-                onClick={() => actions.clearSelection()}
+                onClick={() => uiActions.clearSelection()}
                 title="Clear selection"
                 aria-label="Clear selection"
               >
@@ -202,7 +228,7 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
         className="data-table-wrapper"
         role="grid"
         aria-label="Data table"
-        aria-rowcount={sortedObjects.length}
+        aria-rowcount={dataState.objects.length}
         aria-busy={isLoading}
         onKeyDown={handleKeyDown}
       >
@@ -211,21 +237,23 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
             onSelectAll={handleSelectAll}
             isAllSelected={isAllSelected}
             isSomeSelected={isSomeSelected}
+            displayedColumns={displayedColumns}
           />
 
-          {state.error ? (
+          {dataState.error ? (
             renderErrorState()
-          ) : isLoading && sortedObjects.length === 0 ? (
+          ) : isLoading && dataState.objects.length === 0 ? (
             renderSkeleton()
-          ) : sortedObjects.length === 0 ? (
+          ) : dataState.objects.length === 0 ? (
             renderEmptyState()
           ) : (
             <tbody className="data-table-body">
-              {sortedObjects.map((object) => (
+              {dataState.objects.map((object) => (
                 <TableRow
                   key={object.uuid}
                   object={object}
-                  isSelected={state.selectedRows.has(object.uuid)}
+                  isSelected={uiState.selectedRows.has(object.uuid)}
+                  displayedColumns={displayedColumns}
                   onSelect={handleSelectRow}
                   onRowClick={handleRowClick}
                 />
@@ -236,12 +264,12 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
       </div>
 
       {/* Pagination */}
-      {!state.error && !isLoading && <Pagination />}
+      {!dataState.error && !isLoading && <Pagination />}
 
       {/* Column Manager Dialog */}
       <ColumnManager
-        isOpen={state.showColumnManager}
-        onClose={() => actions.toggleColumnManager(false)}
+        isOpen={uiState.showColumnManager}
+        onClose={() => uiActions.toggleColumnManager()}
       />
     </div>
   );

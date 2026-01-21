@@ -5,12 +5,13 @@
 
 import React, { useCallback } from 'react';
 import { CellRenderer } from './CellRenderer';
-import { useDataExplorer } from '../../context/DataExplorerContext';
+import { useDataState, useUIState } from '../../context';
 import type { WeaviateObject } from '../../../types';
 
 interface TableRowProps {
   object: WeaviateObject;
   isSelected: boolean;
+  displayedColumns: string[];
   onSelect: (uuid: string) => void;
   onRowClick: (uuid: string) => void;
 }
@@ -18,10 +19,12 @@ interface TableRowProps {
 export const TableRow = React.memo(function TableRow({
   object,
   isSelected,
+  displayedColumns,
   onSelect,
   onRowClick,
 }: TableRowProps) {
-  const { state, displayedColumns } = useDataExplorer();
+  const dataState = useDataState();
+  const uiState = useUIState();
 
   const handleCheckboxChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,11 +67,11 @@ export const TableRow = React.memo(function TableRow({
     if (column === 'uuid') {
       return 'uuid';
     }
-    const property = state.schema?.properties?.find((p) => p.name === column);
+    const property = dataState.schema?.properties?.find((p) => p.name === column);
     return property?.dataType?.[0];
   };
 
-  const isPinned = (column: string) => state.pinnedColumns.includes(column);
+  const isPinned = (column: string) => uiState.pinnedColumns.includes(column);
 
   return (
     <tr
@@ -97,7 +100,7 @@ export const TableRow = React.memo(function TableRow({
           className={`data-cell ${isPinned(column) ? 'pinned' : ''}`}
           role="gridcell"
           style={{
-            width: state.columnWidths[column] ? `${state.columnWidths[column]}px` : undefined,
+            width: uiState.columnWidths[column] ? `${uiState.columnWidths[column]}px` : undefined,
           }}
         >
           <CellRenderer

@@ -277,6 +277,7 @@ export class DataExplorerPanel {
       offset: message.offset || 0,
       properties: message.properties,
       sortBy: message.sortBy,
+      where: message.where, // Pass filter conditions to API
     });
 
     this.postMessage({

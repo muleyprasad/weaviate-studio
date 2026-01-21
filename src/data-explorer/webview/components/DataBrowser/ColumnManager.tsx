@@ -3,8 +3,8 @@
  * Allows users to toggle column visibility and manage pinned columns
  */
 
-import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { useDataExplorer } from '../../context/DataExplorerContext';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import { useDataState, useUIState, useUIActions } from '../../context';
 
 interface ColumnManagerProps {
   isOpen: boolean;
@@ -12,18 +12,22 @@ interface ColumnManagerProps {
 }
 
 export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
-  const { state, actions } = useDataExplorer();
+  const dataState = useDataState();
+  const uiState = useUIState();
+  const uiActions = useUIActions();
   const [search, setSearch] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Get all available columns
-  const allColumns = ['uuid', ...(state.schema?.properties?.map((p) => p.name) || [])];
+  const allColumns = useMemo(() => {
+    return ['uuid', ...(dataState.schema?.properties?.map((p) => p.name) || [])];
+  }, [dataState.schema]);
 
   // Filter columns based on search
-  const filteredColumns = allColumns.filter((col) =>
-    col.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredColumns = useMemo(() => {
+    return allColumns.filter((col) => col.toLowerCase().includes(search.toLowerCase()));
+  }, [allColumns, search]);
 
   // Handle click outside to close
   useEffect(() => {
@@ -62,34 +66,38 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
   const handleToggleColumn = useCallback(
     (column: string) => {
-      actions.toggleColumn(column);
+      uiActions.toggleColumn(column);
     },
-    [actions]
+    [uiActions]
   );
 
   const handleTogglePin = useCallback(
     (column: string) => {
-      actions.togglePinColumn(column);
+      if (uiState.pinnedColumns.includes(column)) {
+        uiActions.unpinColumn(column);
+      } else {
+        uiActions.pinColumn(column);
+      }
     },
-    [actions]
+    [uiState.pinnedColumns, uiActions]
   );
 
   const handleShowAll = useCallback(() => {
     allColumns.forEach((col) => {
-      if (!state.visibleColumns.includes(col)) {
-        actions.toggleColumn(col);
+      if (!uiState.visibleColumns.includes(col)) {
+        uiActions.toggleColumn(col);
       }
     });
-  }, [allColumns, state.visibleColumns, actions]);
+  }, [allColumns, uiState.visibleColumns, uiActions]);
 
   const handleHideAll = useCallback(() => {
     // Keep at least uuid visible
-    state.visibleColumns.forEach((col) => {
+    uiState.visibleColumns.forEach((col) => {
       if (col !== 'uuid') {
-        actions.toggleColumn(col);
+        uiActions.toggleColumn(col);
       }
     });
-  }, [state.visibleColumns, actions]);
+  }, [uiState.visibleColumns, uiActions]);
 
   if (!isOpen) return null;
 
@@ -125,8 +133,8 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
         <div className="column-manager-list">
           {filteredColumns.map((column) => {
-            const isVisible = state.visibleColumns.includes(column);
-            const isPinned = state.pinnedColumns.includes(column);
+            const isVisible = uiState.visibleColumns.includes(column);
+            const isPinned = uiState.pinnedColumns.includes(column);
             const isUuid = column === 'uuid';
 
             return (
@@ -165,7 +173,7 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
         <div className="column-manager-footer">
           <span className="column-count">
-            {state.visibleColumns.length} of {allColumns.length} columns visible
+            {uiState.visibleColumns.length} of {allColumns.length} columns visible
           </span>
         </div>
       </div>

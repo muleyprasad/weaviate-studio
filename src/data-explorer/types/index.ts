@@ -200,6 +200,7 @@ export interface WebviewMessage {
   offset?: number;
   properties?: string[];
   sortBy?: SortState;
+  where?: FilterCondition[]; // Phase 2: Filter conditions
   requestId?: string; // For tracking and cancelling requests
 }
 

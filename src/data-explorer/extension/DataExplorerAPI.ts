@@ -10,6 +10,8 @@ import type {
   FetchObjectsParams,
   FetchObjectsResponse,
   PropertyConfig,
+  FilterCondition,
+  FilterOperator,
 } from '../types';
 
 /**
@@ -22,38 +24,38 @@ export class DataExplorerAPI {
   constructor(private client: WeaviateClient) {}
 
   /**
-   * Fetches objects from a collection with pagination support
+   * Fetches objects from a collection with pagination, sorting, and filtering support
    */
   async fetchObjects(params: FetchObjectsParams): Promise<FetchObjectsResponse> {
     try {
       const collection = this.client.collections.get(params.collectionName);
 
-      // Build query options with sorting
-      let result;
-      if (params.sortBy) {
-        // Fetch with sorting
-        result = await collection.query.fetchObjects({
-          limit: params.limit,
-          offset: params.offset,
-          returnMetadata: ['creationTime', 'updateTime'],
-          returnProperties: params.properties,
-          // @ts-ignore - Weaviate client typing issue with sort
-          sort: [{ path: [params.sortBy.field], order: params.sortBy.direction }],
-        });
-      } else {
-        // Fetch without sorting
-        const queryOptions: any = {
-          limit: params.limit,
-          offset: params.offset,
-          returnMetadata: ['creationTime', 'updateTime'],
-        };
+      // Build query options
+      const queryOptions: any = {
+        limit: params.limit,
+        offset: params.offset,
+        returnMetadata: ['creationTime', 'updateTime'],
+      };
 
-        if (params.properties && params.properties.length > 0) {
-          queryOptions.returnProperties = params.properties;
-        }
-
-        result = await collection.query.fetchObjects(queryOptions);
+      // Add properties if specified
+      if (params.properties && params.properties.length > 0) {
+        queryOptions.returnProperties = params.properties;
       }
+
+      // Add sorting if specified
+      if (params.sortBy) {
+        queryOptions.sort = [{ path: [params.sortBy.field], order: params.sortBy.direction }];
+      }
+
+      // Add filters if specified
+      if (params.where && params.where.length > 0) {
+        const filter = this.buildWhereFilter(collection, params.where);
+        if (filter) {
+          queryOptions.filters = filter;
+        }
+      }
+
+      const result = await collection.query.fetchObjects(queryOptions);
 
       // Transform result to our format
       const objects: WeaviateObject[] = result.objects.map((obj) => ({
@@ -66,9 +68,13 @@ export class DataExplorerAPI {
         },
       }));
 
-      // Get total count using cached aggregate
+      // Get total count using cached aggregate (with filter consideration)
       let total = 0;
-      const cached = this.countCache.get(params.collectionName);
+      const hasFilters = params.where && params.where.length > 0;
+      const cacheKey = hasFilters
+        ? `${params.collectionName}:filtered:${JSON.stringify(params.where)}`
+        : params.collectionName;
+      const cached = this.countCache.get(cacheKey);
       const now = Date.now();
 
       if (cached && now - cached.timestamp < this.CACHE_TTL) {
@@ -77,9 +83,25 @@ export class DataExplorerAPI {
       } else {
         // Fetch fresh count
         try {
-          const aggregateResult = await collection.aggregate.overAll();
-          total = aggregateResult.totalCount ?? objects.length;
-          this.countCache.set(params.collectionName, { count: total, timestamp: now });
+          if (hasFilters) {
+            // For filtered queries, we need to count with the same filter
+            // Note: This is a workaround - ideally we'd use aggregate with filters
+            // but for now, we estimate based on the result set
+            const countResult = await collection.query.fetchObjects({
+              limit: 10000, // Get up to 10k to estimate
+              offset: 0,
+              filters: queryOptions.filters,
+            });
+            total = countResult.objects.length;
+            // If we hit the limit, indicate there are more
+            if (total === 10000) {
+              total = 10000; // Show "10000+" in UI
+            }
+          } else {
+            const aggregateResult = await collection.aggregate.overAll();
+            total = aggregateResult.totalCount ?? objects.length;
+          }
+          this.countCache.set(cacheKey, { count: total, timestamp: now });
         } catch (aggregateError) {
           console.warn('Failed to get aggregate count:', aggregateError);
           // Fallback to cached value or objects length
@@ -91,6 +113,141 @@ export class DataExplorerAPI {
     } catch (error) {
       console.error('Error fetching objects:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Builds a Weaviate filter from FilterCondition array
+   * Combines multiple conditions with AND logic
+   */
+  private buildWhereFilter(collection: any, conditions: FilterCondition[]): any {
+    if (!conditions || conditions.length === 0) {
+      return null;
+    }
+
+    // Build individual filters
+    const filters = conditions
+      .map((condition) => this.buildSingleFilter(collection, condition))
+      .filter(Boolean);
+
+    if (filters.length === 0) {
+      return null;
+    }
+
+    if (filters.length === 1) {
+      return filters[0];
+    }
+
+    // Combine multiple filters with AND using the Filters.and method
+    // In v3 client, we need to chain filters with .and()
+    let combinedFilter = filters[0];
+    for (let i = 1; i < filters.length; i++) {
+      combinedFilter = combinedFilter.and(filters[i]);
+    }
+
+    return combinedFilter;
+  }
+
+  /**
+   * Builds a single filter condition for Weaviate
+   */
+  private buildSingleFilter(collection: any, condition: FilterCondition): any {
+    try {
+      const { path, operator, value, valueType } = condition;
+
+      // Get the filter builder for this property
+      const filterBuilder = collection.filter.byProperty(path);
+
+      // Apply the appropriate operator
+      switch (operator) {
+        case 'Equal':
+          return filterBuilder.equal(this.coerceValue(value, valueType));
+
+        case 'NotEqual':
+          return filterBuilder.notEqual(this.coerceValue(value, valueType));
+
+        case 'GreaterThan':
+          return filterBuilder.greaterThan(this.coerceValue(value, valueType));
+
+        case 'GreaterThanEqual':
+          return filterBuilder.greaterOrEqual(this.coerceValue(value, valueType));
+
+        case 'LessThan':
+          return filterBuilder.lessThan(this.coerceValue(value, valueType));
+
+        case 'LessThanEqual':
+          return filterBuilder.lessOrEqual(this.coerceValue(value, valueType));
+
+        case 'Like':
+          // Like uses wildcard patterns
+          return filterBuilder.like(String(value));
+
+        case 'ContainsAny':
+          // ContainsAny expects an array
+          const anyValues = Array.isArray(value) ? value : [value];
+          return filterBuilder.containsAny(anyValues);
+
+        case 'ContainsAll':
+          // ContainsAll expects an array
+          const allValues = Array.isArray(value) ? value : [value];
+          return filterBuilder.containsAll(allValues);
+
+        case 'IsNull':
+          return filterBuilder.isNull(true);
+
+        case 'IsNotNull':
+          return filterBuilder.isNull(false);
+
+        default:
+          console.warn(`Unknown filter operator: ${operator}`);
+          return null;
+      }
+    } catch (error) {
+      console.error(`Error building filter for condition:`, condition, error);
+      return null;
+    }
+  }
+
+  /**
+   * Coerces a value to the appropriate type based on valueType hint
+   */
+  private coerceValue(value: unknown, valueType?: 'text' | 'number' | 'boolean' | 'date'): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    switch (valueType) {
+      case 'number':
+        const num = Number(value);
+        return isNaN(num) ? value : num;
+
+      case 'boolean':
+        if (typeof value === 'boolean') {
+          return value;
+        }
+        if (value === 'true') {
+          return true;
+        }
+        if (value === 'false') {
+          return false;
+        }
+        return Boolean(value);
+
+      case 'date':
+        // Return ISO string for dates
+        if (value instanceof Date) {
+          return value.toISOString();
+        }
+        // Try to parse string as date
+        const date = new Date(String(value));
+        if (!isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+        return value;
+
+      case 'text':
+      default:
+        return String(value);
     }
   }
 
@@ -174,6 +331,23 @@ export class DataExplorerAPI {
     } catch (error) {
       console.error('Error getting collection count:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Clears the count cache for a collection (useful after filter changes)
+   */
+  clearCountCache(collectionName?: string): void {
+    if (collectionName) {
+      // Clear specific collection cache
+      for (const key of this.countCache.keys()) {
+        if (key.startsWith(collectionName)) {
+          this.countCache.delete(key);
+        }
+      }
+    } else {
+      // Clear all cache
+      this.countCache.clear();
     }
   }
 

@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { useDataExplorer } from '../context/DataExplorerContext';
+import { useDataState, useDataActions, useUIState, useFilterState } from '../context';
 import type { VSCodeAPI, ExtensionMessage, WebviewMessage, SortState } from '../../types';
 
 // Get VS Code API (singleton)
@@ -18,7 +18,11 @@ function getVSCodeAPI(): VSCodeAPI {
 }
 
 export function useDataFetch() {
-  const { state, actions } = useDataExplorer();
+  const dataState = useDataState();
+  const dataActions = useDataActions();
+  const uiState = useUIState();
+  const filterState = useFilterState();
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const currentRequestIdRef = useRef<string | null>(null); // Track current request ID
@@ -44,13 +48,14 @@ export function useDataFetch() {
         case 'init':
         case 'schemaLoaded':
           if (message.schema && message.collectionName) {
-            actions.setCollection(message.collectionName, message.schema);
+            dataActions.setCollection(message.collectionName);
+            dataActions.setSchema(message.schema);
           }
           break;
 
         case 'objectsLoaded':
           if (message.objects && message.total !== undefined) {
-            actions.setData(message.objects, message.total);
+            dataActions.setData(message.objects, message.total);
           }
           break;
 
@@ -59,17 +64,17 @@ export function useDataFetch() {
           break;
 
         case 'error':
-          actions.setError(message.error || 'An error occurred');
+          dataActions.setError(message.error || 'An error occurred');
           break;
 
         case 'updateData':
         case 'refresh':
           // Trigger a refresh
-          fetchObjects(state.currentPage, state.pageSize);
+          fetchObjects(uiState.currentPage, uiState.pageSize);
           break;
       }
     },
-    [actions] // Removed state dependencies to avoid recreating handler
+    [dataActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
   );
 
   // Fetch objects with current pagination
@@ -85,52 +90,53 @@ export function useDataFetch() {
       const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       currentRequestIdRef.current = requestId;
 
-      actions.setLoading(true);
+      dataActions.setLoading(true);
 
       const offset = (page - 1) * pageSize;
       postMessage({
         command: 'fetchObjects',
-        collectionName: state.collectionName,
+        collectionName: dataState.collectionName,
         limit: pageSize,
         offset,
         sortBy,
+        where: filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined, // Include filters
         requestId, // Include request ID
       });
     },
-    [postMessage, state.collectionName, actions]
+    [postMessage, dataState.collectionName, dataActions, filterState.activeFilters]
   );
 
   // Initialize - fetch schema and first page of objects
   const initialize = useCallback(() => {
-    if (!state.collectionName) {
+    if (!dataState.collectionName) {
       return;
     }
 
-    actions.setLoading(true);
+    dataActions.setLoading(true);
     postMessage({
       command: 'initialize',
-      collectionName: state.collectionName,
+      collectionName: dataState.collectionName,
     });
-  }, [postMessage, state.collectionName, actions]);
+  }, [postMessage, dataState.collectionName, dataActions]);
 
   // Refresh data
   const refresh = useCallback(() => {
     postMessage({
       command: 'refresh',
-      collectionName: state.collectionName,
+      collectionName: dataState.collectionName,
     });
-  }, [postMessage, state.collectionName]);
+  }, [postMessage, dataState.collectionName]);
 
   // Get object detail
   const getObjectDetail = useCallback(
     (uuid: string) => {
       postMessage({
         command: 'getObjectDetail',
-        collectionName: state.collectionName,
+        collectionName: dataState.collectionName,
         uuid,
       });
     },
-    [postMessage, state.collectionName]
+    [postMessage, dataState.collectionName]
   );
 
   // Set up message listener
@@ -143,24 +149,24 @@ export function useDataFetch() {
 
   // Initial data fetch
   useEffect(() => {
-    if (!initializedRef.current && state.collectionName) {
+    if (!initializedRef.current && dataState.collectionName) {
       initializedRef.current = true;
       initialize();
     }
-  }, [state.collectionName, initialize]);
+  }, [dataState.collectionName, initialize]);
 
-  // Fetch when page, pageSize, or sortBy changes
+  // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {
-    if (initializedRef.current && state.collectionName && !state.loading) {
+    if (initializedRef.current && dataState.collectionName && !dataState.loading) {
       // Debounce page changes
       const timeoutId = setTimeout(() => {
-        fetchObjects(state.currentPage, state.pageSize, state.sortBy || undefined);
+        fetchObjects(uiState.currentPage, uiState.pageSize, uiState.sortBy || undefined);
       }, 100);
 
       return () => clearTimeout(timeoutId);
     }
     return undefined;
-  }, [state.currentPage, state.pageSize, state.sortBy]);
+  }, [uiState.currentPage, uiState.pageSize, uiState.sortBy, filterState.activeFilters]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -177,7 +183,7 @@ export function useDataFetch() {
     refresh,
     getObjectDetail,
     postMessage,
-    isLoading: state.loading,
-    error: state.error,
+    isLoading: dataState.loading,
+    error: dataState.error,
   };
 }

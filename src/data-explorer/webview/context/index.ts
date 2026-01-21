@@ -45,6 +45,3 @@ export {
   type FilterOperator,
   type FilterPreset,
 } from './FilterContext';
-
-// Legacy export - will be removed after migration
-export { DataExplorerProvider, useDataExplorer } from './DataExplorerContext';

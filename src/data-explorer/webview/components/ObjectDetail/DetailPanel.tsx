@@ -5,7 +5,7 @@
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { PropertyView } from './PropertyView';
-import { useDataExplorer } from '../../context/DataExplorerContext';
+import { useDataState } from '../../context';
 import { copyToClipboard, formatAbsoluteTime, formatRelativeTime } from '../../utils/typeRenderers';
 import type { WeaviateObject } from '../../../types';
 
@@ -15,7 +15,7 @@ interface DetailPanelProps {
 }
 
 export function DetailPanel({ object, onClose }: DetailPanelProps) {
-  const { state } = useDataExplorer();
+  const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCopiedUuid, setShowCopiedUuid] = React.useState(false);
 
@@ -66,7 +66,7 @@ export function DetailPanel({ object, onClose }: DetailPanelProps) {
 
   // Get data type hints from schema
   const getDataType = (propName: string): string | undefined => {
-    const prop = state.schema?.properties?.find((p) => p.name === propName);
+    const prop = dataState.schema?.properties?.find((p) => p.name === propName);
     return prop?.dataType?.[0];
   };
 

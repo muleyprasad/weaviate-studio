@@ -133,7 +133,10 @@ src/data-explorer/
 │   │       ├── DetailPanel.tsx   # Slide-out panel
 │   │       └── PropertyView.tsx  # Property display
 │   ├── context/
-│   │   └── DataExplorerContext.tsx # State management
+│   │   ├── DataContext.tsx       # Data fetching & objects state
+│   │   ├── UIContext.tsx         # UI state (columns, pagination, selection)
+│   │   ├── FilterContext.tsx     # Filter state (Phase 2)
+│   │   └── index.ts              # Context exports
 │   ├── hooks/
 │   │   ├── useDataFetch.ts       # Fetch objects hook
 │   │   └── usePagination.ts      # Pagination logic
@@ -155,9 +158,12 @@ src/data-explorer/
 
 ### State Management
 
-- Uses React Context + useReducer pattern
+- Uses React Context + useReducer pattern with **three separate contexts**:
+  - **DataContext** - Data fetching & objects (schema, objects, loading, error)
+  - **UIContext** - UI state (columns, pagination, sorting, selection, panels)
+  - **FilterContext** - Filter state (for Phase 2 filtering)
 - No external state libraries required
-- State includes: objects, pagination, column config, selection, sorting
+- Split contexts prevent unnecessary re-renders for better performance
 
 ### Message Passing
 

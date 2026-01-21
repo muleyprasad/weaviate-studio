@@ -4,46 +4,55 @@
  */
 
 import React, { useCallback } from 'react';
-import { useDataExplorer } from '../../context/DataExplorerContext';
+import { useUIState, useUIActions } from '../../context';
 
 interface TableHeaderProps {
   onSelectAll: (selected: boolean) => void;
   isAllSelected: boolean;
   isSomeSelected: boolean;
+  displayedColumns: string[];
 }
 
-export function TableHeader({ onSelectAll, isAllSelected, isSomeSelected }: TableHeaderProps) {
-  const { state, actions, displayedColumns } = useDataExplorer();
+export function TableHeader({
+  onSelectAll,
+  isAllSelected,
+  isSomeSelected,
+  displayedColumns,
+}: TableHeaderProps) {
+  const uiState = useUIState();
+  const uiActions = useUIActions();
 
   const handleSort = useCallback(
     (column: string) => {
-      const currentSort = state.sortBy;
+      const currentSort = uiState.sortBy;
 
       if (currentSort?.field === column) {
         // Toggle direction or clear sort
         if (currentSort.direction === 'asc') {
-          actions.setSort({ field: column, direction: 'desc' });
+          uiActions.setSortBy({ field: column, direction: 'desc' });
         } else {
-          actions.setSort(null);
+          uiActions.setSortBy(null);
         }
       } else {
         // New sort column
-        actions.setSort({ field: column, direction: 'asc' });
+        uiActions.setSortBy({ field: column, direction: 'asc' });
       }
     },
-    [state.sortBy, actions]
+    [uiState.sortBy, uiActions]
   );
 
   const getSortIndicator = (column: string) => {
-    if (state.sortBy?.field !== column) {
+    if (uiState.sortBy?.field !== column) {
       return <span className="sort-indicator inactive">↕</span>;
     }
     return (
-      <span className="sort-indicator active">{state.sortBy.direction === 'asc' ? '↑' : '↓'}</span>
+      <span className="sort-indicator active">
+        {uiState.sortBy.direction === 'asc' ? '↑' : '↓'}
+      </span>
     );
   };
 
-  const isPinned = (column: string) => state.pinnedColumns.includes(column);
+  const isPinned = (column: string) => uiState.pinnedColumns.includes(column);
 
   return (
     <thead className="data-table-header">
@@ -70,14 +79,14 @@ export function TableHeader({ onSelectAll, isAllSelected, isSomeSelected }: Tabl
             className={`header-cell ${isPinned(column) ? 'pinned' : ''}`}
             role="columnheader"
             aria-sort={
-              state.sortBy?.field === column
-                ? state.sortBy.direction === 'asc'
+              uiState.sortBy?.field === column
+                ? uiState.sortBy.direction === 'asc'
                   ? 'ascending'
                   : 'descending'
                 : 'none'
             }
             style={{
-              width: state.columnWidths[column] ? `${state.columnWidths[column]}px` : undefined,
+              width: uiState.columnWidths[column] ? `${uiState.columnWidths[column]}px` : undefined,
             }}
           >
             <button

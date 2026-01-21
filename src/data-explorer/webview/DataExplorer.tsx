@@ -3,8 +3,15 @@
  * Manages the overall layout and coordinates child components
  */
 
-import React, { useCallback, useEffect } from 'react';
-import { DataExplorerProvider, useDataExplorer } from './context/DataExplorerContext';
+import React, { useCallback } from 'react';
+import {
+  DataProvider,
+  UIProvider,
+  FilterProvider,
+  useDataState,
+  useUIState,
+  useUIActions,
+} from './context';
 import { DataTable } from './components/DataBrowser/DataTable';
 import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { useDataFetch } from './hooks/useDataFetch';
@@ -20,22 +27,28 @@ declare global {
 }
 
 function DataExplorerContent() {
-  const { state, actions, selectedObject } = useDataExplorer();
-  const { refresh, isLoading, error } = useDataFetch();
+  const dataState = useDataState();
+  const uiState = useUIState();
+  const uiActions = useUIActions();
+  const { isLoading } = useDataFetch();
 
   // Handle opening detail panel
   const handleOpenDetail = useCallback(
     (uuid: string) => {
-      actions.selectObject(uuid);
+      uiActions.openDetailPanel(uuid);
     },
-    [actions]
+    [uiActions]
   );
 
   // Handle closing detail panel
   const handleCloseDetail = useCallback(() => {
-    actions.selectObject(null);
-    actions.toggleDetailPanel(false);
-  }, [actions]);
+    uiActions.closeDetailPanel();
+  }, [uiActions]);
+
+  // Get selected object
+  const selectedObject = uiState.selectedObjectId
+    ? dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId) || null
+    : null;
 
   return (
     <div className="data-explorer">
@@ -45,12 +58,14 @@ function DataExplorerContent() {
           <div className="breadcrumb">
             <span className="breadcrumb-parent">Collections</span>
             <span className="breadcrumb-separator">/</span>
-            <h1 className="breadcrumb-current">{state.collectionName}</h1>
+            <h1 className="breadcrumb-current">{dataState.collectionName}</h1>
           </div>
         </div>
         <div className="header-right">
           {!isLoading && (
-            <span className="object-count-badge">{state.totalCount.toLocaleString()} objects</span>
+            <span className="object-count-badge">
+              {dataState.totalCount.toLocaleString()} objects
+            </span>
           )}
         </div>
       </header>
@@ -58,7 +73,7 @@ function DataExplorerContent() {
       {/* Main content */}
       <main className="data-explorer-main">
         {/* Loading indicator */}
-        {isLoading && state.objects.length === 0 && (
+        {isLoading && dataState.objects.length === 0 && (
           <div className="loading-overlay" role="status" aria-live="polite">
             <div className="loading-spinner" />
             <span>Loading objects...</span>
@@ -70,7 +85,9 @@ function DataExplorerContent() {
       </main>
 
       {/* Detail panel */}
-      {state.showDetailPanel && <DetailPanel object={selectedObject} onClose={handleCloseDetail} />}
+      {uiState.showDetailPanel && (
+        <DetailPanel object={selectedObject} onClose={handleCloseDetail} />
+      )}
     </div>
   );
 }
@@ -79,9 +96,13 @@ export function DataExplorer() {
   const initialCollectionName = window.initialData?.collectionName || '';
 
   return (
-    <DataExplorerProvider initialCollectionName={initialCollectionName}>
-      <DataExplorerContent />
-    </DataExplorerProvider>
+    <DataProvider initialCollectionName={initialCollectionName}>
+      <UIProvider>
+        <FilterProvider>
+          <DataExplorerContent />
+        </FilterProvider>
+      </UIProvider>
+    </DataProvider>
   );
 }
 

@@ -4,23 +4,30 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import { useDataExplorer } from '../context/DataExplorerContext';
+import { useDataState, useUIState, useUIActions } from '../context';
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 export function usePagination() {
-  const { state, actions, totalPages } = useDataExplorer();
+  const dataState = useDataState();
+  const uiState = useUIState();
+  const uiActions = useUIActions();
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(dataState.totalCount / uiState.pageSize));
+  }, [dataState.totalCount, uiState.pageSize]);
 
   // Navigation actions
   const goToPage = useCallback(
     (page: number) => {
       const validPage = Math.max(1, Math.min(page, totalPages));
-      if (validPage !== state.currentPage) {
-        actions.setPage(validPage);
+      if (validPage !== uiState.currentPage) {
+        uiActions.setPage(validPage);
       }
     },
-    [actions, state.currentPage, totalPages]
+    [uiActions, uiState.currentPage, totalPages]
   );
 
   const goToFirstPage = useCallback(() => {
@@ -32,36 +39,36 @@ export function usePagination() {
   }, [goToPage, totalPages]);
 
   const goToPreviousPage = useCallback(() => {
-    goToPage(state.currentPage - 1);
-  }, [goToPage, state.currentPage]);
+    goToPage(uiState.currentPage - 1);
+  }, [goToPage, uiState.currentPage]);
 
   const goToNextPage = useCallback(() => {
-    goToPage(state.currentPage + 1);
-  }, [goToPage, state.currentPage]);
+    goToPage(uiState.currentPage + 1);
+  }, [goToPage, uiState.currentPage]);
 
   const changePageSize = useCallback(
     (newSize: PageSize) => {
-      if (newSize !== state.pageSize) {
-        actions.setPageSize(newSize);
+      if (newSize !== uiState.pageSize) {
+        uiActions.setPageSize(newSize);
       }
     },
-    [actions, state.pageSize]
+    [uiActions, uiState.pageSize]
   );
 
   // Computed values
-  const canGoToPrevious = useMemo(() => state.currentPage > 1, [state.currentPage]);
+  const canGoToPrevious = useMemo(() => uiState.currentPage > 1, [uiState.currentPage]);
 
   const canGoToNext = useMemo(
-    () => state.currentPage < totalPages,
-    [state.currentPage, totalPages]
+    () => uiState.currentPage < totalPages,
+    [uiState.currentPage, totalPages]
   );
 
   // Calculate displayed range
   const { startIndex, endIndex } = useMemo(() => {
-    const start = (state.currentPage - 1) * state.pageSize + 1;
-    const end = Math.min(state.currentPage * state.pageSize, state.totalCount);
+    const start = (uiState.currentPage - 1) * uiState.pageSize + 1;
+    const end = Math.min(uiState.currentPage * uiState.pageSize, dataState.totalCount);
     return { startIndex: start, endIndex: end };
-  }, [state.currentPage, state.pageSize, state.totalCount]);
+  }, [uiState.currentPage, uiState.pageSize, dataState.totalCount]);
 
   // Generate page numbers for pagination UI
   const pageNumbers = useMemo(() => {
@@ -78,17 +85,17 @@ export function usePagination() {
       pages.push(1);
 
       // Calculate start and end of visible range
-      let start = Math.max(2, state.currentPage - 1);
-      let end = Math.min(totalPages - 1, state.currentPage + 1);
+      let start = Math.max(2, uiState.currentPage - 1);
+      let end = Math.min(totalPages - 1, uiState.currentPage + 1);
 
       // Adjust if we're near the start
-      if (state.currentPage <= 3) {
+      if (uiState.currentPage <= 3) {
         start = 2;
         end = maxVisiblePages - 1;
       }
 
       // Adjust if we're near the end
-      if (state.currentPage >= totalPages - 2) {
+      if (uiState.currentPage >= totalPages - 2) {
         start = totalPages - maxVisiblePages + 2;
         end = totalPages - 1;
       }
@@ -113,13 +120,13 @@ export function usePagination() {
     }
 
     return pages;
-  }, [state.currentPage, totalPages]);
+  }, [uiState.currentPage, totalPages]);
 
   return {
     // Current state
-    currentPage: state.currentPage,
-    pageSize: state.pageSize,
-    totalCount: state.totalCount,
+    currentPage: uiState.currentPage,
+    pageSize: uiState.pageSize,
+    totalCount: dataState.totalCount,
     totalPages,
     startIndex,
     endIndex,
