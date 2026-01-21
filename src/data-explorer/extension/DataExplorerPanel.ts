@@ -57,12 +57,13 @@ export class DataExplorerPanel {
       this._disposables
     );
 
-    // Update API when panel becomes active
+    // Update API when panel becomes active (only if not already created)
     this._panel.onDidChangeViewState(
       () => {
         if (this._panel.visible) {
           const client = this.getClient();
-          if (client) {
+          if (client && !this._api) {
+            // Only create if doesn't exist
             this._api = new DataExplorerAPI(client);
           }
         }
@@ -205,7 +206,15 @@ export class DataExplorerPanel {
           break;
 
         case 'getObjectDetail':
-          await this._handleGetObjectDetail(message.uuid!);
+          // Validate uuid field
+          if (!message.uuid || typeof message.uuid !== 'string') {
+            this.postMessage({
+              command: 'error',
+              error: 'Invalid getObjectDetail message: missing or invalid uuid',
+            });
+            return;
+          }
+          await this._handleGetObjectDetail(message.uuid);
           break;
 
         case 'refresh':
@@ -236,6 +245,7 @@ export class DataExplorerPanel {
       command: 'schemaLoaded',
       schema,
       collectionName: this._collectionName,
+      // No requestId for schema - it's not cancellable
     });
 
     // Get initial objects
@@ -249,6 +259,7 @@ export class DataExplorerPanel {
       command: 'objectsLoaded',
       objects: result.objects,
       total: result.total,
+      // No requestId for initial load - it's not cancellable
     });
   }
 
@@ -272,6 +283,7 @@ export class DataExplorerPanel {
       command: 'objectsLoaded',
       objects: result.objects,
       total: result.total,
+      requestId: message.requestId, // Echo back request ID
     });
   }
 
@@ -404,14 +416,10 @@ export class DataExplorerPanel {
   }
 
   /**
-   * Generates a nonce for CSP
+   * Generates a cryptographically secure nonce for CSP
    */
   private _getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+    const crypto = require('crypto');
+    return crypto.randomBytes(16).toString('base64');
   }
 }

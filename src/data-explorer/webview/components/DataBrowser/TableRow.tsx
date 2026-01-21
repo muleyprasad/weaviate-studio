@@ -15,7 +15,12 @@ interface TableRowProps {
   onRowClick: (uuid: string) => void;
 }
 
-export function TableRow({ object, isSelected, onSelect, onRowClick }: TableRowProps) {
+export const TableRow = React.memo(function TableRow({
+  object,
+  isSelected,
+  onSelect,
+  onRowClick,
+}: TableRowProps) {
   const { state, displayedColumns } = useDataExplorer();
 
   const handleCheckboxChange = useCallback(
@@ -116,4 +121,4 @@ export function TableRow({ object, isSelected, onSelect, onRowClick }: TableRowP
       </td>
     </tr>
   );
-}
+});

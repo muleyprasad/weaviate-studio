@@ -16,6 +16,9 @@ import type {
  * API class for interacting with Weaviate collections in the Data Explorer
  */
 export class DataExplorerAPI {
+  private countCache = new Map<string, { count: number; timestamp: number }>();
+  private readonly CACHE_TTL = 60000; // 1 minute
+
   constructor(private client: WeaviateClient) {}
 
   /**
@@ -25,30 +28,37 @@ export class DataExplorerAPI {
     try {
       const collection = this.client.collections.get(params.collectionName);
 
-      // Build query options
-      const queryOptions: {
-        limit: number;
-        offset: number;
-        returnMetadata?: ('creationTime' | 'updateTime')[];
-        returnProperties?: string[];
-      } = {
-        limit: params.limit,
-        offset: params.offset,
-        returnMetadata: ['creationTime', 'updateTime'],
-      };
+      // Build query options with sorting
+      let result;
+      if (params.sortBy) {
+        // Fetch with sorting
+        result = await collection.query.fetchObjects({
+          limit: params.limit,
+          offset: params.offset,
+          returnMetadata: ['creationTime', 'updateTime'],
+          returnProperties: params.properties,
+          // @ts-ignore - Weaviate client typing issue with sort
+          sort: [{ path: [params.sortBy.field], order: params.sortBy.direction }],
+        });
+      } else {
+        // Fetch without sorting
+        const queryOptions: any = {
+          limit: params.limit,
+          offset: params.offset,
+          returnMetadata: ['creationTime', 'updateTime'],
+        };
 
-      // Add properties filter if specified
-      if (params.properties && params.properties.length > 0) {
-        queryOptions.returnProperties = params.properties;
+        if (params.properties && params.properties.length > 0) {
+          queryOptions.returnProperties = params.properties;
+        }
+
+        result = await collection.query.fetchObjects(queryOptions);
       }
-
-      // Fetch objects
-      const result = await collection.query.fetchObjects(queryOptions);
 
       // Transform result to our format
       const objects: WeaviateObject[] = result.objects.map((obj) => ({
         uuid: obj.uuid,
-        properties: obj.properties as Record<string, unknown>,
+        properties: this._validateProperties(obj.properties),
         metadata: {
           uuid: obj.uuid,
           creationTime: obj.metadata?.creationTime?.toISOString(),
@@ -56,14 +66,25 @@ export class DataExplorerAPI {
         },
       }));
 
-      // Get total count using aggregate
+      // Get total count using cached aggregate
       let total = 0;
-      try {
-        const aggregateResult = await collection.aggregate.overAll();
-        total = aggregateResult.totalCount ?? objects.length;
-      } catch (aggregateError) {
-        console.warn('Failed to get aggregate count, using objects length:', aggregateError);
-        total = objects.length;
+      const cached = this.countCache.get(params.collectionName);
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < this.CACHE_TTL) {
+        // Use cached count
+        total = cached.count;
+      } else {
+        // Fetch fresh count
+        try {
+          const aggregateResult = await collection.aggregate.overAll();
+          total = aggregateResult.totalCount ?? objects.length;
+          this.countCache.set(params.collectionName, { count: total, timestamp: now });
+        } catch (aggregateError) {
+          console.warn('Failed to get aggregate count:', aggregateError);
+          // Fallback to cached value or objects length
+          total = cached?.count ?? objects.length;
+        }
       }
 
       return { objects, total };
@@ -127,7 +148,7 @@ export class DataExplorerAPI {
 
       return {
         uuid: obj.uuid,
-        properties: obj.properties as Record<string, unknown>,
+        properties: this._validateProperties(obj.properties),
         metadata: {
           uuid: obj.uuid,
           creationTime: obj.metadata?.creationTime?.toISOString(),
@@ -205,5 +226,15 @@ export class DataExplorerAPI {
           )
         : undefined,
     }));
+  }
+
+  /**
+   * Validates and safely casts properties object
+   */
+  private _validateProperties(props: unknown): Record<string, unknown> {
+    if (typeof props === 'object' && props !== null && !Array.isArray(props)) {
+      return props as Record<string, unknown>;
+    }
+    return {};
   }
 }

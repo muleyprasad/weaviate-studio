@@ -1,9 +1,9 @@
 /**
  * useDataFetch - Custom hook for fetching data from the extension
- * Handles message passing between webview and VS Code extension
+ * Manages data loading lifecycle and message passing with request cancellation
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useDataExplorer } from '../context/DataExplorerContext';
 import type { VSCodeAPI, ExtensionMessage, WebviewMessage, SortState } from '../../types';
 
@@ -21,6 +21,7 @@ export function useDataFetch() {
   const { state, actions } = useDataExplorer();
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
+  const currentRequestIdRef = useRef<string | null>(null); // Track current request ID
 
   // Post message to extension
   const postMessage = useCallback((message: WebviewMessage) => {
@@ -32,6 +33,12 @@ export function useDataFetch() {
   const handleMessage = useCallback(
     (event: MessageEvent<ExtensionMessage>) => {
       const message = event.data;
+
+      // Ignore responses from cancelled requests
+      if (message.requestId && message.requestId !== currentRequestIdRef.current) {
+        console.log(`Ignoring stale response for request ${message.requestId}`);
+        return;
+      }
 
       switch (message.command) {
         case 'init':
@@ -62,7 +69,7 @@ export function useDataFetch() {
           break;
       }
     },
-    [actions, state.currentPage, state.pageSize]
+    [actions] // Removed state dependencies to avoid recreating handler
   );
 
   // Fetch objects with current pagination
@@ -74,6 +81,10 @@ export function useDataFetch() {
       }
       abortControllerRef.current = new AbortController();
 
+      // Generate unique request ID
+      const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      currentRequestIdRef.current = requestId;
+
       actions.setLoading(true);
 
       const offset = (page - 1) * pageSize;
@@ -83,6 +94,7 @@ export function useDataFetch() {
         limit: pageSize,
         offset,
         sortBy,
+        requestId, // Include request ID
       });
     },
     [postMessage, state.collectionName, actions]
@@ -137,7 +149,7 @@ export function useDataFetch() {
     }
   }, [state.collectionName, initialize]);
 
-  // Fetch when page or pageSize changes
+  // Fetch when page, pageSize, or sortBy changes
   useEffect(() => {
     if (initializedRef.current && state.collectionName && !state.loading) {
       // Debounce page changes
@@ -148,7 +160,7 @@ export function useDataFetch() {
       return () => clearTimeout(timeoutId);
     }
     return undefined;
-  }, [state.currentPage, state.pageSize]);
+  }, [state.currentPage, state.pageSize, state.sortBy]);
 
   // Cleanup on unmount
   useEffect(() => {

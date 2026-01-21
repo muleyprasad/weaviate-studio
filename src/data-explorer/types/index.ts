@@ -166,6 +166,7 @@ export interface ExtensionMessage {
   schema?: CollectionConfig;
   object?: WeaviateObject;
   total?: number;
+  requestId?: string; // Match with request ID
 }
 
 export interface WebviewMessage {
@@ -176,6 +177,7 @@ export interface WebviewMessage {
   offset?: number;
   properties?: string[];
   sortBy?: SortState;
+  requestId?: string; // For tracking and cancelling requests
 }
 
 // Property data types enumeration

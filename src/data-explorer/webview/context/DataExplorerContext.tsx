@@ -336,49 +336,12 @@ export function DataExplorerProvider({
     });
   }, [state.visibleColumns, state.pinnedColumns, state.columnOrder]);
 
-  // Computed: sorted objects (client-side sorting)
+  // Computed: sorted objects (now handled server-side, just return as-is)
   const sortedObjects = useMemo(() => {
-    if (!state.sortBy) return state.objects;
-
-    return [...state.objects].sort((a, b) => {
-      const field = state.sortBy!.field;
-      let aVal: unknown;
-      let bVal: unknown;
-
-      if (field === 'uuid') {
-        aVal = a.uuid;
-        bVal = b.uuid;
-      } else {
-        aVal = a.properties[field];
-        bVal = b.properties[field];
-      }
-
-      // Handle null/undefined
-      if (aVal === null || aVal === undefined) return state.sortBy!.direction === 'asc' ? 1 : -1;
-      if (bVal === null || bVal === undefined) return state.sortBy!.direction === 'asc' ? -1 : 1;
-
-      // Compare values
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        const comparison = aVal.localeCompare(bVal);
-        return state.sortBy!.direction === 'asc' ? comparison : -comparison;
-      }
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return state.sortBy!.direction === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-
-      if (typeof aVal === 'boolean' && typeof bVal === 'boolean') {
-        const comparison = aVal === bVal ? 0 : aVal ? 1 : -1;
-        return state.sortBy!.direction === 'asc' ? comparison : -comparison;
-      }
-
-      // Default string comparison for other types
-      const strA = String(aVal);
-      const strB = String(bVal);
-      const comparison = strA.localeCompare(strB);
-      return state.sortBy!.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [state.objects, state.sortBy]);
+    // Server-side sorting is now handled in the API
+    // Objects come pre-sorted from the backend
+    return state.objects;
+  }, [state.objects]);
 
   // Computed: is all selected
   const isAllSelected = useMemo(() => {
