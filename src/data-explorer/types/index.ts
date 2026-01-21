@@ -125,6 +125,28 @@ export type DataExplorerAction =
   | { type: 'TOGGLE_COLUMN_MANAGER'; payload?: boolean }
   | { type: 'RESET_STATE' };
 
+// Filter types for Phase 2
+export type FilterOperator =
+  | 'Equal'
+  | 'NotEqual'
+  | 'GreaterThan'
+  | 'GreaterThanEqual'
+  | 'LessThan'
+  | 'LessThanEqual'
+  | 'Like'
+  | 'ContainsAny'
+  | 'ContainsAll'
+  | 'IsNull'
+  | 'IsNotNull';
+
+export interface FilterCondition {
+  id: string;
+  path: string;
+  operator: FilterOperator;
+  value: unknown;
+  valueType?: 'text' | 'number' | 'boolean' | 'date';
+}
+
 // Fetch params for API
 export interface FetchObjectsParams {
   collectionName: string;
@@ -132,6 +154,7 @@ export interface FetchObjectsParams {
   offset: number;
   properties?: string[];
   sortBy?: SortState;
+  where?: FilterCondition[]; // Phase 2: Filter support
 }
 
 // Fetch response type
