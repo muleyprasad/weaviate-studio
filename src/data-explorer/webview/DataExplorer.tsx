@@ -42,14 +42,17 @@ function DataExplorerContent() {
       {/* Header */}
       <header className="data-explorer-header">
         <div className="header-left">
-          <h1 className="collection-title">
-            Collection: <span className="collection-name">{state.collectionName}</span>
-          </h1>
+          <div className="breadcrumb">
+            <span className="breadcrumb-parent">Collections</span>
+            <span className="breadcrumb-separator">/</span>
+            <h1 className="breadcrumb-current">{state.collectionName}</h1>
+          </div>
+        </div>
+        <div className="header-right">
           {!isLoading && (
-            <span className="object-count">[{state.totalCount.toLocaleString()} objects]</span>
+            <span className="object-count-badge">{state.totalCount.toLocaleString()} objects</span>
           )}
         </div>
-        <div className="header-right">{/* Future: Add quick search here */}</div>
       </header>
 
       {/* Main content */}

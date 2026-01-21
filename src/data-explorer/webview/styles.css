@@ -30,24 +30,35 @@
     gap: 12px;
 }
 
-.collection-title {
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.breadcrumb-parent {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.breadcrumb-separator {
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground, #666);
+}
+
+.breadcrumb-current {
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     margin: 0;
     color: var(--vscode-foreground);
 }
 
-.collection-name {
-    font-weight: 600;
-    color: var(--vscode-textLink-foreground, #3794ff);
-}
-
-.object-count {
+.object-count-badge {
     font-size: 12px;
     color: var(--vscode-descriptionForeground, #888);
     background-color: var(--vscode-badge-background, rgba(255, 255, 255, 0.1));
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 4px 10px;
+    border-radius: 12px;
 }
 
 .data-explorer-main {
@@ -130,6 +141,13 @@
 
 .toolbar-btn:hover:not(:disabled) {
     background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.toolbar-btn.icon-btn {
+    padding: 6px 8px;
+    font-size: 14px;
+    min-width: 28px;
+    justify-content: center;
 }
 
 .toolbar-btn:disabled {
@@ -438,6 +456,17 @@
     transform: scale(1.1);
 }
 
+.row-action-btn.more-btn {
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.row-action-btn.more-btn:hover {
+    color: var(--vscode-foreground);
+}
+
 /* ===== Skeleton Loading ===== */
 .skeleton-row {
     animation: skeleton-pulse 1.5s ease-in-out infinite;
@@ -552,8 +581,16 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.results-text strong {
+.page-indicator strong {
     color: var(--vscode-foreground);
+}
+
+.page-indicator .of-text {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground);
+    margin: 0 2px;
 }
 
 .pagination-nav {

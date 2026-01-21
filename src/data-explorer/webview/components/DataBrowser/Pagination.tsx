@@ -39,11 +39,11 @@ export function Pagination() {
 
   return (
     <div className="pagination" role="navigation" aria-label="Pagination">
-      {/* Results summary */}
+      {/* Page indicator */}
       <div className="pagination-info">
-        <span className="results-text">
-          Showing <strong>{startIndex}</strong> - <strong>{endIndex}</strong> of{' '}
-          <strong>{totalCount.toLocaleString()}</strong> objects
+        <span className="page-indicator">
+          Page <strong>{currentPage}</strong> <span className="of-text">OF</span>{' '}
+          <strong>{totalPages}</strong>
         </span>
       </div>
 

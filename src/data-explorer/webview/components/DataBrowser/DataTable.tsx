@@ -170,13 +170,13 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
             ⚙️ Columns
           </button>
           <button
-            className="toolbar-btn refresh-btn"
+            className="toolbar-btn icon-btn refresh-btn"
             onClick={refresh}
             disabled={isLoading}
-            title="Refresh data"
+            title="Refresh"
             aria-label="Refresh data"
           >
-            🔄 Refresh
+            ↻
           </button>
         </div>
 

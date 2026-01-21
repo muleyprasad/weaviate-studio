@@ -106,12 +106,12 @@ export function TableRow({ object, isSelected, onSelect, onRowClick }: TableRowP
       {/* Actions cell */}
       <td className="data-cell actions-cell" role="gridcell">
         <button
-          className="row-action-btn view-btn"
+          className="row-action-btn more-btn"
           onClick={handleViewClick}
-          title="View object details"
-          aria-label="View object details"
+          title="More options"
+          aria-label="More options"
         >
-          👁️
+          ⋯
         </button>
       </td>
     </tr>
