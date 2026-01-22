@@ -223,6 +223,13 @@ export class DataExplorerAPI {
       return collection.query.nearVector(vectorSearch.vector, vectorOptions);
     }
 
+    if (vectorSearch.type === 'nearObject') {
+      if (!vectorSearch.objectId) {
+        throw new Error('nearObject search requires an object UUID');
+      }
+      return collection.query.nearObject(vectorSearch.objectId, vectorOptions);
+    }
+
     // Fallback to standard fetch
     return collection.query.fetchObjects(options);
   }

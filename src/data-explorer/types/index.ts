@@ -151,7 +151,7 @@ export interface FilterCondition {
 export type FilterMatchMode = 'AND' | 'OR';
 
 // Vector search types for Phase 3
-export type VectorSearchType = 'none' | 'nearText' | 'nearVector';
+export type VectorSearchType = 'none' | 'nearText' | 'nearVector' | 'nearObject';
 
 export interface VectorSearchParams {
   type: VectorSearchType;
@@ -159,6 +159,8 @@ export interface VectorSearchParams {
   text?: string;
   // nearVector parameters
   vector?: number[];
+  // nearObject parameters
+  objectId?: string;
   // Common parameters
   certainty?: number; // 0-1, higher means more similar
   distance?: number; // 0-2, lower means more similar
