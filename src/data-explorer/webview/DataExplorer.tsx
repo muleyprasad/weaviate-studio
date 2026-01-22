@@ -59,10 +59,18 @@ function DataExplorerContent() {
     uiActions.closeDetailPanel();
   }, [uiActions]);
 
-  // Get selected object
-  const selectedObject = uiState.selectedObjectId
-    ? dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId) || null
-    : null;
+  // Get selected object (check both table data and search results)
+  const selectedObject = useMemo(() => {
+    if (!uiState.selectedObjectId) return null;
+    // First check table data
+    const fromTable = dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId);
+    if (fromTable) return fromTable;
+    // Then check vector search results
+    const fromSearch = vectorSearchState.searchResults.find(
+      (result) => result.object.uuid === uiState.selectedObjectId
+    );
+    return fromSearch?.object || null;
+  }, [uiState.selectedObjectId, dataState.objects, vectorSearchState.searchResults]);
 
   // Get schema properties for filter builder
   const schemaProperties = dataState.schema?.properties || [];

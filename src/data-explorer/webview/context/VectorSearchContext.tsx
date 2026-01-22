@@ -134,14 +134,22 @@ function vectorSearchReducer(
         searchMode: action.mode,
         searchParams: { ...state.searchParams, mode: action.mode },
         searchError: null,
+        // Results are shared across all modes - don't clear on tab switch
       };
 
-    case 'SET_SEARCH_PARAMS':
+    case 'SET_SEARCH_PARAMS': {
+      // Clear results if query-related params change (query, objectId, vector)
+      const queryParamsChanged =
+        action.params.query !== undefined ||
+        action.params.objectId !== undefined ||
+        action.params.vector !== undefined;
       return {
         ...state,
         searchParams: { ...state.searchParams, ...action.params },
         searchError: null,
+        searchResults: queryParamsChanged ? [] : state.searchResults,
       };
+    }
 
     case 'SET_SEARCH_RESULTS':
       return {
@@ -185,6 +193,8 @@ function vectorSearchReducer(
           mode: 'object',
           objectId: action.objectId,
         },
+        searchResults: [], // Clear previous results
+        searchError: null,
       };
 
     default:

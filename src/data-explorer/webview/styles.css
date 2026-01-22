@@ -875,8 +875,18 @@
     background-color: rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: flex-end;
-    z-index: 1000;
+    z-index: 1100;
     animation: fade-in 0.2s ease;
+}
+
+/* When vector search panel is open, position detail panel to the left of it */
+body:has(.vector-search-panel.open) .detail-panel-overlay {
+    right: min(42%, 520px); /* matches vector-search-content width */
+}
+
+/* Ensure detail panel doesn't extend past available space */
+body:has(.vector-search-panel.open) .detail-panel {
+    max-width: calc(100% - min(42%, 520px) - 20px);
 }
 
 @keyframes fade-in {
@@ -1871,10 +1881,19 @@ input[type="checkbox"]:focus-visible {
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
     transform: translateX(100%);
     transition: transform 300ms ease-out;
+    overflow: hidden;
 }
 
 .vector-search-panel.open .vector-search-content {
     transform: translateX(0);
+}
+
+/* Scrollable body for everything below mode tabs */
+.vector-search-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 /* ===== Vector Search Header ===== */
@@ -1933,6 +1952,7 @@ input[type="checkbox"]:focus-visible {
     gap: 0;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
     flex-shrink: 0;
+    background-color: var(--vscode-sideBar-background, #1e1e1e);
 }
 
 .search-mode-button {
@@ -1982,7 +2002,6 @@ input[type="checkbox"]:focus-visible {
 .search-input-area {
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
-    flex-shrink: 0;
 }
 
 .input-label {
@@ -2193,7 +2212,6 @@ input[type="checkbox"]:focus-visible {
 .search-parameters {
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
-    flex-shrink: 0;
 }
 
 .parameters-title {
@@ -2279,7 +2297,6 @@ input[type="checkbox"]:focus-visible {
     gap: 8px;
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
-    flex-shrink: 0;
 }
 
 .search-btn {
@@ -2337,8 +2354,6 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Search Results Container ===== */
 .search-results-container {
-    flex: 1;
-    overflow-y: auto;
     padding: 0;
 }
 
