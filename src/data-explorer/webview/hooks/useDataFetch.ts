@@ -11,17 +11,8 @@ import {
   useFilterState,
   useFilterActions,
 } from '../context';
-import type { VSCodeAPI, ExtensionMessage, WebviewMessage, SortState } from '../../types';
-
-// Get VS Code API (singleton)
-let vscodeApi: VSCodeAPI | null = null;
-
-function getVSCodeAPI(): VSCodeAPI {
-  if (!vscodeApi) {
-    vscodeApi = window.acquireVsCodeApi();
-  }
-  return vscodeApi;
-}
+import { getVSCodeAPI } from '../utils/vscodeApi';
+import type { ExtensionMessage, WebviewMessage, SortState } from '../../types';
 
 export function useDataFetch() {
   const dataState = useDataState();

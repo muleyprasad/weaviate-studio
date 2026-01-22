@@ -271,22 +271,33 @@ export class DataExplorerPanel {
       return;
     }
 
-    const result = await this._api.fetchObjects({
-      collectionName: this._collectionName,
-      limit: message.limit || 20,
-      offset: message.offset || 0,
-      properties: message.properties,
-      sortBy: message.sortBy,
-      where: message.where, // Pass filter conditions to API
-      matchMode: message.matchMode, // Pass AND/OR logic to API
-    });
+    try {
+      const result = await this._api.fetchObjects({
+        collectionName: this._collectionName,
+        limit: message.limit || 20,
+        offset: message.offset || 0,
+        properties: message.properties,
+        sortBy: message.sortBy,
+        where: message.where, // Pass filter conditions to API
+        matchMode: message.matchMode, // Pass AND/OR logic to API
+        vectorSearch: (message as any).vectorSearch, // Pass vector search params to API
+      });
 
-    this.postMessage({
-      command: 'objectsLoaded',
-      objects: result.objects,
-      total: result.total,
-      requestId: message.requestId, // Echo back request ID
-    });
+      this.postMessage({
+        command: 'objectsLoaded',
+        objects: result.objects,
+        total: result.total,
+        requestId: message.requestId, // Echo back request ID
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Vector search failed';
+      console.error('DataExplorerPanel fetch error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+        requestId: message.requestId, // Echo back request ID for error too
+      });
+    }
   }
 
   /**

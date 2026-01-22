@@ -12,9 +12,10 @@ import type { WeaviateObject } from '../../../types';
 interface DetailPanelProps {
   object: WeaviateObject | null;
   onClose: () => void;
+  onFindSimilar?: (uuid: string) => void;
 }
 
-export function DetailPanel({ object, onClose }: DetailPanelProps) {
+export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps) {
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCopiedUuid, setShowCopiedUuid] = React.useState(false);
@@ -56,6 +57,12 @@ export function DetailPanel({ object, onClose }: DetailPanelProps) {
     },
     [onClose]
   );
+
+  const handleFindSimilar = useCallback(() => {
+    if (object && onFindSimilar) {
+      onFindSimilar(object.uuid);
+    }
+  }, [object, onFindSimilar]);
 
   if (!object) {
     return null;
@@ -203,6 +210,16 @@ export function DetailPanel({ object, onClose }: DetailPanelProps) {
 
         {/* Actions */}
         <div className="detail-panel-actions">
+          {onFindSimilar && (
+            <button
+              className="action-btn primary"
+              onClick={handleFindSimilar}
+              title="Find objects similar to this one"
+            >
+              <span className="codicon codicon-search" aria-hidden="true"></span>
+              Find Similar
+            </button>
+          )}
           <button className="action-btn secondary" onClick={onClose}>
             Close
           </button>

@@ -3,21 +3,27 @@
  * Manages the overall layout and coordinates child components
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   DataProvider,
   UIProvider,
   FilterProvider,
+  VectorSearchProvider,
   useDataState,
   useUIState,
   useUIActions,
   useFilterState,
   useFilterActions,
+  useVectorSearchState,
+  useVectorSearchActions,
 } from './context';
 import { DataTable } from './components/DataBrowser/DataTable';
 import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { FilterPanel, FilterChips } from './components/FilterBuilder';
+import { VectorSearchPanel } from './components/VectorSearch';
 import { useDataFetch } from './hooks/useDataFetch';
+import { useVectorSearch } from './hooks/useVectorSearch';
+import type { WeaviateObject } from '../types';
 
 // Get initial data from the window object (injected by the extension)
 declare global {
@@ -35,7 +41,10 @@ function DataExplorerContent() {
   const uiActions = useUIActions();
   const filterState = useFilterState();
   const filterActions = useFilterActions();
+  const vectorSearchState = useVectorSearchState();
+  const vectorSearchActions = useVectorSearchActions();
   const { isLoading } = useDataFetch();
+  const { executeSearch } = useVectorSearch();
 
   // Handle opening detail panel
   const handleOpenDetail = useCallback(
@@ -58,6 +67,37 @@ function DataExplorerContent() {
   // Get schema properties for filter builder
   const schemaProperties = dataState.schema?.properties || [];
 
+  // Handle vector search result selection
+  const handleVectorResultSelect = useCallback(
+    (object: WeaviateObject) => {
+      uiActions.openDetailPanel(object.uuid);
+    },
+    [uiActions]
+  );
+
+  // Handle vector search execution
+  const handleVectorSearch = useCallback(() => {
+    executeSearch();
+  }, [executeSearch]);
+
+  // Get pre-selected object for vector search (when "Find Similar" is clicked)
+  const preSelectedObject = useMemo(() => {
+    if (vectorSearchState.preSelectedObjectId) {
+      return (
+        dataState.objects.find((obj) => obj.uuid === vectorSearchState.preSelectedObjectId) || null
+      );
+    }
+    return null;
+  }, [vectorSearchState.preSelectedObjectId, dataState.objects]);
+
+  // Handle "Find Similar" action from table or detail panel
+  const handleFindSimilar = useCallback(
+    (objectId: string) => {
+      vectorSearchActions.findSimilar(objectId);
+    },
+    [vectorSearchActions]
+  );
+
   return (
     <div className="data-explorer">
       {/* Header */}
@@ -70,6 +110,19 @@ function DataExplorerContent() {
           </div>
         </div>
         <div className="header-right">
+          {/* Vector Search button */}
+          <button
+            type="button"
+            className={`vector-search-toolbar-btn ${vectorSearchState.showVectorSearchPanel ? 'active' : ''}`}
+            onClick={vectorSearchActions.toggleVectorSearchPanel}
+            title="Open vector search"
+            aria-label="Open vector search"
+            aria-expanded={vectorSearchState.showVectorSearchPanel}
+          >
+            <span className="codicon codicon-search" aria-hidden="true"></span>
+            Vector Search
+          </button>
+
           {/* Filter button */}
           <button
             type="button"
@@ -112,16 +165,29 @@ function DataExplorerContent() {
         )}
 
         {/* Data table */}
-        <DataTable onOpenDetail={handleOpenDetail} />
+        <DataTable onOpenDetail={handleOpenDetail} onFindSimilar={handleFindSimilar} />
       </main>
 
       {/* Detail panel */}
       {uiState.showDetailPanel && (
-        <DetailPanel object={selectedObject} onClose={handleCloseDetail} />
+        <DetailPanel
+          object={selectedObject}
+          onClose={handleCloseDetail}
+          onFindSimilar={handleFindSimilar}
+        />
       )}
 
       {/* Filter panel */}
       <FilterPanel isOpen={filterState.showFilterPanel} properties={schemaProperties} />
+
+      {/* Vector Search panel */}
+      <VectorSearchPanel
+        isOpen={vectorSearchState.showVectorSearchPanel}
+        schema={dataState.schema}
+        onResultSelect={handleVectorResultSelect}
+        onSearch={handleVectorSearch}
+        preSelectedObject={preSelectedObject}
+      />
     </div>
   );
 }
@@ -133,7 +199,9 @@ export function DataExplorer() {
     <DataProvider initialCollectionName={initialCollectionName}>
       <UIProvider>
         <FilterProvider>
-          <DataExplorerContent />
+          <VectorSearchProvider>
+            <DataExplorerContent />
+          </VectorSearchProvider>
         </FilterProvider>
       </UIProvider>
     </DataProvider>

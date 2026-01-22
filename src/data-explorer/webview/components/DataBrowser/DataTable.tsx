@@ -13,9 +13,10 @@ import { useDataFetch } from '../../hooks/useDataFetch';
 
 interface DataTableProps {
   onOpenDetail: (uuid: string) => void;
+  onFindSimilar?: (uuid: string) => void;
 }
 
-export function DataTable({ onOpenDetail }: DataTableProps) {
+export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const dataState = useDataState();
   const uiState = useUIState();
   const uiActions = useUIActions();
@@ -256,6 +257,7 @@ export function DataTable({ onOpenDetail }: DataTableProps) {
                   displayedColumns={displayedColumns}
                   onSelect={handleSelectRow}
                   onRowClick={handleRowClick}
+                  onFindSimilar={onFindSimilar}
                 />
               ))}
             </tbody>

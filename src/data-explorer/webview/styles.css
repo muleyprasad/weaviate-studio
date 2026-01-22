@@ -447,6 +447,13 @@
 }
 
 /* Row action buttons */
+.row-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+}
+
 .row-action-btn {
     background: none;
     border: none;
@@ -455,22 +462,19 @@
     font-size: 14px;
     opacity: 0.5;
     transition: opacity 0.15s ease, transform 0.15s ease;
+    border-radius: 4px;
+    color: var(--vscode-descriptionForeground);
 }
 
 .row-action-btn:hover {
     opacity: 1;
     transform: scale(1.1);
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
 }
 
-.row-action-btn.more-btn {
-    font-size: 16px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    color: var(--vscode-descriptionForeground);
-}
-
-.row-action-btn.more-btn:hover {
-    color: var(--vscode-foreground);
+.row-action-btn.more-btn:hover,
+.row-action-btn.find-similar-btn:hover {
+    color: var(--vscode-textLink-foreground, #3794ff);
 }
 
 /* ===== Skeleton Loading ===== */
@@ -1220,7 +1224,25 @@
 }
 
 .detail-panel-actions .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.detail-panel-actions .action-btn.primary {
+    background: linear-gradient(135deg, #5346e7 0%, #3B82F6 100%);
+    color: white;
+}
+
+.detail-panel-actions .action-btn.primary:hover {
+    background: linear-gradient(135deg, #6356f7 0%, #4B92FF 100%);
 }
 
 .detail-panel-actions .action-btn.secondary {
@@ -1651,7 +1673,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 .filter-value-spacer {
-    /* Empty spacer when no value input is needed */
+    /* Spacer when no value input is needed */
+    min-height: 1px;
 }
 
 .filter-remove-btn {
@@ -1795,5 +1818,804 @@ input[type="checkbox"]:focus-visible {
 
     .filter-rule .filter-value-input {
         grid-column: 1 / -1;
+    }
+}
+
+/* ============================================================================
+   PHASE 3: VECTOR SEARCH PANEL STYLES
+   ============================================================================ */
+
+/* ===== Vector Search Panel (Slide-in) ===== */
+.vector-search-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.vector-search-panel.open {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.vector-search-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0);
+    transition: background-color 300ms ease-out;
+}
+
+.vector-search-panel.open .vector-search-backdrop {
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.vector-search-content {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42%;
+    min-width: 380px;
+    max-width: 520px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--vscode-sideBar-background, #1e1e1e);
+    border-left: 1px solid var(--vscode-panel-border, #333);
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.3);
+    transform: translateX(100%);
+    transition: transform 300ms ease-out;
+}
+
+.vector-search-panel.open .vector-search-content {
+    transform: translateX(0);
+}
+
+/* ===== Vector Search Header ===== */
+.vector-search-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(83, 70, 231, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+}
+
+.vector-search-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vector-search-title h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--vscode-foreground);
+}
+
+.vector-search-title .codicon {
+    font-size: 18px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.vector-search-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.vector-search-close:hover {
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* ===== Search Mode Selector ===== */
+.search-mode-selector {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    flex-shrink: 0;
+}
+
+.search-mode-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--vscode-descriptionForeground, #888);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.search-mode-button:hover:not(:disabled) {
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
+}
+
+.search-mode-button.active {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    border-bottom-color: var(--vscode-textLink-foreground, #3794FF);
+    background-color: rgba(55, 148, 255, 0.08);
+}
+
+.search-mode-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.search-mode-button .mode-label {
+    display: none;
+}
+
+@media (min-width: 450px) {
+    .search-mode-button .mode-label {
+        display: inline;
+    }
+}
+
+/* ===== Search Input Area ===== */
+.search-input-area {
+    padding: 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    flex-shrink: 0;
+}
+
+.input-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+    margin-bottom: 10px;
+}
+
+.input-label .codicon {
+    font-size: 14px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.input-hint {
+    margin: 8px 0 0 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #666);
+}
+
+/* Text Search Input */
+.text-search-textarea {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground, #FFF);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s ease;
+}
+
+.text-search-textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.text-search-textarea::placeholder {
+    color: var(--vscode-input-placeholderForeground, #888);
+}
+
+.vectorizer-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background-color: rgba(55, 148, 255, 0.1);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.vectorizer-info strong {
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.vectorizer-warning {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    background-color: rgba(255, 180, 0, 0.1);
+    border: 1px solid rgba(255, 180, 0, 0.3);
+    border-radius: 6px;
+}
+
+.vectorizer-warning .codicon {
+    font-size: 24px;
+    color: var(--vscode-editorWarning-foreground, #CCA700);
+    flex-shrink: 0;
+}
+
+.vectorizer-warning h4 {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.vectorizer-warning p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Object Search Input */
+.object-uuid-input {
+    width: 100%;
+    padding: 10px 12px;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground, #FFF);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.object-uuid-input:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.selected-object-preview {
+    padding: 12px;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    border: 1px solid var(--vscode-textLink-foreground, #3794FF);
+    border-radius: 6px;
+}
+
+.object-preview-header {
+    margin-bottom: 6px;
+}
+
+.object-preview-id code {
+    font-size: 11px;
+    padding: 2px 6px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.object-preview-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--vscode-foreground);
+}
+
+.change-object-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background-color: transparent;
+    color: var(--vscode-textLink-foreground, #3794FF);
+    border: 1px solid var(--vscode-panel-border, #444);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.change-object-btn:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Vector Input */
+.vector-textarea {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground, #FFF);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color 0.2s ease;
+}
+
+.vector-textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.vector-textarea.has-error {
+    border-color: var(--vscode-inputValidation-errorBorder, #BE1100);
+}
+
+.vector-textarea.is-valid {
+    border-color: var(--vscode-terminal-ansiGreen, #16c60c);
+}
+
+.vector-validation {
+    margin-top: 8px;
+    font-size: 11px;
+}
+
+.validation-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-errorForeground, #F48771);
+}
+
+.validation-success {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-terminal-ansiGreen, #16c60c);
+}
+
+.dimensions-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* ===== Search Parameters ===== */
+.search-parameters {
+    padding: 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    flex-shrink: 0;
+}
+
+.parameters-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.parameter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.parameter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.parameter-item:nth-child(2) {
+    grid-column: 1 / -1;
+}
+
+.parameter-item label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+}
+
+.parameter-item label strong {
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.parameter-item select {
+    padding: 6px 10px;
+    background-color: var(--vscode-dropdown-background, #3C3C3C);
+    color: var(--vscode-dropdown-foreground, #FFF);
+    border: 1px solid var(--vscode-dropdown-border, #3C3C3C);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.parameter-item input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--vscode-progressBar-background, #0E639C);
+    border-radius: 3px;
+    outline: none;
+}
+
+.parameter-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--vscode-button-background, #0E639C);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--vscode-editor-background);
+}
+
+.range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground, #666);
+}
+
+/* ===== Search Action Button ===== */
+.search-action {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    flex-shrink: 0;
+}
+
+.search-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.search-btn.primary {
+    background: linear-gradient(135deg, #5346e7 0%, #3B82F6 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(83, 70, 231, 0.3);
+}
+
+.search-btn.primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6356f7 0%, #4B92FF 100%);
+}
+
+.search-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.clear-results-btn {
+    padding: 8px 16px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground);
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.clear-results-btn:hover:not(:disabled) {
+    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.loading-spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ===== Search Results Container ===== */
+.search-results-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.search-results {
+    padding: 16px;
+}
+
+.results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.results-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.results-count {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    background-color: var(--vscode-badge-background);
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Search Results States */
+.search-results-loading,
+.search-results-error,
+.search-results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+}
+
+.search-results-loading .loading-spinner {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 12px;
+}
+
+.search-results-error {
+    color: var(--vscode-errorForeground);
+}
+
+.search-results-error .codicon,
+.search-results-empty .codicon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.error-content h4,
+.empty-content h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.error-content p,
+.empty-content p {
+    margin: 0;
+    font-size: 12px;
+}
+
+/* ===== Result Card ===== */
+.result-card {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+    background-color: var(--vscode-input-background, #2D2D2D);
+    border: 1px solid var(--vscode-panel-border, #3C3C3C);
+    border-radius: 8px;
+    transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.result-card:hover {
+    border-color: var(--vscode-textLink-foreground, #3794FF);
+    transform: translateX(-2px);
+}
+
+.result-rank {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.rank-number {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.result-match {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 56px;
+    padding: 8px;
+    background: linear-gradient(135deg, rgba(83, 70, 231, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.match-percentage {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.match-percentage.excellent {
+    color: var(--vscode-terminal-ansiGreen, #16c60c);
+}
+
+.match-percentage.good {
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.match-percentage.moderate {
+    color: var(--vscode-editorWarning-foreground, #CCA700);
+}
+
+.match-percentage.low {
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.match-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+    margin-top: 2px;
+}
+
+.result-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.result-title {
+    margin: 0 0 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.result-subtitle {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.result-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground, #666);
+}
+
+.result-distance code,
+.result-uuid code {
+    font-size: 10px;
+    padding: 1px 4px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+}
+
+.result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.result-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground);
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.result-action-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.result-action-btn.view-btn:hover {
+    background-color: var(--vscode-button-background, #0E639C);
+    color: var(--vscode-button-foreground, white);
+}
+
+/* ===== Vector Search Button in Toolbar ===== */
+.vector-search-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, #FFF);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.15s ease;
+}
+
+.vector-search-toolbar-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.vector-search-toolbar-btn.active {
+    background: linear-gradient(135deg, #5346e7 0%, #3B82F6 100%);
+    color: white;
+}
+
+/* ===== Responsive adjustments for Vector Search ===== */
+@media (max-width: 600px) {
+    .vector-search-content {
+        width: 100%;
+        min-width: unset;
+        max-width: unset;
+    }
+
+    .parameter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .parameter-item:nth-child(2) {
+        grid-column: 1;
+    }
+
+    .result-card {
+        flex-wrap: wrap;
+    }
+
+    .result-actions {
+        flex-direction: row;
+        width: 100%;
+        margin-top: 8px;
     }
 }

@@ -14,6 +14,7 @@ interface TableRowProps {
   displayedColumns: string[];
   onSelect: (uuid: string) => void;
   onRowClick: (uuid: string) => void;
+  onFindSimilar?: (uuid: string) => void;
 }
 
 export const TableRow = React.memo(function TableRow({
@@ -22,6 +23,7 @@ export const TableRow = React.memo(function TableRow({
   displayedColumns,
   onSelect,
   onRowClick,
+  onFindSimilar,
 }: TableRowProps) {
   const dataState = useDataState();
   const uiState = useUIState();
@@ -54,6 +56,14 @@ export const TableRow = React.memo(function TableRow({
       onRowClick(object.uuid);
     },
     [onRowClick, object.uuid]
+  );
+
+  const handleFindSimilarClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onFindSimilar?.(object.uuid);
+    },
+    [onFindSimilar, object.uuid]
   );
 
   const getCellValue = (column: string): unknown => {
@@ -113,14 +123,26 @@ export const TableRow = React.memo(function TableRow({
 
       {/* Actions cell */}
       <td className="data-cell actions-cell" role="gridcell">
-        <button
-          className="row-action-btn more-btn"
-          onClick={handleViewClick}
-          title="More options"
-          aria-label="More options"
-        >
-          ⋯
-        </button>
+        <div className="row-actions">
+          {onFindSimilar && (
+            <button
+              className="row-action-btn find-similar-btn"
+              onClick={handleFindSimilarClick}
+              title="Find similar objects"
+              aria-label="Find similar objects"
+            >
+              <span className="codicon codicon-search" aria-hidden="true"></span>
+            </button>
+          )}
+          <button
+            className="row-action-btn more-btn"
+            onClick={handleViewClick}
+            title="View details"
+            aria-label="View details"
+          >
+            <span className="codicon codicon-eye" aria-hidden="true"></span>
+          </button>
+        </div>
       </td>
     </tr>
   );

@@ -46,3 +46,17 @@ export {
   type FilterPreset,
   type FilterMatchMode,
 } from './FilterContext';
+
+// Vector Search Context (Phase 3)
+export {
+  VectorSearchProvider,
+  useVectorSearchContext,
+  useVectorSearchState,
+  useVectorSearchActions,
+  type VectorSearchContextState,
+  type VectorSearchContextActions,
+  type VectorSearchMode,
+  type VectorSearchParameters,
+  type VectorSearchResult,
+  type DistanceMetric,
+} from './VectorSearchContext';
