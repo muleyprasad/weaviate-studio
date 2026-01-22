@@ -50,6 +50,8 @@ export interface VectorSearchContextState {
   searchError: string | null;
   // Pre-selected object for "Find Similar" action
   preSelectedObjectId: string | null;
+  // Track if a search has been performed (for empty state messaging)
+  hasSearched: boolean;
 }
 
 // ============================================================================
@@ -66,7 +68,8 @@ type VectorSearchAction =
   | { type: 'SET_SEARCHING'; isSearching: boolean }
   | { type: 'SET_SEARCH_ERROR'; error: string | null }
   | { type: 'CLEAR_SEARCH' }
-  | { type: 'FIND_SIMILAR'; objectId: string };
+  | { type: 'FIND_SIMILAR'; objectId: string }
+  | { type: 'RESET_FOR_COLLECTION_CHANGE' };
 
 // ============================================================================
 // Initial State
@@ -90,6 +93,7 @@ const initialState: VectorSearchContextState = {
   isSearching: false,
   searchError: null,
   preSelectedObjectId: null,
+  hasSearched: false,
 };
 
 // ============================================================================
@@ -157,6 +161,7 @@ function vectorSearchReducer(
         searchResults: action.results,
         isSearching: false,
         searchError: null,
+        hasSearched: true,
       };
 
     case 'SET_SEARCHING':
@@ -180,6 +185,7 @@ function vectorSearchReducer(
         searchParams: { ...initialSearchParams },
         searchError: null,
         isSearching: false,
+        hasSearched: false,
       };
 
     case 'FIND_SIMILAR':
@@ -195,6 +201,14 @@ function vectorSearchReducer(
         },
         searchResults: [], // Clear previous results
         searchError: null,
+      };
+
+    case 'RESET_FOR_COLLECTION_CHANGE':
+      // Reset all vector search state when collection changes
+      return {
+        ...initialState,
+        // Keep panel open state if it was open
+        showVectorSearchPanel: state.showVectorSearchPanel,
       };
 
     default:
@@ -217,6 +231,7 @@ export interface VectorSearchContextActions {
   setSearchError: (error: string | null) => void;
   clearSearch: () => void;
   findSimilar: (objectId: string) => void;
+  resetForCollectionChange: () => void;
 }
 
 // ============================================================================
@@ -282,6 +297,10 @@ export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
 
       findSimilar: (objectId: string) => {
         dispatch({ type: 'FIND_SIMILAR', objectId });
+      },
+
+      resetForCollectionChange: () => {
+        dispatch({ type: 'RESET_FOR_COLLECTION_CHANGE' });
       },
     }),
     []

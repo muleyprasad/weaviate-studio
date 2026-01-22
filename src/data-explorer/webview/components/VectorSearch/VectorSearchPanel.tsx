@@ -35,12 +35,14 @@ export function VectorSearchPanel({
   const state = useVectorSearchState();
   const actions = useVectorSearchActions();
 
-  const { searchMode, searchParams, searchResults, isSearching, searchError } = state;
+  const { searchMode, searchParams, searchResults, isSearching, searchError, hasSearched } = state;
 
-  // Handle keyboard escape to close panel
+  // Handle keyboard escape to close panel (only add listener when open)
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         actions.closeVectorSearchPanel();
       }
     };
@@ -49,11 +51,20 @@ export function VectorSearchPanel({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, actions]);
 
+  // Type for vectorizer config entries
+  interface VectorizerConfigEntry {
+    name?: string;
+    [key: string]: unknown;
+  }
+
   // Check if collection has a vectorizer configured
   const hasVectorizer = useMemo(() => {
     if (!schema?.vectorizerConfig) return false;
     // Check if vectorizer is configured and not 'none'
-    const config = schema.vectorizerConfig as any;
+    const config = schema.vectorizerConfig as
+      | VectorizerConfigEntry[]
+      | Record<string, unknown>
+      | undefined;
     if (Array.isArray(config)) {
       return config.length > 0;
     }
@@ -63,7 +74,10 @@ export function VectorSearchPanel({
   // Get vectorizer name for display
   const vectorizerName = useMemo(() => {
     if (!schema?.vectorizerConfig) return undefined;
-    const config = schema.vectorizerConfig as any;
+    const config = schema.vectorizerConfig as
+      | VectorizerConfigEntry[]
+      | Record<string, unknown>
+      | undefined;
     if (Array.isArray(config) && config.length > 0) {
       return config[0]?.name || 'default';
     }
@@ -351,6 +365,7 @@ export function VectorSearchPanel({
               error={searchError}
               onViewObject={handleViewObject}
               onFindSimilar={handleFindSimilar}
+              hasSearched={hasSearched}
             />
           </div>
         </div>

@@ -203,6 +203,13 @@ export class DataExplorerAPI {
       vectorOptions.distance = vectorSearch.distance;
     }
 
+    // Add distance metric if specified
+    // Note: Weaviate typically uses the distance metric configured at collection level,
+    // but we pass it through for potential client library support
+    if (vectorSearch.distanceMetric) {
+      vectorOptions.distanceMetric = vectorSearch.distanceMetric;
+    }
+
     // Add target vector for named vectors
     if (vectorSearch.targetVector) {
       vectorOptions.targetVector = vectorSearch.targetVector;

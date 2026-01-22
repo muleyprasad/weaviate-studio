@@ -164,6 +164,7 @@ export interface VectorSearchParams {
   // Common parameters
   certainty?: number; // 0-1, higher means more similar
   distance?: number; // 0-2, lower means more similar
+  distanceMetric?: string; // cosine, euclidean, manhattan, dot
   targetVector?: string; // For named vectors
 }
 
@@ -224,6 +225,7 @@ export interface WebviewMessage {
   sortBy?: SortState;
   where?: FilterCondition[]; // Phase 2: Filter conditions
   matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
+  vectorSearch?: VectorSearchParams; // Phase 3: Vector search parameters
   requestId?: string; // For tracking and cancelling requests
 }
 

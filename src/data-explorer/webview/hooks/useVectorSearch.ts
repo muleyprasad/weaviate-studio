@@ -13,6 +13,18 @@ import {
 import { getVSCodeAPI } from '../utils/vscodeApi';
 import type { WebviewMessage, WeaviateObject, ExtensionMessage } from '../../types';
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+function debugLog(message: string, data?: unknown): void {
+  if (isDevelopment) {
+    if (data !== undefined) {
+      console.log(`[VectorSearch] ${message}`, data);
+    } else {
+      console.log(`[VectorSearch] ${message}`);
+    }
+  }
+}
+
 export function useVectorSearch() {
   const dataState = useDataState();
   const searchState = useVectorSearchState();
@@ -28,6 +40,7 @@ export function useVectorSearch() {
   // Handle vector search response
   const handleSearchResponse = useCallback(
     (objects: WeaviateObject[]) => {
+      debugLog('Response received', { count: objects.length });
       // Transform objects to VectorSearchResult format
       const results: VectorSearchResult[] = objects.map((obj) => ({
         object: obj,
@@ -43,6 +56,7 @@ export function useVectorSearch() {
   // Handle search error
   const handleSearchError = useCallback(
     (error: string) => {
+      debugLog('Search error', { error });
       searchActions.setSearchError(error);
     },
     [searchActions]
@@ -97,6 +111,8 @@ export function useVectorSearch() {
       objectId?: string;
       distance?: number;
       limit?: number;
+      distanceMetric?: string;
+      targetVector?: string;
     } | null = null;
 
     switch (searchMode) {
@@ -108,6 +124,8 @@ export function useVectorSearch() {
             text: searchParams.query.trim(),
             distance: searchParams.maxDistance,
             limit: searchParams.limit,
+            distanceMetric: searchParams.distanceMetric,
+            targetVector: searchParams.targetVector,
           };
         }
         break;
@@ -121,6 +139,8 @@ export function useVectorSearch() {
             objectId: searchParams.objectId.trim(),
             distance: searchParams.maxDistance,
             limit: searchParams.limit,
+            distanceMetric: searchParams.distanceMetric,
+            targetVector: searchParams.targetVector,
           };
         }
         break;
@@ -135,6 +155,8 @@ export function useVectorSearch() {
               vector: parsed,
               distance: searchParams.maxDistance,
               limit: searchParams.limit,
+              distanceMetric: searchParams.distanceMetric,
+              targetVector: searchParams.targetVector,
             };
           }
         } catch {
@@ -151,6 +173,13 @@ export function useVectorSearch() {
     // Generate unique request ID with vs- prefix for vector search
     const requestId = `vs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     currentRequestIdRef.current = requestId;
+
+    debugLog('Executing search', {
+      requestId,
+      mode: searchMode,
+      collection: dataState.collectionName,
+      payload: vectorSearchPayload,
+    });
 
     // Set searching state
     searchActions.setSearching(true);

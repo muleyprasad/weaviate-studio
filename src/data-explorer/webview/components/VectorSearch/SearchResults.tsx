@@ -14,6 +14,7 @@ interface SearchResultsProps {
   error: string | null;
   onViewObject: (object: WeaviateObject) => void;
   onFindSimilar: (objectId: string) => void;
+  hasSearched?: boolean;
 }
 
 export function SearchResults({
@@ -22,6 +23,7 @@ export function SearchResults({
   error,
   onViewObject,
   onFindSimilar,
+  hasSearched = false,
 }: SearchResultsProps) {
   // Loading state
   if (isLoading) {
@@ -46,14 +48,26 @@ export function SearchResults({
     );
   }
 
-  // Empty state (no search performed yet)
+  // Empty state
   if (results.length === 0) {
     return (
       <div className="search-results-empty">
         <span className="codicon codicon-search" aria-hidden="true"></span>
         <div className="empty-content">
-          <h4>No Results Yet</h4>
-          <p>Enter a search query and click "Search" to find similar objects.</p>
+          {hasSearched ? (
+            <>
+              <h4>No Matching Objects</h4>
+              <p>
+                No objects found matching your search criteria. Try adjusting the distance threshold
+                or search terms.
+              </p>
+            </>
+          ) : (
+            <>
+              <h4>No Results Yet</h4>
+              <p>Enter a search query and click "Search" to find similar objects.</p>
+            </>
+          )}
         </div>
       </div>
     );

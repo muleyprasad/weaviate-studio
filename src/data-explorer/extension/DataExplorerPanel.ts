@@ -280,7 +280,7 @@ export class DataExplorerPanel {
         sortBy: message.sortBy,
         where: message.where, // Pass filter conditions to API
         matchMode: message.matchMode, // Pass AND/OR logic to API
-        vectorSearch: (message as any).vectorSearch, // Pass vector search params to API
+        vectorSearch: message.vectorSearch, // Pass vector search params to API
       });
 
       this.postMessage({

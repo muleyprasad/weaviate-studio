@@ -10,6 +10,7 @@ import {
   useUIState,
   useFilterState,
   useFilterActions,
+  useVectorSearchActions,
 } from '../context';
 import { getVSCodeAPI } from '../utils/vscodeApi';
 import type { ExtensionMessage, WebviewMessage, SortState } from '../../types';
@@ -20,6 +21,7 @@ export function useDataFetch() {
   const uiState = useUIState();
   const filterState = useFilterState();
   const filterActions = useFilterActions();
+  const vectorSearchActions = useVectorSearchActions();
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
@@ -47,12 +49,13 @@ export function useDataFetch() {
         case 'init':
         case 'schemaLoaded':
           if (message.schema && message.collectionName) {
-            // Clear filters when switching to a different collection
+            // Clear filters and vector search when switching to a different collection
             if (
               previousCollectionRef.current &&
               previousCollectionRef.current !== message.collectionName
             ) {
               filterActions.clearAllFilters();
+              vectorSearchActions.resetForCollectionChange();
             }
             previousCollectionRef.current = message.collectionName;
             dataActions.setCollection(message.collectionName);
@@ -81,7 +84,7 @@ export function useDataFetch() {
           break;
       }
     },
-    [dataActions, filterActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
+    [dataActions, filterActions, vectorSearchActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
   );
 
   // Fetch objects with current pagination
