@@ -8,7 +8,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { WeaviateClient } from 'weaviate-client';
 import { DataExplorerAPI } from './DataExplorerAPI';
-import type { ExtensionMessage, WebviewMessage, WeaviateObject, CollectionConfig } from '../types';
+import type {
+  ExtensionMessage,
+  WebviewMessage,
+  WeaviateObject,
+  CollectionConfig,
+  AggregationParams,
+  ExportParams,
+} from '../types';
 
 /**
  * Manages the Data Explorer webview panel
@@ -220,6 +227,15 @@ export class DataExplorerPanel {
         case 'refresh':
           await this._handleInitialize();
           break;
+
+        // Phase 5: Aggregations and Export
+        case 'getAggregations':
+          await this._handleGetAggregations(message);
+          break;
+
+        case 'exportObjects':
+          await this._handleExportObjects(message);
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -329,6 +345,88 @@ export class DataExplorerPanel {
       command: 'objectDetailLoaded',
       object,
     });
+  }
+
+  // =====================================================
+  // Phase 5: Aggregation and Export Handlers
+  // =====================================================
+
+  /**
+   * Handles get aggregations request
+   */
+  private async _handleGetAggregations(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      return;
+    }
+
+    try {
+      const params: AggregationParams = message.aggregationParams || {
+        collectionName: this._collectionName,
+      };
+
+      // Ensure collection name is set
+      params.collectionName = this._collectionName;
+
+      const aggregations = await this._api.getAggregations(params);
+
+      this.postMessage({
+        command: 'aggregationsLoaded',
+        aggregations,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get aggregations';
+      console.error('DataExplorerPanel aggregations error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Handles export objects request
+   */
+  private async _handleExportObjects(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      return;
+    }
+
+    try {
+      const params: ExportParams = message.exportParams || {
+        collectionName: this._collectionName,
+        scope: 'currentPage',
+        format: 'json',
+        options: {
+          scope: 'currentPage',
+          format: 'json',
+          includeMetadata: true,
+          includeVectors: false,
+          flattenNested: false,
+          includeProperties: true,
+        },
+      };
+
+      // Ensure collection name is set
+      params.collectionName = this._collectionName;
+
+      const exportResult = await this._api.exportObjects(params);
+
+      this.postMessage({
+        command: 'exportComplete',
+        exportResult,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Export failed';
+      console.error('DataExplorerPanel export error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
   }
 
   /**

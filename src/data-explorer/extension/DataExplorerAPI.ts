@@ -15,6 +15,15 @@ import type {
   FilterOperator,
   FilterMatchMode,
   VectorSearchParams,
+  AggregationResult,
+  AggregationParams,
+  ExportParams,
+  ExportResult,
+  ExportOptions,
+  PropertyTopValues,
+  PropertyNumericStats,
+  PropertyDateRange,
+  PropertyBooleanCounts,
 } from '../types';
 
 /**
@@ -589,5 +598,589 @@ export class DataExplorerAPI {
       return props as Record<string, unknown>;
     }
     return {};
+  }
+
+  // =====================================================
+  // Phase 5: Aggregation Methods
+  // =====================================================
+
+  /**
+   * Gets aggregation statistics for a collection
+   * Returns total count, top values for categorical properties,
+   * min/max/avg for numeric properties, date ranges, and boolean counts
+   */
+  async getAggregations(params: AggregationParams): Promise<AggregationResult> {
+    try {
+      const collection = this.client.collections.get(params.collectionName);
+
+      // Get collection schema to understand property types
+      const schema = await this.getCollectionSchema(params.collectionName);
+      const properties = schema.properties || [];
+
+      // Build filter if specified
+      let filters: unknown = undefined;
+      if (params.where && params.where.length > 0) {
+        filters = this.buildWhereFilter(collection, params.where, params.matchMode || 'AND');
+      }
+
+      // Get total count
+      const countResult = filters
+        ? await collection.aggregate.overAll({ filters: filters as any })
+        : await collection.aggregate.overAll();
+      const totalCount = countResult.totalCount ?? 0;
+
+      // Initialize result
+      const result: AggregationResult = {
+        totalCount,
+        topValues: [],
+        numericStats: [],
+        dateRange: [],
+        booleanCounts: [],
+      };
+
+      // Process each property based on its type
+      for (const prop of properties) {
+        const dataType = prop.dataType[0]?.toLowerCase() || '';
+        const propName = prop.name;
+
+        // Skip if specific properties are requested and this isn't one
+        if (
+          params.properties &&
+          params.properties.length > 0 &&
+          !params.properties.includes(propName)
+        ) {
+          continue;
+        }
+
+        try {
+          if (dataType === 'text' || dataType === 'string') {
+            // Get top values for text properties
+            const topValues = await this.getPropertyTopValues(
+              collection,
+              propName,
+              totalCount,
+              filters
+            );
+            if (topValues && topValues.values.length > 0) {
+              result.topValues!.push(topValues);
+            }
+          } else if (dataType === 'int' || dataType === 'number') {
+            // Get numeric stats
+            const numericStats = await this.getPropertyNumericStats(collection, propName, filters);
+            if (numericStats) {
+              result.numericStats!.push(numericStats);
+            }
+          } else if (dataType === 'date') {
+            // Get date range
+            const dateRange = await this.getPropertyDateRange(collection, propName, filters);
+            if (dateRange) {
+              result.dateRange!.push(dateRange);
+            }
+          } else if (dataType === 'boolean') {
+            // Get boolean counts
+            const booleanCounts = await this.getPropertyBooleanCounts(
+              collection,
+              propName,
+              totalCount,
+              filters
+            );
+            if (booleanCounts) {
+              result.booleanCounts!.push(booleanCounts);
+            }
+          }
+        } catch (propError) {
+          console.warn(`Failed to aggregate property ${propName}:`, propError);
+          // Continue with other properties
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error getting aggregations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets top values for a text property using aggregation
+   */
+  private async getPropertyTopValues(
+    collection: any,
+    propertyName: string,
+    totalCount: number,
+    filters?: unknown
+  ): Promise<PropertyTopValues | null> {
+    try {
+      // Use groupBy aggregation to get value counts
+      const groupByOptions: { groupBy: { property: string }; filters?: unknown } = {
+        groupBy: { property: propertyName },
+      };
+      if (filters) {
+        groupByOptions.filters = filters;
+      }
+      const result = await collection.aggregate.groupBy.overAll(groupByOptions);
+
+      if (!result || !result.groups || result.groups.length === 0) {
+        return null;
+      }
+
+      // Sort by count and take top 5
+      const sortedGroups = result.groups
+        .filter((g: any) => g.groupedBy?.value !== null && g.groupedBy?.value !== undefined)
+        .sort((a: any, b: any) => (b.totalCount || 0) - (a.totalCount || 0))
+        .slice(0, 5);
+
+      const values = sortedGroups.map((group: any) => ({
+        value: String(group.groupedBy?.value || 'N/A'),
+        count: group.totalCount || 0,
+        percentage: totalCount > 0 ? Math.round(((group.totalCount || 0) / totalCount) * 100) : 0,
+      }));
+
+      return {
+        property: propertyName,
+        values,
+      };
+    } catch (error) {
+      console.warn(`Failed to get top values for ${propertyName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets numeric statistics for a number/int property
+   */
+  private async getPropertyNumericStats(
+    collection: any,
+    propertyName: string,
+    filters?: unknown
+  ): Promise<PropertyNumericStats | null> {
+    try {
+      const numericOptions: { returnMetrics: unknown; filters?: unknown } = {
+        returnMetrics: collection.metrics.aggregate(propertyName).integer({
+          count: true,
+          minimum: true,
+          maximum: true,
+          mean: true,
+          median: true,
+          sum: true,
+        }),
+      };
+      if (filters) {
+        numericOptions.filters = filters;
+      }
+      const result = await collection.aggregate.overAll(numericOptions);
+
+      const metrics = result.properties?.[propertyName];
+      if (!metrics) {
+        // Try number type instead of integer
+        const numberOptions: { returnMetrics: unknown; filters?: unknown } = {
+          returnMetrics: collection.metrics.aggregate(propertyName).number({
+            count: true,
+            minimum: true,
+            maximum: true,
+            mean: true,
+            median: true,
+            sum: true,
+          }),
+        };
+        if (filters) {
+          numberOptions.filters = filters;
+        }
+        const numberResult = await collection.aggregate.overAll(numberOptions);
+        const numberMetrics = numberResult.properties?.[propertyName];
+        if (!numberMetrics) {
+          return null;
+        }
+
+        return {
+          property: propertyName,
+          count: numberMetrics.count ?? 0,
+          min: numberMetrics.minimum ?? 0,
+          max: numberMetrics.maximum ?? 0,
+          mean: numberMetrics.mean ?? 0,
+          median: numberMetrics.median,
+          sum: numberMetrics.sum,
+        };
+      }
+
+      return {
+        property: propertyName,
+        count: metrics.count ?? 0,
+        min: metrics.minimum ?? 0,
+        max: metrics.maximum ?? 0,
+        mean: metrics.mean ?? 0,
+        median: metrics.median,
+        sum: metrics.sum,
+      };
+    } catch (error) {
+      console.warn(`Failed to get numeric stats for ${propertyName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets date range for a date property
+   */
+  private async getPropertyDateRange(
+    collection: any,
+    propertyName: string,
+    filters?: unknown
+  ): Promise<PropertyDateRange | null> {
+    try {
+      const dateOptions: { returnMetrics: unknown; filters?: unknown } = {
+        returnMetrics: collection.metrics.aggregate(propertyName).date({
+          minimum: true,
+          maximum: true,
+        }),
+      };
+      if (filters) {
+        dateOptions.filters = filters;
+      }
+      const result = await collection.aggregate.overAll(dateOptions);
+
+      const metrics = result.properties?.[propertyName];
+      if (!metrics || (!metrics.minimum && !metrics.maximum)) {
+        return null;
+      }
+
+      return {
+        property: propertyName,
+        earliest: metrics.minimum ? new Date(metrics.minimum).toISOString() : 'N/A',
+        latest: metrics.maximum ? new Date(metrics.maximum).toISOString() : 'N/A',
+      };
+    } catch (error) {
+      console.warn(`Failed to get date range for ${propertyName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets boolean counts for a boolean property
+   */
+  private async getPropertyBooleanCounts(
+    collection: any,
+    propertyName: string,
+    totalCount: number,
+    filters?: unknown
+  ): Promise<PropertyBooleanCounts | null> {
+    try {
+      const boolOptions: { groupBy: { property: string }; filters?: unknown } = {
+        groupBy: { property: propertyName },
+      };
+      if (filters) {
+        boolOptions.filters = filters;
+      }
+      const result = await collection.aggregate.groupBy.overAll(boolOptions);
+
+      if (!result || !result.groups) {
+        return null;
+      }
+
+      let trueCount = 0;
+      let falseCount = 0;
+
+      for (const group of result.groups) {
+        if (group.groupedBy?.value === true) {
+          trueCount = group.totalCount || 0;
+        } else if (group.groupedBy?.value === false) {
+          falseCount = group.totalCount || 0;
+        }
+      }
+
+      const total = trueCount + falseCount;
+      return {
+        property: propertyName,
+        trueCount,
+        falseCount,
+        truePercentage: total > 0 ? Math.round((trueCount / total) * 100) : 0,
+        falsePercentage: total > 0 ? Math.round((falseCount / total) * 100) : 0,
+      };
+    } catch (error) {
+      console.warn(`Failed to get boolean counts for ${propertyName}:`, error);
+      return null;
+    }
+  }
+
+  // =====================================================
+  // Phase 5: Export Methods
+  // =====================================================
+
+  /**
+   * Exports objects from a collection in the specified format
+   */
+  async exportObjects(params: ExportParams): Promise<ExportResult> {
+    try {
+      let objects: WeaviateObject[];
+
+      switch (params.scope) {
+        case 'currentPage':
+          // Use provided current objects
+          objects = params.currentObjects || [];
+          break;
+
+        case 'filtered':
+          // Fetch all objects matching the filter
+          objects = await this.fetchAllObjects(
+            params.collectionName,
+            params.where,
+            params.matchMode
+          );
+          break;
+
+        case 'all':
+          // Fetch all objects from collection
+          objects = await this.fetchAllObjects(params.collectionName);
+          break;
+
+        default:
+          objects = [];
+      }
+
+      // Format the data
+      const data =
+        params.format === 'json'
+          ? this.toJSON(objects, params.options)
+          : this.toCSV(objects, params.options);
+
+      // Generate filename
+      const filename = this.generateExportFilename(params);
+
+      return {
+        filename,
+        data,
+        objectCount: objects.length,
+        format: params.format,
+      };
+    } catch (error) {
+      console.error('Error exporting objects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches all objects from a collection (with optional filters)
+   * Uses pagination to handle large collections
+   */
+  private async fetchAllObjects(
+    collectionName: string,
+    where?: FilterCondition[],
+    matchMode?: FilterMatchMode
+  ): Promise<WeaviateObject[]> {
+    const allObjects: WeaviateObject[] = [];
+    let offset = 0;
+    const limit = 100;
+    const maxObjects = 10000; // Safety limit
+
+    while (allObjects.length < maxObjects) {
+      const result = await this.fetchObjects({
+        collectionName,
+        limit,
+        offset,
+        where,
+        matchMode,
+      });
+
+      allObjects.push(...result.objects);
+
+      // Break if we got fewer objects than requested (end of data)
+      if (result.objects.length < limit) {
+        break;
+      }
+
+      offset += limit;
+    }
+
+    return allObjects;
+  }
+
+  /**
+   * Converts objects to JSON format
+   */
+  private toJSON(objects: WeaviateObject[], options: ExportOptions): string {
+    const formatted = objects.map((obj) => {
+      const result: Record<string, unknown> = {};
+
+      // Add metadata if requested
+      if (options.includeMetadata) {
+        result.uuid = obj.uuid;
+        if (obj.metadata?.creationTime) {
+          result.createdAt = obj.metadata.creationTime;
+        }
+        if (obj.metadata?.lastUpdateTime) {
+          result.updatedAt = obj.metadata.lastUpdateTime;
+        }
+      }
+
+      // Add properties
+      if (options.includeProperties) {
+        if (options.flattenNested) {
+          Object.assign(result, this.flattenObject(obj.properties));
+        } else {
+          Object.assign(result, obj.properties);
+        }
+      }
+
+      // Add vectors if requested
+      if (options.includeVectors && obj.vector) {
+        result.vector = obj.vector;
+      }
+      if (options.includeVectors && obj.vectors) {
+        result.vectors = obj.vectors;
+      }
+
+      return result;
+    });
+
+    return JSON.stringify(formatted, null, 2);
+  }
+
+  /**
+   * Converts objects to CSV format
+   */
+  private toCSV(objects: WeaviateObject[], options: ExportOptions): string {
+    if (objects.length === 0) {
+      return '';
+    }
+
+    // Collect all unique column names
+    const columns = new Set<string>();
+
+    if (options.includeMetadata) {
+      columns.add('uuid');
+      columns.add('createdAt');
+      columns.add('updatedAt');
+    }
+
+    // Get property columns from first object (assuming consistent schema)
+    if (options.includeProperties) {
+      const sampleObj = objects[0];
+      if (options.flattenNested) {
+        const flattened = this.flattenObject(sampleObj.properties);
+        Object.keys(flattened).forEach((key) => columns.add(key));
+      } else {
+        Object.keys(sampleObj.properties).forEach((key) => columns.add(key));
+      }
+    }
+
+    // Note: Vectors are typically too large for CSV, but include a flag if requested
+    if (options.includeVectors) {
+      columns.add('hasVector');
+    }
+
+    const columnArray = Array.from(columns);
+
+    // Build CSV header
+    const header = columnArray.map((col) => this.escapeCSV(col)).join(',');
+
+    // Build CSV rows
+    const rows = objects.map((obj) => {
+      const row: string[] = [];
+
+      for (const col of columnArray) {
+        let value: unknown = '';
+
+        if (col === 'uuid') {
+          value = obj.uuid;
+        } else if (col === 'createdAt') {
+          value = obj.metadata?.creationTime || '';
+        } else if (col === 'updatedAt') {
+          value = obj.metadata?.lastUpdateTime || '';
+        } else if (col === 'hasVector') {
+          value = obj.vector ? 'true' : 'false';
+        } else {
+          // Property value
+          if (options.flattenNested) {
+            const flattened = this.flattenObject(obj.properties);
+            value = flattened[col];
+          } else {
+            value = obj.properties[col];
+          }
+        }
+
+        // Format the value for CSV
+        row.push(this.formatCSVValue(value));
+      }
+
+      return row.join(',');
+    });
+
+    return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Flattens nested objects using dot notation
+   */
+  private flattenObject(
+    obj: Record<string, unknown>,
+    prefix: string = ''
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      const newKey = prefix ? `${prefix}.${key}` : key;
+
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively flatten nested objects
+        Object.assign(result, this.flattenObject(value as Record<string, unknown>, newKey));
+      } else {
+        result[newKey] = value;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Escapes a string for CSV (handles quotes, commas, newlines)
+   */
+  private escapeCSV(value: string): string {
+    if (
+      value.includes('"') ||
+      value.includes(',') ||
+      value.includes('\n') ||
+      value.includes('\r')
+    ) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  }
+
+  /**
+   * Formats a value for CSV output
+   */
+  private formatCSVValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return this.escapeCSV(value);
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    if (Array.isArray(value)) {
+      // Join arrays with semicolon to avoid CSV delimiter conflicts
+      return this.escapeCSV(value.map((v) => String(v)).join(';'));
+    }
+
+    if (typeof value === 'object') {
+      return this.escapeCSV(JSON.stringify(value));
+    }
+
+    return String(value);
+  }
+
+  /**
+   * Generates a filename for the export
+   */
+  private generateExportFilename(params: ExportParams): string {
+    const date = new Date().toISOString().split('T')[0];
+    const scopeSuffix =
+      params.scope === 'all' ? 'all' : params.scope === 'filtered' ? 'filtered' : 'page';
+    const extension = params.format === 'json' ? 'json' : 'csv';
+    return `${params.collectionName}_${date}_${scopeSuffix}.${extension}`;
   }
 }

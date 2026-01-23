@@ -219,14 +219,21 @@ export type ExtensionMessageCommand =
   | 'objectDetailLoaded'
   | 'error'
   | 'updateData'
-  | 'refresh';
+  | 'refresh'
+  // Phase 5: Aggregations and Export
+  | 'aggregationsLoaded'
+  | 'exportComplete'
+  | 'exportProgress';
 
 export type WebviewMessageCommand =
   | 'initialize'
   | 'fetchObjects'
   | 'getSchema'
   | 'getObjectDetail'
-  | 'refresh';
+  | 'refresh'
+  // Phase 5: Aggregations and Export
+  | 'getAggregations'
+  | 'exportObjects';
 
 export interface ExtensionMessage {
   command: ExtensionMessageCommand;
@@ -238,6 +245,14 @@ export interface ExtensionMessage {
   object?: WeaviateObject;
   total?: number;
   requestId?: string; // Match with request ID
+  // Phase 5: Aggregations and Export
+  aggregations?: AggregationResult;
+  exportResult?: ExportResult;
+  exportProgress?: {
+    current: number;
+    total: number;
+    phase: 'fetching' | 'formatting' | 'complete';
+  };
 }
 
 export interface WebviewMessage {
@@ -252,6 +267,9 @@ export interface WebviewMessage {
   matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
   vectorSearch?: VectorSearchParams; // Phase 3: Vector search parameters
   requestId?: string; // For tracking and cancelling requests
+  // Phase 5: Aggregations and Export
+  aggregationParams?: AggregationParams;
+  exportParams?: ExportParams;
 }
 
 // Property data types enumeration
@@ -293,3 +311,130 @@ export interface VSCodeAPI {
 }
 
 // Note: Window.acquireVsCodeApi is declared elsewhere in the project
+
+// =====================================================
+// Phase 5: Aggregation Types
+// =====================================================
+
+/**
+ * Result of aggregation queries for collection insights
+ */
+export interface AggregationResult {
+  totalCount: number;
+
+  // Categorical properties (text with low cardinality)
+  topValues?: PropertyTopValues[];
+
+  // Numeric properties
+  numericStats?: PropertyNumericStats[];
+
+  // Date properties
+  dateRange?: PropertyDateRange[];
+
+  // Boolean properties
+  booleanCounts?: PropertyBooleanCounts[];
+}
+
+/**
+ * Top values breakdown for categorical/text properties
+ */
+export interface PropertyTopValues {
+  property: string;
+  values: Array<{
+    value: string;
+    count: number;
+    percentage: number;
+  }>;
+}
+
+/**
+ * Numeric statistics for number/int properties
+ */
+export interface PropertyNumericStats {
+  property: string;
+  count: number;
+  min: number;
+  max: number;
+  mean: number;
+  median?: number;
+  sum?: number;
+}
+
+/**
+ * Date range for date properties
+ */
+export interface PropertyDateRange {
+  property: string;
+  earliest: string;
+  latest: string;
+}
+
+/**
+ * Boolean counts for boolean properties
+ */
+export interface PropertyBooleanCounts {
+  property: string;
+  trueCount: number;
+  falseCount: number;
+  truePercentage: number;
+  falsePercentage: number;
+}
+
+// =====================================================
+// Phase 5: Export Types
+// =====================================================
+
+/**
+ * Export format options
+ */
+export type ExportFormat = 'json' | 'csv';
+
+/**
+ * Export scope options
+ */
+export type ExportScope = 'currentPage' | 'filtered' | 'all';
+
+/**
+ * Options for exporting data
+ */
+export interface ExportOptions {
+  scope: ExportScope;
+  format: ExportFormat;
+  includeMetadata: boolean; // UUID, creationTime, updateTime
+  includeVectors: boolean;
+  flattenNested: boolean; // Convert nested objects to dot notation
+  includeProperties: boolean;
+}
+
+/**
+ * Result of an export operation
+ */
+export interface ExportResult {
+  filename: string; // e.g., "Articles_2025-01-22_filtered.json"
+  data: string; // File content
+  objectCount: number;
+  format: ExportFormat;
+}
+
+/**
+ * Parameters for export API call
+ */
+export interface ExportParams {
+  collectionName: string;
+  scope: ExportScope;
+  format: ExportFormat;
+  options: ExportOptions;
+  currentObjects?: WeaviateObject[]; // For currentPage scope
+  where?: FilterCondition[]; // For filtered scope
+  matchMode?: FilterMatchMode;
+}
+
+/**
+ * Parameters for aggregation API call
+ */
+export interface AggregationParams {
+  collectionName: string;
+  where?: FilterCondition[];
+  matchMode?: FilterMatchMode;
+  properties?: string[]; // Limit to specific properties
+}

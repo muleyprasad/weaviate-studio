@@ -21,6 +21,8 @@ import { DataTable } from './components/DataBrowser/DataTable';
 import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { FilterPanel, FilterChips } from './components/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch';
+import { InsightsPanel } from './components/Insights';
+import { ExportDialog, ExportButton } from './components/Export';
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
 import type { WeaviateObject } from '../types';
@@ -45,6 +47,18 @@ function DataExplorerContent() {
   const vectorSearchActions = useVectorSearchActions();
   const { isLoading } = useDataFetch();
   const { executeSearch } = useVectorSearch();
+
+  // Phase 5: Export dialog state
+  const [showExportDialog, setShowExportDialog] = React.useState(false);
+
+  // Open/close export dialog handlers
+  const handleOpenExportDialog = useCallback(() => {
+    setShowExportDialog(true);
+  }, []);
+
+  const handleCloseExportDialog = useCallback(() => {
+    setShowExportDialog(false);
+  }, []);
 
   // Handle opening detail panel
   const handleOpenDetail = useCallback(
@@ -146,6 +160,12 @@ function DataExplorerContent() {
               <span className="filter-count-badge">{filterState.activeFilters.length}</span>
             )}
           </button>
+
+          {/* Export button */}
+          <ExportButton
+            onClick={handleOpenExportDialog}
+            disabled={dataState.objects.length === 0}
+          />
           {!isLoading && (
             <span className="object-count-badge">
               {dataState.totalCount.toLocaleString()} objects
@@ -160,6 +180,15 @@ function DataExplorerContent() {
         onRemove={filterActions.removeFilter}
         onClearAll={filterActions.clearAllFilters}
         onChipClick={() => filterActions.openFilterPanel()}
+      />
+
+      {/* Quick Insights Panel */}
+      <InsightsPanel
+        collectionName={dataState.collectionName}
+        schema={dataState.schema}
+        totalCount={dataState.totalCount}
+        activeFilters={filterState.activeFilters}
+        matchMode={filterState.matchMode}
       />
 
       {/* Main content */}
@@ -195,6 +224,18 @@ function DataExplorerContent() {
         onResultSelect={handleVectorResultSelect}
         onSearch={handleVectorSearch}
         preSelectedObject={preSelectedObject}
+      />
+
+      {/* Export dialog */}
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={handleCloseExportDialog}
+        collectionName={dataState.collectionName}
+        currentPageCount={dataState.objects.length}
+        filteredCount={dataState.totalCount}
+        totalCount={dataState.totalCount}
+        currentObjects={dataState.objects}
+        hasFilters={filterState.activeFilters.length > 0}
       />
     </div>
   );
