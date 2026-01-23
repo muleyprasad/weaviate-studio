@@ -223,7 +223,8 @@ export type ExtensionMessageCommand =
   // Phase 5: Aggregations and Export
   | 'aggregationsLoaded'
   | 'exportComplete'
-  | 'exportProgress';
+  | 'exportProgress'
+  | 'exportCancelled';
 
 export type WebviewMessageCommand =
   | 'initialize'
@@ -233,7 +234,8 @@ export type WebviewMessageCommand =
   | 'refresh'
   // Phase 5: Aggregations and Export
   | 'getAggregations'
-  | 'exportObjects';
+  | 'exportObjects'
+  | 'cancelExport';
 
 export interface ExtensionMessage {
   command: ExtensionMessageCommand;

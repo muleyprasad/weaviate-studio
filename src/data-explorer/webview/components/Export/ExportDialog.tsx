@@ -37,6 +37,7 @@ export function ExportDialog({
   const [flattenNested, setFlattenNested] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -55,6 +56,9 @@ export function ExportDialog({
         setExporting(false);
         // Extension has saved the file, just close the dialog
         onClose();
+      } else if (message.command === 'exportCancelled') {
+        setExporting(false);
+        setError('Export cancelled by user');
       } else if (message.command === 'error' && message.requestId?.startsWith('export-')) {
         setError(message.error);
         setExporting(false);
@@ -69,6 +73,9 @@ export function ExportDialog({
   const handleExport = useCallback(() => {
     setExporting(true);
     setError(null);
+
+    const requestId = `export-${Date.now()}`;
+    setCurrentRequestId(requestId);
 
     const options: ExportOptions = {
       scope,
@@ -88,7 +95,7 @@ export function ExportDialog({
         options,
         currentObjects: scope === 'currentPage' ? currentObjects : undefined,
       },
-      requestId: `export-${Date.now()}`,
+      requestId,
     });
   }, [
     scope,
@@ -101,15 +108,32 @@ export function ExportDialog({
     currentObjects,
   ]);
 
+  // Handle cancel export
+  const handleCancelExport = useCallback(() => {
+    if (exporting && currentRequestId) {
+      postMessageToExtension({
+        command: 'cancelExport',
+        requestId: currentRequestId,
+      });
+    }
+  }, [exporting, currentRequestId]);
+
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !exporting) {
         onClose();
       }
     },
-    [onClose]
+    [onClose, exporting]
   );
+
+  // Handle backdrop click
+  const handleBackdropClick = useCallback(() => {
+    if (!exporting) {
+      onClose();
+    }
+  }, [onClose, exporting]);
 
   // Don't render if not open
   if (!isOpen) return null;
@@ -139,7 +163,7 @@ export function ExportDialog({
   const showCsvVectorWarning = format === 'csv' && includeVectors;
 
   return (
-    <div className="export-dialog-overlay" onClick={onClose} onKeyDown={handleKeyDown}>
+    <div className="export-dialog-overlay" onClick={handleBackdropClick} onKeyDown={handleKeyDown}>
       <div
         className="export-dialog"
         onClick={(e) => e.stopPropagation()}
@@ -284,8 +308,7 @@ export function ExportDialog({
           <button
             type="button"
             className="dialog-btn secondary"
-            onClick={onClose}
-            disabled={exporting}
+            onClick={exporting ? handleCancelExport : onClose}
           >
             Cancel
           </button>

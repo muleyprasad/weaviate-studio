@@ -30,6 +30,7 @@ export class DataExplorerPanel {
   private readonly _collectionName: string;
   private _api: DataExplorerAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
+  private _exportAbortController: AbortController | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -236,6 +237,10 @@ export class DataExplorerPanel {
         case 'exportObjects':
           await this._handleExportObjects(message);
           break;
+
+        case 'cancelExport':
+          this._handleCancelExport(message);
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -393,6 +398,9 @@ export class DataExplorerPanel {
       return;
     }
 
+    // Create abort controller for this export
+    this._exportAbortController = new AbortController();
+
     try {
       const params: ExportParams = message.exportParams || {
         collectionName: this._collectionName,
@@ -411,7 +419,10 @@ export class DataExplorerPanel {
       // Ensure collection name is set
       params.collectionName = this._collectionName;
 
-      const exportResult = await this._api.exportObjects(params);
+      const exportResult = await this._api.exportObjects(
+        params,
+        this._exportAbortController.signal
+      );
 
       // Show save dialog with proper default path
       const fileExtension = exportResult.format === 'json' ? 'json' : 'csv';
@@ -456,11 +467,39 @@ export class DataExplorerPanel {
         });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Export failed';
-      console.error('DataExplorerPanel export error:', error);
+      // Check if it was a cancellation
+      if (error instanceof Error && error.message === 'Export cancelled') {
+        this.postMessage({
+          command: 'exportCancelled',
+          requestId: message.requestId,
+        });
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'Export failed';
+        console.error('DataExplorerPanel export error:', error);
+        this.postMessage({
+          command: 'error',
+          error: errorMessage,
+          requestId: message.requestId,
+        });
+      }
+    } finally {
+      // Clean up abort controller
+      this._exportAbortController = undefined;
+    }
+  }
+
+  /**
+   * Handles cancel export request
+   */
+  private _handleCancelExport(message: WebviewMessage): void {
+    if (this._exportAbortController) {
+      console.log('Cancelling export...');
+      this._exportAbortController.abort();
+      // The abort will be caught in _handleExportObjects and send exportCancelled message
+    } else {
+      // No active export
       this.postMessage({
-        command: 'error',
-        error: errorMessage,
+        command: 'exportCancelled',
         requestId: message.requestId,
       });
     }

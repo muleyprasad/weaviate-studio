@@ -932,8 +932,13 @@ export class DataExplorerAPI {
   /**
    * Exports objects from a collection in the specified format
    */
-  async exportObjects(params: ExportParams): Promise<ExportResult> {
+  async exportObjects(params: ExportParams, signal?: AbortSignal): Promise<ExportResult> {
     try {
+      // Check if already aborted
+      if (signal?.aborted) {
+        throw new Error('Export cancelled');
+      }
+
       let objects: WeaviateObject[];
 
       switch (params.scope) {
@@ -947,17 +952,23 @@ export class DataExplorerAPI {
           objects = await this.fetchAllObjects(
             params.collectionName,
             params.where,
-            params.matchMode
+            params.matchMode,
+            signal
           );
           break;
 
         case 'all':
           // Fetch all objects from collection
-          objects = await this.fetchAllObjects(params.collectionName);
+          objects = await this.fetchAllObjects(params.collectionName, undefined, undefined, signal);
           break;
 
         default:
           objects = [];
+      }
+
+      // Check if aborted after fetching
+      if (signal?.aborted) {
+        throw new Error('Export cancelled');
       }
 
       // Format the data
@@ -965,6 +976,11 @@ export class DataExplorerAPI {
         params.format === 'json'
           ? this.toJSON(objects, params.options)
           : this.toCSV(objects, params.options);
+
+      // Check if aborted after formatting
+      if (signal?.aborted) {
+        throw new Error('Export cancelled');
+      }
 
       // Generate filename
       const filename = this.generateExportFilename(params);
@@ -976,6 +992,9 @@ export class DataExplorerAPI {
         format: params.format,
       };
     } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.message === 'Export cancelled')) {
+        throw new Error('Export cancelled');
+      }
       console.error('Error exporting objects:', error);
       throw error;
     }
@@ -988,7 +1007,8 @@ export class DataExplorerAPI {
   private async fetchAllObjects(
     collectionName: string,
     where?: FilterCondition[],
-    matchMode?: FilterMatchMode
+    matchMode?: FilterMatchMode,
+    signal?: AbortSignal
   ): Promise<WeaviateObject[]> {
     const allObjects: WeaviateObject[] = [];
     let offset = 0;
@@ -996,6 +1016,11 @@ export class DataExplorerAPI {
     const maxObjects = 10000; // Safety limit
 
     while (allObjects.length < maxObjects) {
+      // Check if export was cancelled
+      if (signal?.aborted) {
+        throw new Error('Export cancelled');
+      }
+
       const result = await this.fetchObjects({
         collectionName,
         limit,
