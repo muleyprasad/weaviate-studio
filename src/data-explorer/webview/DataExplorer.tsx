@@ -21,7 +21,6 @@ import { DataTable } from './components/DataBrowser/DataTable';
 import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { FilterPanel, FilterChips } from './components/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch';
-import { InsightsPanel } from './components/Insights';
 import { ExportDialog, ExportButton } from './components/Export';
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
@@ -180,15 +179,6 @@ function DataExplorerContent() {
         onRemove={filterActions.removeFilter}
         onClearAll={filterActions.clearAllFilters}
         onChipClick={() => filterActions.openFilterPanel()}
-      />
-
-      {/* Quick Insights Panel */}
-      <InsightsPanel
-        collectionName={dataState.collectionName}
-        schema={dataState.schema}
-        totalCount={dataState.totalCount}
-        activeFilters={filterState.activeFilters}
-        matchMode={filterState.matchMode}
       />
 
       {/* Main content */}
