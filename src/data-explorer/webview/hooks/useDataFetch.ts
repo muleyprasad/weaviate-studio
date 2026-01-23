@@ -39,8 +39,14 @@ export function useDataFetch() {
     (event: MessageEvent<ExtensionMessage>) => {
       const message = event.data;
 
-      // Ignore responses from cancelled requests
-      if (message.requestId && message.requestId !== currentRequestIdRef.current) {
+      // Only check for stale responses on commands that this hook handles
+      // Commands like 'aggregationsLoaded', 'exportComplete' are handled by other components
+      const commandsToCheckForStale = ['objectsLoaded', 'init', 'schemaLoaded'];
+      if (
+        message.requestId &&
+        commandsToCheckForStale.includes(message.command) &&
+        message.requestId !== currentRequestIdRef.current
+      ) {
         console.log(`Ignoring stale response for request ${message.requestId}`);
         return;
       }
@@ -74,7 +80,10 @@ export function useDataFetch() {
           break;
 
         case 'error':
-          dataActions.setError(message.error || 'An error occurred');
+          // Only handle errors for this hook's requests
+          if (!message.requestId || message.requestId === currentRequestIdRef.current) {
+            dataActions.setError(message.error || 'An error occurred');
+          }
           break;
 
         case 'updateData':

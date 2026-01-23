@@ -413,11 +413,48 @@ export class DataExplorerPanel {
 
       const exportResult = await this._api.exportObjects(params);
 
-      this.postMessage({
-        command: 'exportComplete',
-        exportResult,
-        requestId: message.requestId,
+      // Show save dialog with proper default path
+      const fileExtension = exportResult.format === 'json' ? 'json' : 'csv';
+      const filters: Record<string, string[]> = {};
+      if (exportResult.format === 'json') {
+        filters['JSON Files'] = ['json'];
+      } else {
+        filters['CSV Files'] = ['csv'];
+      }
+      filters['All Files'] = ['*'];
+
+      // Use workspace folder or home directory as default location
+      const defaultFolder =
+        vscode.workspace.workspaceFolders?.[0]?.uri || vscode.Uri.file(require('os').homedir());
+      const defaultUri = vscode.Uri.joinPath(defaultFolder, exportResult.filename);
+
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri,
+        filters,
       });
+
+      if (uri) {
+        // Write file
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(exportResult.data, 'utf-8'));
+
+        // Show success message
+        vscode.window.showInformationMessage(
+          `Exported ${exportResult.objectCount} objects to ${path.basename(uri.fsPath)}`
+        );
+
+        // Send success back to webview
+        this.postMessage({
+          command: 'exportComplete',
+          requestId: message.requestId,
+        });
+      } else {
+        // User cancelled the save dialog
+        this.postMessage({
+          command: 'error',
+          error: 'Export cancelled',
+          requestId: message.requestId,
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Export failed';
       console.error('DataExplorerPanel export error:', error);

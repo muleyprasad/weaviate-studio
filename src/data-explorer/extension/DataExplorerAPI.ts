@@ -611,11 +611,18 @@ export class DataExplorerAPI {
    */
   async getAggregations(params: AggregationParams): Promise<AggregationResult> {
     try {
+      console.log('[DataExplorerAPI] Getting aggregations for:', params.collectionName);
+
       const collection = this.client.collections.get(params.collectionName);
 
       // Get collection schema to understand property types
       const schema = await this.getCollectionSchema(params.collectionName);
       const properties = schema.properties || [];
+
+      console.log(
+        '[DataExplorerAPI] Schema properties:',
+        properties.map((p) => p.name)
+      );
 
       // Build filter if specified
       let filters: unknown = undefined;
@@ -629,6 +636,8 @@ export class DataExplorerAPI {
         : await collection.aggregate.overAll();
       const totalCount = countResult.totalCount ?? 0;
 
+      console.log('[DataExplorerAPI] Total count:', totalCount);
+
       // Initialize result
       const result: AggregationResult = {
         totalCount,
@@ -639,20 +648,23 @@ export class DataExplorerAPI {
       };
 
       // Process each property based on its type
-      for (const prop of properties) {
+      const propertiesToProcess =
+        params.properties && params.properties.length > 0
+          ? properties.filter((p) => params.properties!.includes(p.name))
+          : properties;
+
+      console.log(
+        '[DataExplorerAPI] Processing properties:',
+        propertiesToProcess.map((p) => `${p.name} (${p.dataType[0]})`)
+      );
+
+      for (const prop of propertiesToProcess) {
         const dataType = prop.dataType[0]?.toLowerCase() || '';
         const propName = prop.name;
 
-        // Skip if specific properties are requested and this isn't one
-        if (
-          params.properties &&
-          params.properties.length > 0 &&
-          !params.properties.includes(propName)
-        ) {
-          continue;
-        }
-
         try {
+          console.log(`[DataExplorerAPI] Aggregating property: ${propName} (${dataType})`);
+
           if (dataType === 'text' || dataType === 'string') {
             // Get top values for text properties
             const topValues = await this.getPropertyTopValues(
@@ -663,18 +675,21 @@ export class DataExplorerAPI {
             );
             if (topValues && topValues.values.length > 0) {
               result.topValues!.push(topValues);
+              console.log(`[DataExplorerAPI] Added top values for ${propName}`);
             }
           } else if (dataType === 'int' || dataType === 'number') {
             // Get numeric stats
             const numericStats = await this.getPropertyNumericStats(collection, propName, filters);
             if (numericStats) {
               result.numericStats!.push(numericStats);
+              console.log(`[DataExplorerAPI] Added numeric stats for ${propName}`);
             }
           } else if (dataType === 'date') {
             // Get date range
             const dateRange = await this.getPropertyDateRange(collection, propName, filters);
             if (dateRange) {
               result.dateRange!.push(dateRange);
+              console.log(`[DataExplorerAPI] Added date range for ${propName}`);
             }
           } else if (dataType === 'boolean') {
             // Get boolean counts
@@ -686,17 +701,26 @@ export class DataExplorerAPI {
             );
             if (booleanCounts) {
               result.booleanCounts!.push(booleanCounts);
+              console.log(`[DataExplorerAPI] Added boolean counts for ${propName}`);
             }
           }
         } catch (propError) {
-          console.warn(`Failed to aggregate property ${propName}:`, propError);
+          console.warn(`[DataExplorerAPI] Failed to aggregate property ${propName}:`, propError);
           // Continue with other properties
         }
       }
 
+      console.log('[DataExplorerAPI] Aggregation result:', {
+        totalCount: result.totalCount,
+        topValues: result.topValues?.length || 0,
+        numericStats: result.numericStats?.length || 0,
+        dateRange: result.dateRange?.length || 0,
+        booleanCounts: result.booleanCounts?.length || 0,
+      });
+
       return result;
     } catch (error) {
-      console.error('Error getting aggregations:', error);
+      console.error('[DataExplorerAPI] Error getting aggregations:', error);
       throw error;
     }
   }

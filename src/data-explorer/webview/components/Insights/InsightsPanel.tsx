@@ -42,10 +42,15 @@ export function InsightsPanel({
 
   // Fetch aggregations when collection or filters change
   const fetchAggregations = useCallback(() => {
-    if (!collectionName) return;
+    if (!collectionName || !schema) return;
 
     setLoading(true);
     setError(null);
+
+    // Get list of properties to aggregate (limit to avoid too many API calls)
+    const properties = schema.properties?.map((prop) => prop.name).slice(0, 10) || [];
+
+    console.log('[InsightsPanel] Fetching aggregations for properties:', properties);
 
     postMessageToExtension({
       command: 'getAggregations',
@@ -53,10 +58,11 @@ export function InsightsPanel({
         collectionName,
         where: activeFilters,
         matchMode: matchMode,
+        properties,
       },
       requestId: `agg-${Date.now()}`,
     });
-  }, [collectionName, activeFilters, matchMode]);
+  }, [collectionName, schema, activeFilters, matchMode]);
 
   // Handle messages from extension
   useEffect(() => {
@@ -64,9 +70,11 @@ export function InsightsPanel({
       const message = event.data;
 
       if (message.command === 'aggregationsLoaded') {
+        console.log('[InsightsPanel] Received aggregations:', message.aggregations);
         setAggregations(message.aggregations);
         setLoading(false);
       } else if (message.command === 'error' && message.requestId?.startsWith('agg-')) {
+        console.error('[InsightsPanel] Aggregation error:', message.error);
         setError(message.error);
         setLoading(false);
       }
@@ -189,10 +197,13 @@ export function InsightsPanel({
               )}
 
               {/* No data message */}
-              {!hasAnyData && !loading && (
+              {!hasAnyData && !loading && aggregations && (
                 <div className="insights-empty">
                   <span className="codicon codicon-info" aria-hidden="true"></span>
-                  <span>No aggregation data available</span>
+                  <span>
+                    No detailed aggregations available. This collection may not have aggregatable
+                    properties.
+                  </span>
                 </div>
               )}
             </>
