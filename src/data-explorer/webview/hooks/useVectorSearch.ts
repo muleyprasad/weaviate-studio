@@ -11,7 +11,12 @@ import {
   type VectorSearchResult,
 } from '../context';
 import { getVSCodeAPI } from '../utils/vscodeApi';
-import type { WebviewMessage, WeaviateObject, ExtensionMessage } from '../../types';
+import type {
+  WebviewMessage,
+  WeaviateObject,
+  ExtensionMessage,
+  WeaviateExplainScoreRaw,
+} from '../../types';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -37,16 +42,70 @@ export function useVectorSearch() {
     vscode.postMessage(message);
   }, []);
 
+  /**
+   * Parse raw explainScore from Weaviate API into normalized format
+   * Handles both JSON string and object formats with various field naming conventions
+   */
+  const parseExplainScore = (
+    rawScore: string | WeaviateExplainScoreRaw | unknown,
+    metadataScore?: number
+  ): VectorSearchResult['explainScore'] | undefined => {
+    if (!rawScore) {
+      return undefined;
+    }
+
+    try {
+      let parsed: WeaviateExplainScoreRaw;
+
+      if (typeof rawScore === 'string') {
+        parsed = JSON.parse(rawScore) as WeaviateExplainScoreRaw;
+      } else if (typeof rawScore === 'object' && rawScore !== null) {
+        parsed = rawScore as WeaviateExplainScoreRaw;
+      } else {
+        return undefined;
+      }
+
+      const keywordScore = parsed.bm25 ?? parsed.keyword ?? 0;
+      const vectorScore = parsed.vector ?? parsed.nearText ?? 0;
+      const combinedScore = metadataScore ?? parsed.score ?? (keywordScore + vectorScore) / 2;
+
+      return {
+        keyword: keywordScore,
+        vector: vectorScore,
+        combined: combinedScore,
+        matchedTerms: parsed.matchedTerms ?? parsed.keywords,
+      };
+    } catch (e) {
+      // Log parsing failures in development for debugging
+      debugLog('Failed to parse explainScore', { rawScore, error: e });
+      return undefined;
+    }
+  };
+
   // Handle vector search response
   const handleSearchResponse = useCallback(
     (objects: WeaviateObject[]) => {
       debugLog('Response received', { count: objects.length });
       // Transform objects to VectorSearchResult format
-      const results: VectorSearchResult[] = objects.map((obj) => ({
-        object: obj,
-        distance: obj.metadata?.distance ?? 0,
-        certainty: obj.metadata?.certainty ?? 1 - (obj.metadata?.distance ?? 0) / 2,
-      }));
+      const results: VectorSearchResult[] = objects.map((obj) => {
+        // Parse explainScore for hybrid search results
+        const explainScore = parseExplainScore(obj.metadata?.explainScore, obj.metadata?.score);
+
+        // For hybrid search, use combined score for certainty calculation
+        // since distance may not be meaningful
+        const hasHybridScore = explainScore?.combined !== undefined;
+        const effectiveDistance = obj.metadata?.distance ?? 0;
+        const effectiveCertainty = hasHybridScore
+          ? explainScore.combined // Use combined score directly as certainty proxy
+          : (obj.metadata?.certainty ?? 1 - effectiveDistance / 2);
+
+        return {
+          object: obj,
+          distance: effectiveDistance,
+          certainty: effectiveCertainty,
+          explainScore,
+        };
+      });
 
       searchActions.setSearchResults(results);
     },
@@ -105,7 +164,7 @@ export function useVectorSearch() {
     // Validate input based on mode
     let isValid = false;
     let vectorSearchPayload: {
-      type: 'nearText' | 'nearVector' | 'nearObject';
+      type: 'nearText' | 'nearVector' | 'nearObject' | 'hybrid';
       text?: string;
       vector?: number[];
       objectId?: string;
@@ -113,6 +172,10 @@ export function useVectorSearch() {
       limit?: number;
       distanceMetric?: string;
       targetVector?: string;
+      // Hybrid-specific params
+      alpha?: number;
+      fusionType?: string;
+      properties?: string[];
     } | null = null;
 
     switch (searchMode) {
@@ -161,6 +224,22 @@ export function useVectorSearch() {
           }
         } catch {
           isValid = false;
+        }
+        break;
+
+      case 'hybrid':
+        if (searchParams.query.trim()) {
+          isValid = true;
+          vectorSearchPayload = {
+            type: 'hybrid',
+            text: searchParams.query.trim(),
+            alpha: searchParams.hybridAlpha,
+            fusionType: searchParams.fusionType,
+            properties:
+              searchParams.searchProperties.length > 0 ? searchParams.searchProperties : undefined, // undefined means all text properties
+            limit: searchParams.limit,
+            targetVector: searchParams.targetVector,
+          };
         }
         break;
     }

@@ -47,7 +47,7 @@ export {
   type FilterMatchMode,
 } from './FilterContext';
 
-// Vector Search Context (Phase 3)
+// Vector Search Context (Phase 3 + Phase 4 Hybrid)
 export {
   VectorSearchProvider,
   useVectorSearchContext,
@@ -59,4 +59,6 @@ export {
   type VectorSearchParameters,
   type VectorSearchResult,
   type DistanceMetric,
+  type FusionType,
+  type HybridExplainScore,
 } from './VectorSearchContext';

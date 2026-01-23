@@ -1,10 +1,13 @@
 /**
  * ResultCard - Individual search result display
  * Shows match percentage, object preview, distance, and actions
+ * Supports hybrid search score breakdown
  */
 
 import React, { useMemo } from 'react';
 import type { WeaviateObject } from '../../../types';
+import type { HybridExplainScore } from '../../context';
+import { ScoreBreakdown } from './ScoreBreakdown';
 
 interface ResultCardProps {
   object: WeaviateObject;
@@ -13,6 +16,7 @@ interface ResultCardProps {
   onView: () => void;
   onFindSimilar: () => void;
   rank: number;
+  explainScore?: HybridExplainScore;
 }
 
 export function ResultCard({
@@ -22,6 +26,7 @@ export function ResultCard({
   onView,
   onFindSimilar,
   rank,
+  explainScore,
 }: ResultCardProps) {
   // Get display title from object
   const title = useMemo(() => {
@@ -55,8 +60,15 @@ export function ResultCard({
     return null;
   }, [object, title]);
 
-  // Calculate match percentage from certainty (0-1 scale)
-  const matchPercentage = Math.round((certainty ?? 1 - distance / 2) * 100);
+  // Calculate match percentage from certainty (0-1 scale) or combined score
+  const matchPercentage = useMemo(() => {
+    // If we have hybrid explain scores, use the combined score
+    if (explainScore?.combined !== undefined) {
+      return Math.round(explainScore.combined * 100);
+    }
+    // Fall back to certainty-based calculation
+    return Math.round((certainty ?? 1 - distance / 2) * 100);
+  }, [explainScore, certainty, distance]);
 
   // Get color class based on match percentage
   const getMatchClass = () => {
@@ -68,7 +80,7 @@ export function ResultCard({
 
   return (
     <article
-      className={`result-card ${getMatchClass()}`}
+      className={`result-card ${getMatchClass()} ${explainScore ? 'has-breakdown' : ''}`}
       aria-label={`Search result ${rank}: ${title}`}
     >
       <div className="result-rank">
@@ -77,7 +89,7 @@ export function ResultCard({
 
       <div className="result-match">
         <span className={`match-percentage ${getMatchClass()}`}>{matchPercentage}%</span>
-        <span className="match-label">Match</span>
+        <span className="match-label">{explainScore ? 'Score' : 'Match'}</span>
       </div>
 
       <div className="result-content">
@@ -91,6 +103,9 @@ export function ResultCard({
             <code>{object.uuid.substring(0, 8)}...</code>
           </span>
         </div>
+
+        {/* Hybrid Search Score Breakdown */}
+        {explainScore && <ScoreBreakdown explainScore={explainScore} />}
       </div>
 
       <div className="result-actions">

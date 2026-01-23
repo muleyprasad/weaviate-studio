@@ -16,14 +16,24 @@ import type { WeaviateObject } from '../../types';
 // Types
 // ============================================================================
 
-export type VectorSearchMode = 'text' | 'object' | 'vector';
+export type VectorSearchMode = 'text' | 'object' | 'vector' | 'hybrid';
 
 export type DistanceMetric = 'cosine' | 'euclidean' | 'manhattan' | 'dot';
+
+export type FusionType = 'rankedFusion' | 'relativeScoreFusion';
+
+export interface HybridExplainScore {
+  keyword: number;
+  vector: number;
+  combined: number;
+  matchedTerms?: string[];
+}
 
 export interface VectorSearchResult {
   object: WeaviateObject;
   distance: number;
   certainty: number;
+  explainScore?: HybridExplainScore;
 }
 
 export interface VectorSearchParameters {
@@ -35,6 +45,11 @@ export interface VectorSearchParameters {
   maxDistance: number;
   limit: number;
   targetVector?: string; // For named vectors
+  // Hybrid search parameters
+  hybridAlpha: number; // 0 = pure keyword (BM25), 1 = pure vector
+  fusionType: FusionType;
+  searchProperties: string[]; // Which properties to search in
+  enableQueryRewriting: boolean;
 }
 
 // ============================================================================
@@ -83,6 +98,11 @@ const initialSearchParams: VectorSearchParameters = {
   distanceMetric: 'cosine',
   maxDistance: 0.5,
   limit: 25,
+  // Hybrid search parameters
+  hybridAlpha: 0.5, // Balanced by default
+  fusionType: 'rankedFusion',
+  searchProperties: [], // Empty = search all text properties
+  enableQueryRewriting: false,
 };
 
 const initialState: VectorSearchContextState = {

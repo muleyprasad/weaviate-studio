@@ -26,6 +26,12 @@ export function SearchModeSelector({
     },
     { id: 'object', label: 'Similar Object', icon: 'codicon-references' },
     { id: 'vector', label: 'Raw Vector', icon: 'codicon-symbol-array' },
+    {
+      id: 'hybrid',
+      label: 'Hybrid',
+      icon: 'codicon-combine',
+      disabled: !hasVectorizer,
+    },
   ];
 
   return (

@@ -12,6 +12,27 @@ export interface WeaviateObject {
   vectors?: Record<string, number[]>;
 }
 
+export interface HybridExplainScoreDetails {
+  keyword?: number;
+  vector?: number;
+  combined?: number;
+  matchedTerms?: string[];
+}
+
+/**
+ * Raw explainScore format from Weaviate API
+ * Can be either a JSON string or an object with various field names
+ */
+export interface WeaviateExplainScoreRaw {
+  bm25?: number;
+  keyword?: number;
+  vector?: number;
+  nearText?: number;
+  score?: number;
+  matchedTerms?: string[];
+  keywords?: string[];
+}
+
 export interface WeaviateObjectMetadata {
   uuid?: string;
   creationTime?: string;
@@ -21,7 +42,7 @@ export interface WeaviateObjectMetadata {
   distance?: number;
   certainty?: number;
   score?: number;
-  explainScore?: string;
+  explainScore?: string | HybridExplainScoreDetails; // Can be string or structured object
 }
 
 // Collection schema types
@@ -151,7 +172,7 @@ export interface FilterCondition {
 export type FilterMatchMode = 'AND' | 'OR';
 
 // Vector search types for Phase 3
-export type VectorSearchType = 'none' | 'nearText' | 'nearVector' | 'nearObject';
+export type VectorSearchType = 'none' | 'nearText' | 'nearVector' | 'nearObject' | 'hybrid';
 
 export interface VectorSearchParams {
   type: VectorSearchType;
@@ -162,10 +183,14 @@ export interface VectorSearchParams {
   // nearObject parameters
   objectId?: string;
   // Common parameters
-  certainty?: number; // 0-1, higher means more similar
-  distance?: number; // 0-2, lower means more similar
-  distanceMetric?: string; // cosine, euclidean, manhattan, dot
-  targetVector?: string; // For named vectors
+  certainty?: number;
+  distance?: number;
+  distanceMetric?: string;
+  targetVector?: string;
+  // Hybrid search parameters
+  alpha?: number; // 0 = pure BM25, 1 = pure vector
+  fusionType?: 'rankedFusion' | 'relativeScoreFusion';
+  properties?: string[]; // Which properties to search in
 }
 
 // Fetch params for API

@@ -93,6 +93,7 @@ export function SearchResults({
             rank={index + 1}
             onView={() => onViewObject(result.object)}
             onFindSimilar={() => onFindSimilar(result.object.uuid)}
+            explainScore={result.explainScore}
           />
         ))}
       </div>

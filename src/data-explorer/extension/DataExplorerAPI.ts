@@ -181,8 +181,21 @@ export class DataExplorerAPI {
     }
 
     // Build vector search options
+    // Note: Using interface with index signature for Weaviate client compatibility
+    // The Weaviate client library has complex types that vary by version
+    interface VectorQueryOptions {
+      limit: number;
+      returnMetadata: string[];
+      returnProperties?: string[];
+      filters?: unknown;
+      certainty?: number;
+      distance?: number;
+      distanceMetric?: string;
+      targetVector?: string;
+      [key: string]: unknown; // Index signature for Record<string, unknown> compatibility
+    }
 
-    const vectorOptions: any = {
+    const vectorOptions: VectorQueryOptions = {
       limit: options.limit,
       returnMetadata: options.returnMetadata,
     };
@@ -216,25 +229,61 @@ export class DataExplorerAPI {
     }
 
     // Execute appropriate vector search
+    // Cast to Record<string, unknown> for Weaviate client compatibility
+    const queryOptions = vectorOptions as Record<string, unknown>;
+
     if (vectorSearch.type === 'nearText') {
       if (!vectorSearch.text) {
         throw new Error('nearText search requires a text query');
       }
-      return collection.query.nearText(vectorSearch.text, vectorOptions);
+      return collection.query.nearText(vectorSearch.text, queryOptions);
     }
 
     if (vectorSearch.type === 'nearVector') {
       if (!vectorSearch.vector || vectorSearch.vector.length === 0) {
         throw new Error('nearVector search requires a vector');
       }
-      return collection.query.nearVector(vectorSearch.vector, vectorOptions);
+      return collection.query.nearVector(vectorSearch.vector, queryOptions);
     }
 
     if (vectorSearch.type === 'nearObject') {
       if (!vectorSearch.objectId) {
         throw new Error('nearObject search requires an object UUID');
       }
-      return collection.query.nearObject(vectorSearch.objectId, vectorOptions);
+      return collection.query.nearObject(vectorSearch.objectId, queryOptions);
+    }
+
+    // Hybrid search - combines BM25 keyword search with vector similarity
+    if (vectorSearch.type === 'hybrid') {
+      if (!vectorSearch.text) {
+        throw new Error('hybrid search requires a text query');
+      }
+
+      // Build hybrid-specific options
+      interface HybridQueryOptions extends VectorQueryOptions {
+        alpha: number;
+        fusionType?: 'rankedFusion' | 'relativeScoreFusion';
+        queryProperties?: string[];
+        // Index signature inherited from VectorQueryOptions
+      }
+
+      const hybridOptions: HybridQueryOptions = {
+        ...vectorOptions,
+        alpha: vectorSearch.alpha ?? 0.5, // 0 = pure BM25, 1 = pure vector
+        returnMetadata: ['score', 'distance', 'certainty', 'explainScore'],
+      };
+
+      // Add fusion type if specified (default: rankedFusion)
+      if (vectorSearch.fusionType) {
+        hybridOptions.fusionType = vectorSearch.fusionType;
+      }
+
+      // Add target properties for keyword search (empty array = search all text properties)
+      if (vectorSearch.properties && vectorSearch.properties.length > 0) {
+        hybridOptions.queryProperties = vectorSearch.properties;
+      }
+
+      return collection.query.hybrid(vectorSearch.text, hybridOptions as Record<string, unknown>);
     }
 
     // Fallback to standard fetch

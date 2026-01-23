@@ -2634,3 +2634,494 @@ input[type="checkbox"]:focus-visible {
         margin-top: 8px;
     }
 }
+
+/* ============================================================================
+   PHASE 4: HYBRID SEARCH STYLES
+   ============================================================================ */
+
+/* ===== Hybrid Search Input ===== */
+.hybrid-search-input {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.search-query-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hybrid-search-textarea {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground, #FFF);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s ease;
+}
+
+.hybrid-search-textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.hybrid-search-textarea::placeholder {
+    color: var(--vscode-input-placeholderForeground, #888);
+}
+
+.hybrid-search-textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===== Alpha Slider (Keyword/Semantic Balance) ===== */
+.alpha-slider {
+    padding: 16px;
+    background: var(--vscode-input-background, #2D2D2D);
+    border: 1px solid var(--vscode-panel-border, #3C3C3C);
+    border-radius: 8px;
+}
+
+.alpha-slider-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.alpha-slider-title .codicon {
+    font-size: 14px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+/* Preset buttons */
+.alpha-presets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.alpha-preset-btn {
+    flex: 1;
+    padding: 6px 10px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, #FFF);
+    border: 1px solid var(--vscode-panel-border, #444);
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.alpha-preset-btn:hover:not(:disabled) {
+    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.alpha-preset-btn.active {
+    background-color: var(--vscode-button-background, #0E639C);
+    color: var(--vscode-button-foreground, #FFF);
+    border-color: var(--vscode-button-background, #0E639C);
+}
+
+.alpha-preset-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Slider row labels */
+.slider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.slider-row label {
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.weight-value {
+    font-weight: 700;
+    font-size: 13px;
+    min-width: 28px;
+    text-align: right;
+    color: var(--vscode-foreground);
+}
+
+/* Visual weight bars */
+.slider-visual {
+    height: 8px;
+    background: var(--vscode-panel-border, #3C3C3C);
+    border-radius: 4px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.slider-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.2s ease;
+}
+
+.slider-visual.keyword .slider-fill {
+    background: linear-gradient(90deg, #3B82F6, #60A5FA);
+}
+
+.slider-visual.semantic .slider-fill {
+    background: linear-gradient(90deg, #10B981, #34D399);
+}
+
+/* Actual range input */
+.alpha-range-input {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(90deg, #3B82F6 0%, #10B981 100%);
+    border-radius: 3px;
+    outline: none;
+    margin: 8px 0;
+}
+
+.alpha-range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--vscode-editor-background, #1e1e1e);
+    border: 3px solid var(--vscode-button-background, #0E639C);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.alpha-range-input::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    border-color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.alpha-range-input::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--vscode-editor-background, #1e1e1e);
+    border: 3px solid var(--vscode-button-background, #0E639C);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.alpha-range-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.alpha-range-input:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+}
+
+/* Alpha label display */
+.alpha-label {
+    margin-top: 12px;
+    text-align: center;
+}
+
+.alpha-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--vscode-foreground);
+}
+
+.alpha-description {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--vscode-descriptionForeground, #888);
+    margin-top: 4px;
+}
+
+/* ===== Query Options (Checkbox) ===== */
+.query-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checkbox-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.checkbox-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--vscode-button-background, #0E639C);
+}
+
+.checkbox-option input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.checkbox-label {
+    color: var(--vscode-foreground);
+}
+
+.info-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background-color: rgba(55, 148, 255, 0.1);
+    border: 1px solid rgba(55, 148, 255, 0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.info-message .codicon {
+    font-size: 14px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ===== Property Selector ===== */
+.property-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.property-selector-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.property-selector-label .codicon {
+    font-size: 14px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.property-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.property-chip {
+    padding: 6px 12px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, #FFF);
+    border: 1px solid var(--vscode-panel-border, #444);
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.property-chip:hover:not(:disabled) {
+    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.property-chip.active {
+    background-color: var(--vscode-button-background, #0E639C);
+    color: var(--vscode-button-foreground, #FFF);
+    border-color: var(--vscode-button-background, #0E639C);
+}
+
+.property-chip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.property-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 0 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #666);
+}
+
+.property-hint .codicon {
+    font-size: 12px;
+}
+
+/* ===== Score Breakdown (in Result Card) ===== */
+.score-breakdown {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--vscode-editor-background, #1e1e1e);
+    border: 1px solid var(--vscode-panel-border, #3C3C3C);
+    border-radius: 6px;
+}
+
+.score-breakdown-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 12px 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.score-breakdown-title .codicon {
+    font-size: 12px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.score-row {
+    display: grid;
+    grid-template-columns: 100px 50px 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.score-row:last-of-type:not(.combined) {
+    margin-bottom: 0;
+}
+
+.score-label {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #888);
+}
+
+.score-value {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    text-align: right;
+}
+
+.score-bar {
+    height: 6px;
+    background: var(--vscode-panel-border, #3C3C3C);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.score-fill.keyword {
+    background: linear-gradient(90deg, #3B82F6, #60A5FA);
+}
+
+.score-fill.semantic {
+    background: linear-gradient(90deg, #10B981, #34D399);
+}
+
+.score-fill.combined {
+    background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+}
+
+.score-row.combined {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--vscode-panel-border, #3C3C3C);
+}
+
+.matched-terms {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--vscode-panel-border, #3C3C3C);
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground, #888);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.matched-terms .codicon {
+    font-size: 12px;
+    color: var(--vscode-textLink-foreground, #3794FF);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.matched-term {
+    color: var(--vscode-debugTokenExpression-string, #CE9178);
+    font-style: italic;
+}
+
+/* Result card with breakdown - adjust layout */
+.result-card.has-breakdown {
+    flex-direction: column;
+}
+
+.result-card.has-breakdown .result-content {
+    width: 100%;
+}
+
+.result-card.has-breakdown .result-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    width: 100%;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border, #3C3C3C);
+}
+
+/* Override the normal card layout for hybrid results */
+.result-card.has-breakdown > .result-rank,
+.result-card.has-breakdown > .result-match {
+    display: none;
+}
+
+.result-card.has-breakdown .result-content::before {
+    content: none;
+}
+
+/* Show score in title area for hybrid results */
+.result-card.has-breakdown .result-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ===== Responsive adjustments for Hybrid Search ===== */
+@media (max-width: 500px) {
+    .alpha-presets {
+        flex-direction: column;
+    }
+
+    .property-chips {
+        max-height: 120px;
+        overflow-y: auto;
+    }
+
+    .score-row {
+        grid-template-columns: 80px 40px 1fr;
+    }
+}

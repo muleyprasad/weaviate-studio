@@ -1,10 +1,10 @@
 /**
  * VectorSearchPanel - Main slide-out panel for vector search
- * Supports three search modes: Text (Semantic), Similar Object, Raw Vector
+ * Supports four search modes: Text (Semantic), Similar Object, Raw Vector, Hybrid
  */
 
 import React, { useCallback, useEffect, useMemo } from 'react';
-import type { CollectionConfig, WeaviateObject } from '../../../types';
+import type { CollectionConfig, WeaviateObject, PropertyConfig } from '../../../types';
 import {
   useVectorSearchState,
   useVectorSearchActions,
@@ -15,6 +15,7 @@ import { SearchModeSelector } from './SearchModeSelector';
 import { TextSearchInput } from './TextSearchInput';
 import { ObjectSearchInput } from './ObjectSearchInput';
 import { VectorInput } from './VectorInput';
+import { HybridSearchInput } from './HybridSearchInput';
 import { SearchResults } from './SearchResults';
 
 interface VectorSearchPanelProps {
@@ -90,6 +91,17 @@ export function VectorSearchPanel({
     return undefined;
   }, [schema]);
 
+  // Extract text properties from schema for hybrid search property selector
+  const textProperties = useMemo(() => {
+    if (!schema?.properties) return [];
+    return schema.properties
+      .filter((prop: PropertyConfig) => {
+        const dataType = prop.dataType?.[0]?.toLowerCase();
+        return dataType === 'text' || dataType === 'string';
+      })
+      .map((prop: PropertyConfig) => prop.name);
+  }, [schema]);
+
   // Handle search mode change
   const handleModeChange = useCallback(
     (mode: VectorSearchMode) => {
@@ -150,6 +162,9 @@ export function VectorSearchPanel({
         } catch {
           return false;
         }
+      case 'hybrid':
+        // Hybrid search requires vectorizer and a query
+        return hasVectorizer && searchParams.query.trim().length > 0;
       default:
         return false;
     }
@@ -256,6 +271,43 @@ export function VectorSearchPanel({
                 expectedDimensions={expectedDimensions}
                 isSearching={isSearching}
               />
+            )}
+
+            {searchMode === 'hybrid' && (
+              <>
+                {!hasVectorizer ? (
+                  <div className="vectorizer-warning">
+                    <span className="codicon codicon-warning" aria-hidden="true"></span>
+                    <div>
+                      <h4>Vectorizer Not Configured</h4>
+                      <p>
+                        Hybrid search requires a vectorizer to be configured for this collection.
+                        Use "Similar Object" or "Raw Vector" mode instead.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <HybridSearchInput
+                    query={searchParams.query}
+                    alpha={searchParams.hybridAlpha}
+                    properties={searchParams.searchProperties}
+                    enableQueryRewriting={searchParams.enableQueryRewriting}
+                    availableProperties={textProperties}
+                    onQueryChange={(value) => handleParamChange('query', value)}
+                    onAlphaChange={(value) => actions.setSearchParams({ hybridAlpha: value })}
+                    onPropertiesChange={(props) =>
+                      actions.setSearchParams({ searchProperties: props })
+                    }
+                    onQueryRewritingToggle={() =>
+                      actions.setSearchParams({
+                        enableQueryRewriting: !searchParams.enableQueryRewriting,
+                      })
+                    }
+                    onSearch={handleSearch}
+                    isSearching={isSearching}
+                  />
+                )}
+              </>
             )}
           </div>
 
