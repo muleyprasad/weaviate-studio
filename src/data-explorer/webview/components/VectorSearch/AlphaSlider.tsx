@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { InfoTooltip } from '../common';
 
 interface AlphaSliderProps {
   value: number; // 0-1
@@ -28,6 +29,22 @@ export function AlphaSlider({ value, onChange, disabled = false }: AlphaSliderPr
       <h4 className="alpha-slider-title">
         <span className="codicon codicon-settings-gear" aria-hidden="true"></span>
         Search Strategy
+        <InfoTooltip
+          content={
+            <>
+              <strong>Alpha</strong> controls the balance between keyword (BM25) and semantic
+              (vector) search.
+              <br />
+              <br />
+              <strong>0</strong> = Pure keyword matching
+              <br />
+              <strong>0.5</strong> = Balanced hybrid
+              <br />
+              <strong>1</strong> = Pure semantic similarity
+            </>
+          }
+          position="bottom"
+        />
       </h4>
 
       {/* Preset buttons */}

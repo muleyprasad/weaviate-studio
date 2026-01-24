@@ -22,7 +22,9 @@ export function ScoreBreakdown({ explainScore }: ScoreBreakdownProps) {
    * Handles BM25 scores that can be > 1.0
    */
   const normalizeScore = (score: number): number => {
-    if (!Number.isFinite(score) || score < 0) return 0;
+    if (!Number.isFinite(score) || score < 0) {
+      return 0;
+    }
     // Normalize against max score, then convert to percentage
     return Math.min(100, Math.max(0, (score / maxScore) * 100));
   };

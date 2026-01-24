@@ -72,9 +72,15 @@ export function ResultCard({
 
   // Get color class based on match percentage
   const getMatchClass = () => {
-    if (matchPercentage >= 90) return 'excellent';
-    if (matchPercentage >= 75) return 'good';
-    if (matchPercentage >= 50) return 'moderate';
+    if (matchPercentage >= 90) {
+      return 'excellent';
+    }
+    if (matchPercentage >= 75) {
+      return 'good';
+    }
+    if (matchPercentage >= 50) {
+      return 'moderate';
+    }
     return 'low';
   };
 

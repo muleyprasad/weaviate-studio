@@ -136,7 +136,9 @@ export function ExportDialog({
   }, [onClose, exporting]);
 
   // Don't render if not open
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   // Calculate scope counts based on filter state
   const scopeOptions = [

@@ -151,7 +151,9 @@ function filterReducer(state: FilterContextState, action: FilterAction): FilterC
 
     case 'LOAD_PRESET': {
       const preset = state.filterPresets.find((p) => p.id === action.presetId);
-      if (!preset) return state;
+      if (!preset) {
+        return state;
+      }
       return {
         ...state,
         activeFilters: preset.filters,

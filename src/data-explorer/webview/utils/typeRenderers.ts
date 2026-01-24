@@ -109,7 +109,12 @@ export function formatFileSize(bytes: number): string {
  * Formats geo coordinates
  */
 export function formatGeoCoordinates(coords: { latitude?: number; longitude?: number }): string {
-  if (coords.latitude != null && coords.longitude != null) {
+  if (
+    coords.latitude !== null &&
+    coords.latitude !== undefined &&
+    coords.longitude !== null &&
+    coords.longitude !== undefined
+  ) {
     return `📍 ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`;
   }
   return '📍 Invalid coordinates';

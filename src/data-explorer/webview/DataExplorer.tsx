@@ -22,8 +22,11 @@ import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { FilterPanel, FilterChips } from './components/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch';
 import { ExportDialog, ExportButton } from './components/Export';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { KeyboardShortcutsHelp } from './components/common';
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
+import { useDataExplorerShortcuts } from './hooks/useKeyboardShortcuts';
 import type { WeaviateObject } from '../types';
 
 // Get initial data from the window object (injected by the extension)
@@ -74,10 +77,14 @@ function DataExplorerContent() {
 
   // Get selected object (check both table data and search results)
   const selectedObject = useMemo(() => {
-    if (!uiState.selectedObjectId) return null;
+    if (!uiState.selectedObjectId) {
+      return null;
+    }
     // First check table data
     const fromTable = dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId);
-    if (fromTable) return fromTable;
+    if (fromTable) {
+      return fromTable;
+    }
     // Then check vector search results
     const fromSearch = vectorSearchState.searchResults.find(
       (result) => result.object.uuid === uiState.selectedObjectId
@@ -119,8 +126,49 @@ function DataExplorerContent() {
     [vectorSearchActions]
   );
 
+  // Get refresh function from useDataFetch
+  const { refresh } = useDataFetch();
+
+  // Close all panels handler
+  const handleCloseAllPanels = useCallback(() => {
+    if (filterState.showFilterPanel) {
+      filterActions.closeFilterPanel();
+    }
+    if (vectorSearchState.showVectorSearchPanel) {
+      vectorSearchActions.closeVectorSearchPanel();
+    }
+    if (showExportDialog) {
+      setShowExportDialog(false);
+    }
+    if (uiState.showDetailPanel) {
+      uiActions.closeDetailPanel();
+    }
+  }, [
+    filterState.showFilterPanel,
+    vectorSearchState.showVectorSearchPanel,
+    showExportDialog,
+    uiState.showDetailPanel,
+    filterActions,
+    vectorSearchActions,
+    uiActions,
+  ]);
+
+  // Register keyboard shortcuts
+  useDataExplorerShortcuts({
+    onToggleFilters: filterActions.toggleFilterPanel,
+    onToggleVectorSearch: vectorSearchActions.toggleVectorSearchPanel,
+    onOpenExport: handleOpenExportDialog,
+    onClosePanel: handleCloseAllPanels,
+    onRefresh: refresh,
+  });
+
   return (
     <div className="data-explorer">
+      {/* Skip link for accessibility */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Header */}
       <header className="data-explorer-header">
         <div className="header-left">
@@ -136,7 +184,7 @@ function DataExplorerContent() {
             type="button"
             className={`vector-search-toolbar-btn ${vectorSearchState.showVectorSearchPanel ? 'active' : ''}`}
             onClick={vectorSearchActions.toggleVectorSearchPanel}
-            title="Open vector search"
+            title="Open vector search (Ctrl+K)"
             aria-label="Open vector search"
             aria-expanded={vectorSearchState.showVectorSearchPanel}
           >
@@ -149,7 +197,7 @@ function DataExplorerContent() {
             type="button"
             className={`filter-toolbar-btn ${filterState.activeFilters.length > 0 ? 'active' : ''}`}
             onClick={filterActions.toggleFilterPanel}
-            title="Open filter builder"
+            title="Open filter builder (Ctrl+F)"
             aria-label="Open filter builder"
             aria-expanded={filterState.showFilterPanel}
           >
@@ -165,6 +213,23 @@ function DataExplorerContent() {
             onClick={handleOpenExportDialog}
             disabled={dataState.objects.length === 0}
           />
+
+          {/* Column manager button */}
+          <button
+            type="button"
+            className="toolbar-btn columns-btn"
+            onClick={() => uiActions.toggleColumnManager()}
+            title="Manage columns"
+            aria-label="Manage columns"
+            aria-expanded={uiState.showColumnManager}
+          >
+            <span className="codicon codicon-list-unordered" aria-hidden="true"></span>
+            Columns
+          </button>
+
+          {/* Keyboard shortcuts help - with visible icon */}
+          <KeyboardShortcutsHelp />
+
           {!isLoading && (
             <span className="object-count-badge">
               {dataState.totalCount.toLocaleString()} objects
@@ -182,39 +247,47 @@ function DataExplorerContent() {
       />
 
       {/* Main content */}
-      <main className="data-explorer-main">
+      <main id="main-content" className="data-explorer-main">
         {/* Loading indicator */}
         {isLoading && dataState.objects.length === 0 && (
           <div className="loading-overlay" role="status" aria-live="polite">
             <div className="loading-spinner" />
-            <span>Loading objects...</span>
+            <span className="loading-message">Loading objects...</span>
           </div>
         )}
 
-        {/* Data table */}
-        <DataTable onOpenDetail={handleOpenDetail} onFindSimilar={handleFindSimilar} />
+        {/* Data table with error boundary */}
+        <ErrorBoundary fallbackMessage="Failed to load data table">
+          <DataTable onOpenDetail={handleOpenDetail} onFindSimilar={handleFindSimilar} />
+        </ErrorBoundary>
       </main>
 
-      {/* Detail panel */}
+      {/* Detail panel with error boundary */}
       {uiState.showDetailPanel && (
-        <DetailPanel
-          object={selectedObject}
-          onClose={handleCloseDetail}
-          onFindSimilar={handleFindSimilar}
-        />
+        <ErrorBoundary fallbackMessage="Failed to load object details">
+          <DetailPanel
+            object={selectedObject}
+            onClose={handleCloseDetail}
+            onFindSimilar={handleFindSimilar}
+          />
+        </ErrorBoundary>
       )}
 
-      {/* Filter panel */}
-      <FilterPanel isOpen={filterState.showFilterPanel} properties={schemaProperties} />
+      {/* Filter panel with error boundary */}
+      <ErrorBoundary fallbackMessage="Failed to load filter panel">
+        <FilterPanel isOpen={filterState.showFilterPanel} properties={schemaProperties} />
+      </ErrorBoundary>
 
-      {/* Vector Search panel */}
-      <VectorSearchPanel
-        isOpen={vectorSearchState.showVectorSearchPanel}
-        schema={dataState.schema}
-        onResultSelect={handleVectorResultSelect}
-        onSearch={handleVectorSearch}
-        preSelectedObject={preSelectedObject}
-      />
+      {/* Vector Search panel with error boundary */}
+      <ErrorBoundary fallbackMessage="Failed to load vector search">
+        <VectorSearchPanel
+          isOpen={vectorSearchState.showVectorSearchPanel}
+          schema={dataState.schema}
+          onResultSelect={handleVectorResultSelect}
+          onSearch={handleVectorSearch}
+          preSelectedObject={preSelectedObject}
+        />
+      </ErrorBoundary>
 
       {/* Export dialog */}
       <ExportDialog

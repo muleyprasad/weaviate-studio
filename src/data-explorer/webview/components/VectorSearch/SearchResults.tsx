@@ -7,6 +7,7 @@ import React from 'react';
 import type { VectorSearchResult } from '../../context';
 import type { WeaviateObject } from '../../../types';
 import { ResultCard } from './ResultCard';
+import { SkeletonResultCard, NoSearchResultsEmptyState } from '../common';
 
 interface SearchResultsProps {
   results: VectorSearchResult[];
@@ -15,6 +16,8 @@ interface SearchResultsProps {
   onViewObject: (object: WeaviateObject) => void;
   onFindSimilar: (objectId: string) => void;
   hasSearched?: boolean;
+  searchMode?: string;
+  onClearSearch?: () => void;
 }
 
 export function SearchResults({
@@ -24,13 +27,20 @@ export function SearchResults({
   onViewObject,
   onFindSimilar,
   hasSearched = false,
+  searchMode,
+  onClearSearch,
 }: SearchResultsProps) {
-  // Loading state
+  // Loading state with skeleton
   if (isLoading) {
     return (
-      <div className="search-results-loading">
+      <div className="search-results-loading" role="status" aria-label="Searching">
         <div className="loading-spinner" />
-        <span>Searching for similar objects...</span>
+        <span className="loading-message">Searching for similar objects...</span>
+        <div className="skeleton-results">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonResultCard key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -50,24 +60,16 @@ export function SearchResults({
 
   // Empty state
   if (results.length === 0) {
+    if (hasSearched) {
+      return <NoSearchResultsEmptyState onClearSearch={onClearSearch} searchMode={searchMode} />;
+    }
+
     return (
       <div className="search-results-empty">
         <span className="codicon codicon-search" aria-hidden="true"></span>
         <div className="empty-content">
-          {hasSearched ? (
-            <>
-              <h4>No Matching Objects</h4>
-              <p>
-                No objects found matching your search criteria. Try adjusting the distance threshold
-                or search terms.
-              </p>
-            </>
-          ) : (
-            <>
-              <h4>No Results Yet</h4>
-              <p>Enter a search query and click "Search" to find similar objects.</p>
-            </>
-          )}
+          <h4>No Results Yet</h4>
+          <p>Enter a search query and click "Search" to find similar objects.</p>
         </div>
       </div>
     );

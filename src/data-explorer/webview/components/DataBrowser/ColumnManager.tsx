@@ -99,7 +99,9 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
     });
   }, [uiState.visibleColumns, uiActions]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="column-manager-overlay" role="dialog" aria-label="Manage columns">

@@ -8,7 +8,14 @@ import { TableHeader } from './TableHeader';
 import { TableRow } from './TableRow';
 import { Pagination } from './Pagination';
 import { ColumnManager } from './ColumnManager';
-import { useDataState, useUIState, useUIActions } from '../../context';
+import { NoObjectsEmptyState } from '../common';
+import {
+  useDataState,
+  useUIState,
+  useUIActions,
+  useFilterState,
+  useFilterActions,
+} from '../../context';
 import { useDataFetch } from '../../hooks/useDataFetch';
 
 interface DataTableProps {
@@ -20,11 +27,15 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const dataState = useDataState();
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const filterState = useFilterState();
+  const filterActions = useFilterActions();
   const { refresh, isLoading } = useDataFetch();
 
   // Get displayed columns from schema
   const displayedColumns = useMemo(() => {
-    if (!dataState.schema) return [];
+    if (!dataState.schema) {
+      return [];
+    }
 
     const allColumns = ['uuid', ...(dataState.schema.properties || []).map((p) => p.name)];
 
@@ -82,7 +93,9 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!dataState.objects.length) return;
+      if (!dataState.objects.length) {
+        return;
+      }
 
       const currentIndex = uiState.selectedObjectId
         ? dataState.objects.findIndex((obj) => obj.uuid === uiState.selectedObjectId)
@@ -126,56 +139,71 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
     [dataState.objects, uiState.selectedObjectId, uiActions, onOpenDetail]
   );
 
-  // Render loading skeleton
+  // Check if there are active filters
+  const hasFilters = filterState.activeFilters.length > 0;
+
+  // Clear all filters handler
+  const handleClearFilters = useCallback(() => {
+    filterActions.clearAllFilters();
+  }, [filterActions]);
+
+  // Render loading skeleton with improved shimmer animation
   const renderSkeleton = () => (
-    <tbody className="data-table-body skeleton">
-      {Array.from({ length: 5 }).map((_, rowIndex) => (
+    <tbody className="data-table-body skeleton" role="status" aria-label="Loading data">
+      {Array.from({ length: uiState.pageSize || 10 }).map((_, rowIndex) => (
         <tr key={rowIndex} className="skeleton-row">
-          <td className="data-cell checkbox-cell">
-            <div className="skeleton-checkbox" />
-          </td>
-          {displayedColumns.slice(0, 4).map((_, colIndex) => (
+          {displayedColumns.slice(0, 5).map((_, colIndex) => (
             <td key={colIndex} className="data-cell">
-              <div className="skeleton-cell" />
+              <div
+                className="skeleton-shimmer"
+                style={{
+                  height: 16,
+                  width: `${70 + Math.random() * 25}%`,
+                  borderRadius: 4,
+                }}
+              />
             </td>
           ))}
           <td className="data-cell actions-cell">
-            <div className="skeleton-action" />
+            <div className="skeleton-shimmer" style={{ width: 24, height: 24, borderRadius: 4 }} />
           </td>
         </tr>
       ))}
     </tbody>
   );
 
-  // Render empty state
+  // Render empty state using the new component
   const renderEmptyState = () => (
     <tbody className="data-table-body empty">
       <tr>
-        <td colSpan={displayedColumns.length + 2} className="empty-cell">
-          <div className="empty-state">
-            <div className="empty-icon">📭</div>
-            <h3>No objects found</h3>
-            <p>This collection is empty or no objects match your criteria.</p>
-            <button className="refresh-btn" onClick={refresh}>
-              🔄 Refresh Data
-            </button>
-          </div>
+        <td colSpan={displayedColumns.length + 1} className="empty-cell">
+          <NoObjectsEmptyState
+            onRefresh={refresh}
+            hasFilters={hasFilters}
+            onClearFilters={handleClearFilters}
+          />
         </td>
       </tr>
     </tbody>
   );
 
-  // Render error state
+  // Render error state with improved styling
   const renderErrorState = () => (
     <tbody className="data-table-body error">
       <tr>
-        <td colSpan={displayedColumns.length + 2} className="error-cell">
-          <div className="error-state" role="alert">
-            <div className="error-icon">⚠️</div>
+        <td colSpan={displayedColumns.length + 1} className="error-cell">
+          <div className="error-boundary" role="alert">
+            <span className="codicon codicon-error" aria-hidden="true"></span>
             <h3>Error loading data</h3>
-            <p>{dataState.error}</p>
-            <button className="retry-btn" onClick={refresh}>
-              🔄 Retry
+            <p className="error-message">{dataState.error}</p>
+            <button
+              type="button"
+              className="error-retry-btn"
+              onClick={refresh}
+              aria-label="Retry loading data"
+            >
+              <span className="codicon codicon-refresh" aria-hidden="true"></span>
+              Retry
             </button>
           </div>
         </td>
@@ -185,45 +213,6 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
 
   return (
     <div className="data-table-container">
-      {/* Toolbar */}
-      <div className="data-table-toolbar">
-        <div className="toolbar-left">
-          <button
-            className="toolbar-btn columns-btn"
-            onClick={toggleColumnManager}
-            title="Manage columns"
-            aria-label="Manage columns"
-          >
-            ⚙️ Columns
-          </button>
-          <button
-            className="toolbar-btn icon-btn refresh-btn"
-            onClick={refresh}
-            disabled={isLoading}
-            title="Refresh"
-            aria-label="Refresh data"
-          >
-            ↻
-          </button>
-        </div>
-
-        <div className="toolbar-right">
-          {uiState.selectedRows.size > 0 && (
-            <span className="selection-info">
-              {uiState.selectedRows.size} selected
-              <button
-                className="clear-selection-btn"
-                onClick={() => uiActions.clearSelection()}
-                title="Clear selection"
-                aria-label="Clear selection"
-              >
-                ✕
-              </button>
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Table */}
       <div
         className="data-table-wrapper"

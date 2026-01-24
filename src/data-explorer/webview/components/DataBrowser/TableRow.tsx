@@ -17,7 +17,7 @@ interface TableRowProps {
   onFindSimilar?: (uuid: string) => void;
 }
 
-export const TableRow = React.memo(function TableRow({
+function TableRowComponent({
   object,
   isSelected,
   displayedColumns,
@@ -92,17 +92,6 @@ export const TableRow = React.memo(function TableRow({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Checkbox cell */}
-      <td className="data-cell checkbox-cell" role="gridcell">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={handleCheckboxChange}
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Select row ${object.uuid}`}
-        />
-      </td>
-
       {/* Data cells */}
       {displayedColumns.map((column) => (
         <td
@@ -146,4 +135,37 @@ export const TableRow = React.memo(function TableRow({
       </td>
     </tr>
   );
-});
+}
+
+/**
+ * Custom comparison function for React.memo
+ * Only re-render if essential props change
+ */
+function arePropsEqual(prevProps: TableRowProps, nextProps: TableRowProps): boolean {
+  // Always re-render if selection state changes
+  if (prevProps.isSelected !== nextProps.isSelected) {
+    return false;
+  }
+
+  // Re-render if object UUID changes (different object)
+  if (prevProps.object.uuid !== nextProps.object.uuid) {
+    return false;
+  }
+
+  // Re-render if displayed columns change
+  if (prevProps.displayedColumns.length !== nextProps.displayedColumns.length) {
+    return false;
+  }
+
+  // Check if column list is the same (order matters)
+  for (let i = 0; i < prevProps.displayedColumns.length; i++) {
+    if (prevProps.displayedColumns[i] !== nextProps.displayedColumns[i]) {
+      return false;
+    }
+  }
+
+  // Props are equal, don't re-render
+  return true;
+}
+
+export const TableRow = React.memo(TableRowComponent, arePropsEqual);

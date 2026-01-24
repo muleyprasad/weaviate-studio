@@ -15,7 +15,11 @@ interface DetailPanelProps {
   onFindSimilar?: (uuid: string) => void;
 }
 
-export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps) {
+export const DetailPanel = React.memo(function DetailPanel({
+  object,
+  onClose,
+  onFindSimilar,
+}: DetailPanelProps) {
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCopiedUuid, setShowCopiedUuid] = React.useState(false);
@@ -40,7 +44,9 @@ export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps
   }, [object]);
 
   const handleCopyUuid = useCallback(async () => {
-    if (!object) return;
+    if (!object) {
+      return;
+    }
 
     const success = await copyToClipboard(object.uuid);
     if (success) {
@@ -94,12 +100,13 @@ export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps
         <div className="detail-panel-header">
           <h2>Object Details</h2>
           <button
+            type="button"
             className="close-btn"
             onClick={onClose}
             title="Close panel"
             aria-label="Close details panel"
           >
-            ✕
+            <span className="codicon codicon-close" aria-hidden="true"></span>
           </button>
         </div>
 
@@ -109,12 +116,23 @@ export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps
             <label>UUID</label>
             <code className="uuid-value">{object.uuid}</code>
             <button
+              type="button"
               className="copy-uuid-btn"
               onClick={handleCopyUuid}
               title="Copy UUID"
               aria-label="Copy UUID to clipboard"
             >
-              {showCopiedUuid ? '✓ Copied' : '📋 Copy'}
+              {showCopiedUuid ? (
+                <>
+                  <span className="codicon codicon-check" aria-hidden="true"></span>
+                  Copied
+                </>
+              ) : (
+                <>
+                  <span className="codicon codicon-copy" aria-hidden="true"></span>
+                  Copy
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -227,4 +245,4 @@ export function DetailPanel({ object, onClose, onFindSimilar }: DetailPanelProps
       </div>
     </div>
   );
-}
+});

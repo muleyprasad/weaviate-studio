@@ -40,7 +40,9 @@ export function VectorSearchPanel({
 
   // Handle keyboard escape to close panel (only add listener when open)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -60,7 +62,9 @@ export function VectorSearchPanel({
 
   // Check if collection has a vectorizer configured
   const hasVectorizer = useMemo(() => {
-    if (!schema?.vectorizerConfig) return false;
+    if (!schema?.vectorizerConfig) {
+      return false;
+    }
     // Check if vectorizer is configured and not 'none'
     const config = schema.vectorizerConfig as
       | VectorizerConfigEntry[]
@@ -74,7 +78,9 @@ export function VectorSearchPanel({
 
   // Get vectorizer name for display
   const vectorizerName = useMemo(() => {
-    if (!schema?.vectorizerConfig) return undefined;
+    if (!schema?.vectorizerConfig) {
+      return undefined;
+    }
     const config = schema.vectorizerConfig as
       | VectorizerConfigEntry[]
       | Record<string, unknown>
@@ -93,7 +99,9 @@ export function VectorSearchPanel({
 
   // Extract text properties from schema for hybrid search property selector
   const textProperties = useMemo(() => {
-    if (!schema?.properties) return [];
+    if (!schema?.properties) {
+      return [];
+    }
     return schema.properties
       .filter((prop: PropertyConfig) => {
         const dataType = prop.dataType?.[0]?.toLowerCase();
@@ -146,7 +154,9 @@ export function VectorSearchPanel({
 
   // Validate search can be performed
   const canSearch = useMemo(() => {
-    if (isSearching) return false;
+    if (isSearching) {
+      return false;
+    }
 
     switch (searchMode) {
       case 'text':
