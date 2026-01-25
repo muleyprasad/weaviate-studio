@@ -29,12 +29,29 @@ import type {
 // Debug flag - set to false for production
 const DEBUG = false;
 
+// Default timeout for API requests (30 seconds)
+const DEFAULT_TIMEOUT_MS = 30000;
+
+/**
+ * Wraps a promise with a timeout
+ * Rejects if the promise doesn't resolve within the specified timeout
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+}
+
 /**
  * API class for interacting with Weaviate collections in the Data Explorer
  */
 export class DataExplorerAPI {
   private countCache = new Map<string, { count: number; timestamp: number }>();
   private readonly CACHE_TTL = 60000; // 1 minute
+  private readonly REQUEST_TIMEOUT = DEFAULT_TIMEOUT_MS;
 
   constructor(private client: WeaviateClient) {}
 
@@ -526,7 +543,7 @@ export class DataExplorerAPI {
   async getCollectionCount(collectionName: string): Promise<number> {
     try {
       const collection = this.client.collections.get(collectionName);
-      const result = await collection.aggregate.overAll();
+      const result = await withTimeout(collection.aggregate.overAll(), this.REQUEST_TIMEOUT);
       return result.totalCount ?? 0;
     } catch (error) {
       console.error('Error getting collection count:', error);

@@ -34,6 +34,11 @@ export function useDataFetch() {
     vscode.postMessage(message);
   }, []);
 
+  // Store fetchObjects in a ref to avoid dependency issues
+  const fetchObjectsRef = useRef<
+    ((page: number, pageSize: number, sortBy?: SortState) => void) | null
+  >(null);
+
   // Handle messages from extension
   const handleMessage = useCallback(
     (event: MessageEvent<ExtensionMessage>) => {
@@ -88,12 +93,14 @@ export function useDataFetch() {
 
         case 'updateData':
         case 'refresh':
-          // Trigger a refresh
-          fetchObjects(uiState.currentPage, uiState.pageSize);
+          // Trigger a refresh - use ref to get latest fetchObjects
+          if (fetchObjectsRef.current) {
+            fetchObjectsRef.current(uiState.currentPage, uiState.pageSize);
+          }
           break;
       }
     },
-    [dataActions, filterActions, vectorSearchActions, uiState.currentPage, uiState.pageSize] // Include UI state for refresh
+    [dataActions, filterActions, vectorSearchActions, uiState.currentPage, uiState.pageSize]
   );
 
   // Fetch objects with current pagination
@@ -131,6 +138,11 @@ export function useDataFetch() {
       filterState.matchMode,
     ]
   );
+
+  // Keep fetchObjectsRef updated
+  useEffect(() => {
+    fetchObjectsRef.current = fetchObjects;
+  }, [fetchObjects]);
 
   // Initialize - fetch schema and first page of objects
   const initialize = useCallback(() => {
@@ -183,16 +195,29 @@ export function useDataFetch() {
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {
-    if (initializedRef.current && dataState.collectionName && !dataState.loading) {
+    if (initializedRef.current && dataState.collectionName) {
       // Debounce page changes
       const timeoutId = setTimeout(() => {
-        fetchObjects(uiState.currentPage, uiState.pageSize, uiState.sortBy || undefined);
+        if (fetchObjectsRef.current) {
+          fetchObjectsRef.current(
+            uiState.currentPage,
+            uiState.pageSize,
+            uiState.sortBy || undefined
+          );
+        }
       }, 100);
 
       return () => clearTimeout(timeoutId);
     }
     return undefined;
-  }, [uiState.currentPage, uiState.pageSize, uiState.sortBy, filterState.activeFilters]);
+  }, [
+    uiState.currentPage,
+    uiState.pageSize,
+    uiState.sortBy,
+    filterState.activeFilters,
+    dataState.collectionName,
+    // Do NOT include dataState.loading or fetchObjects to avoid infinite loop
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
