@@ -277,6 +277,12 @@ export class DataExplorerAPI {
       if (!vectorSearch.vector || vectorSearch.vector.length === 0) {
         throw new Error('nearVector search requires a vector');
       }
+      // Validate that all vector elements are valid numbers
+      if (!vectorSearch.vector.every((n) => typeof n === 'number' && isFinite(n))) {
+        throw new Error(
+          'nearVector search requires a vector of valid numbers (no NaN, Infinity, null, or undefined)'
+        );
+      }
       return collection.query.nearVector(vectorSearch.vector, queryOptions);
     }
 

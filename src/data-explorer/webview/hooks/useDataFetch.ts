@@ -42,62 +42,81 @@ export function useDataFetch() {
   // Handle messages from extension
   const handleMessage = useCallback(
     (event: MessageEvent<ExtensionMessage>) => {
-      const message = event.data;
+      try {
+        const message = event.data;
 
-      // Only check for stale responses on commands that this hook handles
-      // Commands like 'aggregationsLoaded', 'exportComplete' are handled by other components
-      const commandsToCheckForStale = ['objectsLoaded', 'init', 'schemaLoaded'];
-      if (
-        message.requestId &&
-        commandsToCheckForStale.includes(message.command) &&
-        message.requestId !== currentRequestIdRef.current
-      ) {
-        console.log(`Ignoring stale response for request ${message.requestId}`);
-        return;
-      }
+        // Validate message structure
+        if (!message || typeof message !== 'object' || !message.command) {
+          console.error('[DataFetch] Invalid message structure received:', message);
+          dataActions.setError('Received malformed message from extension');
+          return;
+        }
 
-      switch (message.command) {
-        case 'init':
-        case 'schemaLoaded':
-          if (message.schema && message.collectionName) {
-            // Clear filters and vector search when switching to a different collection
-            if (
-              previousCollectionRef.current &&
-              previousCollectionRef.current !== message.collectionName
-            ) {
-              filterActions.clearAllFilters();
-              vectorSearchActions.resetForCollectionChange();
+        // Only check for stale responses on commands that this hook handles
+        // Commands like 'aggregationsLoaded', 'exportComplete' are handled by other components
+        const commandsToCheckForStale = ['objectsLoaded', 'init', 'schemaLoaded'];
+        if (
+          message.requestId &&
+          commandsToCheckForStale.includes(message.command) &&
+          message.requestId !== currentRequestIdRef.current
+        ) {
+          console.log(`Ignoring stale response for request ${message.requestId}`);
+          return;
+        }
+
+        switch (message.command) {
+          case 'init':
+          case 'schemaLoaded':
+            if (message.schema && message.collectionName) {
+              // Clear filters and vector search when switching to a different collection
+              if (
+                previousCollectionRef.current &&
+                previousCollectionRef.current !== message.collectionName
+              ) {
+                filterActions.clearAllFilters();
+                vectorSearchActions.resetForCollectionChange();
+              }
+              previousCollectionRef.current = message.collectionName;
+              dataActions.setCollection(message.collectionName);
+              dataActions.setSchema(message.schema);
             }
-            previousCollectionRef.current = message.collectionName;
-            dataActions.setCollection(message.collectionName);
-            dataActions.setSchema(message.schema);
-          }
-          break;
+            break;
 
-        case 'objectsLoaded':
-          if (message.objects && message.total !== undefined) {
-            dataActions.setData(message.objects, message.total);
-          }
-          break;
+          case 'objectsLoaded':
+            if (message.objects && message.total !== undefined) {
+              dataActions.setData(message.objects, message.total);
+            }
+            break;
 
-        case 'objectDetailLoaded':
-          // Object detail is handled separately
-          break;
+          case 'objectDetailLoaded':
+            // Object detail is handled separately
+            break;
 
-        case 'error':
-          // Only handle errors for this hook's requests
-          if (!message.requestId || message.requestId === currentRequestIdRef.current) {
-            dataActions.setError(message.error || 'An error occurred');
-          }
-          break;
+          case 'error':
+            // Only handle errors for this hook's requests
+            if (!message.requestId || message.requestId === currentRequestIdRef.current) {
+              dataActions.setError(message.error || 'An error occurred');
+            }
+            break;
 
-        case 'updateData':
-        case 'refresh':
-          // Trigger a refresh - use ref to get latest fetchObjects
-          if (fetchObjectsRef.current) {
-            fetchObjectsRef.current(uiState.currentPage, uiState.pageSize);
-          }
-          break;
+          case 'updateData':
+          case 'refresh':
+            // Trigger a refresh - use ref to get latest fetchObjects
+            if (fetchObjectsRef.current) {
+              fetchObjectsRef.current(uiState.currentPage, uiState.pageSize);
+            }
+            break;
+        }
+      } catch (error) {
+        const err = error as Error;
+        console.error('[DataFetch] Error processing message:', {
+          error: err.message,
+          stack: err.stack,
+          message: event.data,
+        });
+        dataActions.setError(
+          `Failed to process extension message: ${err.message || 'Unknown error'}`
+        );
       }
     },
     [dataActions, filterActions, vectorSearchActions, uiState.currentPage, uiState.pageSize]
@@ -113,7 +132,7 @@ export function useDataFetch() {
       abortControllerRef.current = new AbortController();
 
       // Generate unique request ID
-      const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       currentRequestIdRef.current = requestId;
 
       dataActions.setLoading(true);

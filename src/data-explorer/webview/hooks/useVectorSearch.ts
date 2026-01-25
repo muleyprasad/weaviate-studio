@@ -221,8 +221,17 @@ export function useVectorSearch() {
               distanceMetric: searchParams.distanceMetric,
               targetVector: searchParams.targetVector,
             };
+          } else {
+            searchActions.setSearchError(
+              'Invalid vector format: Expected an array of numbers. Example: [0.1, 0.2, 0.3]'
+            );
           }
-        } catch {
+        } catch (e) {
+          const error = e as Error;
+          const errorMessage = error.message || 'Unknown error';
+          searchActions.setSearchError(
+            `Invalid vector JSON: ${errorMessage}. Please check your JSON syntax.`
+          );
           isValid = false;
         }
         break;
@@ -250,7 +259,7 @@ export function useVectorSearch() {
     }
 
     // Generate unique request ID with vs- prefix for vector search
-    const requestId = `vs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `vs-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     currentRequestIdRef.current = requestId;
 
     debugLog('Executing search', {
