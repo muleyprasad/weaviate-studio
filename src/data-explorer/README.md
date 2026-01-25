@@ -1,274 +1,184 @@
-# Data Explorer - Phase 1-3
+# Weaviate Data Explorer
 
-The Data Explorer provides a zero-code table view for browsing Weaviate collection objects with pagination, column management, smart type rendering, visual filtering, and vector search.
+A visual data browser for Weaviate collections with advanced filtering, vector search, and export capabilities.
 
 ## Features
 
-### ✅ Implemented in Phase 1
+### Data Browsing
 
-1. **Automatic Data Loading** - Objects load automatically when opening the Data Explorer
-2. **Pagination Controls** - Navigate through pages with 10/20/50/100 items per page
-3. **Smart Type Rendering** - Type-specific cell formatting:
-   - Text: Truncated at 100 chars with tooltip for full text
-   - Numbers: Right-aligned, formatted with commas
-   - Booleans: ✓ (green) or ✗ (red) icons
-   - Dates: Relative time ("2 hours ago"), absolute on hover
-   - UUIDs: Shortened format with copy button
-   - GeoCoordinates: "📍 lat, lng" format
-   - Objects: "{3 properties}" badge with expand
-   - Arrays: "[5 items]" badge with expand
-   - Vectors: "🔢 [768 dims]" badge (full view in detail panel)
-4. **Column Management** - Show/hide columns, pin columns to left
-5. **Row Selection** - Checkboxes for selecting rows
-6. **Detail Panel** - Slide-out panel showing full object data
-7. **Loading States** - Skeleton loading during fetch
-8. **Error Handling** - Error banner with retry button
-9. **Empty States** - Helpful guidance when collection is empty
-10. **Client-side Sorting** - Sort by clicking column headers
+- **Interactive table view** with sortable columns and pagination
+- **Configurable page size** (10, 20, 50, or 100 objects per page)
+- **Column management** - show, hide, and reorder columns
+- **Object detail panel** - view full object details with expandable nested properties
+- **Support for all Weaviate data types** - text, numbers, booleans, dates, references, geo-coordinates, phone numbers, and more
 
-### ✅ Implemented in Phase 2
+### Advanced Filtering
 
-1. **Visual Filter Builder** - Slide-in panel with intuitive filter creation
-2. **Filter Operators** - Equal, NotEqual, GreaterThan, LessThan, Like, ContainsAny, ContainsAll, IsNull, IsNotNull
-3. **AND/OR Match Mode** - Combine filters with logical operators
-4. **Server-side Filtering** - Filters applied via Weaviate queries
-5. **Filter Chips** - Quick visibility and removal of active filters
-6. **Debounced Input** - Prevents excessive API calls
+- **Visual filter builder** with 10+ operators (Equal, Not Equal, Contains, Greater Than, Less Than, Like, etc.)
+- **AND/OR logic** for combining multiple filter conditions
+- **Filter presets** - save, load, and delete frequently used filter combinations
+- **Real-time filtering** with instant table updates
 
-### ✅ Implemented in Phase 3
+### Vector Search
 
-1. **Vector Search Panel** - Slide-in panel with three search modes
-2. **Text (Semantic) Search** - Natural language queries using configured vectorizer
-3. **Similar Object Search** - Find objects similar to a reference UUID
-4. **Raw Vector Search** - Paste vector embeddings directly
-5. **Search Parameters** - Distance metric, max distance slider, result limit
-6. **Match Percentage Display** - Visual match quality indicators
-7. **Find Similar Actions** - Quick action buttons in table rows and detail panel
-8. **Result Cards** - Rich result display with rank, distance, and actions
+Four search modes to find similar objects:
 
-## How to Test
+1. **Text Search** - Natural language semantic search using nearText
+2. **Object Search** - Find objects similar to an existing object (click "Find Similar" in object menu)
+3. **Vector Search** - Direct vector similarity search by pasting embedding vectors
+4. **Hybrid Search** - Combines BM25 keyword search with vector semantic search
+   - Alpha slider to balance keyword (0.0) vs semantic (1.0) weighting
+   - Score breakdown showing keyword, semantic, and combined scores
+   - Property selection for targeted search
 
-### Prerequisites
+### Export
 
-1. Make sure you have a Weaviate instance running with some data
-2. Connect to the instance in Weaviate Studio
+- **Multiple formats** - JSON or CSV
+- **Three export scopes**:
+  - Current page only (quick samples)
+  - Filtered results (export search/filter results)
+  - Entire collection (full backup)
+- **Export options** - include/exclude metadata, vectors, and flatten nested objects
+- **Native VS Code save dialog** integration
 
-### Testing the Feature
+### Performance & UX
 
-1. **Build the webview bundle:**
+- **Virtual scrolling** for smooth performance with large datasets (1000+ objects)
+- **Keyboard shortcuts** - Ctrl+F (filters), Ctrl+K (vector search), Ctrl+E (export), Ctrl+R (refresh)
+- **User preferences persistence** - column visibility, sort order, and panel states saved per collection
+- **Loading states** with skeleton screens and progress indicators
+- **Error handling** with recovery options and user-friendly messages
+- **Accessibility** - ARIA labels, keyboard navigation, and high contrast mode support
 
-   ```bash
-   npm run build:webview
-   ```
+## Getting Started
 
-2. **Open VS Code with the extension:**
+### Open Data Explorer
 
-   ```bash
-   code --extensionDevelopmentPath=/path/to/weaviate-studio
-   ```
+1. In the Weaviate sidebar, expand your connection
+2. Right-click on a collection
+3. Select **"Open Data Explorer"** or click the search icon
 
-   Or press F5 in VS Code to launch the extension development host.
+### Browse Data
 
-3. **Open Data Explorer:**
+- **Navigate**: Scroll through objects in the table view
+- **Sort**: Click column headers to sort ascending/descending
+- **View details**: Click any row to open the detail panel on the right
+- **Manage columns**: Click the "Columns" button to show/hide columns
 
-   - Connect to a Weaviate instance
-   - Expand the Collections node
-   - Right-click on a collection → "Open Data Explorer"
-   - Or click the search icon (🔍) next to the collection name
+### Filter Data
 
-4. **Test pagination:**
+1. Press **Ctrl+F** or click the "Filters" button
+2. Click "Add Filter" and select a property
+3. Choose an operator and enter a value
+4. Add more filters and combine with AND/OR logic
+5. Click "Apply Filters" to update the table
+6. **Save** frequently used filters as presets for quick access
 
-   - Change page size using the dropdown (10/20/50/100)
-   - Navigate using Previous/Next buttons
-   - Click page numbers directly
+### Vector Search
 
-5. **Test column management:**
+1. Press **Ctrl+K** or click the "Vector Search" button
+2. Choose your search mode:
+   - **Text**: Enter a natural language query (e.g., "articles about machine learning")
+   - **Hybrid**: Balance keyword and semantic search with the alpha slider
+     - Alpha = 0.5: Balanced approach (recommended)
+     - Alpha = 0.0: Pure keyword search
+     - Alpha = 1.0: Pure semantic search
+   - **Object**: Click "Find Similar" from any object's action menu
+   - **Vector**: Paste an embedding vector (advanced users)
+3. Adjust distance threshold and result limit as needed
+4. Click "Search" to view results with similarity scores
 
-   - Click "⚙️ Columns" button in the toolbar
-   - Toggle column visibility
-   - Pin/unpin columns
-   - Search for columns
+### Export Data
 
-6. **Test row selection:**
+1. Press **Ctrl+E** or click the "Export" button
+2. Select export scope (current page, filtered results, or all)
+3. Choose format (JSON or CSV)
+4. Configure options:
+   - Include metadata (creation time, update time)
+   - Include vectors (not recommended for CSV)
+   - Flatten nested objects (CSV only)
+5. Click "Export" and choose save location
 
-   - Click checkboxes to select individual rows
-   - Use the header checkbox to select all
-   - View selection count in toolbar
+## Keyboard Shortcuts
 
-7. **Test detail panel:**
+| Shortcut        | Action                                |
+| --------------- | ------------------------------------- |
+| `Ctrl+F`        | Open/close filters panel              |
+| `Ctrl+K`        | Open/close vector search panel        |
+| `Ctrl+E`        | Open export dialog                    |
+| `Ctrl+R`        | Refresh data                          |
+| `Escape`        | Close active panel                    |
+| `Arrow Up/Down` | Navigate table when detail panel open |
 
-   - Click on any row to open the detail panel
-   - View all properties with type-specific formatting
-   - Copy UUID using the copy button
-   - Press Escape or click outside to close
+## Tips & Best Practices
 
-8. **Test sorting:**
-   - Click on column headers to sort
-   - Click again to toggle ascending/descending
-   - Click a third time to clear sort
+### Filtering
 
-### Testing Phase 3 - Vector Search
+- Use **"Contains"** for partial text matches when you don't know the exact value
+- Use **"Greater Than"** with date fields to find recent objects
+- **Save complex filters** as presets to avoid rebuilding them
+- Combine filters with vector search for precision results
 
-1. **Open Vector Search Panel:**
+### Vector Search
 
-   - Click "Vector Search" button in the header toolbar
-   - Panel slides in from the right
+- **Text mode**: Best for natural language queries
+- **Hybrid mode**: Best when you need both keyword accuracy and semantic understanding
+  - Use **alpha = 0.5** for balanced results (works well for most cases)
+  - Use **alpha = 0.0** when you need exact term matches (like product codes)
+  - Use **alpha = 1.0** when concepts matter more than exact wording
+- **Object mode**: Great for "show me more like this" workflows
 
-2. **Test Text (Semantic) Search:**
+### Performance
 
-   - Select "Text (Semantic)" mode tab
-   - Enter a natural language query (e.g., "machine learning healthcare")
-   - Adjust max distance and result limit
-   - Click "Run Vector Search"
-   - View results with match percentages
+- Virtual scrolling automatically handles large datasets
+- Apply **filters before exporting** large collections to reduce file size
+- Use **"Current page"** export for quick samples
+- **Hide unused columns** to improve rendering performance
 
-3. **Test Similar Object Search:**
+### Export
 
-   - Select "Similar Object" mode tab
-   - Paste a UUID or use "Find Similar" from:
-     - Table row action buttons (🔍 icon)
-     - Detail panel "Find Similar" button
-   - Click "Run Vector Search"
-   - View objects similar to the reference
+- **JSON** format better preserves complex nested data structures
+- **CSV** format easier to open in Excel/spreadsheets
+- **Uncheck "Include vectors"** for CSV exports to avoid giant files
+- Use **"Filtered results"** scope after applying filters or vector search
 
-4. **Test Raw Vector Search:**
+## Troubleshooting
 
-   - Select "Raw Vector" mode tab
-   - Paste a JSON array of numbers (e.g., `[0.1, -0.2, 0.3, ...]`)
-   - Validation shows dimension count
-   - Click "Run Vector Search"
+### No results found
 
-5. **Test Search Results:**
+- Check if filters are too restrictive - try removing some conditions
+- Increase "Max Distance" threshold in vector search settings
+- Try hybrid search with a lower alpha value (more keyword-focused)
 
-   - Click "View" to open object in detail panel
-   - Click "Find Similar" to chain searches
-   - Observe match percentage color coding:
-     - Green (90%+): Excellent match
-     - Blue (75%+): Good match
-     - Yellow (50%+): Moderate match
-     - Gray (<50%): Low match
+### Failed to load data
 
-6. **Test Edge Cases:**
-   - Collection without vectorizer → Warning message
-   - Invalid vector format → Validation error
-   - Empty results → Empty state message
+- Verify your Weaviate connection is still active (check sidebar)
+- Ensure the collection still exists
+- Click "Try Again" or press Ctrl+R to refresh
 
-### Testing Checklist
+### Slow performance
 
-- [ ] Test with empty collection
-- [ ] Test with 1 object
-- [ ] Test with 1000+ objects
-- [ ] Test with all property types
-- [ ] Test with deeply nested objects (5+ levels)
-- [ ] Test with very long text fields (10,000+ chars)
-- [ ] Test with disconnected Weaviate instance
-- [ ] Test rapid page switching (debounce check)
-- [ ] Test detail panel with all data types
-- [ ] Test keyboard navigation (Arrow keys, Enter, Escape, Space)
-- [ ] Test vector search with text query
-- [ ] Test "Find Similar" from table rows
-- [ ] Test "Find Similar" from detail panel
-- [ ] Test raw vector input validation
-- [ ] Test chained "Find Similar" searches
+- Virtual scrolling should handle large datasets automatically
+- If still slow, reduce page size or apply filters to limit results
+- Consider hiding columns you don't need
 
-## Known Limitations
+## Limitations
 
-1. **No server-side sorting** - Sorting is client-side, so it only sorts the current page
-2. **No hybrid search** - Will be added in Phase 4
-3. **No export** - Will be added in Phase 5
-4. **Column widths are not persisted** - Resizing is not implemented yet
-5. **No column reordering** - Drag and drop will be added later
-6. **Single vector support** - Named vectors not fully supported yet
+- **Max vector dimensions**: 65,536
+- **Recommended export limit**: <100,000 objects per file
+- **LocalStorage limit**: ~5MB per collection for preferences (automatic cleanup if exceeded)
+- **Network timeout**: Requests timeout after 30 seconds
 
-## File Structure
+## Requirements
 
-```
-src/data-explorer/
-├── extension/
-│   ├── DataExplorerPanel.ts      # VS Code webview panel controller
-│   └── DataExplorerAPI.ts        # Weaviate API wrapper
-├── webview/
-│   ├── DataExplorer.tsx          # Root React component
-│   ├── index.tsx                 # Webview entry point
-│   ├── styles.css                # Component styles
-│   ├── data-explorer.html        # HTML template
-│   ├── components/
-│   │   ├── DataBrowser/
-│   │   │   ├── DataTable.tsx     # Main table component
-│   │   │   ├── TableHeader.tsx   # Column headers with sort
-│   │   │   ├── TableRow.tsx      # Individual row
-│   │   │   ├── CellRenderer.tsx  # Type-specific cells
-│   │   │   ├── ColumnManager.tsx # Show/hide columns dialog
-│   │   │   └── Pagination.tsx    # Page controls
-│   │   ├── FilterBuilder/
-│   │   │   ├── FilterPanel.tsx   # Filter builder panel
-│   │   │   ├── FilterRule.tsx    # Single filter rule
-│   │   │   ├── FilterChips.tsx   # Active filter chips
-│   │   │   └── ValueInput.tsx    # Type-aware value inputs
-│   │   ├── VectorSearch/         # Phase 3
-│   │   │   ├── VectorSearchPanel.tsx  # Main search panel
-│   │   │   ├── SearchModeSelector.tsx # Mode tabs
-│   │   │   ├── TextSearchInput.tsx    # Text mode UI
-│   │   │   ├── ObjectSearchInput.tsx  # Object mode UI
-│   │   │   ├── VectorInput.tsx        # Vector mode UI
-│   │   │   ├── SearchResults.tsx      # Results container
-│   │   │   └── ResultCard.tsx         # Result display
-│   │   └── ObjectDetail/
-│   │       ├── DetailPanel.tsx   # Slide-out panel
-│   │       └── PropertyView.tsx  # Property display
-│   ├── context/
-│   │   ├── DataContext.tsx       # Data fetching & objects state
-│   │   ├── UIContext.tsx         # UI state (columns, pagination, selection)
-│   │   ├── FilterContext.tsx     # Filter state (Phase 2)
-│   │   ├── VectorSearchContext.tsx # Vector search state (Phase 3)
-│   │   └── index.ts              # Context exports
-│   ├── hooks/
-│   │   ├── useDataFetch.ts       # Fetch objects hook
-│   │   ├── usePagination.ts      # Pagination logic
-│   │   └── useVectorSearch.ts    # Vector search hook (Phase 3)
-│   └── utils/
-│       └── typeRenderers.ts      # Type formatting helpers
-└── types/
-    └── index.ts                  # TypeScript interfaces
-```
+- **Weaviate**: v1.23 or later
+- **Weaviate TypeScript Client**: v3.0 or later
+- **VS Code**: 1.80 or later
 
-## Architecture Notes
+## Contributing
 
-### State Management
+See the main [Weaviate Studio repository](https://github.com/muleyprasad/weaviate-studio) for development setup and contribution guidelines.
 
-- Uses React Context + useReducer pattern with **four separate contexts**:
-  - **DataContext** - Data fetching & objects (schema, objects, loading, error)
-  - **UIContext** - UI state (columns, pagination, sorting, selection, panels)
-  - **FilterContext** - Filter state (activeFilters, pendingFilters, matchMode)
-  - **VectorSearchContext** - Vector search state (mode, params, results)
-- No external state libraries required
-- Split contexts prevent unnecessary re-renders for better performance
-- **Pending/Active filter pattern**: UI edits update pending state, only Apply triggers API calls
+## License
 
-### Message Passing
-
-- Extension → Webview: `postMessage({ command: 'objectsLoaded', objects, total })`
-- Webview → Extension: `vscode.postMessage({ command: 'fetchObjects', limit, offset, where, matchMode, vectorSearch })`
-
-### Vector Search Integration
-
-The vector search feature integrates with the existing data fetching infrastructure:
-
-1. **VectorSearchContext** manages search panel state (mode, params, results)
-2. **useVectorSearch** hook handles search execution and result processing
-3. **DataExplorerAPI** supports three query modes:
-   - `nearText` - Semantic text search
-   - `nearVector` - Raw vector similarity
-   - Standard `fetchObjects` with optional `nearObject`
-
-### Performance Considerations
-
-- Pagination limits data fetched per page (max 100)
-- Skeleton loading prevents layout shifts
-- Client-side sorting avoids API calls for small datasets
-- Debounced page changes prevent rapid API calls
-- **Debounced filter inputs** (300ms) prevent excessive re-renders
-- **Efficient aggregate counting** with filters for total count
-- **Request cancellation** prevents stale responses
-- **Filters cleared on collection switch** prevents invalid queries
-- **Vector search results cached** to prevent redundant queries
+Part of Weaviate Studio - MIT License
