@@ -169,10 +169,15 @@ export function useDataFetch() {
       return;
     }
 
+    // Generate unique request ID for tracking
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    currentRequestIdRef.current = requestId;
+
     dataActions.setLoading(true);
     postMessage({
       command: 'initialize',
       collectionName: dataState.collectionName,
+      requestId,
     });
   }, [postMessage, dataState.collectionName, dataActions]);
 
