@@ -31,6 +31,8 @@ export class DataExplorerPanel {
   private _api: DataExplorerAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
   private _exportAbortController: AbortController | undefined;
+  private _messageQueue: WebviewMessage[] = [];
+  private _isInitializing = false;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -48,6 +50,9 @@ export class DataExplorerPanel {
     const client = this.getClient();
     if (client) {
       this._api = new DataExplorerAPI(client);
+    } else {
+      // Client not ready - send connecting state to webview
+      this._isInitializing = true;
     }
 
     // Set the webview's initial HTML content
@@ -73,6 +78,9 @@ export class DataExplorerPanel {
           if (client && !this._api) {
             // Only create if doesn't exist
             this._api = new DataExplorerAPI(client);
+            this._isInitializing = false;
+            // Process queued messages
+            this._processMessageQueue();
           }
         }
       },
@@ -186,15 +194,26 @@ export class DataExplorerPanel {
    * Handles messages from the webview
    */
   private async _handleMessage(message: WebviewMessage): Promise<void> {
+    // If client not ready, try to initialize or queue the message
     if (!this._api) {
       const client = this.getClient();
       if (client) {
+        // Client became available - initialize now
         this._api = new DataExplorerAPI(client);
+        this._isInitializing = false;
+        // Process any queued messages
+        this._processMessageQueue();
       } else {
-        this.postMessage({
-          command: 'error',
-          error: 'No Weaviate client available. Please reconnect.',
-        });
+        // Still not ready - queue the message and notify user
+        this._messageQueue.push(message);
+        if (!this._isInitializing) {
+          this._isInitializing = true;
+          this.postMessage({
+            command: 'connectionStatus',
+            status: 'connecting',
+            message: 'Connecting to Weaviate...',
+          });
+        }
         return;
       }
     }
@@ -628,9 +647,23 @@ export class DataExplorerPanel {
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}' ${cspSource}; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
     );
 
-    // Replace nonce placeholder
+    // Replace nonce placeholder with validation
     const nonce = this._getNonce();
+    const noncePlaceholderCount = (html.match(/{{nonce}}/g) || []).length;
     html = html.replace(/{{nonce}}/g, nonce);
+
+    // Validate all placeholders were replaced
+    const remainingPlaceholders = (html.match(/{{nonce}}/g) || []).length;
+    if (remainingPlaceholders > 0) {
+      console.error(
+        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced`
+      );
+    }
+    if (noncePlaceholderCount === 0) {
+      console.warn(
+        'CSP nonce replacement: No {{nonce}} placeholders found in HTML. Expected at least 2.'
+      );
+    }
 
     // Inject initial data
     const initScript = `
@@ -644,6 +677,41 @@ export class DataExplorerPanel {
     html = html.replace('</head>', `${initScript}</head>`);
 
     return html;
+  }
+
+  /**
+   * Processes queued messages after client becomes available
+   */
+  private async _processMessageQueue(): Promise<void> {
+    if (this._messageQueue.length === 0) {
+      return;
+    }
+
+    console.log(`Processing ${this._messageQueue.length} queued messages`);
+
+    // Notify webview that connection is ready
+    this.postMessage({
+      command: 'connectionStatus',
+      status: 'connected',
+      message: 'Connected to Weaviate',
+    });
+
+    // Process all queued messages
+    const queue = [...this._messageQueue];
+    this._messageQueue = [];
+
+    for (const message of queue) {
+      try {
+        await this._handleMessage(message);
+      } catch (error) {
+        console.error('Error processing queued message:', error);
+        this.postMessage({
+          command: 'error',
+          error: error instanceof Error ? error.message : 'Failed to process queued message',
+          requestId: message.requestId,
+        });
+      }
+    }
   }
 
   /**

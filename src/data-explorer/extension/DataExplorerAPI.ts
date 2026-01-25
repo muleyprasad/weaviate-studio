@@ -1,6 +1,31 @@
 /**
  * DataExplorerAPI - Weaviate API wrapper for Data Explorer
  * Handles all Weaviate client interactions for fetching objects and schema
+ *
+ * ERROR HANDLING STANDARD:
+ * ========================
+ * This module follows a consistent error handling pattern:
+ *
+ * 1. PUBLIC METHODS (fetchObjects, getCollectionSchema, etc.):
+ *    - Always throw errors for exceptional conditions
+ *    - Never return null/undefined for errors
+ *    - Errors include context (collection name, operation type)
+ *    - Timeout errors are detected and given actionable messages
+ *
+ * 2. PRIVATE HELPER METHODS (buildWeaviateFilter, aggregation helpers):
+ *    - Return null for "no data" or "not applicable" cases (e.g., empty filters)
+ *    - Throw errors for actual failures
+ *    - Log warnings for non-critical failures that can be handled gracefully
+ *
+ * 3. AGGREGATION METHODS:
+ *    - Return null when data doesn't match expected format (graceful degradation)
+ *    - Collect failures in aggregationFailures array instead of throwing
+ *    - This allows partial results when some properties fail
+ *
+ * RATIONALE:
+ * - Public API throws: Callers can use try-catch for error handling
+ * - Helpers return null: Allows optional/conditional logic without try-catch
+ * - Aggregations return null: Enables partial results for mixed property types
  */
 
 import type { WeaviateClient, Collection } from 'weaviate-client';
@@ -60,6 +85,29 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number = DEFAULT_TIMEOUT
       setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
     ),
   ]);
+}
+
+/**
+ * Checks if an error is a timeout error
+ */
+function isTimeoutError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes('timeout') || message.includes('timed out');
+}
+
+/**
+ * Creates a user-friendly timeout error message with actionable suggestions
+ */
+function createTimeoutError(
+  operation: string,
+  context: string,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Error {
+  return new Error(
+    `${operation} timed out after ${timeoutMs}ms for ${context}. ` +
+      'Suggestions: Try again, reduce page size, add filters to narrow results, or check server connectivity.'
+  );
 }
 
 /**
@@ -224,13 +272,11 @@ export class DataExplorerAPI {
         );
       }
 
-      if (
-        errorMessage.toLowerCase().includes('timeout') ||
-        errorMessage.toLowerCase().includes('timed out')
-      ) {
-        throw new Error(
-          `Request to collection "${params.collectionName}" timed out after ${this.REQUEST_TIMEOUT}ms. ` +
-            'The server may be slow or unreachable. Please try again or reduce the page size.'
+      if (isTimeoutError(error)) {
+        throw createTimeoutError(
+          'Data fetch',
+          `collection "${params.collectionName}"`,
+          this.REQUEST_TIMEOUT
         );
       }
 
@@ -373,12 +419,15 @@ export class DataExplorerAPI {
   /**
    * Builds a Weaviate filter from FilterCondition array
    * Combines multiple conditions with AND or OR logic based on matchMode
+   *
+   * @returns WeaviateFilter or null if no valid conditions (null = no filtering)
    */
   private buildWhereFilter(
     collection: Collection,
     conditions: FilterCondition[],
     matchMode: FilterMatchMode = 'AND'
   ): WeaviateFilter | null {
+    // Return null for empty conditions - this is not an error, just means "no filter"
     if (!conditions || conditions.length === 0) {
       return null;
     }
@@ -388,6 +437,7 @@ export class DataExplorerAPI {
       .map((condition) => this.buildSingleFilter(collection, condition))
       .filter((f): f is WeaviateFilter => f !== null && f !== undefined);
 
+    // Return null if all conditions were invalid - this is not an error
     if (filters.length === 0) {
       return null;
     }
@@ -590,6 +640,13 @@ export class DataExplorerAPI {
       return result.totalCount ?? 0;
     } catch (error) {
       console.error('Error getting collection count:', error);
+      if (isTimeoutError(error)) {
+        throw createTimeoutError(
+          'Count aggregation',
+          `collection "${collectionName}"`,
+          this.REQUEST_TIMEOUT
+        );
+      }
       throw new Error(
         `Failed to get count for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -829,6 +886,9 @@ export class DataExplorerAPI {
 
   /**
    * Gets top values for a text property using aggregation
+   *
+   * @returns PropertyTopValues or null if no data available (graceful degradation)
+   * @throws Error only for actual API failures (logged as warnings, not thrown)
    */
   private async getPropertyTopValues(
     collection: Collection,
@@ -848,6 +908,7 @@ export class DataExplorerAPI {
 
       // Result is an array, not an object with groups property
       const groupByResult = result as WeaviateGroupByResult;
+      // Return null if no data - this is not an error, just means no values to aggregate
       if (!groupByResult || !Array.isArray(groupByResult) || groupByResult.length === 0) {
         return null;
       }
@@ -869,6 +930,7 @@ export class DataExplorerAPI {
         values,
       };
     } catch (error) {
+      // Log warning but return null - allows partial aggregation results
       console.warn(`Failed to get top values for ${propertyName}:`, error);
       return null;
     }
@@ -876,6 +938,9 @@ export class DataExplorerAPI {
 
   /**
    * Gets numeric statistics for a number/int property
+   *
+   * @returns PropertyNumericStats or null if no data/wrong type (graceful degradation)
+   * @throws Error only for actual API failures (logged as warnings, not thrown)
    */
   private async getPropertyNumericStats(
     collection: Collection,
@@ -933,6 +998,7 @@ export class DataExplorerAPI {
         sum: metrics.sum,
       };
     } catch (error) {
+      // Log warning but return null - allows partial aggregation results
       console.warn(`Failed to get numeric stats for ${propertyName}:`, error);
       return null;
     }
@@ -940,6 +1006,9 @@ export class DataExplorerAPI {
 
   /**
    * Gets date range for a date property
+   *
+   * @returns PropertyDateRange or null if no data/wrong type (graceful degradation)
+   * @throws Error only for actual API failures (logged as warnings, not thrown)
    */
   private async getPropertyDateRange(
     collection: Collection,
@@ -966,6 +1035,7 @@ export class DataExplorerAPI {
         latest: metrics.maximum ? new Date(metrics.maximum).toISOString() : 'N/A',
       };
     } catch (error) {
+      // Log warning but return null - allows partial aggregation results
       console.warn(`Failed to get date range for ${propertyName}:`, error);
       return null;
     }
@@ -973,6 +1043,9 @@ export class DataExplorerAPI {
 
   /**
    * Gets boolean counts for a boolean property
+   *
+   * @returns PropertyBooleanCounts or null if no data/wrong type (graceful degradation)
+   * @throws Error only for actual API failures (logged as warnings, not thrown)
    */
   private async getPropertyBooleanCounts(
     collection: Collection,
@@ -1015,6 +1088,7 @@ export class DataExplorerAPI {
         falsePercentage: total > 0 ? Math.round((falseCount / total) * 100) : 0,
       };
     } catch (error) {
+      // Log warning but return null - allows partial aggregation results
       console.warn(`Failed to get boolean counts for ${propertyName}:`, error);
       return null;
     }
@@ -1107,6 +1181,9 @@ export class DataExplorerAPI {
         throw new Error('Export cancelled');
       }
       console.error('Error exporting objects:', error);
+      if (isTimeoutError(error)) {
+        throw createTimeoutError('Export', `collection "${params.collectionName}"`);
+      }
       throw error;
     }
   }
@@ -1245,9 +1322,12 @@ export class DataExplorerAPI {
     // Build CSV header
     const header = columnArray.map((col) => this.escapeCSV(col)).join(',');
 
-    // Build CSV rows
+    // Build CSV rows - flatten once per object for performance
     const rows = objects.map((obj) => {
       const row: string[] = [];
+      const flattenedProps = options.flattenNested
+        ? this.flattenObject(obj.properties)
+        : obj.properties;
 
       for (const col of columnArray) {
         let value: unknown = '';
@@ -1261,13 +1341,7 @@ export class DataExplorerAPI {
         } else if (col === 'hasVector') {
           value = obj.vector ? 'true' : 'false';
         } else {
-          // Property value
-          if (options.flattenNested) {
-            const flattened = this.flattenObject(obj.properties);
-            value = flattened[col];
-          } else {
-            value = obj.properties[col];
-          }
+          value = flattenedProps[col];
         }
 
         // Format the value for CSV

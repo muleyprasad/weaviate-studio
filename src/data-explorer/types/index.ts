@@ -220,6 +220,7 @@ export type ExtensionMessageCommand =
   | 'error'
   | 'updateData'
   | 'refresh'
+  | 'connectionStatus' // Connection state updates
   // Phase 5: Aggregations and Export
   | 'aggregationsLoaded'
   | 'exportComplete'
@@ -247,6 +248,9 @@ export interface ExtensionMessage {
   object?: WeaviateObject;
   total?: number;
   requestId?: string; // Match with request ID
+  // Connection status
+  status?: 'connecting' | 'connected' | 'disconnected';
+  message?: string;
   // Phase 5: Aggregations and Export
   aggregations?: AggregationResult;
   exportResult?: ExportResult;
