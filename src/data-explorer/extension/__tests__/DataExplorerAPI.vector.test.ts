@@ -86,7 +86,7 @@ describe('DataExplorerAPI - Vector Search', () => {
         }),
       },
       aggregate: {
-        overAll: jest.fn().mockResolvedValue({ totalCount: 100 }),
+        overAll: (jest.fn() as any).mockResolvedValue({ totalCount: 100 }),
       },
       sort: {
         byProperty: jest.fn(() => ({})),

@@ -78,8 +78,6 @@ export function ExportDialog({
     setCurrentRequestId(requestId);
 
     const options: ExportOptions = {
-      scope,
-      format,
       includeProperties,
       includeVectors,
       includeMetadata,

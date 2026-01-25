@@ -665,18 +665,15 @@ describe('useDataFetch', () => {
 
       // Send a message that will throw an error when accessed
       // by using a Proxy that throws on property access
-      const errorMessage = new Proxy(
-        { command: 'objectsLoaded' },
-        {
-          get(target, prop) {
-            if (prop === 'command') return 'objectsLoaded';
-            if (prop === 'objects' || prop === 'total') {
-              throw new Error('Simulated processing error');
-            }
-            return target[prop];
-          },
-        }
-      );
+      const errorMessage = new Proxy({ command: 'objectsLoaded' } as any, {
+        get(target: any, prop: string | symbol) {
+          if (prop === 'command') return 'objectsLoaded';
+          if (prop === 'objects' || prop === 'total') {
+            throw new Error('Simulated processing error');
+          }
+          return target[prop];
+        },
+      });
 
       act(() => {
         window.dispatchEvent(new MessageEvent('message', { data: errorMessage }));

@@ -13,10 +13,21 @@ export interface WeaviateObject {
 }
 
 export interface HybridExplainScoreDetails {
+  // BM25/keyword search score components
+  bm25?: number;
   keyword?: number;
+
+  // Vector search score components
   vector?: number;
+  nearText?: number;
+
+  // Combined/final scores
   combined?: number;
+  score?: number;
+
+  // Additional metadata
   matchedTerms?: string[];
+  keywords?: string[];
 }
 
 /**
@@ -414,10 +425,9 @@ export type ExportScope = 'currentPage' | 'filtered' | 'all';
 
 /**
  * Options for exporting data
+ * Note: scope and format are specified at the ExportParams level, not here
  */
 export interface ExportOptions {
-  scope: ExportScope;
-  format: ExportFormat;
   includeMetadata: boolean; // UUID, creationTime, updateTime
   includeVectors: boolean;
   flattenNested: boolean; // Convert nested objects to dot notation

@@ -470,8 +470,6 @@ export class DataExplorerPanel {
         scope: 'currentPage',
         format: 'json',
         options: {
-          scope: 'currentPage',
-          format: 'json',
           includeMetadata: true,
           includeVectors: false,
           flattenNested: false,

@@ -78,17 +78,18 @@ describe('DataExplorerAPI - Export Functionality', () => {
   beforeEach(() => {
     mockCollection = {
       query: {
-        fetchObjects: jest.fn().mockImplementation(({ limit, offset }) => {
-          const start = offset || 0;
+        fetchObjects: jest.fn().mockImplementation((options: any) => {
+          const limit = options?.limit || 100;
+          const offset = options?.offset || 0;
+          const start = offset;
           const objects = createMockObjects(Math.min(limit, 100));
           return Promise.resolve({
             objects: objects.slice(0, Math.min(limit, 100 - start)),
-            metadata: { totalCount: 100 },
           });
         }),
       },
       aggregate: {
-        overAll: jest.fn().mockResolvedValue({ totalCount: 100 }),
+        overAll: (jest.fn() as any).mockResolvedValue({ totalCount: 100 }),
       },
       filter: {
         byProperty: jest.fn(() => ({
@@ -634,14 +635,15 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('exports all objects scope', async () => {
-      mockCollection.query.fetchObjects.mockImplementation(({ limit, offset }) => {
-        const start = offset || 0;
+      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
+        const limit = options?.limit || 100;
+        const offset = options?.offset || 0;
+        const start = offset;
         if (start >= 100) {
-          return Promise.resolve({ objects: [], metadata: { totalCount: 100 } });
+          return Promise.resolve({ objects: [] });
         }
         return Promise.resolve({
           objects: createMockObjects(limit),
-          metadata: { totalCount: 100 },
         });
       });
 
@@ -688,19 +690,20 @@ describe('DataExplorerAPI - Export Functionality', () => {
   describe('Large Dataset Handling', () => {
     test('paginates through large datasets', async () => {
       let callCount = 0;
-      mockCollection.query.fetchObjects.mockImplementation(({ limit, offset }) => {
+      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
+        const limit = options?.limit || 100;
+        const offset = options?.offset || 0;
         callCount++;
         const start = offset || 0;
         const remaining = Math.max(0, 250 - start);
         const objectsToReturn = Math.min(limit, remaining);
 
         if (remaining === 0) {
-          return Promise.resolve({ objects: [], metadata: { totalCount: 250 } });
+          return Promise.resolve({ objects: [] });
         }
 
         return Promise.resolve({
           objects: createMockObjects(objectsToReturn),
-          metadata: { totalCount: 250 },
         });
       });
 
@@ -723,14 +726,14 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('truncates at 10,000 objects and sets flag', async () => {
-      mockCollection.query.fetchObjects.mockImplementation(({ limit }) => {
+      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
+        const limit = options?.limit || 100;
         return Promise.resolve({
           objects: createMockObjects(limit),
-          metadata: { totalCount: 15000 },
         });
       });
 
-      mockCollection.aggregate.overAll.mockResolvedValue({ totalCount: 15000 });
+      (mockCollection.aggregate.overAll.mockResolvedValue as any)({ totalCount: 15000 });
 
       const params: ExportParams = {
         collectionName: 'Article',
@@ -753,14 +756,15 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('does not set truncated flag when within limit', async () => {
-      mockCollection.query.fetchObjects.mockImplementation(({ limit, offset }) => {
-        const start = offset || 0;
+      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
+        const limit = options?.limit || 100;
+        const offset = options?.offset || 0;
+        const start = offset;
         if (start >= 100) {
-          return Promise.resolve({ objects: [], metadata: { totalCount: 100 } });
+          return Promise.resolve({ objects: [] });
         }
         return Promise.resolve({
           objects: createMockObjects(Math.min(limit, 100 - start)),
-          metadata: { totalCount: 100 },
         });
       });
 
@@ -808,11 +812,10 @@ describe('DataExplorerAPI - Export Functionality', () => {
     test('cancels export when AbortSignal is triggered during fetch', async () => {
       const abortController = new AbortController();
 
-      mockCollection.query.fetchObjects.mockImplementation(() => {
+      (mockCollection.query.fetchObjects.mockImplementation as any)(() => {
         abortController.abort();
         return Promise.resolve({
           objects: createMockObjects(100),
-          metadata: { totalCount: 200 },
         });
       });
 

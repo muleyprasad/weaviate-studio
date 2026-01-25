@@ -85,7 +85,7 @@ describe('DataExplorerAPI - Filter Building', () => {
         byProperty: jest.fn((path: string) => mockFilterBuilder),
       },
       query: {
-        fetchObjects: jest.fn().mockResolvedValue({
+        fetchObjects: (jest.fn() as any).mockResolvedValue({
           objects: [
             {
               uuid: 'test-uuid-1',
@@ -98,9 +98,6 @@ describe('DataExplorerAPI - Filter Building', () => {
               metadata: {},
             },
           ],
-          metadata: {
-            totalCount: 2,
-          },
         }),
         nearText: jest.fn().mockReturnThis(),
         nearVector: jest.fn().mockReturnThis(),
@@ -108,7 +105,7 @@ describe('DataExplorerAPI - Filter Building', () => {
         hybrid: jest.fn().mockReturnThis(),
       },
       aggregate: {
-        overAll: jest.fn().mockResolvedValue({
+        overAll: (jest.fn() as any).mockResolvedValue({
           totalCount: 100,
         }),
       },
