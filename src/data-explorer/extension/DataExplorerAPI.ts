@@ -174,25 +174,86 @@ export class DataExplorerAPI {
           this.countCache.set(cacheKey, { count: total, timestamp: now });
         } catch (aggregateError) {
           console.warn('Failed to get aggregate count:', aggregateError);
-          // Fallback to cached value or objects length
-          total = cached?.count ?? objects.length;
+          // Distinguish between cache available vs no cache scenarios
+          if (cached) {
+            // Log that we're using stale cache
+            const staleness = now - cached.timestamp;
+            console.warn(
+              `Using stale count cache (${staleness}ms old). ` +
+                `Aggregate count failed: ${aggregateError instanceof Error ? aggregateError.message : String(aggregateError)}`
+            );
+            total = cached.count;
+          } else {
+            // No cache available - log error and fall back to objects length
+            console.error(
+              'Failed to get aggregate count and no cache available. Using object count as fallback.',
+              aggregateError
+            );
+            total = objects.length;
+          }
         }
       }
 
       return { objects, total };
     } catch (error) {
-      console.error('Error fetching objects:', error);
+      console.error('Error fetching objects from collection:', {
+        collection: params.collectionName,
+        limit: params.limit,
+        offset: params.offset,
+        hasFilters: params.where && params.where.length > 0,
+        hasVectorSearch: params.vectorSearch?.type !== 'none',
+        error,
+      });
 
-      // Provide better error messages for common issues
+      // Provide specific, actionable error messages for common issues
       const errorMessage = error instanceof Error ? error.message : String(error);
+
       if (errorMessage.includes('stopwords')) {
         throw new Error(
-          'Filter contains only stopwords (common words like "the", "a", "is"). ' +
+          `[Collection: ${params.collectionName}] Filter contains only stopwords (common words like "the", "a", "is"). ` +
             'Please use more specific terms or try the "Equal" operator instead of "Like".'
         );
       }
 
-      throw error;
+      if (
+        errorMessage.toLowerCase().includes('not found') ||
+        errorMessage.toLowerCase().includes('does not exist')
+      ) {
+        throw new Error(
+          `Collection "${params.collectionName}" not found. Please verify the collection name and that you\'re connected to the correct Weaviate instance.`
+        );
+      }
+
+      if (
+        errorMessage.toLowerCase().includes('timeout') ||
+        errorMessage.toLowerCase().includes('timed out')
+      ) {
+        throw new Error(
+          `Request to collection "${params.collectionName}" timed out after ${this.REQUEST_TIMEOUT}ms. ` +
+            'The server may be slow or unreachable. Please try again or reduce the page size.'
+        );
+      }
+
+      if (
+        errorMessage.toLowerCase().includes('authentication') ||
+        errorMessage.toLowerCase().includes('unauthorized') ||
+        errorMessage.toLowerCase().includes('forbidden')
+      ) {
+        throw new Error(
+          'Authentication failed. Please verify your connection credentials and try again.'
+        );
+      }
+
+      if (errorMessage.toLowerCase().includes('invalid filter')) {
+        throw new Error(
+          `[Collection: ${params.collectionName}] Invalid filter syntax. Please check your filter conditions and try again.`
+        );
+      }
+
+      // Generic error with context
+      throw new Error(
+        `[Collection: ${params.collectionName}] Failed to fetch objects: ${errorMessage}`
+      );
     }
   }
 
@@ -664,6 +725,7 @@ export class DataExplorerAPI {
         numericStats: [],
         dateRange: [],
         booleanCounts: [],
+        aggregationFailures: [],
       };
 
       // Process each property based on its type
@@ -736,8 +798,14 @@ export class DataExplorerAPI {
             }
           }
         } catch (propError) {
+          // Collect failure details with property info
+          const errorMessage = propError instanceof Error ? propError.message : String(propError);
           console.warn(`[DataExplorerAPI] Failed to aggregate property ${propName}:`, propError);
-          // Continue with other properties
+          result.aggregationFailures!.push({
+            property: propName,
+            error: errorMessage,
+            type: dataType,
+          });
         }
       }
 
@@ -748,6 +816,7 @@ export class DataExplorerAPI {
           numericStats: result.numericStats?.length || 0,
           dateRange: result.dateRange?.length || 0,
           booleanCounts: result.booleanCounts?.length || 0,
+          aggregationFailures: result.aggregationFailures?.length || 0,
         });
       }
 
@@ -966,6 +1035,8 @@ export class DataExplorerAPI {
       }
 
       let objects: WeaviateObject[];
+      let isTruncated = false;
+      let totalCount: number | undefined;
 
       switch (params.scope) {
         case 'currentPage':
@@ -975,17 +1046,28 @@ export class DataExplorerAPI {
 
         case 'filtered':
           // Fetch all objects matching the filter
-          objects = await this.fetchAllObjects(
+          const filteredResult = await this.fetchAllObjects(
             params.collectionName,
             params.where,
             params.matchMode,
             signal
           );
+          objects = filteredResult.objects;
+          isTruncated = filteredResult.isTruncated;
+          totalCount = filteredResult.totalCount;
           break;
 
         case 'all':
           // Fetch all objects from collection
-          objects = await this.fetchAllObjects(params.collectionName, undefined, undefined, signal);
+          const allResult = await this.fetchAllObjects(
+            params.collectionName,
+            undefined,
+            undefined,
+            signal
+          );
+          objects = allResult.objects;
+          isTruncated = allResult.isTruncated;
+          totalCount = allResult.totalCount;
           break;
 
         default:
@@ -1016,6 +1098,9 @@ export class DataExplorerAPI {
         data,
         objectCount: objects.length,
         format: params.format,
+        isTruncated,
+        totalCount,
+        truncationLimit: isTruncated ? 10000 : undefined,
       };
     } catch (error) {
       if (signal?.aborted || (error instanceof Error && error.message === 'Export cancelled')) {
@@ -1029,17 +1114,20 @@ export class DataExplorerAPI {
   /**
    * Fetches all objects from a collection (with optional filters)
    * Uses pagination to handle large collections
+   * Returns objects and truncation info
    */
   private async fetchAllObjects(
     collectionName: string,
     where?: FilterCondition[],
     matchMode?: FilterMatchMode,
     signal?: AbortSignal
-  ): Promise<WeaviateObject[]> {
+  ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
     const allObjects: WeaviateObject[] = [];
     let offset = 0;
     const limit = 100;
     const maxObjects = 10000; // Safety limit
+    let isTruncated = false;
+    let totalCount: number | undefined;
 
     while (allObjects.length < maxObjects) {
       // Check if export was cancelled
@@ -1057,6 +1145,11 @@ export class DataExplorerAPI {
 
       allObjects.push(...result.objects);
 
+      // Store total count from first request
+      if (offset === 0) {
+        totalCount = result.total;
+      }
+
       // Break if we got fewer objects than requested (end of data)
       if (result.objects.length < limit) {
         break;
@@ -1065,7 +1158,12 @@ export class DataExplorerAPI {
       offset += limit;
     }
 
-    return allObjects;
+    // Check if we hit the max limit and there's more data
+    if (allObjects.length >= maxObjects && totalCount && totalCount > maxObjects) {
+      isTruncated = true;
+    }
+
+    return { objects: allObjects, isTruncated, totalCount };
   }
 
   /**

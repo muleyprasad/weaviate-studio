@@ -45,6 +45,7 @@ export function useVectorSearch() {
   /**
    * Parse raw explainScore from Weaviate API into normalized format
    * Handles both JSON string and object formats with various field naming conventions
+   * Returns partial data with fallback values if parsing fails
    */
   const parseExplainScore = (
     rawScore: string | WeaviateExplainScoreRaw | unknown,
@@ -75,9 +76,28 @@ export function useVectorSearch() {
         combined: combinedScore,
         matchedTerms: parsed.matchedTerms ?? parsed.keywords,
       };
-    } catch (e) {
-      // Log parsing failures in development for debugging
-      debugLog('Failed to parse explainScore', { rawScore, error: e });
+    } catch (parseError) {
+      // Log parse failures but return fallback with combined score only
+      console.warn(
+        '[VectorSearch] Failed to parse explainScore breakdown, using metadata score as fallback',
+        {
+          rawScore,
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+        }
+      );
+      debugLog('Failed to parse explainScore', { rawScore, error: parseError });
+
+      // Return minimal result with just the combined/metadata score if available
+      // This ensures users still see scoring even when breakdown parsing fails
+      if (metadataScore !== undefined) {
+        return {
+          keyword: 0,
+          vector: 0,
+          combined: metadataScore,
+          matchedTerms: undefined,
+        };
+      }
+
       return undefined;
     }
   };

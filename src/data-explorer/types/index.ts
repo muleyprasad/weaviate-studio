@@ -319,6 +319,15 @@ export interface VSCodeAPI {
 // =====================================================
 
 /**
+ * Represents a failure during property aggregation
+ */
+export interface AggregationFailure {
+  property: string;
+  error: string;
+  type?: string; // The property type that failed
+}
+
+/**
  * Result of aggregation queries for collection insights
  */
 export interface AggregationResult {
@@ -335,6 +344,9 @@ export interface AggregationResult {
 
   // Boolean properties
   booleanCounts?: PropertyBooleanCounts[];
+
+  // Properties that failed to aggregate
+  aggregationFailures?: AggregationFailure[];
 }
 
 /**
@@ -416,6 +428,9 @@ export interface ExportResult {
   data: string; // File content
   objectCount: number;
   format: ExportFormat;
+  isTruncated?: boolean; // Whether export was limited to max objects
+  totalCount?: number; // Total count if export was truncated
+  truncationLimit?: number; // The limit that was applied
 }
 
 /**
