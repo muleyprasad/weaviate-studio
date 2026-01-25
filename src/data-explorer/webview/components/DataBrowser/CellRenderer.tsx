@@ -13,7 +13,7 @@ interface CellRendererProps {
   onExpand?: (value: unknown) => void;
 }
 
-export function CellRenderer({ value, dataTypeHint, columnName, onExpand }: CellRendererProps) {
+function CellRendererComponent({ value, dataTypeHint, columnName, onExpand }: CellRendererProps) {
   const [showCopied, setShowCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -201,3 +201,18 @@ export function CellRenderer({ value, dataTypeHint, columnName, onExpand }: Cell
       );
   }
 }
+
+/**
+ * Custom comparison function for React.memo
+ * Only re-render if value or dataTypeHint changes
+ */
+function arePropsEqual(prevProps: CellRendererProps, nextProps: CellRendererProps): boolean {
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.dataTypeHint === nextProps.dataTypeHint &&
+    prevProps.columnName === nextProps.columnName &&
+    prevProps.onExpand === nextProps.onExpand
+  );
+}
+
+export const CellRenderer = React.memo(CellRendererComponent, arePropsEqual);

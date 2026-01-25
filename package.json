@@ -513,6 +513,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.18",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
     "monaco-editor": "^0.52.2",

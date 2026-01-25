@@ -21,8 +21,15 @@ export function getVSCodeAPI(): VSCodeAPI {
 
 /**
  * Posts a message to the extension
+ * Handles cases where the webview has been disposed
  */
 export function postMessageToExtension(message: unknown): void {
-  const vscode = getVSCodeAPI();
-  vscode.postMessage(message as any);
+  try {
+    const vscode = getVSCodeAPI();
+    vscode.postMessage(message as any);
+  } catch (error) {
+    console.error('Failed to post message to extension (webview may be disposed):', error);
+    // Optional: Show user-friendly error notification
+    // In a real implementation, you might want to show a toast notification
+  }
 }

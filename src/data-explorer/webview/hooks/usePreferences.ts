@@ -117,7 +117,27 @@ export function usePreferences(collectionName: string) {
 
       setPreferencesState((current) => {
         const updated = { ...current, ...updates };
-        localStorage.setItem(getStorageKey(collectionName), JSON.stringify(updated));
+        try {
+          localStorage.setItem(getStorageKey(collectionName), JSON.stringify(updated));
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+            console.error('localStorage quota exceeded. Unable to save preferences.');
+            // Attempt to recover by clearing old preferences
+            try {
+              localStorage.removeItem(getStorageKey(collectionName));
+              // Try again with just the current update
+              localStorage.setItem(getStorageKey(collectionName), JSON.stringify(updated));
+            } catch (retryError) {
+              console.error('Failed to save preferences even after clearing:', retryError);
+              // Notify user - in a real app, you'd show a toast/notification
+              alert(
+                'Unable to save preferences: Storage quota exceeded. Some preferences may not be saved.'
+              );
+            }
+          } else {
+            console.error('Failed to save preferences:', error);
+          }
+        }
         return updated;
       });
     },
@@ -249,8 +269,12 @@ export function usePreferences(collectionName: string) {
     if (!collectionName) {
       return;
     }
-    localStorage.removeItem(getStorageKey(collectionName));
-    setPreferencesState(DEFAULT_PREFERENCES);
+    try {
+      localStorage.removeItem(getStorageKey(collectionName));
+      setPreferencesState(DEFAULT_PREFERENCES);
+    } catch (error) {
+      console.error('Failed to reset preferences:', error);
+    }
   }, [collectionName]);
 
   /**

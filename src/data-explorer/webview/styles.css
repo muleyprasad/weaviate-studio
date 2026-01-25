@@ -223,16 +223,31 @@
     background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
     white-space: nowrap;
     border-bottom: 2px solid var(--vscode-panel-border, #333);
+    vertical-align: middle;
+    box-sizing: border-box;
 }
 
 .header-cell.checkbox-cell {
-    width: 40px;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
     text-align: center;
+    padding: 8px 8px;
 }
 
 .header-cell.actions-cell {
-    width: 80px;
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
     text-align: center;
+    padding: 8px 12px;
+}
+
+.header-cell.checkbox-cell input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    margin: 0;
 }
 
 .header-cell.pinned {
@@ -252,12 +267,19 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
-    padding: 0;
-    width: 100%;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    width: calc(100% + 12px);
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
 }
 
 .header-button:hover {
-    color: var(--vscode-textLink-foreground, #3794ff);
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+.header-button:hover .sort-indicator {
+    opacity: 1;
 }
 
 .header-label {
@@ -314,16 +336,30 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    box-sizing: border-box;
 }
 
 .data-cell.checkbox-cell {
-    width: 40px;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
     text-align: center;
+    padding: 10px 8px;
+}
+
+.data-cell.checkbox-cell input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    margin: 0;
 }
 
 .data-cell.actions-cell {
-    width: 80px;
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
     text-align: center;
+    padding: 10px 12px;
 }
 
 .data-cell.pinned {

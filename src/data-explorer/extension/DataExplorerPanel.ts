@@ -222,6 +222,15 @@ export class DataExplorerPanel {
             });
             return;
           }
+          // Validate UUID format
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(message.uuid)) {
+            this.postMessage({
+              command: 'error',
+              error: 'Invalid UUID format',
+            });
+            return;
+          }
           await this._handleGetObjectDetail(message.uuid);
           break;
 
@@ -241,6 +250,14 @@ export class DataExplorerPanel {
         case 'cancelExport':
           this._handleCancelExport(message);
           break;
+
+        default:
+          console.warn(`Unknown command received: ${message.command}`);
+          this.postMessage({
+            command: 'error',
+            error: `Unknown command: ${message.command}`,
+          });
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -257,6 +274,10 @@ export class DataExplorerPanel {
    */
   private async _handleInitialize(): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
       return;
     }
 
@@ -289,6 +310,11 @@ export class DataExplorerPanel {
    */
   private async _handleFetchObjects(message: WebviewMessage): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
       return;
     }
 
@@ -326,6 +352,10 @@ export class DataExplorerPanel {
    */
   private async _handleGetSchema(): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
       return;
     }
 
@@ -342,6 +372,10 @@ export class DataExplorerPanel {
    */
   private async _handleGetObjectDetail(uuid: string): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
       return;
     }
 
@@ -361,6 +395,11 @@ export class DataExplorerPanel {
    */
   private async _handleGetAggregations(message: WebviewMessage): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
       return;
     }
 
@@ -395,6 +434,11 @@ export class DataExplorerPanel {
    */
   private async _handleExportObjects(message: WebviewMessage): Promise<void> {
     if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
       return;
     }
 
@@ -591,10 +635,10 @@ export class DataExplorerPanel {
     // Inject initial data
     const initScript = `
       <script nonce="${nonce}">
-        window.initialData = {
-          collectionName: "${this._collectionName}",
-          connectionId: "${this._connectionId}"
-        };
+        window.initialData = ${JSON.stringify({
+          collectionName: this._collectionName,
+          connectionId: this._connectionId,
+        })};
       </script>
     `;
     html = html.replace('</head>', `${initScript}</head>`);

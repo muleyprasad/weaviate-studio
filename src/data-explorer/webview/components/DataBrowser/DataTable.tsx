@@ -3,7 +3,8 @@
  * Displays collection objects in a sortable, selectable table
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { TableHeader } from './TableHeader';
 import { TableRow } from './TableRow';
 import { Pagination } from './Pagination';
@@ -30,6 +31,9 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const filterState = useFilterState();
   const filterActions = useFilterActions();
   const { refresh, isLoading } = useDataFetch();
+
+  // Ref for virtual scrolling container
+  const tableBodyRef = useRef<HTMLDivElement>(null);
 
   // Get displayed columns from schema
   const displayedColumns = useMemo(() => {
@@ -139,6 +143,14 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
     [dataState.objects, uiState.selectedObjectId, uiActions, onOpenDetail]
   );
 
+  // Virtual scrolling configuration
+  const rowVirtualizer = useVirtualizer({
+    count: dataState.objects.length,
+    getScrollElement: () => tableBodyRef.current,
+    estimateSize: () => 40, // Estimated row height in pixels
+    overscan: 10, // Number of items to render outside of the visible area
+  });
+
   // Check if there are active filters
   const hasFilters = filterState.activeFilters.length > 0;
 
@@ -152,6 +164,11 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
     <tbody className="data-table-body skeleton" role="status" aria-label="Loading data">
       {Array.from({ length: uiState.pageSize || 10 }).map((_, rowIndex) => (
         <tr key={rowIndex} className="skeleton-row">
+          {/* Checkbox cell */}
+          <td className="data-cell checkbox-cell">
+            <div className="skeleton-shimmer" style={{ width: 16, height: 16, borderRadius: 3 }} />
+          </td>
+          {/* Data cells */}
           {displayedColumns.slice(0, 5).map((_, colIndex) => (
             <td key={colIndex} className="data-cell">
               <div
@@ -164,6 +181,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
               />
             </td>
           ))}
+          {/* Actions cell */}
           <td className="data-cell actions-cell">
             <div className="skeleton-shimmer" style={{ width: 24, height: 24, borderRadius: 4 }} />
           </td>
@@ -176,7 +194,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const renderEmptyState = () => (
     <tbody className="data-table-body empty">
       <tr>
-        <td colSpan={displayedColumns.length + 1} className="empty-cell">
+        <td colSpan={displayedColumns.length + 2} className="empty-cell">
           <NoObjectsEmptyState
             onRefresh={refresh}
             hasFilters={hasFilters}
@@ -191,7 +209,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const renderErrorState = () => (
     <tbody className="data-table-body error">
       <tr>
-        <td colSpan={displayedColumns.length + 1} className="error-cell">
+        <td colSpan={displayedColumns.length + 2} className="error-cell">
           <div className="error-boundary" role="alert">
             <span className="codicon codicon-error" aria-hidden="true"></span>
             <h3>Error loading data</h3>
@@ -215,12 +233,17 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
     <div className="data-table-container">
       {/* Table */}
       <div
+        ref={tableBodyRef}
         className="data-table-wrapper"
         role="grid"
         aria-label="Data table"
         aria-rowcount={dataState.objects.length}
         aria-busy={isLoading}
         onKeyDown={handleKeyDown}
+        style={{
+          height: '600px',
+          overflow: 'auto',
+        }}
       >
         <table className="data-table">
           <TableHeader
@@ -238,17 +261,23 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
             renderEmptyState()
           ) : (
             <tbody className="data-table-body">
-              {dataState.objects.map((object) => (
-                <TableRow
-                  key={object.uuid}
-                  object={object}
-                  isSelected={uiState.selectedRows.has(object.uuid)}
-                  displayedColumns={displayedColumns}
-                  onSelect={handleSelectRow}
-                  onRowClick={handleRowClick}
-                  onFindSimilar={onFindSimilar}
-                />
-              ))}
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const object = dataState.objects[virtualRow.index];
+                return (
+                  <TableRow
+                    key={object.uuid}
+                    object={object}
+                    isSelected={uiState.selectedRows.has(object.uuid)}
+                    displayedColumns={displayedColumns}
+                    schema={dataState.schema}
+                    pinnedColumns={uiState.pinnedColumns}
+                    columnWidths={uiState.columnWidths}
+                    onSelect={handleSelectRow}
+                    onRowClick={handleRowClick}
+                    onFindSimilar={onFindSimilar}
+                  />
+                );
+              })}
             </tbody>
           )}
         </table>

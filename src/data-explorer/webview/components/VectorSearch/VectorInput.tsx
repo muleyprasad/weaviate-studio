@@ -19,6 +19,9 @@ interface ValidationResult {
   error: string | null;
 }
 
+// Maximum vector dimensions to prevent memory issues
+const MAX_VECTOR_DIMENSIONS = 65536;
+
 export function VectorInput({
   value,
   onChange,
@@ -41,6 +44,14 @@ export function VectorInput({
 
       if (parsed.length === 0) {
         return { isValid: false, dimensions: 0, error: 'Vector cannot be empty' };
+      }
+
+      if (parsed.length > MAX_VECTOR_DIMENSIONS) {
+        return {
+          isValid: false,
+          dimensions: parsed.length,
+          error: `Vector exceeds maximum dimensions (${MAX_VECTOR_DIMENSIONS})`,
+        };
       }
 
       if (!parsed.every((n) => typeof n === 'number' && !isNaN(n))) {

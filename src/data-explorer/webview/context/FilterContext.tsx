@@ -11,7 +11,7 @@
  * Changes to data or UI won't trigger re-renders here.
  */
 
-import React, { createContext, useContext, useReducer, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useMemo, useRef, useEffect } from 'react';
 
 // ============================================================================
 // Types
@@ -274,7 +274,15 @@ interface FilterProviderProps {
 export function FilterProvider({ children }: FilterProviderProps) {
   const [state, dispatch] = useReducer(filterReducer, initialState);
 
+  // Use ref to access latest state without causing re-renders
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Memoize actions to prevent unnecessary re-renders
+  // Actions no longer depend on state, they access it via ref
   const actions = useMemo<FilterContextActions>(
     () => ({
       addFilter: (filter: FilterCondition) => {
@@ -305,7 +313,7 @@ export function FilterProvider({ children }: FilterProviderProps) {
         const preset: FilterPreset = {
           id: crypto.randomUUID(),
           name,
-          filters: state.activeFilters,
+          filters: stateRef.current.activeFilters,
           createdAt: new Date(),
         };
         dispatch({ type: 'SAVE_PRESET', preset });
@@ -357,7 +365,7 @@ export function FilterProvider({ children }: FilterProviderProps) {
         dispatch({ type: 'RESET_PENDING_FILTERS' });
       },
     }),
-    [state.activeFilters]
+    [] // No dependencies - actions are stable
   );
 
   // Memoize context value to prevent unnecessary re-renders

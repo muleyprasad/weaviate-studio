@@ -3,7 +3,7 @@
  * Handles all Weaviate client interactions for fetching objects and schema
  */
 
-import type { WeaviateClient } from 'weaviate-client';
+import type { WeaviateClient, Collection } from 'weaviate-client';
 import { Filters } from 'weaviate-client';
 import type {
   WeaviateObject,
@@ -25,6 +25,9 @@ import type {
   PropertyDateRange,
   PropertyBooleanCounts,
 } from '../types';
+
+// Debug flag - set to false for production
+const DEBUG = false;
 
 /**
  * API class for interacting with Weaviate collections in the Data Explorer
@@ -50,15 +53,15 @@ export class DataExplorerAPI {
       interface BaseQueryOptions {
         limit: number;
         offset?: number;
-        returnMetadata: string[];
+        returnMetadata?: any; // Use any for metadata to allow flexibility
         returnProperties?: string[];
-        sort?: Array<{ path: string[]; order: string }>;
-        filters?: unknown; // Weaviate filter type is complex, kept as unknown
+        sort?: any; // Weaviate Sorting builder object
+        filters?: any; // Weaviate filter type is complex, use any for compatibility
       }
 
       const baseOptions: BaseQueryOptions = {
         limit: params.limit,
-        returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'],
+        returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'] as any,
       };
 
       // Add offset for non-vector search queries (vector search uses limit only)
@@ -73,7 +76,12 @@ export class DataExplorerAPI {
 
       // Add sorting if specified (only for boolean queries, not vector search)
       if (params.sortBy && (!params.vectorSearch || params.vectorSearch.type === 'none')) {
-        baseOptions.sort = [{ path: [params.sortBy.field], order: params.sortBy.direction }];
+        // Use the collection's sort builder with proper typing
+        const sortOrder = params.sortBy.direction.toLowerCase() === 'asc' ? 'asc' : 'desc';
+        baseOptions.sort = (collection.sort as any).byProperty(
+          params.sortBy.field,
+          sortOrder as 'asc' | 'desc'
+        );
       }
 
       // Add filters if specified (works with all query types)
@@ -172,14 +180,14 @@ export class DataExplorerAPI {
    */
 
   private async executeQuery(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     options: {
       limit: number;
       offset?: number;
-      returnMetadata: string[];
+      returnMetadata?: any;
       returnProperties?: string[];
-      sort?: Array<{ path: string[]; order: string }>;
-      filters?: unknown;
+      sort?: any;
+      filters?: any;
     },
     vectorSearch?: VectorSearchParams
   ): Promise<{ objects: any[] }> {
@@ -194,9 +202,9 @@ export class DataExplorerAPI {
     // The Weaviate client library has complex types that vary by version
     interface VectorQueryOptions {
       limit: number;
-      returnMetadata: string[];
+      returnMetadata?: any;
       returnProperties?: string[];
-      filters?: unknown;
+      filters?: any;
       certainty?: number;
       distance?: number;
       distanceMetric?: string;
@@ -279,7 +287,7 @@ export class DataExplorerAPI {
       const hybridOptions: HybridQueryOptions = {
         ...vectorOptions,
         alpha: vectorSearch.alpha ?? 0.5, // 0 = pure BM25, 1 = pure vector
-        returnMetadata: ['score', 'distance', 'certainty', 'explainScore'],
+        returnMetadata: ['score', 'distance', 'certainty', 'explainScore'] as any,
       };
 
       // Add fusion type if specified (default: rankedFusion)
@@ -305,10 +313,10 @@ export class DataExplorerAPI {
    */
 
   private buildWhereFilter(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     conditions: FilterCondition[],
     matchMode: FilterMatchMode = 'AND'
-  ): unknown {
+  ): any {
     if (!conditions || conditions.length === 0) {
       return null;
     }
@@ -339,7 +347,10 @@ export class DataExplorerAPI {
    * Builds a single filter condition for Weaviate
    */
 
-  private buildSingleFilter(collection: any, condition: FilterCondition): unknown {
+  private buildSingleFilter(
+    collection: Collection<any, string, undefined>,
+    condition: FilterCondition
+  ): any {
     try {
       const { path, operator, value, valueType } = condition;
 
@@ -387,12 +398,13 @@ export class DataExplorerAPI {
           return filterBuilder.isNull(false);
 
         default:
-          console.warn(`Unknown filter operator: ${operator}`);
-          return null;
+          throw new Error(`Unknown filter operator: ${operator}`);
       }
     } catch (error) {
       console.error(`Error building filter for condition:`, condition, error);
-      return null;
+      throw new Error(
+        `Failed to build filter for path "${condition.path}": ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -518,7 +530,9 @@ export class DataExplorerAPI {
       return result.totalCount ?? 0;
     } catch (error) {
       console.error('Error getting collection count:', error);
-      return 0;
+      throw new Error(
+        `Failed to get count for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -611,7 +625,9 @@ export class DataExplorerAPI {
    */
   async getAggregations(params: AggregationParams): Promise<AggregationResult> {
     try {
-      console.log('[DataExplorerAPI] Getting aggregations for:', params.collectionName);
+      if (DEBUG) {
+        console.log('[DataExplorerAPI] Getting aggregations for:', params.collectionName);
+      }
 
       const collection = this.client.collections.get(params.collectionName);
 
@@ -619,13 +635,15 @@ export class DataExplorerAPI {
       const schema = await this.getCollectionSchema(params.collectionName);
       const properties = schema.properties || [];
 
-      console.log(
-        '[DataExplorerAPI] Schema properties:',
-        properties.map((p) => p.name)
-      );
+      if (DEBUG) {
+        console.log(
+          '[DataExplorerAPI] Schema properties:',
+          properties.map((p) => p.name)
+        );
+      }
 
       // Build filter if specified
-      let filters: unknown = undefined;
+      let filters: any = undefined;
       if (params.where && params.where.length > 0) {
         filters = this.buildWhereFilter(collection, params.where, params.matchMode || 'AND');
       }
@@ -636,7 +654,9 @@ export class DataExplorerAPI {
         : await collection.aggregate.overAll();
       const totalCount = countResult.totalCount ?? 0;
 
-      console.log('[DataExplorerAPI] Total count:', totalCount);
+      if (DEBUG) {
+        console.log('[DataExplorerAPI] Total count:', totalCount);
+      }
 
       // Initialize result
       const result: AggregationResult = {
@@ -653,17 +673,21 @@ export class DataExplorerAPI {
           ? properties.filter((p) => params.properties!.includes(p.name))
           : properties;
 
-      console.log(
-        '[DataExplorerAPI] Processing properties:',
-        propertiesToProcess.map((p) => `${p.name} (${p.dataType[0]})`)
-      );
+      if (DEBUG) {
+        console.log(
+          '[DataExplorerAPI] Processing properties:',
+          propertiesToProcess.map((p) => `${p.name} (${p.dataType[0]})`)
+        );
+      }
 
       for (const prop of propertiesToProcess) {
         const dataType = prop.dataType[0]?.toLowerCase() || '';
         const propName = prop.name;
 
         try {
-          console.log(`[DataExplorerAPI] Aggregating property: ${propName} (${dataType})`);
+          if (DEBUG) {
+            console.log(`[DataExplorerAPI] Aggregating property: ${propName} (${dataType})`);
+          }
 
           if (dataType === 'text' || dataType === 'string') {
             // Get top values for text properties
@@ -675,21 +699,27 @@ export class DataExplorerAPI {
             );
             if (topValues && topValues.values.length > 0) {
               result.topValues!.push(topValues);
-              console.log(`[DataExplorerAPI] Added top values for ${propName}`);
+              if (DEBUG) {
+                console.log(`[DataExplorerAPI] Added top values for ${propName}`);
+              }
             }
           } else if (dataType === 'int' || dataType === 'number') {
             // Get numeric stats
             const numericStats = await this.getPropertyNumericStats(collection, propName, filters);
             if (numericStats) {
               result.numericStats!.push(numericStats);
-              console.log(`[DataExplorerAPI] Added numeric stats for ${propName}`);
+              if (DEBUG) {
+                console.log(`[DataExplorerAPI] Added numeric stats for ${propName}`);
+              }
             }
           } else if (dataType === 'date') {
             // Get date range
             const dateRange = await this.getPropertyDateRange(collection, propName, filters);
             if (dateRange) {
               result.dateRange!.push(dateRange);
-              console.log(`[DataExplorerAPI] Added date range for ${propName}`);
+              if (DEBUG) {
+                console.log(`[DataExplorerAPI] Added date range for ${propName}`);
+              }
             }
           } else if (dataType === 'boolean') {
             // Get boolean counts
@@ -701,7 +731,9 @@ export class DataExplorerAPI {
             );
             if (booleanCounts) {
               result.booleanCounts!.push(booleanCounts);
-              console.log(`[DataExplorerAPI] Added boolean counts for ${propName}`);
+              if (DEBUG) {
+                console.log(`[DataExplorerAPI] Added boolean counts for ${propName}`);
+              }
             }
           }
         } catch (propError) {
@@ -710,13 +742,15 @@ export class DataExplorerAPI {
         }
       }
 
-      console.log('[DataExplorerAPI] Aggregation result:', {
-        totalCount: result.totalCount,
-        topValues: result.topValues?.length || 0,
-        numericStats: result.numericStats?.length || 0,
-        dateRange: result.dateRange?.length || 0,
-        booleanCounts: result.booleanCounts?.length || 0,
-      });
+      if (DEBUG) {
+        console.log('[DataExplorerAPI] Aggregation result:', {
+          totalCount: result.totalCount,
+          topValues: result.topValues?.length || 0,
+          numericStats: result.numericStats?.length || 0,
+          dateRange: result.dateRange?.length || 0,
+          booleanCounts: result.booleanCounts?.length || 0,
+        });
+      }
 
       return result;
     } catch (error) {
@@ -729,14 +763,14 @@ export class DataExplorerAPI {
    * Gets top values for a text property using aggregation
    */
   private async getPropertyTopValues(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     propertyName: string,
     totalCount: number,
-    filters?: unknown
+    filters?: any
   ): Promise<PropertyTopValues | null> {
     try {
       // Use groupBy aggregation to get value counts
-      const groupByOptions: { groupBy: { property: string }; filters?: unknown } = {
+      const groupByOptions: { groupBy: { property: string }; filters?: any } = {
         groupBy: { property: propertyName },
       };
       if (filters) {
@@ -744,12 +778,13 @@ export class DataExplorerAPI {
       }
       const result = await collection.aggregate.groupBy.overAll(groupByOptions);
 
-      if (!result || !result.groups || result.groups.length === 0) {
+      // Result is an array, not an object with groups property
+      if (!result || !Array.isArray(result) || result.length === 0) {
         return null;
       }
 
       // Sort by count and take top 5
-      const sortedGroups = result.groups
+      const sortedGroups = result
         .filter((g: any) => g.groupedBy?.value !== null && g.groupedBy?.value !== undefined)
         .sort((a: any, b: any) => (b.totalCount || 0) - (a.totalCount || 0))
         .slice(0, 5);
@@ -774,20 +809,15 @@ export class DataExplorerAPI {
    * Gets numeric statistics for a number/int property
    */
   private async getPropertyNumericStats(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     propertyName: string,
-    filters?: unknown
+    filters?: any
   ): Promise<PropertyNumericStats | null> {
     try {
-      const numericOptions: { returnMetrics: unknown; filters?: unknown } = {
-        returnMetrics: collection.metrics.aggregate(propertyName).integer({
-          count: true,
-          minimum: true,
-          maximum: true,
-          mean: true,
-          median: true,
-          sum: true,
-        }),
+      const numericOptions: { returnMetrics: any; filters?: any } = {
+        returnMetrics: collection.metrics
+          .aggregate(propertyName)
+          .integer(['count', 'maximum', 'mean', 'median', 'minimum', 'sum']),
       };
       if (filters) {
         numericOptions.filters = filters;
@@ -797,15 +827,10 @@ export class DataExplorerAPI {
       const metrics = result.properties?.[propertyName];
       if (!metrics) {
         // Try number type instead of integer
-        const numberOptions: { returnMetrics: unknown; filters?: unknown } = {
-          returnMetrics: collection.metrics.aggregate(propertyName).number({
-            count: true,
-            minimum: true,
-            maximum: true,
-            mean: true,
-            median: true,
-            sum: true,
-          }),
+        const numberOptions: { returnMetrics: any; filters?: any } = {
+          returnMetrics: collection.metrics
+            .aggregate(propertyName)
+            .number(['count', 'maximum', 'mean', 'median', 'minimum', 'sum']),
         };
         if (filters) {
           numberOptions.filters = filters;
@@ -818,23 +843,23 @@ export class DataExplorerAPI {
 
         return {
           property: propertyName,
-          count: numberMetrics.count ?? 0,
-          min: numberMetrics.minimum ?? 0,
-          max: numberMetrics.maximum ?? 0,
-          mean: numberMetrics.mean ?? 0,
-          median: numberMetrics.median,
-          sum: numberMetrics.sum,
+          count: (numberMetrics as any).count ?? 0,
+          min: (numberMetrics as any).minimum ?? 0,
+          max: (numberMetrics as any).maximum ?? 0,
+          mean: (numberMetrics as any).mean ?? 0,
+          median: (numberMetrics as any).median,
+          sum: (numberMetrics as any).sum,
         };
       }
 
       return {
         property: propertyName,
-        count: metrics.count ?? 0,
-        min: metrics.minimum ?? 0,
-        max: metrics.maximum ?? 0,
-        mean: metrics.mean ?? 0,
-        median: metrics.median,
-        sum: metrics.sum,
+        count: (metrics as any).count ?? 0,
+        min: (metrics as any).minimum ?? 0,
+        max: (metrics as any).maximum ?? 0,
+        mean: (metrics as any).mean ?? 0,
+        median: (metrics as any).median,
+        sum: (metrics as any).sum,
       };
     } catch (error) {
       console.warn(`Failed to get numeric stats for ${propertyName}:`, error);
@@ -846,16 +871,13 @@ export class DataExplorerAPI {
    * Gets date range for a date property
    */
   private async getPropertyDateRange(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     propertyName: string,
-    filters?: unknown
+    filters?: any
   ): Promise<PropertyDateRange | null> {
     try {
-      const dateOptions: { returnMetrics: unknown; filters?: unknown } = {
-        returnMetrics: collection.metrics.aggregate(propertyName).date({
-          minimum: true,
-          maximum: true,
-        }),
+      const dateOptions: { returnMetrics: any; filters?: any } = {
+        returnMetrics: collection.metrics.aggregate(propertyName).date(['minimum', 'maximum']),
       };
       if (filters) {
         dateOptions.filters = filters;
@@ -863,14 +885,16 @@ export class DataExplorerAPI {
       const result = await collection.aggregate.overAll(dateOptions);
 
       const metrics = result.properties?.[propertyName];
-      if (!metrics || (!metrics.minimum && !metrics.maximum)) {
+      if (!metrics || (!(metrics as any).minimum && !(metrics as any).maximum)) {
         return null;
       }
 
       return {
         property: propertyName,
-        earliest: metrics.minimum ? new Date(metrics.minimum).toISOString() : 'N/A',
-        latest: metrics.maximum ? new Date(metrics.maximum).toISOString() : 'N/A',
+        earliest: (metrics as any).minimum
+          ? new Date((metrics as any).minimum).toISOString()
+          : 'N/A',
+        latest: (metrics as any).maximum ? new Date((metrics as any).maximum).toISOString() : 'N/A',
       };
     } catch (error) {
       console.warn(`Failed to get date range for ${propertyName}:`, error);
@@ -882,13 +906,13 @@ export class DataExplorerAPI {
    * Gets boolean counts for a boolean property
    */
   private async getPropertyBooleanCounts(
-    collection: any,
+    collection: Collection<any, string, undefined>,
     propertyName: string,
     totalCount: number,
-    filters?: unknown
+    filters?: any
   ): Promise<PropertyBooleanCounts | null> {
     try {
-      const boolOptions: { groupBy: { property: string }; filters?: unknown } = {
+      const boolOptions: { groupBy: { property: string }; filters?: any } = {
         groupBy: { property: propertyName },
       };
       if (filters) {
@@ -896,14 +920,15 @@ export class DataExplorerAPI {
       }
       const result = await collection.aggregate.groupBy.overAll(boolOptions);
 
-      if (!result || !result.groups) {
+      // Result is an array, not an object with groups property
+      if (!result || !Array.isArray(result) || result.length === 0) {
         return null;
       }
 
       let trueCount = 0;
       let falseCount = 0;
 
-      for (const group of result.groups) {
+      for (const group of result) {
         if (group.groupedBy?.value === true) {
           trueCount = group.totalCount || 0;
         } else if (group.groupedBy?.value === false) {

@@ -5,13 +5,15 @@
 
 import React, { useCallback } from 'react';
 import { CellRenderer } from './CellRenderer';
-import { useDataState, useUIState } from '../../context';
-import type { WeaviateObject } from '../../../types';
+import type { WeaviateObject, CollectionConfig } from '../../../types';
 
 interface TableRowProps {
   object: WeaviateObject;
   isSelected: boolean;
   displayedColumns: string[];
+  schema: CollectionConfig | null;
+  pinnedColumns: string[];
+  columnWidths: Record<string, number>;
   onSelect: (uuid: string) => void;
   onRowClick: (uuid: string) => void;
   onFindSimilar?: (uuid: string) => void;
@@ -21,13 +23,13 @@ function TableRowComponent({
   object,
   isSelected,
   displayedColumns,
+  schema,
+  pinnedColumns,
+  columnWidths,
   onSelect,
   onRowClick,
   onFindSimilar,
 }: TableRowProps) {
-  const dataState = useDataState();
-  const uiState = useUIState();
-
   const handleCheckboxChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       e.stopPropagation();
@@ -77,11 +79,11 @@ function TableRowComponent({
     if (column === 'uuid') {
       return 'uuid';
     }
-    const property = dataState.schema?.properties?.find((p) => p.name === column);
+    const property = schema?.properties?.find((p) => p.name === column);
     return property?.dataType?.[0];
   };
 
-  const isPinned = (column: string) => uiState.pinnedColumns.includes(column);
+  const isPinned = (column: string) => pinnedColumns.includes(column);
 
   return (
     <tr
@@ -92,6 +94,16 @@ function TableRowComponent({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
+      {/* Checkbox cell */}
+      <td className="data-cell checkbox-cell" role="gridcell" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={handleCheckboxChange}
+          aria-label={`Select row ${object.uuid}`}
+        />
+      </td>
+
       {/* Data cells */}
       {displayedColumns.map((column) => (
         <td
@@ -99,7 +111,7 @@ function TableRowComponent({
           className={`data-cell ${isPinned(column) ? 'pinned' : ''}`}
           role="gridcell"
           style={{
-            width: uiState.columnWidths[column] ? `${uiState.columnWidths[column]}px` : undefined,
+            width: columnWidths[column] ? `${columnWidths[column]}px` : undefined,
           }}
         >
           <CellRenderer
@@ -162,6 +174,21 @@ function arePropsEqual(prevProps: TableRowProps, nextProps: TableRowProps): bool
     if (prevProps.displayedColumns[i] !== nextProps.displayedColumns[i]) {
       return false;
     }
+  }
+
+  // Re-render if schema changes (affects data type hints)
+  if (prevProps.schema !== nextProps.schema) {
+    return false;
+  }
+
+  // Re-render if pinned columns change
+  if (prevProps.pinnedColumns !== nextProps.pinnedColumns) {
+    return false;
+  }
+
+  // Re-render if column widths reference changes
+  if (prevProps.columnWidths !== nextProps.columnWidths) {
+    return false;
   }
 
   // Props are equal, don't re-render
