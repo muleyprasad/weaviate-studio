@@ -57,21 +57,6 @@ export function TableHeader({
   return (
     <thead className="data-table-header">
       <tr role="row">
-        {/* Checkbox column for select all */}
-        <th className="header-cell checkbox-cell" role="columnheader" aria-label="Select all">
-          <input
-            type="checkbox"
-            checked={isAllSelected}
-            ref={(input) => {
-              if (input) {
-                input.indeterminate = isSomeSelected;
-              }
-            }}
-            onChange={(e) => onSelectAll(e.target.checked)}
-            aria-label="Select all rows"
-          />
-        </th>
-
         {/* Data columns */}
         {displayedColumns.map((column) => (
           <th

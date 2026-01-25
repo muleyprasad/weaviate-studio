@@ -494,23 +494,31 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 6px;
+    padding: 6px 8px;
     font-size: 14px;
-    opacity: 0.5;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    opacity: 0.7;
+    transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
     border-radius: 4px;
-    color: var(--vscode-descriptionForeground);
+    color: var(--vscode-foreground);
 }
 
 .row-action-btn:hover {
     opacity: 1;
     transform: scale(1.1);
-    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
 }
 
-.row-action-btn.more-btn:hover,
-.row-action-btn.find-similar-btn:hover {
+.row-action-btn:focus-visible {
+    outline: 2px solid var(--vscode-focusBorder, #007ACC);
+    outline-offset: 1px;
+}
+
+.row-action-btn.view-btn:hover {
     color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.row-action-btn.find-similar-btn:hover {
+    color: var(--vscode-charts-green, #10B981);
 }
 
 /* ===== Skeleton Loading ===== */

@@ -164,10 +164,6 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
     <tbody className="data-table-body skeleton" role="status" aria-label="Loading data">
       {Array.from({ length: uiState.pageSize || 10 }).map((_, rowIndex) => (
         <tr key={rowIndex} className="skeleton-row">
-          {/* Checkbox cell */}
-          <td className="data-cell checkbox-cell">
-            <div className="skeleton-shimmer" style={{ width: 16, height: 16, borderRadius: 3 }} />
-          </td>
           {/* Data cells */}
           {displayedColumns.slice(0, 5).map((_, colIndex) => (
             <td key={colIndex} className="data-cell">
@@ -194,7 +190,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const renderEmptyState = () => (
     <tbody className="data-table-body empty">
       <tr>
-        <td colSpan={displayedColumns.length + 2} className="empty-cell">
+        <td colSpan={displayedColumns.length + 1} className="empty-cell">
           <NoObjectsEmptyState
             onRefresh={refresh}
             hasFilters={hasFilters}
@@ -209,7 +205,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
   const renderErrorState = () => (
     <tbody className="data-table-body error">
       <tr>
-        <td colSpan={displayedColumns.length + 2} className="error-cell">
+        <td colSpan={displayedColumns.length + 1} className="error-cell">
           <div className="error-boundary" role="alert">
             <span className="codicon codicon-error" aria-hidden="true"></span>
             <h3>Error loading data</h3>

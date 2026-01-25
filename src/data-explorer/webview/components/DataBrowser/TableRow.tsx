@@ -94,16 +94,6 @@ function TableRowComponent({
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Checkbox cell */}
-      <td className="data-cell checkbox-cell" role="gridcell" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={handleCheckboxChange}
-          aria-label={`Select row ${object.uuid}`}
-        />
-      </td>
-
       {/* Data cells */}
       {displayedColumns.map((column) => (
         <td
@@ -127,19 +117,21 @@ function TableRowComponent({
         <div className="row-actions">
           {onFindSimilar && (
             <button
+              type="button"
               className="row-action-btn find-similar-btn"
               onClick={handleFindSimilarClick}
-              title="Find similar objects"
-              aria-label="Find similar objects"
+              title="Find similar objects using vector search"
+              aria-label="Find similar objects using vector search"
             >
-              <span className="codicon codicon-search" aria-hidden="true"></span>
+              <span className="codicon codicon-symbol-array" aria-hidden="true"></span>
             </button>
           )}
           <button
-            className="row-action-btn more-btn"
+            type="button"
+            className="row-action-btn view-btn"
             onClick={handleViewClick}
-            title="View details"
-            aria-label="View details"
+            title="View object details"
+            aria-label="View object details"
           >
             <span className="codicon codicon-eye" aria-hidden="true"></span>
           </button>
