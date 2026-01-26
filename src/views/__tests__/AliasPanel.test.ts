@@ -36,13 +36,17 @@ describe('AliasPanel', () => {
       reveal: jest.fn(),
       dispose: jest.fn(),
       viewColumn: 1,
+      title: '',
       set html(val: string) {},
       get html() {
         return '';
       },
     };
     // Mocka vscode.window.createWebviewPanel para retornar mockPanel
-    jest.spyOn(vscode.window, 'createWebviewPanel').mockImplementation(() => mockPanel);
+    jest.spyOn(vscode.window, 'createWebviewPanel').mockImplementation((viewType, title) => {
+      mockPanel.title = title;
+      return mockPanel;
+    });
     mockExtensionUri = { fsPath: '/mock/uri' };
     mockOnCreate = jest.fn().mockResolvedValue(undefined);
     mockOnUpdate = jest.fn().mockResolvedValue(undefined);
@@ -51,6 +55,9 @@ describe('AliasPanel', () => {
     aliasItem = { alias: 'alias1', collection: 'col1' };
     collections = ['col1', 'col2'];
     connectionId = 'conn-1';
+
+    // Clear the panels cache between tests
+    (AliasPanel as any).panels.clear();
   });
   it('should handle error in onCreateCallback and post error', async () => {
     mockOnCreate.mockRejectedValueOnce(new Error('fail-create'));
@@ -107,6 +114,10 @@ describe('AliasPanel', () => {
       mockOnDelete,
       mockOnMessage
     );
+
+    // Clear any previous calls
+    mockPanel.webview.postMessage.mockClear();
+
     await panel['_handleMessage']({ command: 'deleteAlias', alias: 'alias1' });
     expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
       command: 'error',
@@ -221,6 +232,10 @@ describe('AliasPanel', () => {
       mockOnMessage
     );
     const aliasData = { alias: 'a', collection: 'c' };
+
+    // Clear any previous calls
+    mockPanel.webview.postMessage.mockClear();
+
     await panel['_handleMessage']({ command: 'createAlias', aliasData });
     expect(mockOnCreate).toHaveBeenCalledWith(aliasData);
     expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
@@ -243,6 +258,10 @@ describe('AliasPanel', () => {
       mockOnMessage
     );
     const aliasData = { alias: 'a', collection: 'c' };
+
+    // Clear any previous calls
+    mockPanel.webview.postMessage.mockClear();
+
     await panel['_handleMessage']({ command: 'updateAlias', aliasData });
     expect(mockOnUpdate).toHaveBeenCalledWith(aliasData);
     expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
@@ -263,6 +282,10 @@ describe('AliasPanel', () => {
       mockOnDelete,
       mockOnMessage
     );
+
+    // Clear any previous calls
+    mockOnDelete.mockClear();
+
     await panel['_handleMessage']({ command: 'deleteAlias', alias: 'alias1' });
     expect(mockOnDelete).toHaveBeenCalledWith('alias1');
   });
@@ -279,6 +302,10 @@ describe('AliasPanel', () => {
       mockOnDelete,
       mockOnMessage
     );
+
+    // Clear any previous calls
+    mockPanel.dispose.mockClear();
+
     panel.dispose();
     expect(mockPanel.dispose).toHaveBeenCalled();
   });
@@ -297,5 +324,147 @@ describe('AliasPanel', () => {
     );
     await panel['_handleMessage']({ command: 'unknown', foo: 1 });
     expect(mockOnMessage).toHaveBeenCalled();
+  });
+
+  it('should set panel title to "Create Alias" when in create mode', () => {
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'create',
+      undefined,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+    // Verify the panel was created with the correct title
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      'weaviateAlias',
+      'Create Alias',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('should set panel title to "Edit Alias: <alias name>" when in edit mode', () => {
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'edit',
+      { alias: 'myAlias', collection: 'myCollection' },
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+    // Verify the panel was created with the correct title
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      'weaviateAlias',
+      'Edit Alias: myAlias',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('should set panel title to "Manage Aliases" when in list mode', () => {
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'list',
+      undefined,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+    // Verify the panel was created with the correct title
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      'weaviateAlias',
+      'Manage Aliases',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('should update panel title when switching from create to edit mode', async () => {
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'create',
+      undefined,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+
+    // Initially created with "Create Alias"
+    expect(mockPanel.title).toBe('Create Alias');
+
+    // Create an alias
+    const aliasData = { alias: 'newAlias', collection: 'col1' };
+    await panel['_handleMessage']({ command: 'createAlias', aliasData });
+
+    // Title should be updated
+    expect(mockPanel.title).toBe('Edit Alias: newAlias');
+  });
+
+  it('should reuse existing panel when opening the same alias in edit mode', () => {
+    const aliasItem1 = { alias: 'testAlias', collection: 'col1' };
+
+    // Create first panel
+    const panel1 = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'edit',
+      aliasItem1,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+
+    // Clear the mock
+    mockPanel.reveal.mockClear();
+
+    // Create second panel with same alias - should reuse
+    const panel2 = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'edit',
+      aliasItem1,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+
+    // Should return the same instance
+    expect(panel1).toBe(panel2);
+
+    // Should reveal the existing panel
+    expect(mockPanel.reveal).toHaveBeenCalled();
+  });
+
+  it('should return aliasToEdit when calling getAliasToEdit', () => {
+    const panel = AliasPanel.createOrShow(
+      mockExtensionUri as any,
+      connectionId,
+      collections,
+      'edit',
+      aliasItem,
+      mockOnCreate,
+      mockOnUpdate,
+      mockOnDelete,
+      mockOnMessage
+    );
+
+    expect(panel.getAliasToEdit()).toEqual(aliasItem);
   });
 });

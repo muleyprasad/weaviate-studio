@@ -954,4 +954,92 @@ describe('WeaviateTreeDataProvider', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('sortAliases', () => {
+    it('should sort aliases alphabetically by alias name', () => {
+      const aliases = [
+        { alias: 'zebra', collection: 'col1' },
+        { alias: 'apple', collection: 'col2' },
+        { alias: 'banana', collection: 'col3' },
+      ];
+
+      const sorted = (provider as any).sortAliases(aliases);
+
+      expect(sorted).toEqual([
+        { alias: 'apple', collection: 'col2' },
+        { alias: 'banana', collection: 'col3' },
+        { alias: 'zebra', collection: 'col1' },
+      ]);
+    });
+
+    it('should sort by collection name when alias names are the same', () => {
+      const aliases = [
+        { alias: 'myalias', collection: 'zebra' },
+        { alias: 'myalias', collection: 'apple' },
+        { alias: 'myalias', collection: 'banana' },
+      ];
+
+      const sorted = (provider as any).sortAliases(aliases);
+
+      expect(sorted).toEqual([
+        { alias: 'myalias', collection: 'apple' },
+        { alias: 'myalias', collection: 'banana' },
+        { alias: 'myalias', collection: 'zebra' },
+      ]);
+    });
+
+    it('should handle mixed case sorting correctly', () => {
+      const aliases = [
+        { alias: 'Zebra', collection: 'col1' },
+        { alias: 'apple', collection: 'col2' },
+        { alias: 'Banana', collection: 'col3' },
+      ];
+
+      const sorted = (provider as any).sortAliases(aliases);
+
+      // localeCompare should handle case-insensitive sorting
+      expect(sorted[0].alias.toLowerCase()).toBe('apple');
+      expect(sorted[1].alias.toLowerCase()).toBe('banana');
+      expect(sorted[2].alias.toLowerCase()).toBe('zebra');
+    });
+
+    it('should return empty array when given empty array', () => {
+      const sorted = (provider as any).sortAliases([]);
+      expect(sorted).toEqual([]);
+    });
+
+    it('should not modify the original array', () => {
+      const aliases = [
+        { alias: 'zebra', collection: 'col1' },
+        { alias: 'apple', collection: 'col2' },
+      ];
+
+      const originalOrder = [...aliases];
+      const sorted = (provider as any).sortAliases(aliases);
+
+      expect(aliases).toEqual(originalOrder);
+      expect(sorted).not.toBe(aliases);
+    });
+
+    it('should handle single element array', () => {
+      const aliases = [{ alias: 'single', collection: 'col1' }];
+      const sorted = (provider as any).sortAliases(aliases);
+
+      expect(sorted).toEqual([{ alias: 'single', collection: 'col1' }]);
+    });
+
+    it('should maintain stable sort for identical elements', () => {
+      const aliases = [
+        { alias: 'same', collection: 'same' },
+        { alias: 'same', collection: 'same' },
+      ];
+
+      const sorted = (provider as any).sortAliases(aliases);
+
+      expect(sorted).toEqual([
+        { alias: 'same', collection: 'same' },
+        { alias: 'same', collection: 'same' },
+      ]);
+    });
+  });
 });
