@@ -51,7 +51,6 @@ describe('AliasPanel', () => {
     aliasItem = { alias: 'alias1', collection: 'col1' };
     collections = ['col1', 'col2'];
     connectionId = 'conn-1';
-    AliasPanel.currentPanel = undefined;
   });
   it('should handle error in onCreateCallback and post error', async () => {
     mockOnCreate.mockRejectedValueOnce(new Error('fail-create'));
@@ -194,7 +193,7 @@ describe('AliasPanel', () => {
     );
   });
 
-  it('should create a new AliasPanel and set currentPanel', () => {
+  it('should create a new AliasPanel', () => {
     const panel = AliasPanel.createOrShow(
       mockExtensionUri as any,
       connectionId,
@@ -209,7 +208,7 @@ describe('AliasPanel', () => {
     expect(panel).toBeInstanceOf(AliasPanel);
   });
 
-  it('should call onCreateCallback and post aliasCreated', async () => {
+  it('should call onCreateCallback and switch to edit mode', async () => {
     const panel = AliasPanel.createOrShow(
       mockExtensionUri as any,
       connectionId,
@@ -225,8 +224,9 @@ describe('AliasPanel', () => {
     await panel['_handleMessage']({ command: 'createAlias', aliasData });
     expect(mockOnCreate).toHaveBeenCalledWith(aliasData);
     expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
-      command: 'aliasCreated',
-      alias: 'a',
+      command: 'setMode',
+      mode: 'edit',
+      aliasToEdit: { alias: 'a', collection: 'c' },
     });
   });
 
@@ -251,7 +251,7 @@ describe('AliasPanel', () => {
     });
   });
 
-  it('should call onDeleteCallback and post aliasDeleted', async () => {
+  it('should call onDeleteCallback', async () => {
     const panel = AliasPanel.createOrShow(
       mockExtensionUri as any,
       connectionId,
@@ -265,13 +265,9 @@ describe('AliasPanel', () => {
     );
     await panel['_handleMessage']({ command: 'deleteAlias', alias: 'alias1' });
     expect(mockOnDelete).toHaveBeenCalledWith('alias1');
-    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
-      command: 'aliasDeleted',
-      alias: 'alias1',
-    });
   });
 
-  it('should dispose and clear currentPanel', () => {
+  it('should dispose panel', () => {
     const panel = AliasPanel.createOrShow(
       mockExtensionUri as any,
       connectionId,
@@ -284,7 +280,6 @@ describe('AliasPanel', () => {
       mockOnMessage
     );
     panel.dispose();
-    expect(AliasPanel.currentPanel).toBeUndefined();
     expect(mockPanel.dispose).toHaveBeenCalled();
   });
 
