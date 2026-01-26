@@ -7,7 +7,14 @@ import { BackupPanel } from './views/BackupPanel';
 import { BackupRestorePanel } from './views/BackupRestorePanel';
 import { ClusterPanel } from './views/ClusterPanel';
 import { AliasPanel } from './views/AliasPanel';
-import type { BackupArgs, BackupConfigCreate, BackupItem, AliasItem } from './types';
+import type {
+  BackupArgs,
+  BackupConfigCreate,
+  BackupItem,
+  AliasItem,
+  AliasCreateData,
+  AliasUpdateData,
+} from './types';
 
 /**
  * Handles opening of .weaviate files
@@ -1036,14 +1043,14 @@ export function activate(context: vscode.ExtensionContext) {
     connectionId: string
   ) {
     return {
-      onCreate: async (aliasData: any) => {
+      onCreate: async (aliasData: AliasCreateData) => {
         await client.alias.create({
           alias: aliasData.alias,
           collection: aliasData.collection,
         });
         await treeProvider.refreshAliases(connectionId, true);
       },
-      onUpdate: async (aliasData: any) => {
+      onUpdate: async (aliasData: AliasUpdateData) => {
         await client.alias.update({
           alias: aliasData.alias,
           newTargetCollection: aliasData.newTargetCollection,

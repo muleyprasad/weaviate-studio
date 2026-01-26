@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import type { AliasItem } from '../types';
+import type { AliasItem, AliasCreateData, AliasUpdateData } from '../types';
 
 /**
  * Manages the Alias webview panel
@@ -22,8 +22,8 @@ export class AliasPanel {
     collections: string[],
     mode: 'create' | 'edit' | 'list',
     aliasToEdit: AliasItem | undefined,
-    private readonly onCreateCallback: (aliasData: any) => Promise<void>,
-    private readonly onUpdateCallback: (aliasData: any) => Promise<void>,
+    private readonly onCreateCallback: (aliasData: AliasCreateData) => Promise<void>,
+    private readonly onUpdateCallback: (aliasData: AliasUpdateData) => Promise<void>,
     private readonly onDeleteCallback: (alias: string) => Promise<void>,
     private readonly onMessageCallback?: (
       message: any,
@@ -78,8 +78,8 @@ export class AliasPanel {
     collections: string[],
     mode: 'create' | 'edit' | 'list',
     aliasToEdit: AliasItem | undefined,
-    onCreateCallback: (aliasData: any) => Promise<void>,
-    onUpdateCallback: (aliasData: any) => Promise<void>,
+    onCreateCallback: (aliasData: AliasCreateData) => Promise<void>,
+    onUpdateCallback: (aliasData: AliasUpdateData) => Promise<void>,
     onDeleteCallback: (alias: string) => Promise<void>,
     onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>
   ): AliasPanel {

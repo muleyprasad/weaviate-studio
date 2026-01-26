@@ -45,6 +45,18 @@ export interface AliasItem {
   collection: string;
 }
 
+// Alias create data
+export interface AliasCreateData {
+  alias: string;
+  collection: string;
+}
+
+// Alias update data
+export interface AliasUpdateData {
+  alias: string;
+  newTargetCollection: string;
+}
+
 // Available modules type
 export interface AvailableModules {
   [key: string]: {
