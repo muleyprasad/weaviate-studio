@@ -47,12 +47,8 @@ export function TenantSelectionModal() {
   // - Collection is multi-tenant
   // - Tenants are loaded
   // - No tenant is selected yet
-  // - Not currently loading
   const showModal =
-    dataState.isMultiTenant &&
-    dataState.availableTenants.length > 0 &&
-    !dataState.selectedTenant &&
-    !dataState.loading;
+    dataState.isMultiTenant && dataState.availableTenants.length > 0 && !dataState.selectedTenant;
 
   if (!showModal) {
     return null;

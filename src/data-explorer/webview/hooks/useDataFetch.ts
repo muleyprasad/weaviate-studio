@@ -80,10 +80,20 @@ export function useDataFetch() {
               dataActions.setCollection(message.collectionName);
               dataActions.setSchema(message.schema);
 
-              // Check if multi-tenant and request tenants
-              const isMultiTenant = !!(message.schema.multiTenancy as any)?.enabled;
+              // Check if multi-tenant
+              const isMultiTenant =
+                message.isMultiTenant || !!(message.schema.multiTenancy as any)?.enabled;
+
               if (isMultiTenant) {
-                postMessage({ command: 'getTenants' });
+                // If tenants were sent with schema, use them immediately
+                if (message.tenants) {
+                  dataActions.setTenants(message.tenants, true);
+                  dataActions.setLoading(false);
+                  // Modal will show immediately
+                } else {
+                  // Otherwise request tenants
+                  postMessage({ command: 'getTenants' });
+                }
               } else {
                 dataActions.setTenants([], false);
               }
@@ -94,15 +104,10 @@ export function useDataFetch() {
             if (message.tenants !== undefined && message.isMultiTenant !== undefined) {
               dataActions.setTenants(message.tenants, message.isMultiTenant);
 
-              // If multi-tenant and no tenant selected yet, stop here
-              // User needs to select a tenant before loading data
-              if (
-                message.isMultiTenant &&
-                message.tenants.length > 0 &&
-                !dataState.selectedTenant
-              ) {
+              // If multi-tenant, stop loading and wait for user to select a tenant
+              // Modal will be shown by the UI component
+              if (message.isMultiTenant && message.tenants.length > 0) {
                 dataActions.setLoading(false);
-                // Modal will be shown by the UI component
                 return;
               }
             }

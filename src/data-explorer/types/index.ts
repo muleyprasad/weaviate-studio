@@ -487,6 +487,7 @@ export interface ExportParams {
   currentObjects?: WeaviateObject[]; // For currentPage scope
   where?: FilterCondition[]; // For filtered scope
   matchMode?: FilterMatchMode;
+  tenant?: string; // For multi-tenant collections
 }
 
 /**
@@ -497,4 +498,5 @@ export interface AggregationParams {
   where?: FilterCondition[];
   matchMode?: FilterMatchMode;
   properties?: string[]; // Limit to specific properties
+  tenant?: string; // For multi-tenant collections
 }

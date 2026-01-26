@@ -350,7 +350,12 @@ describe('DataExplorerPanel', () => {
 
       const postMessageSpy = jest.spyOn(panel, 'postMessage');
 
-      // Mock API method
+      // Mock API methods
+      (panel as any)._api.getCollectionSchema = jest.fn<any>().mockResolvedValue({
+        name: 'TestCollection',
+        properties: [],
+        multiTenancy: { enabled: false },
+      });
       (panel as any)._api.fetchObjects = jest.fn<any>().mockResolvedValue({
         objects: [{ uuid: '123', properties: {} }],
         total: 1,
@@ -959,7 +964,12 @@ describe('DataExplorerPanel', () => {
       const postMessageSpy = jest.spyOn(panel, 'postMessage');
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Mock API method to throw error
+      // Mock API methods
+      (panel as any)._api.getCollectionSchema = jest.fn<any>().mockResolvedValue({
+        name: 'TestCollection',
+        properties: [],
+        multiTenancy: { enabled: false },
+      });
       (panel as any)._api.fetchObjects = jest
         .fn<any>()
         .mockRejectedValue(new Error('Fetch failed'));

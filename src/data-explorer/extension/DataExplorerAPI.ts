@@ -625,9 +625,15 @@ export class DataExplorerAPI {
   /**
    * Fetches a single object by UUID
    */
-  async getObjectByUuid(collectionName: string, uuid: string): Promise<WeaviateObject> {
+  async getObjectByUuid(
+    collectionName: string,
+    uuid: string,
+    tenant?: string
+  ): Promise<WeaviateObject> {
     try {
-      const collection = this.client.collections.get(collectionName);
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
 
       const obj = await collection.query.fetchObjectById(uuid, {
         includeVector: true,
@@ -657,9 +663,11 @@ export class DataExplorerAPI {
   /**
    * Gets the total count of objects in a collection
    */
-  async getCollectionCount(collectionName: string): Promise<number> {
+  async getCollectionCount(collectionName: string, tenant?: string): Promise<number> {
     try {
-      const collection = this.client.collections.get(collectionName);
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
       const result = await withTimeout(collection.aggregate.overAll(), this.REQUEST_TIMEOUT);
       return result.totalCount ?? 0;
     } catch (error) {
@@ -1171,7 +1179,8 @@ export class DataExplorerAPI {
             params.collectionName,
             params.where,
             params.matchMode,
-            signal
+            signal,
+            params.tenant
           );
           objects = filteredResult.objects;
           isTruncated = filteredResult.isTruncated;
@@ -1180,7 +1189,11 @@ export class DataExplorerAPI {
 
         case 'all':
           // Use collection.iterator() for entire collection - more efficient for large datasets
-          const allResult = await this.fetchAllObjectsWithIterator(params.collectionName, signal);
+          const allResult = await this.fetchAllObjectsWithIterator(
+            params.collectionName,
+            signal,
+            params.tenant
+          );
           objects = allResult.objects;
           isTruncated = allResult.isTruncated;
           totalCount = allResult.totalCount;
@@ -1239,7 +1252,8 @@ export class DataExplorerAPI {
     collectionName: string,
     where?: FilterCondition[],
     matchMode?: FilterMatchMode,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    tenant?: string
   ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
     const allObjects: WeaviateObject[] = [];
     let offset = 0;
@@ -1260,6 +1274,7 @@ export class DataExplorerAPI {
         offset,
         where,
         matchMode,
+        tenant,
       });
 
       allObjects.push(...result.objects);
@@ -1292,7 +1307,8 @@ export class DataExplorerAPI {
    */
   private async fetchAllObjectsWithIterator(
     collectionName: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    tenant?: string
   ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
     const allObjects: WeaviateObject[] = [];
     const maxObjects = 10000; // Safety limit
@@ -1300,7 +1316,9 @@ export class DataExplorerAPI {
     let totalCount: number | undefined;
 
     try {
-      const collection = this.client.collections.get(collectionName);
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
 
       // Get total count first
       try {
@@ -1538,6 +1556,7 @@ export class DataExplorerAPI {
     const scopeSuffix =
       params.scope === 'all' ? 'all' : params.scope === 'filtered' ? 'filtered' : 'page';
     const extension = params.format === 'json' ? 'json' : 'csv';
-    return `${params.collectionName}_${date}_${scopeSuffix}.${extension}`;
+    const tenantSuffix = params.tenant ? `_TENANT_${params.tenant}` : '';
+    return `${params.collectionName}${tenantSuffix}_${date}_${scopeSuffix}.${extension}`;
   }
 }
