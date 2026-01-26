@@ -1972,13 +1972,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
 
       // Sort aliases by alias name, then by collection name
-      const sortedAliases = [...allAliases].sort((a, b) => {
-        const aliasCompare = a.alias.localeCompare(b.alias);
-        if (aliasCompare !== 0) {
-          return aliasCompare;
-        }
-        return a.collection.localeCompare(b.collection);
-      });
+      const sortedAliases = this.sortAliases(allAliases);
 
       // Create tree items for each alias
       const aliasItems: WeaviateTreeItem[] = sortedAliases.map((aliasItem) => {
@@ -2760,13 +2754,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         : [];
 
       // Sort aliases by alias name, then by collection name before caching
-      const sortedAliases = allAliases.sort((a, b) => {
-        const aliasCompare = a.alias.localeCompare(b.alias);
-        if (aliasCompare !== 0) {
-          return aliasCompare;
-        }
-        return a.collection.localeCompare(b.collection);
-      });
+      const sortedAliases = this.sortAliases(allAliases);
 
       // Store sorted aliases in cache
       this.aliasesCache[connectionId] = sortedAliases;
