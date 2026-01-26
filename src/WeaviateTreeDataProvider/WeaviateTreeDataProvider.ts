@@ -2670,6 +2670,14 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * Refreshes aliases for a connection (public method that can be called from UI)
    * @param connectionId - The ID of the connection
    */
+  /**
+   * Utility method to add delays in async operations
+   * @param ms - Milliseconds to delay
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async refreshAliases(connectionId: string, reveal: boolean = false): Promise<void> {
     try {
       // Fetch fresh data from server
@@ -2678,51 +2686,51 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       this.refresh();
 
       // Add a small delay to ensure the refresh completes
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await this.delay(100);
 
       // Reveal and expand the Aliases item if requested
       if (reveal && this.treeView) {
-        // Use setTimeout to ensure the tree has been updated before revealing
-        setTimeout(async () => {
-          // First, ensure the connection is expanded
-          const connection = this.connections.find((conn) => conn.id === connectionId);
-          if (connection) {
-            const connectionItem = new WeaviateTreeItem(
-              `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
-              vscode.TreeItemCollapsibleState.Expanded,
-              'connection',
-              connection.id,
-              undefined,
-              undefined,
-              this.getStatusIcon(connection.status),
-              connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
-            );
+        // First, ensure the connection is expanded
+        const connection = this.connections.find((conn) => conn.id === connectionId);
+        if (connection) {
+          const connectionItem = new WeaviateTreeItem(
+            `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'connection',
+            connection.id,
+            undefined,
+            undefined,
+            this.getStatusIcon(connection.status),
+            connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
+          );
 
-            // Expand the connection first
-            await this.treeView?.reveal(connectionItem, { expand: true });
+          // Expand the connection first
+          await this.treeView?.reveal(connectionItem, { expand: true });
 
-            // Then reveal and expand the Aliases item
-            const cachedAliases = this.aliasesCache[connectionId] || [];
-            const aliasesLabel =
-              cachedAliases.length > 0 ? `Aliases (${cachedAliases.length})` : 'Aliases';
+          // Then reveal and expand the Aliases item
+          const cachedAliases = this.aliasesCache[connectionId] || [];
+          const aliasesLabel =
+            cachedAliases.length > 0 ? `Aliases (${cachedAliases.length})` : 'Aliases';
 
-            const aliasesTreeItem = new WeaviateTreeItem(
-              aliasesLabel,
-              vscode.TreeItemCollapsibleState.Expanded,
-              'aliases',
-              connectionId,
-              undefined,
-              'aliases',
-              new vscode.ThemeIcon('link'),
-              'weaviateAliases'
-            );
+          const aliasesTreeItem = new WeaviateTreeItem(
+            aliasesLabel,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'aliases',
+            connectionId,
+            undefined,
+            'aliases',
+            new vscode.ThemeIcon('link'),
+            'weaviateAliases'
+          );
 
-            // Small delay to ensure connection is expanded first
-            setTimeout(() => {
-              this.treeView?.reveal(aliasesTreeItem, { expand: true, select: false, focus: false });
-            }, 100);
-          }
-        }, 100);
+          // Small delay to ensure connection is expanded first
+          await this.delay(100);
+          await this.treeView?.reveal(aliasesTreeItem, {
+            expand: true,
+            select: false,
+            focus: false,
+          });
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
