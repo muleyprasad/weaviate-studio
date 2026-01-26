@@ -1127,7 +1127,7 @@ export function activate(context: vscode.ExtensionContext) {
         const callbacks = createAliasCallbacks(client, weaviateTreeDataProvider, item.connectionId);
 
         // Open alias panel in create mode
-        const panel = AliasPanel.createOrShow(
+        AliasPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           collectionNames,
@@ -1181,7 +1181,7 @@ export function activate(context: vscode.ExtensionContext) {
         const callbacks = createAliasCallbacks(client, weaviateTreeDataProvider, item.connectionId);
 
         // Open alias panel in edit mode
-        const panel = AliasPanel.createOrShow(
+        AliasPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           collectionNames,
