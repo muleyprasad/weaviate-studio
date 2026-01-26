@@ -2763,7 +2763,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Store sorted aliases in cache
       this.aliasesCache[connectionId] = sortedAliases;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error fetching aliases:', error);
+      vscode.window.showErrorMessage(
+        `Failed to fetch aliases: ${errorMessage}. The aliases list may be incomplete.`
+      );
       // On error, keep existing cache or set empty array
       if (!this.aliasesCache[connectionId]) {
         this.aliasesCache[connectionId] = [];
