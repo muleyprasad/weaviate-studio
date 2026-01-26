@@ -121,6 +121,13 @@ export class DataExplorerAPI {
   constructor(private client: WeaviateClient) {}
 
   /**
+   * Helper method to check if a collection schema has multi-tenancy enabled
+   */
+  private isMultiTenantCollection(schema: CollectionConfig): boolean {
+    return !!(schema.multiTenancy as any)?.enabled;
+  }
+
+  /**
    * Fetches objects from a collection with pagination, sorting, filtering, and vector search support
    * Supports three query modes:
    * 1. Boolean-only (default): Uses fetchObjects for standard pagination/filtering
@@ -651,7 +658,7 @@ export class DataExplorerAPI {
           creationTime: obj.metadata?.creationTime?.toISOString(),
           lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
         },
-        vector: (obj as any).vector,
+        vector: obj.vector as number[] | undefined,
         vectors: obj.vectors,
       };
     } catch (error) {
@@ -801,7 +808,10 @@ export class DataExplorerAPI {
         console.log('[DataExplorerAPI] Getting aggregations for:', params.collectionName);
       }
 
-      const collection = this.client.collections.get(params.collectionName);
+      // Get collection - use tenant-aware method if tenant is specified
+      const collection = params.tenant
+        ? this.client.collections.use(params.collectionName).withTenant(params.tenant)
+        : this.client.collections.get(params.collectionName);
 
       // Get collection schema to understand property types
       const schema = await this.getCollectionSchema(params.collectionName);
@@ -1354,7 +1364,7 @@ export class DataExplorerAPI {
             creationTime: obj.metadata?.creationTime?.toISOString(),
             lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
           },
-          vector: (obj as any).vector,
+          vector: obj.vector as number[] | undefined,
           vectors: obj.vectors,
         });
       }

@@ -34,6 +34,7 @@ export class DataExplorerPanel {
   private _messageQueue: WebviewMessage[] = [];
   private _isInitializing = false;
   private _selectedTenant: string | undefined;
+  private _isMultiTenant = false;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -311,10 +312,10 @@ export class DataExplorerPanel {
 
     // Get schema first
     const schema = await this._api.getCollectionSchema(this._collectionName);
-    const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
+    this._isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
 
     // If multi-tenant, get tenants immediately and send everything together
-    if (isMultiTenant) {
+    if (this._isMultiTenant) {
       try {
         const tenants = await this._api.getTenants(this._collectionName);
 
@@ -376,13 +377,9 @@ export class DataExplorerPanel {
     }
 
     try {
-      // Get schema to check multi-tenancy status
-      const schema = await this._api.getCollectionSchema(this._collectionName);
-      const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
-
       // For multi-tenant collections, ensure a tenant is selected
       // Silently ignore the request if no tenant is selected - modal will be shown
-      if (isMultiTenant && !this._selectedTenant && !message.tenant) {
+      if (this._isMultiTenant && !this._selectedTenant && !message.tenant) {
         return;
       }
 
