@@ -481,5 +481,148 @@ describe('Add Collection', () => {
     });
   });
 
+  describe('ready message handling', () => {
+    beforeEach(async () => {
+      await provider.addCollection('conn1');
+      expect(capturedOnMessage).toBeDefined();
+    });
+
+    it('sends nodesNumber when webview is ready', async () => {
+      // Setup cluster nodes cache
+      (provider as any).clusterNodesCache = {
+        conn1: [
+          { name: 'node-1', status: 'HEALTHY' },
+          { name: 'node-2', status: 'HEALTHY' },
+          { name: 'node-3', status: 'HEALTHY' },
+        ],
+      };
+
+      // Setup cluster metadata cache
+      (provider as any).clusterMetadataCache = {
+        conn1: {
+          version: '1.20.0',
+          modules: {
+            'text2vec-openai': {},
+            'text2vec-cohere': {},
+          },
+        },
+      };
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      // Should receive nodesNumber message
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'nodesNumber',
+        nodesNumber: 3,
+      });
+
+      // Should also receive availableModules message
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'availableModules',
+        modules: {
+          'text2vec-openai': {},
+          'text2vec-cohere': {},
+        },
+      });
+    });
+
+    it('sends default nodesNumber of 1 when no nodes cached', async () => {
+      // No cluster nodes cache
+      (provider as any).clusterNodesCache = {};
+
+      // Empty cluster metadata cache
+      (provider as any).clusterMetadataCache = {
+        conn1: {
+          modules: {},
+        },
+      };
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'nodesNumber',
+        nodesNumber: 1,
+      });
+    });
+
+    it('sends empty modules when no metadata cached', async () => {
+      // Setup cluster nodes cache
+      (provider as any).clusterNodesCache = {
+        conn1: [{ name: 'node-1', status: 'HEALTHY' }],
+      };
+
+      // No cluster metadata cache
+      (provider as any).clusterMetadataCache = {};
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'availableModules',
+        modules: {},
+      });
+    });
+
+    it('handles ready message before getVectorizers', async () => {
+      // Setup caches
+      (provider as any).clusterNodesCache = {
+        conn1: [
+          { name: 'node-1', status: 'HEALTHY' },
+          { name: 'node-2', status: 'HEALTHY' },
+        ],
+      };
+
+      (provider as any).clusterMetadataCache = {
+        conn1: {
+          version: '1.20.0',
+          modules: {
+            'text2vec-openai': {},
+          },
+        },
+      };
+
+      // Clear previous calls
+      postMessageSpy.mockClear();
+
+      // First, ready message
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      // Should get nodesNumber and modules
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'nodesNumber',
+        nodesNumber: 2,
+      });
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'availableModules',
+        modules: {
+          'text2vec-openai': {},
+        },
+      });
+
+      postMessageSpy.mockClear();
+
+      // Then, getVectorizers message
+      const mockClient: any = {
+        getMeta: jest.fn().mockImplementation(() => Promise.resolve({} as any)),
+        cluster: {
+          nodes: jest.fn().mockImplementation(() => Promise.resolve({ nodes: [] } as any)),
+        },
+      };
+      mockConnectionManager.getClient.mockReturnValue(mockClient);
+
+      await capturedOnMessage!({ command: 'getVectorizers' }, postMessageSpy);
+
+      // Should get vectorizers, modules, and nodesNumber again
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'vectorizers',
+        })
+      );
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'nodesNumber',
+        nodesNumber: 2,
+      });
+    });
+  });
+
   // Legacy inline HTML-based flow has been replaced by a React webview; HTML generation tests removed.
 });

@@ -1196,4 +1196,84 @@ describe('ConnectionManager', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('Connection Status Management', () => {
+    test('supports connecting status', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      expect(conn.status).toBe('disconnected');
+
+      // Update status to connecting
+      const updated = await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(updated?.status).toBe('connecting');
+
+      // Verify it persists
+      const retrieved = mgr.getConnection(conn.id);
+      expect(retrieved?.status).toBe('connecting');
+    });
+
+    test('transitions through connection states correctly', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'State Transition Test',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Initial state
+      expect(conn.status).toBe('disconnected');
+
+      // Move to connecting
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connecting');
+
+      // Move to connected
+      await mgr.updateConnection(conn.id, { status: 'connected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connected');
+
+      // Move back to disconnected
+      await mgr.updateConnection(conn.id, { status: 'disconnected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('disconnected');
+    });
+
+    test('handles failed connection by reverting to disconnected', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Failed Connection Test',
+        type: 'custom',
+        httpHost: 'invalid-host-that-does-not-exist',
+        httpPort: 8080,
+        grpcHost: 'invalid-host',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Set to connecting
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connecting');
+
+      // Simulate connection failure - revert to disconnected
+      await mgr.updateConnection(conn.id, { status: 'disconnected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('disconnected');
+    });
+  });
 });

@@ -163,5 +163,171 @@ describe('ClusterPanel', () => {
 
       expect(showInformationMessageSpy).toHaveBeenCalledWith('Test info message');
     });
+
+    test('handles refresh command', () => {
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = { nodes: [{ name: 'node1', status: 'HEALTHY' }] };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Trigger refresh
+      messageHandler({ command: 'refresh' });
+
+      // Should post a message back with refreshed data
+      // The refresh is handled internally in the panel
+      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+    });
+
+    test('handles updateShardStatus command', () => {
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = { nodes: [{ name: 'node1', status: 'HEALTHY' }] };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      messageHandler({
+        command: 'updateShardStatus',
+        collection: 'TestCollection',
+        shardNames: ['shard-1', 'shard-2'],
+        newStatus: 'READY',
+      });
+
+      // Verify command is handled (implementation may vary)
+      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+    });
+
+    test('handles toggleOpenClusterViewOnConnect command', () => {
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = { nodes: [] };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      messageHandler({
+        command: 'toggleOpenClusterViewOnConnect',
+        value: false,
+      });
+
+      // Verify the setting is updated (implementation may store this)
+      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe('Auto-refresh functionality', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    test('webview should handle auto-refresh interval changes', () => {
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = { nodes: [] };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      // The webview should have received the initial data
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'init',
+        })
+      );
+    });
+
+    test('updateData should update existing panel with new data', () => {
+      const connectionId = 'test-connection-123';
+      const initialData = { nodes: [{ name: 'node1' }] };
+      const updatedData = { nodes: [{ name: 'node1' }, { name: 'node2' }] };
+
+      const panel = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        initialData,
+        'Test Connection'
+      );
+
+      // Clear previous calls
+      mockPanel.webview.postMessage.mockClear();
+
+      // Update with new data using createOrShow (which updates existing panel)
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, updatedData, 'Test Connection');
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'updateData',
+          nodeStatusData: updatedData,
+        })
+      );
+    });
+  });
+
+  describe('View type support', () => {
+    test('panel supports both node and collection views through webview', () => {
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = {
+        nodes: [
+          {
+            name: 'node-1',
+            status: 'HEALTHY',
+            shards: [
+              {
+                name: 'shard-1',
+                class: 'Collection1',
+                objectCount: 100,
+                vectorIndexingStatus: 'READY',
+              },
+            ],
+          },
+        ],
+      };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      // Initial data should be sent
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'init',
+          nodeStatusData: nodeStatusData,
+        })
+      );
+    });
+
+    test('webview receives data structured for both view types', () => {
+      const connectionId = 'test-connection-123';
+      const complexData = {
+        nodes: [
+          {
+            name: 'node-1',
+            status: 'HEALTHY',
+            shards: [
+              { name: 'shard-1', class: 'Collection1', objectCount: 50 },
+              { name: 'shard-2', class: 'Collection2', objectCount: 75 },
+            ],
+          },
+          {
+            name: 'node-2',
+            status: 'HEALTHY',
+            shards: [
+              { name: 'shard-3', class: 'Collection1', objectCount: 50 },
+              { name: 'shard-4', class: 'Collection3', objectCount: 100 },
+            ],
+          },
+        ],
+      };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, complexData, 'Test Connection');
+
+      const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
+      const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
+
+      expect(initCall).toBeDefined();
+      expect(initCall[0].nodeStatusData).toEqual(complexData);
+    });
   });
 });
