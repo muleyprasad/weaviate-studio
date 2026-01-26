@@ -9,6 +9,7 @@ import {
   SchemaClass,
   WeaviateMetadata,
   BackupItem,
+  AliasItem,
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
@@ -54,6 +55,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
   /** Cache of backups per connection */
   private backupsCache: Record<string, BackupItem[]> = {};
+
+  /** Cache of aliases per connection */
+  private aliasesCache: Record<string, AliasItem[]> = {};
 
   /** VS Code extension context */
   private readonly context: vscode.ExtensionContext;
@@ -285,6 +289,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     } else if (element.itemType === 'backupItem' && !element.iconPath) {
       element.iconPath = new vscode.ThemeIcon('file-zip');
       element.tooltip = 'Backup details';
+    } else if (element.itemType === 'aliases' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('link');
+      element.tooltip = 'Aliases for this cluster';
+    } else if (element.itemType === 'aliasItem' && !element.iconPath) {
+      element.iconPath = new vscode.ThemeIcon('symbol-reference');
+      element.tooltip = 'Alias details';
     } else if (element.itemType === 'property') {
       // Ensure property items have the correct context value
       if (!element.contextValue) {
@@ -558,6 +568,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           'collections',
           new vscode.ThemeIcon('database'),
           'weaviateCollectionsGroup'
+        )
+      );
+
+      // Add aliases section
+      const cachedAliases = this.aliasesCache[element.connectionId] || [];
+      const aliasesLabel =
+        cachedAliases.length > 0 ? `Aliases (${cachedAliases.length})` : 'Aliases';
+
+      items.push(
+        new WeaviateTreeItem(
+          aliasesLabel,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'aliases',
+          element.connectionId,
+          undefined,
+          'aliases',
+          new vscode.ThemeIcon('link'),
+          'weaviateAliases'
         )
       );
 
@@ -1933,6 +1961,40 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           ),
         ];
       }
+    } else if (element.itemType === 'aliases' && element.connectionId) {
+      // Aliases section - use cached data, don't fetch on expand
+      const allAliases = this.aliasesCache[element.connectionId] || [];
+
+      if (allAliases.length === 0) {
+        return [
+          new WeaviateTreeItem('No aliases found', vscode.TreeItemCollapsibleState.None, 'message'),
+        ];
+      }
+
+      // Sort aliases by alias name, then by collection name
+      const sortedAliases = this.sortAliases(allAliases);
+
+      // Create tree items for each alias
+      const aliasItems: WeaviateTreeItem[] = sortedAliases.map((aliasItem) => {
+        const aliasTreeItem = new WeaviateTreeItem(
+          aliasItem.alias,
+          vscode.TreeItemCollapsibleState.None,
+          'aliasItem',
+          element.connectionId,
+          undefined,
+          aliasItem.alias,
+          new vscode.ThemeIcon('symbol-reference'),
+          'weaviateAliasItem',
+          `→ ${aliasItem.collection}`
+        );
+
+        // Add tooltip with full information
+        aliasTreeItem.tooltip = `Alias: ${aliasItem.alias}\nTarget Collection: ${aliasItem.collection}`;
+
+        return aliasTreeItem;
+      });
+
+      return aliasItems;
     } else if (element.itemType === 'backupItem' && element.connectionId && element.itemId) {
       // Backup item details - show detailed information about a specific backup
       const backups = this.backupsCache[element.connectionId] || [];
@@ -2486,6 +2548,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this.fetchMetadata(connectionId),
         this.fetchNodes(connectionId),
         this.fetchCollectionsData(connectionId),
+        this.fetchAliases(connectionId),
       ]);
 
       // Fetch backups in the background to populate cache for count display
@@ -2594,6 +2657,132 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Show notification even on error
       vscode.window.showWarningMessage(`Backups refresh completed with issues: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Refreshes aliases for a connection (public method that can be called from UI)
+   * @param connectionId - The ID of the connection
+   */
+  /**
+   * Utility method to add delays in async operations
+   * @param ms - Milliseconds to delay
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async refreshAliases(connectionId: string, reveal: boolean = false): Promise<void> {
+    try {
+      // Fetch fresh data from server
+      await this.fetchAliases(connectionId);
+      // Trigger refresh - fire entire tree to ensure parent connection updates the label
+      this.refresh();
+
+      // Add a small delay to ensure the refresh completes
+      await this.delay(100);
+
+      // Reveal and expand the Aliases item if requested
+      if (reveal && this.treeView) {
+        // First, ensure the connection is expanded
+        const connection = this.connections.find((conn) => conn.id === connectionId);
+        if (connection) {
+          const connectionItem = new WeaviateTreeItem(
+            `${connection.type === 'cloud' ? '☁️' : '🔗'} ${connection.name}`,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'connection',
+            connection.id,
+            undefined,
+            undefined,
+            this.getStatusIcon(connection.status),
+            connection.status === 'connected' ? 'connectedConnection' : 'disconnectedConnection'
+          );
+
+          // Expand the connection first
+          await this.treeView?.reveal(connectionItem, { expand: true });
+
+          // Then reveal and expand the Aliases item
+          const cachedAliases = this.aliasesCache[connectionId] || [];
+          const aliasesLabel =
+            cachedAliases.length > 0 ? `Aliases (${cachedAliases.length})` : 'Aliases';
+
+          const aliasesTreeItem = new WeaviateTreeItem(
+            aliasesLabel,
+            vscode.TreeItemCollapsibleState.Expanded,
+            'aliases',
+            connectionId,
+            undefined,
+            'aliases',
+            new vscode.ThemeIcon('link'),
+            'weaviateAliases'
+          );
+
+          // Small delay to ensure connection is expanded first
+          await this.delay(100);
+          await this.treeView?.reveal(aliasesTreeItem, {
+            expand: true,
+            select: false,
+            focus: false,
+          });
+        }
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing aliases:', error);
+      vscode.window.showErrorMessage(`Failed to refresh aliases: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Sorts aliases by alias name, then by collection name
+   * @param aliases - Array of alias items to sort
+   * @returns Sorted array of alias items
+   */
+  private sortAliases(aliases: AliasItem[]): AliasItem[] {
+    return [...aliases].sort((a, b) => {
+      const aliasCompare = a.alias.localeCompare(b.alias);
+      if (aliasCompare !== 0) {
+        return aliasCompare;
+      }
+      return a.collection.localeCompare(b.collection);
+    });
+  }
+
+  /**
+   * Fetches aliases and populates the cache
+   * @param connectionId - The ID of the connection
+   */
+  private async fetchAliases(connectionId: string): Promise<void> {
+    const client = this.connectionManager.getClient(connectionId);
+    if (!client) {
+      return;
+    }
+
+    try {
+      // Fetch all aliases
+      const aliasesResponse = await client.alias.listAll();
+      const allAliases: AliasItem[] = aliasesResponse
+        ? (aliasesResponse as any[]).map((aliasObj: any) => ({
+            alias: aliasObj.alias,
+            collection: aliasObj.collection,
+          }))
+        : [];
+
+      // Sort aliases by alias name, then by collection name before caching
+      const sortedAliases = this.sortAliases(allAliases);
+
+      // Store sorted aliases in cache
+      this.aliasesCache[connectionId] = sortedAliases;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error fetching aliases:', error);
+      vscode.window.showErrorMessage(
+        `Failed to fetch aliases: ${errorMessage}. The aliases list may be incomplete.`
+      );
+      // On error, keep existing cache or set empty array
+      if (!this.aliasesCache[connectionId]) {
+        this.aliasesCache[connectionId] = [];
+      }
     }
   }
 
