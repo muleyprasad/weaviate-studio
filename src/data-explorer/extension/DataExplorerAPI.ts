@@ -28,7 +28,7 @@
  * - Aggregations return null: Enables partial results for mixed property types
  */
 
-import type { WeaviateClient, Collection } from 'weaviate-client';
+import type { WeaviateClient, Collection, Vectors } from 'weaviate-client';
 import { Filters } from 'weaviate-client';
 import type {
   WeaviateObject,
@@ -129,17 +129,21 @@ export class DataExplorerAPI {
    */
   async fetchObjects(params: FetchObjectsParams): Promise<FetchObjectsResponse> {
     try {
-      const collection = this.client.collections.get(params.collectionName);
+      // Get collection - use tenant-aware method if tenant is specified
+      const collection = params.tenant
+        ? this.client.collections.use(params.collectionName).withTenant(params.tenant)
+        : this.client.collections.get(params.collectionName);
 
       // Build common query options using Weaviate types
       const baseOptions: WeaviateQueryOptions = {
-        limit: params.limit,
+        limit: params.limit ?? 20,
         returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'],
+        includeVector: true,
       };
 
       // Add offset for non-vector search queries (vector search uses limit only)
       if (!params.vectorSearch || params.vectorSearch.type === 'none') {
-        baseOptions.offset = params.offset;
+        baseOptions.offset = params.offset ?? 0;
       }
 
       // Add properties if specified
@@ -180,6 +184,7 @@ export class DataExplorerAPI {
             distance?: number;
             certainty?: number;
           };
+          vector?: number[];
           vectors?: Record<string, number[]>;
         }) => ({
           uuid: obj.uuid,
@@ -191,11 +196,14 @@ export class DataExplorerAPI {
             distance: obj.metadata?.distance,
             certainty: obj.metadata?.certainty,
           },
+          vector: obj.vector,
+          vectors: obj.vectors,
         })
       );
 
       // Get total count using cached aggregate (with filter consideration)
       let total = 0;
+      let unfilteredTotal: number | undefined = undefined;
       const hasFilters = params.where && params.where.length > 0;
       const cacheKey = hasFilters
         ? `${params.collectionName}:filtered:${JSON.stringify(params.where)}:${params.matchMode || 'AND'}`
@@ -242,7 +250,32 @@ export class DataExplorerAPI {
         }
       }
 
-      return { objects, total };
+      // Get unfiltered total count when filters are active
+      if (hasFilters) {
+        const unfilteredCacheKey = params.collectionName;
+        const unfilteredCached = this.countCache.get(unfilteredCacheKey);
+
+        if (unfilteredCached && now - unfilteredCached.timestamp < this.CACHE_TTL) {
+          // Use cached unfiltered count
+          unfilteredTotal = unfilteredCached.count;
+        } else {
+          // Fetch fresh unfiltered count
+          try {
+            const aggregateResult = await collection.aggregate.overAll();
+            unfilteredTotal = aggregateResult.totalCount ?? total;
+            this.countCache.set(unfilteredCacheKey, { count: unfilteredTotal, timestamp: now });
+          } catch (aggregateError) {
+            console.warn('Failed to get unfiltered aggregate count:', aggregateError);
+            // Use cached value if available
+            if (unfilteredCached) {
+              unfilteredTotal = unfilteredCached.count;
+            }
+            // If no cache, don't set unfilteredTotal (will be undefined)
+          }
+        }
+      }
+
+      return { objects, total, unfilteredTotal };
     } catch (error) {
       console.error('Error fetching objects from collection:', {
         collection: params.collectionName,
@@ -592,9 +625,15 @@ export class DataExplorerAPI {
   /**
    * Fetches a single object by UUID
    */
-  async getObjectByUuid(collectionName: string, uuid: string): Promise<WeaviateObject> {
+  async getObjectByUuid(
+    collectionName: string,
+    uuid: string,
+    tenant?: string
+  ): Promise<WeaviateObject> {
     try {
-      const collection = this.client.collections.get(collectionName);
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
 
       const obj = await collection.query.fetchObjectById(uuid, {
         includeVector: true,
@@ -602,15 +641,6 @@ export class DataExplorerAPI {
 
       if (!obj) {
         throw new Error(`Object with UUID ${uuid} not found`);
-      }
-
-      // Handle vector types - could be number[] or number[][]
-      let vector: number[] | undefined;
-      if (obj.vectors?.default) {
-        const defaultVector = obj.vectors.default;
-        if (Array.isArray(defaultVector) && typeof defaultVector[0] === 'number') {
-          vector = defaultVector as number[];
-        }
       }
 
       return {
@@ -621,8 +651,8 @@ export class DataExplorerAPI {
           creationTime: obj.metadata?.creationTime?.toISOString(),
           lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
         },
-        vector,
-        vectors: undefined, // Skip named vectors for now
+        vector: (obj as any).vector,
+        vectors: obj.vectors,
       };
     } catch (error) {
       console.error('Error fetching object by UUID:', error);
@@ -633,9 +663,11 @@ export class DataExplorerAPI {
   /**
    * Gets the total count of objects in a collection
    */
-  async getCollectionCount(collectionName: string): Promise<number> {
+  async getCollectionCount(collectionName: string, tenant?: string): Promise<number> {
     try {
-      const collection = this.client.collections.get(collectionName);
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
       const result = await withTimeout(collection.aggregate.overAll(), this.REQUEST_TIMEOUT);
       return result.totalCount ?? 0;
     } catch (error) {
@@ -649,6 +681,29 @@ export class DataExplorerAPI {
       }
       throw new Error(
         `Failed to get count for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Gets the list of tenants for a multi-tenant collection
+   */
+  async getTenants(
+    collectionName: string
+  ): Promise<Array<{ name: string; activityStatus?: string }>> {
+    try {
+      const collection = this.client.collections.use(collectionName);
+      const tenants = await collection.tenants.get();
+
+      // Transform tenants object to array
+      return Object.entries(tenants).map(([name, info]: [string, any]) => ({
+        name,
+        activityStatus: info.activityStatus,
+      }));
+    } catch (error) {
+      console.error('Error getting tenants:', error);
+      throw new Error(
+        `Failed to get tenants for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
@@ -1124,7 +1179,8 @@ export class DataExplorerAPI {
             params.collectionName,
             params.where,
             params.matchMode,
-            signal
+            signal,
+            params.tenant
           );
           objects = filteredResult.objects;
           isTruncated = filteredResult.isTruncated;
@@ -1132,12 +1188,11 @@ export class DataExplorerAPI {
           break;
 
         case 'all':
-          // Fetch all objects from collection
-          const allResult = await this.fetchAllObjects(
+          // Use collection.iterator() for entire collection - more efficient for large datasets
+          const allResult = await this.fetchAllObjectsWithIterator(
             params.collectionName,
-            undefined,
-            undefined,
-            signal
+            signal,
+            params.tenant
           );
           objects = allResult.objects;
           isTruncated = allResult.isTruncated;
@@ -1197,7 +1252,8 @@ export class DataExplorerAPI {
     collectionName: string,
     where?: FilterCondition[],
     matchMode?: FilterMatchMode,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    tenant?: string
   ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
     const allObjects: WeaviateObject[] = [];
     let offset = 0;
@@ -1218,6 +1274,7 @@ export class DataExplorerAPI {
         offset,
         where,
         matchMode,
+        tenant,
       });
 
       allObjects.push(...result.objects);
@@ -1241,6 +1298,75 @@ export class DataExplorerAPI {
     }
 
     return { objects: allObjects, isTruncated, totalCount };
+  }
+
+  /**
+   * Fetches all objects from a collection using iterator (more efficient for entire collections)
+   * Uses collection.iterator() which is optimized for scanning entire collections
+   * Returns objects and truncation info
+   */
+  private async fetchAllObjectsWithIterator(
+    collectionName: string,
+    signal?: AbortSignal,
+    tenant?: string
+  ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
+    const allObjects: WeaviateObject[] = [];
+    const maxObjects = 10000; // Safety limit
+    let isTruncated = false;
+    let totalCount: number | undefined;
+
+    try {
+      const collection = tenant
+        ? this.client.collections.use(collectionName).withTenant(tenant)
+        : this.client.collections.get(collectionName);
+
+      // Get total count first
+      try {
+        const aggregateResult = await collection.aggregate.overAll();
+        totalCount = aggregateResult.totalCount ?? 0;
+      } catch (aggregateError) {
+        console.warn('Failed to get total count:', aggregateError);
+      }
+
+      // Use iterator for efficient scanning
+      const iterator = collection.iterator({
+        includeVector: true,
+        returnMetadata: ['creationTime', 'updateTime'],
+      });
+
+      for await (const obj of iterator) {
+        // Check if export was cancelled
+        if (signal?.aborted) {
+          throw new Error('Export cancelled');
+        }
+
+        // Check safety limit
+        if (allObjects.length >= maxObjects) {
+          isTruncated = true;
+          break;
+        }
+
+        allObjects.push({
+          uuid: obj.uuid,
+          properties: this._validateProperties(obj.properties),
+          metadata: {
+            uuid: obj.uuid,
+            creationTime: obj.metadata?.creationTime?.toISOString(),
+            lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
+          },
+          vector: (obj as any).vector,
+          vectors: obj.vectors,
+        });
+      }
+
+      return { objects: allObjects, isTruncated, totalCount };
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.message === 'Export cancelled')) {
+        throw new Error('Export cancelled');
+      }
+      console.error('Error fetching objects with iterator:', error);
+      throw error;
+    }
   }
 
   /**
@@ -1271,11 +1397,13 @@ export class DataExplorerAPI {
       }
 
       // Add vectors if requested
-      if (options.includeVectors && obj.vector) {
-        result.vector = obj.vector;
-      }
-      if (options.includeVectors && obj.vectors) {
-        result.vectors = obj.vectors;
+      if (options.includeVectors) {
+        if (obj.vector) {
+          result.vector = obj.vector;
+        }
+        if (obj.vectors) {
+          result.vectors = obj.vectors;
+        }
       }
 
       return result;
@@ -1428,6 +1556,7 @@ export class DataExplorerAPI {
     const scopeSuffix =
       params.scope === 'all' ? 'all' : params.scope === 'filtered' ? 'filtered' : 'page';
     const extension = params.format === 'json' ? 'json' : 'csv';
-    return `${params.collectionName}_${date}_${scopeSuffix}.${extension}`;
+    const tenantSuffix = params.tenant ? `_TENANT_${params.tenant}` : '';
+    return `${params.collectionName}${tenantSuffix}_${date}_${scopeSuffix}.${extension}`;
   }
 }

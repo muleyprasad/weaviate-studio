@@ -4,7 +4,14 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { ExportFormat, ExportScope, ExportOptions, WeaviateObject } from '../../../types';
+import type {
+  ExportFormat,
+  ExportScope,
+  ExportOptions,
+  WeaviateObject,
+  FilterCondition,
+  FilterMatchMode,
+} from '../../../types';
 import { postMessageToExtension } from '../../utils/vscodeApi';
 
 export interface ExportDialogProps {
@@ -14,8 +21,11 @@ export interface ExportDialogProps {
   currentPageCount: number;
   filteredCount: number;
   totalCount: number;
+  unfilteredTotalCount: number;
   currentObjects?: WeaviateObject[];
   hasFilters: boolean;
+  where?: FilterCondition[];
+  matchMode?: FilterMatchMode;
 }
 
 export function ExportDialog({
@@ -25,8 +35,11 @@ export function ExportDialog({
   currentPageCount,
   filteredCount,
   totalCount,
+  unfilteredTotalCount,
   currentObjects,
   hasFilters,
+  where,
+  matchMode,
 }: ExportDialogProps) {
   // Export configuration state
   const [format, setFormat] = useState<ExportFormat>('json');
@@ -92,6 +105,8 @@ export function ExportDialog({
         format,
         options,
         currentObjects: scope === 'currentPage' ? currentObjects : undefined,
+        where: scope === 'filtered' ? where : undefined,
+        matchMode: scope === 'filtered' ? matchMode : undefined,
       },
       requestId,
     });
@@ -104,6 +119,8 @@ export function ExportDialog({
     flattenNested,
     collectionName,
     currentObjects,
+    where,
+    matchMode,
   ]);
 
   // Handle cancel export
@@ -147,19 +164,22 @@ export function ExportDialog({
     },
     {
       value: 'filtered' as ExportScope,
-      label: 'All Filtered Results',
+      label: hasFilters
+        ? `All Filtered Results (${filteredCount.toLocaleString()} of ${unfilteredTotalCount.toLocaleString()})`
+        : 'All Filtered Results',
       count: filteredCount,
       disabled: !hasFilters,
     },
     {
       value: 'all' as ExportScope,
       label: 'Entire Collection',
-      count: totalCount,
+      count: unfilteredTotalCount,
     },
   ];
 
   const showLargeExportWarning =
-    (scope === 'all' && totalCount > 10000) || (scope === 'filtered' && filteredCount > 10000);
+    (scope === 'all' && unfilteredTotalCount > 10000) ||
+    (scope === 'filtered' && filteredCount > 10000);
   const showCsvVectorWarning = format === 'csv' && includeVectors;
 
   return (

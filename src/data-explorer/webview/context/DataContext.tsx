@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react';
-import type { WeaviateObject, CollectionConfig } from '../../types';
+import type { WeaviateObject, CollectionConfig, TenantInfo } from '../../types';
 
 // ============================================================================
 // State Interface
@@ -20,8 +20,14 @@ import type { WeaviateObject, CollectionConfig } from '../../types';
 export interface DataContextState {
   collectionName: string;
   schema: CollectionConfig | null;
+  // Multi-tenancy
+  availableTenants: TenantInfo[];
+  selectedTenant: string | null;
+  isMultiTenant: boolean;
+  // Data
   objects: WeaviateObject[];
   totalCount: number;
+  unfilteredTotalCount: number;
   loading: boolean;
   error: string | null;
 }
@@ -33,11 +39,14 @@ export interface DataContextState {
 type DataAction =
   | { type: 'SET_COLLECTION'; collectionName: string }
   | { type: 'SET_SCHEMA'; schema: CollectionConfig }
-  | { type: 'SET_DATA'; objects: WeaviateObject[]; total: number }
+  | { type: 'SET_DATA'; objects: WeaviateObject[]; total: number; unfilteredTotal?: number }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'REFRESH' };
+  | { type: 'REFRESH' }
+  // Multi-tenancy actions
+  | { type: 'SET_TENANTS'; tenants: TenantInfo[]; isMultiTenant: boolean }
+  | { type: 'SET_SELECTED_TENANT'; tenant: string | null };
 
 // ============================================================================
 // Reducer
@@ -46,8 +55,12 @@ type DataAction =
 const initialState: DataContextState = {
   collectionName: '',
   schema: null,
+  availableTenants: [],
+  selectedTenant: null,
+  isMultiTenant: false,
   objects: [],
   totalCount: 0,
+  unfilteredTotalCount: 0,
   loading: false,
   error: null,
 };
@@ -60,6 +73,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         collectionName: action.collectionName,
         objects: [],
         totalCount: 0,
+        unfilteredTotalCount: 0,
         schema: null,
         error: null,
       };
@@ -75,6 +89,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         ...state,
         objects: action.objects,
         totalCount: action.total,
+        unfilteredTotalCount: action.unfilteredTotal ?? action.total,
         loading: false,
         error: null,
       };
@@ -105,6 +120,22 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         error: null,
       };
 
+    case 'SET_TENANTS':
+      return {
+        ...state,
+        availableTenants: action.tenants,
+        isMultiTenant: action.isMultiTenant,
+      };
+
+    case 'SET_SELECTED_TENANT':
+      return {
+        ...state,
+        selectedTenant: action.tenant,
+        objects: [], // Clear objects when changing tenant
+        totalCount: 0,
+        unfilteredTotalCount: 0,
+      };
+
     default:
       return state;
   }
@@ -117,11 +148,14 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
 export interface DataContextActions {
   setCollection: (collectionName: string) => void;
   setSchema: (schema: CollectionConfig) => void;
-  setData: (objects: WeaviateObject[], total: number) => void;
+  setData: (objects: WeaviateObject[], total: number, unfilteredTotal?: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
   refresh: () => void;
+  // Multi-tenancy actions
+  setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => void;
+  setSelectedTenant: (tenant: string | null) => void;
 }
 
 // ============================================================================
@@ -161,8 +195,8 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
         dispatch({ type: 'SET_SCHEMA', schema });
       },
 
-      setData: (objects: WeaviateObject[], total: number) => {
-        dispatch({ type: 'SET_DATA', objects, total });
+      setData: (objects: WeaviateObject[], total: number, unfilteredTotal?: number) => {
+        dispatch({ type: 'SET_DATA', objects, total, unfilteredTotal });
       },
 
       setLoading: (loading: boolean) => {
@@ -179,6 +213,14 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
 
       refresh: () => {
         dispatch({ type: 'REFRESH' });
+      },
+
+      setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => {
+        dispatch({ type: 'SET_TENANTS', tenants, isMultiTenant });
+      },
+
+      setSelectedTenant: (tenant: string | null) => {
+        dispatch({ type: 'SET_SELECTED_TENANT', tenant });
       },
     }),
     []

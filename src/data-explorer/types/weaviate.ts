@@ -59,6 +59,9 @@ export interface WeaviateQueryOptions {
 
   /** Filter conditions to apply */
   filters?: WeaviateFilter;
+
+  /** Include vector embeddings in results */
+  includeVector?: boolean;
 }
 
 /**

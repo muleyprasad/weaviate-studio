@@ -79,12 +79,52 @@ export function useDataFetch() {
               previousCollectionRef.current = message.collectionName;
               dataActions.setCollection(message.collectionName);
               dataActions.setSchema(message.schema);
+
+              // Check if multi-tenant
+              const isMultiTenant =
+                message.isMultiTenant || !!(message.schema.multiTenancy as any)?.enabled;
+
+              if (isMultiTenant) {
+                // If tenants were sent with schema, use them immediately
+                if (message.tenants) {
+                  dataActions.setTenants(message.tenants, true);
+                  dataActions.setLoading(false);
+                  // Modal will show immediately
+                } else {
+                  // Otherwise request tenants
+                  postMessage({ command: 'getTenants' });
+                }
+              } else {
+                dataActions.setTenants([], false);
+              }
+            }
+            break;
+
+          case 'tenantsLoaded':
+            if (message.tenants !== undefined && message.isMultiTenant !== undefined) {
+              dataActions.setTenants(message.tenants, message.isMultiTenant);
+
+              // If multi-tenant, stop loading and wait for user to select a tenant
+              // Modal will be shown by the UI component
+              if (message.isMultiTenant && message.tenants.length > 0) {
+                dataActions.setLoading(false);
+                return;
+              }
+            }
+            break;
+
+          case 'tenantChanged':
+            if (message.tenant !== undefined) {
+              dataActions.setSelectedTenant(message.tenant);
+              if (message.objects && message.total !== undefined) {
+                dataActions.setData(message.objects, message.total, message.unfilteredTotal);
+              }
             }
             break;
 
           case 'objectsLoaded':
             if (message.objects && message.total !== undefined) {
-              dataActions.setData(message.objects, message.total);
+              dataActions.setData(message.objects, message.total, message.unfilteredTotal);
             }
             break;
 
@@ -141,6 +181,7 @@ export function useDataFetch() {
       postMessage({
         command: 'fetchObjects',
         collectionName: dataState.collectionName,
+        tenant: dataState.selectedTenant || undefined,
         limit: pageSize,
         offset,
         sortBy,
@@ -152,6 +193,7 @@ export function useDataFetch() {
     [
       postMessage,
       dataState.collectionName,
+      dataState.selectedTenant,
       dataActions,
       filterState.activeFilters,
       filterState.matchMode,

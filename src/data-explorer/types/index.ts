@@ -3,13 +3,15 @@
  * Defines interfaces for state management, API responses, and UI components
  */
 
+import type { Vectors } from 'weaviate-client';
+
 // Weaviate object structure
 export interface WeaviateObject {
   uuid: string;
   properties: Record<string, unknown>;
   metadata?: WeaviateObjectMetadata;
   vector?: number[];
-  vectors?: Record<string, number[]>;
+  vectors?: Vectors;
 }
 
 export interface HybridExplainScoreDetails {
@@ -54,6 +56,12 @@ export interface WeaviateObjectMetadata {
   certainty?: number;
   score?: number;
   explainScore?: string | HybridExplainScoreDetails; // Can be string or structured object
+}
+
+// Tenant information
+export interface TenantInfo {
+  name: string;
+  activityStatus?: string; // Can be ACTIVE, INACTIVE, HOT, COLD, FROZEN, UNFROZEN
 }
 
 // Collection schema types
@@ -112,9 +120,15 @@ export interface DataExplorerState {
   collectionName: string;
   schema: CollectionConfig | null;
 
+  // Multi-tenancy
+  availableTenants: TenantInfo[];
+  selectedTenant: string | null;
+  isMultiTenant: boolean;
+
   // Data
   objects: WeaviateObject[];
   totalCount: number;
+  unfilteredTotalCount: number; // Total count without filters applied
   loading: boolean;
   error: string | null;
 
@@ -207,8 +221,9 @@ export interface VectorSearchParams {
 // Fetch params for API
 export interface FetchObjectsParams {
   collectionName: string;
-  limit: number;
-  offset: number;
+  tenant?: string; // For multi-tenant collections
+  limit?: number;
+  offset?: number;
   properties?: string[];
   sortBy?: SortState;
   where?: FilterCondition[]; // Phase 2: Filter support
@@ -220,6 +235,7 @@ export interface FetchObjectsParams {
 export interface FetchObjectsResponse {
   objects: WeaviateObject[];
   total: number;
+  unfilteredTotal?: number; // Total count without filters (only set when filters are active)
 }
 
 // Message types for extension <-> webview communication
@@ -232,6 +248,9 @@ export type ExtensionMessageCommand =
   | 'updateData'
   | 'refresh'
   | 'connectionStatus' // Connection state updates
+  // Multi-tenancy
+  | 'tenantsLoaded'
+  | 'tenantChanged'
   // Phase 5: Aggregations and Export
   | 'aggregationsLoaded'
   | 'exportComplete'
@@ -244,6 +263,9 @@ export type WebviewMessageCommand =
   | 'getSchema'
   | 'getObjectDetail'
   | 'refresh'
+  // Multi-tenancy
+  | 'getTenants'
+  | 'setTenant'
   // Phase 5: Aggregations and Export
   | 'getAggregations'
   | 'exportObjects'
@@ -258,10 +280,15 @@ export interface ExtensionMessage {
   schema?: CollectionConfig;
   object?: WeaviateObject;
   total?: number;
+  unfilteredTotal?: number; // Total count without filters
   requestId?: string; // Match with request ID
   // Connection status
   status?: 'connecting' | 'connected' | 'disconnected';
   message?: string;
+  // Multi-tenancy
+  tenants?: TenantInfo[];
+  tenant?: string;
+  isMultiTenant?: boolean;
   // Phase 5: Aggregations and Export
   aggregations?: AggregationResult;
   exportResult?: ExportResult;
@@ -284,6 +311,8 @@ export interface WebviewMessage {
   matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
   vectorSearch?: VectorSearchParams; // Phase 3: Vector search parameters
   requestId?: string; // For tracking and cancelling requests
+  // Multi-tenancy
+  tenant?: string;
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;
@@ -458,6 +487,7 @@ export interface ExportParams {
   currentObjects?: WeaviateObject[]; // For currentPage scope
   where?: FilterCondition[]; // For filtered scope
   matchMode?: FilterMatchMode;
+  tenant?: string; // For multi-tenant collections
 }
 
 /**
@@ -468,4 +498,5 @@ export interface AggregationParams {
   where?: FilterCondition[];
   matchMode?: FilterMatchMode;
   properties?: string[]; // Limit to specific properties
+  tenant?: string; // For multi-tenant collections
 }

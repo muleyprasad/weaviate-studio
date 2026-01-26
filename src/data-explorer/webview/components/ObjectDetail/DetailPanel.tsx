@@ -216,7 +216,7 @@ export const DetailPanel = React.memo(function DetailPanel({
                       [
                       {vector
                         .slice(0, 5)
-                        .map((v) => v.toFixed(4))
+                        .map((v) => (typeof v === 'number' ? v.toFixed(4) : String(v)))
                         .join(', ')}
                       {vector.length > 5 && `, ... (${vector.length - 5} more)`}]
                     </code>

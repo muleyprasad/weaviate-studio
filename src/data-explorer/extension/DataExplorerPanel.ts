@@ -33,6 +33,7 @@ export class DataExplorerPanel {
   private _exportAbortController: AbortController | undefined;
   private _messageQueue: WebviewMessage[] = [];
   private _isInitializing = false;
+  private _selectedTenant: string | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -232,6 +233,14 @@ export class DataExplorerPanel {
           await this._handleGetSchema();
           break;
 
+        case 'getTenants':
+          await this._handleGetTenants();
+          break;
+
+        case 'setTenant':
+          await this._handleSetTenant(message);
+          break;
+
         case 'getObjectDetail':
           // Validate uuid field
           if (!message.uuid || typeof message.uuid !== 'string') {
@@ -302,14 +311,43 @@ export class DataExplorerPanel {
 
     // Get schema first
     const schema = await this._api.getCollectionSchema(this._collectionName);
+    const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
+
+    // If multi-tenant, get tenants immediately and send everything together
+    if (isMultiTenant) {
+      try {
+        const tenants = await this._api.getTenants(this._collectionName);
+
+        // Send schema and tenants together
+        this.postMessage({
+          command: 'schemaLoaded',
+          schema,
+          collectionName: this._collectionName,
+          isMultiTenant: true,
+          tenants,
+        });
+
+        // Do NOT fetch objects - wait for tenant selection
+        return;
+      } catch (error) {
+        console.error('Error getting tenants:', error);
+        this.postMessage({
+          command: 'error',
+          error: 'Failed to load tenants for multi-tenant collection',
+        });
+        return;
+      }
+    }
+
+    // For non-multi-tenant collections, proceed normally
     this.postMessage({
       command: 'schemaLoaded',
       schema,
       collectionName: this._collectionName,
-      // No requestId for schema - it's not cancellable
+      isMultiTenant: false,
     });
 
-    // Get initial objects
+    // Fetch initial objects for non-multi-tenant collections
     const result = await this._api.fetchObjects({
       collectionName: this._collectionName,
       limit: 20,
@@ -320,7 +358,7 @@ export class DataExplorerPanel {
       command: 'objectsLoaded',
       objects: result.objects,
       total: result.total,
-      // No requestId for initial load - it's not cancellable
+      unfilteredTotal: result.unfilteredTotal,
     });
   }
 
@@ -338,8 +376,22 @@ export class DataExplorerPanel {
     }
 
     try {
+      // Get schema to check multi-tenancy status
+      const schema = await this._api.getCollectionSchema(this._collectionName);
+      const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
+
+      // For multi-tenant collections, ensure a tenant is selected
+      // Silently ignore the request if no tenant is selected - modal will be shown
+      if (isMultiTenant && !this._selectedTenant && !message.tenant) {
+        return;
+      }
+
+      // Use stored tenant if available, otherwise use message tenant
+      const tenantToUse = this._selectedTenant || message.tenant;
+
       const result = await this._api.fetchObjects({
         collectionName: this._collectionName,
+        tenant: tenantToUse,
         limit: message.limit || 20,
         offset: message.offset || 0,
         properties: message.properties,
@@ -353,6 +405,7 @@ export class DataExplorerPanel {
         command: 'objectsLoaded',
         objects: result.objects,
         total: result.total,
+        unfilteredTotal: result.unfilteredTotal,
         requestId: message.requestId, // Echo back request ID
       });
     } catch (error) {
@@ -398,13 +451,95 @@ export class DataExplorerPanel {
       return;
     }
 
-    const object = await this._api.getObjectByUuid(this._collectionName, uuid);
+    const object = await this._api.getObjectByUuid(
+      this._collectionName,
+      uuid,
+      this._selectedTenant
+    );
     this.postMessage({
       command: 'objectDetailLoaded',
       object,
     });
   }
+  /**
+   * Handles get tenants request for multi-tenant collections
+   */
+  private async _handleGetTenants(): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
+      return;
+    }
 
+    try {
+      const schema = await this._api.getCollectionSchema(this._collectionName);
+      const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
+
+      if (!isMultiTenant) {
+        this.postMessage({
+          command: 'tenantsLoaded',
+          tenants: [],
+          isMultiTenant: false,
+        });
+        return;
+      }
+
+      const tenants = await this._api.getTenants(this._collectionName);
+      this.postMessage({
+        command: 'tenantsLoaded',
+        tenants,
+        isMultiTenant: true,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get tenants';
+      console.error('DataExplorerPanel get tenants error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Handles set tenant request - updates the selected tenant and reloads data
+   */
+  private async _handleSetTenant(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
+      return;
+    }
+
+    try {
+      // Store the selected tenant
+      this._selectedTenant = message.tenant;
+
+      // Fetch initial objects with the new tenant
+      const result = await this._api.fetchObjects({
+        collectionName: this._collectionName,
+        tenant: message.tenant,
+      });
+
+      this.postMessage({
+        command: 'tenantChanged',
+        tenant: message.tenant,
+        objects: result.objects,
+        total: result.total,
+        unfilteredTotal: result.unfilteredTotal,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set tenant';
+      console.error('DataExplorerPanel set tenant error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+      });
+    }
+  }
   // =====================================================
   // Phase 5: Aggregation and Export Handlers
   // =====================================================
@@ -479,6 +614,11 @@ export class DataExplorerPanel {
 
       // Ensure collection name is set
       params.collectionName = this._collectionName;
+
+      // Ensure tenant is set if we have a selected tenant
+      if (this._selectedTenant) {
+        params.tenant = this._selectedTenant;
+      }
 
       const exportResult = await this._api.exportObjects(
         params,
