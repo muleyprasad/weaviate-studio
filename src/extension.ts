@@ -1024,8 +1024,67 @@ export function activate(context: vscode.ExtensionContext) {
           `Failed to open backup panel: ${error instanceof Error ? error.message : String(error)}`
         );
       }
-    }),
+    })
+  );
 
+  /**
+   * Creates common alias callbacks for create, update, delete and message handling
+   */
+  function createAliasCallbacks(
+    client: any,
+    treeProvider: WeaviateTreeDataProvider,
+    connectionId: string
+  ) {
+    return {
+      onCreate: async (aliasData: any) => {
+        await client.alias.create({
+          alias: aliasData.alias,
+          collection: aliasData.collection,
+        });
+        await treeProvider.refreshAliases(connectionId, true);
+      },
+      onUpdate: async (aliasData: any) => {
+        await client.alias.update({
+          alias: aliasData.alias,
+          newTargetCollection: aliasData.newTargetCollection,
+        });
+        await treeProvider.refreshAliases(connectionId, true);
+      },
+      onDelete: async (alias: string) => {
+        await client.alias.delete(alias);
+        await treeProvider.refreshAliases(connectionId, true);
+        // Close the panel for this alias
+        AliasPanel.closeForAlias(connectionId, alias);
+      },
+      onMessage: async (message: any, postMessage: any) => {
+        if (message.command === 'fetchAliases') {
+          try {
+            const aliasesResponse = await client.alias.listAll();
+            const aliases: AliasItem[] = aliasesResponse
+              ? (aliasesResponse as any[]).map((aliasObj: any) => ({
+                  alias: aliasObj.alias,
+                  collection: aliasObj.collection,
+                }))
+              : [];
+
+            postMessage({
+              command: 'aliasesData',
+              aliases,
+            });
+
+            await treeProvider.refreshAliases(connectionId);
+          } catch (error) {
+            postMessage({
+              command: 'error',
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      },
+    };
+  }
+
+  context.subscriptions.push(
     // Manage aliases command (create new alias)
     vscode.commands.registerCommand('weaviate.manageAliases', async (item) => {
       if (!item?.connectionId) {
@@ -1048,65 +1107,20 @@ export function activate(context: vscode.ExtensionContext) {
           (key: string) => (collections as any)[key].name
         );
 
+        // Create alias callbacks
+        const callbacks = createAliasCallbacks(client, weaviateTreeDataProvider, item.connectionId);
+
         // Open alias panel in create mode
         const panel = AliasPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           collectionNames,
-          'create', // mode
-          undefined, // aliasToEdit
-          async (aliasData) => {
-            // Create alias
-            await client.alias.create({
-              alias: aliasData.alias,
-              collection: aliasData.collection,
-            });
-            // Refresh aliases in tree view after creation
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (aliasData) => {
-            // Update alias
-            await client.alias.update({
-              alias: aliasData.alias,
-              newTargetCollection: aliasData.newTargetCollection,
-            });
-            // Refresh aliases in tree view after update
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (alias: string) => {
-            // Delete alias
-            await client.alias.delete(alias);
-            // Refresh aliases in tree view after deletion
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (message, postMessage) => {
-            // Handle additional messages
-            if (message.command === 'fetchAliases') {
-              try {
-                // Fetch all aliases
-                const aliasesResponse = await client.alias.listAll();
-                const aliases: AliasItem[] = aliasesResponse
-                  ? (aliasesResponse as any[]).map((aliasObj: any) => ({
-                      alias: aliasObj.alias,
-                      collection: aliasObj.collection,
-                    }))
-                  : [];
-
-                postMessage({
-                  command: 'aliasesData',
-                  aliases,
-                });
-
-                // Refresh aliases in tree view
-                await weaviateTreeDataProvider.refreshAliases(item.connectionId);
-              } catch (error) {
-                postMessage({
-                  command: 'error',
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              }
-            }
-          }
+          'create',
+          undefined,
+          callbacks.onCreate,
+          callbacks.onUpdate,
+          callbacks.onDelete,
+          callbacks.onMessage
         );
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1147,65 +1161,20 @@ export function activate(context: vscode.ExtensionContext) {
 
         const aliasToEdit = aliases.find((a) => a.alias === item.itemId);
 
+        // Create alias callbacks
+        const callbacks = createAliasCallbacks(client, weaviateTreeDataProvider, item.connectionId);
+
         // Open alias panel in edit mode
         const panel = AliasPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           collectionNames,
-          'edit', // mode
-          aliasToEdit, // aliasToEdit
-          async (aliasData) => {
-            // Create alias
-            await client.alias.create({
-              alias: aliasData.alias,
-              collection: aliasData.collection,
-            });
-            // Refresh aliases in tree view after creation
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (aliasData) => {
-            // Update alias
-            await client.alias.update({
-              alias: aliasData.alias,
-              newTargetCollection: aliasData.newTargetCollection,
-            });
-            // Refresh aliases in tree view after update
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (alias: string) => {
-            // Delete alias
-            await client.alias.delete(alias);
-            // Refresh aliases in tree view after deletion
-            await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
-          },
-          async (message, postMessage) => {
-            // Handle additional messages
-            if (message.command === 'fetchAliases') {
-              try {
-                // Fetch all aliases
-                const aliasesResponse = await client.alias.listAll();
-                const aliases: AliasItem[] = aliasesResponse
-                  ? (aliasesResponse as any[]).map((aliasObj: any) => ({
-                      alias: aliasObj.alias,
-                      collection: aliasObj.collection,
-                    }))
-                  : [];
-
-                postMessage({
-                  command: 'aliasesData',
-                  aliases,
-                });
-
-                // Refresh aliases in tree view
-                await weaviateTreeDataProvider.refreshAliases(item.connectionId);
-              } catch (error) {
-                postMessage({
-                  command: 'error',
-                  message: error instanceof Error ? error.message : String(error),
-                });
-              }
-            }
-          }
+          'edit',
+          aliasToEdit,
+          callbacks.onCreate,
+          callbacks.onUpdate,
+          callbacks.onDelete,
+          callbacks.onMessage
         );
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1240,6 +1209,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         await client.alias.delete(item.itemId);
+
+        // Close the alias panel for this alias if it's open
+        AliasPanel.closeForAlias(item.connectionId, item.itemId);
 
         await weaviateTreeDataProvider.refreshAliases(item.connectionId, true);
         vscode.window.showInformationMessage(`Alias "${item.itemId}" deleted successfully`);

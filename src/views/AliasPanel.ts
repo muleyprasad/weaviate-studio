@@ -6,12 +6,12 @@ import type { AliasItem } from '../types';
  * Manages the Alias webview panel
  */
 export class AliasPanel {
-  public static currentPanel: AliasPanel | undefined;
+  private static readonly panels = new Map<string, AliasPanel>();
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
   private readonly _connectionId: string;
-  private readonly _collections: string[];
+  private _collections: string[];
   private _mode: 'create' | 'edit' | 'list';
   private _aliasToEdit?: AliasItem;
 
@@ -54,6 +54,22 @@ export class AliasPanel {
   }
 
   /**
+   * Generates a unique key for this panel
+   */
+  private static _getPanelKey(
+    connectionId: string,
+    mode: 'create' | 'edit' | 'list',
+    aliasName?: string
+  ): string {
+    if (mode === 'create') {
+      return `${connectionId}:create`;
+    } else if (mode === 'edit' && aliasName) {
+      return `${connectionId}:edit:${aliasName}`;
+    }
+    return `${connectionId}:list`;
+  }
+
+  /**
    * Creates or shows the Alias panel
    */
   public static createOrShow(
@@ -71,23 +87,45 @@ export class AliasPanel {
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // If we already have a panel, update it with new data
-    if (AliasPanel.currentPanel) {
-      AliasPanel.currentPanel._panel.reveal(column);
-      AliasPanel.currentPanel._mode = mode;
-      AliasPanel.currentPanel._aliasToEdit = aliasToEdit;
+    const panelKey = AliasPanel._getPanelKey(connectionId, mode, aliasToEdit?.alias);
+
+    // If we already have this specific panel, update it and show it
+    const existingPanel = AliasPanel.panels.get(panelKey);
+    if (existingPanel) {
+      existingPanel._panel.reveal(column);
+      existingPanel._mode = mode;
+      existingPanel._aliasToEdit = aliasToEdit;
+      existingPanel._collections = collections;
+      // Update panel title
+      const title =
+        mode === 'create'
+          ? 'Create Alias'
+          : mode === 'edit' && aliasToEdit
+            ? `Edit Alias: ${aliasToEdit.alias}`
+            : mode === 'edit'
+              ? 'Edit Alias'
+              : 'Manage Aliases';
+      existingPanel._panel.title = title;
+      // Update HTML to ensure clean state
+      existingPanel._update();
       // Send mode change to webview
-      AliasPanel.currentPanel.postMessage({
+      existingPanel.postMessage({
         command: 'setMode',
         mode,
         aliasToEdit,
       });
-      return AliasPanel.currentPanel;
+      return existingPanel;
     }
 
     // Otherwise, create a new panel.
     const title =
-      mode === 'create' ? 'Create Alias' : mode === 'edit' ? 'Edit Alias' : 'Manage Aliases';
+      mode === 'create'
+        ? 'Create Alias'
+        : mode === 'edit' && aliasToEdit
+          ? `Edit Alias: ${aliasToEdit.alias}`
+          : mode === 'edit'
+            ? 'Edit Alias'
+            : 'Manage Aliases';
     const panel = vscode.window.createWebviewPanel(
       'weaviateAlias',
       title,
@@ -107,7 +145,7 @@ export class AliasPanel {
       }
     );
 
-    AliasPanel.currentPanel = new AliasPanel(
+    const aliasPanel = new AliasPanel(
       panel,
       extensionUri,
       connectionId,
@@ -120,7 +158,24 @@ export class AliasPanel {
       onMessageCallback
     );
 
-    return AliasPanel.currentPanel;
+    // Store panel in map
+    AliasPanel.panels.set(panelKey, aliasPanel);
+
+    return aliasPanel;
+  }
+
+  /**
+   * Gets the panel key for this instance
+   */
+  private _getInstancePanelKey(): string {
+    return AliasPanel._getPanelKey(this._connectionId, this._mode, this._aliasToEdit?.alias);
+  }
+
+  /**
+   * Gets the alias being edited
+   */
+  public getAliasToEdit(): AliasItem | undefined {
+    return this._aliasToEdit;
   }
 
   /**
@@ -134,7 +189,9 @@ export class AliasPanel {
    * Disposes the panel
    */
   public dispose(): void {
-    AliasPanel.currentPanel = undefined;
+    // Remove from panels map
+    const panelKey = this._getInstancePanelKey();
+    AliasPanel.panels.delete(panelKey);
 
     // Clean up our resources
     this._panel.dispose();
@@ -144,6 +201,17 @@ export class AliasPanel {
       if (x) {
         x.dispose();
       }
+    }
+  }
+
+  /**
+   * Closes the panel for a specific alias if it exists
+   */
+  public static closeForAlias(connectionId: string, aliasName: string): void {
+    const panelKey = AliasPanel._getPanelKey(connectionId, 'edit', aliasName);
+    const panel = AliasPanel.panels.get(panelKey);
+    if (panel) {
+      panel.dispose();
     }
   }
 
@@ -165,9 +233,28 @@ export class AliasPanel {
       case 'createAlias':
         try {
           await this.onCreateCallback(message.aliasData);
-          this.postMessage({
-            command: 'aliasCreated',
+          // Remove from old key (create mode)
+          const oldKey = this._getInstancePanelKey();
+          AliasPanel.panels.delete(oldKey);
+
+          // Switch to edit mode after successful creation
+          this._mode = 'edit';
+          this._aliasToEdit = {
             alias: message.aliasData.alias,
+            collection: message.aliasData.collection,
+          };
+
+          // Add to map with new key (edit mode)
+          const newKey = this._getInstancePanelKey();
+          AliasPanel.panels.set(newKey, this);
+
+          // Update panel title
+          this._panel.title = `Edit Alias: ${message.aliasData.alias}`;
+          // Notify webview of mode change
+          this.postMessage({
+            command: 'setMode',
+            mode: 'edit',
+            aliasToEdit: this._aliasToEdit,
           });
         } catch (error) {
           this.postMessage({
@@ -193,10 +280,7 @@ export class AliasPanel {
       case 'deleteAlias':
         try {
           await this.onDeleteCallback(message.alias);
-          this.postMessage({
-            command: 'aliasDeleted',
-            alias: message.alias,
-          });
+          // Panel will be disposed by the callback, no need to send message back
         } catch (error) {
           this.postMessage({
             command: 'error',
