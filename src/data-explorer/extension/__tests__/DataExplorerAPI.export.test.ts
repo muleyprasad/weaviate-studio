@@ -3,6 +3,18 @@ import type { WeaviateClient, Collection } from 'weaviate-client';
 import { DataExplorerAPI } from '../DataExplorerAPI';
 import type { ExportParams, WeaviateObject } from '../../types';
 
+// Mock Filters module
+jest.mock('weaviate-client', () => {
+  const actual = jest.requireActual('weaviate-client') as any;
+  return {
+    ...actual,
+    Filters: {
+      and: jest.fn((...filters) => ({ _operator: 'AND', filters })),
+      or: jest.fn((...filters) => ({ _operator: 'OR', filters })),
+    },
+  };
+});
+
 /**
  * Test suite for DataExplorerAPI export functionality
  *
@@ -76,6 +88,25 @@ describe('DataExplorerAPI - Export Functionality', () => {
   ];
 
   beforeEach(() => {
+    // Create default mock iterator
+    const defaultMockIterator = {
+      [Symbol.asyncIterator]: async function* () {
+        const objects = createMockObjects(100);
+        for (const obj of objects) {
+          yield {
+            uuid: obj.uuid,
+            properties: obj.properties,
+            metadata: {
+              creationTime: new Date('2024-01-01'),
+              updateTime: new Date('2024-01-02'),
+            },
+            vectors: {},
+            vector: undefined,
+          };
+        }
+      },
+    };
+
     mockCollection = {
       query: {
         fetchObjects: jest.fn().mockImplementation((options: any) => {
@@ -92,10 +123,16 @@ describe('DataExplorerAPI - Export Functionality', () => {
         overAll: (jest.fn() as any).mockResolvedValue({ totalCount: 100 }),
       },
       filter: {
-        byProperty: jest.fn(() => ({
-          equal: jest.fn(() => ({ _filter: { equal: true } })),
+        byProperty: jest.fn((prop: string) => ({
+          equal: jest.fn((value: any) => ({ _filter: { property: prop, equal: value } })),
+          notEqual: jest.fn((value: any) => ({ _filter: { property: prop, notEqual: value } })),
+          greaterThan: jest.fn((value: any) => ({
+            _filter: { property: prop, greaterThan: value },
+          })),
+          lessThan: jest.fn((value: any) => ({ _filter: { property: prop, lessThan: value } })),
         })),
       },
+      iterator: jest.fn(() => defaultMockIterator),
     } as any;
 
     mockClient = {
@@ -635,18 +672,7 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('exports all objects scope', async () => {
-      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
-        const limit = options?.limit || 100;
-        const offset = options?.offset || 0;
-        const start = offset;
-        if (start >= 100) {
-          return Promise.resolve({ objects: [] });
-        }
-        return Promise.resolve({
-          objects: createMockObjects(limit),
-        });
-      });
-
+      // This test should now verify that iterator is used, not fetchObjects
       const params: ExportParams = {
         collectionName: 'Article',
         format: 'json',
@@ -662,7 +688,9 @@ describe('DataExplorerAPI - Export Functionality', () => {
       const result = await api.exportObjects(params);
 
       expect(result.objectCount).toBe(100);
-      expect(mockCollection.query.fetchObjects).toHaveBeenCalled();
+      // Verify iterator was used instead of fetchObjects
+      expect(mockCollection.iterator).toHaveBeenCalled();
+      expect(mockCollection.query.fetchObjects).not.toHaveBeenCalled();
     });
 
     test('exports filtered scope', async () => {
@@ -689,22 +717,31 @@ describe('DataExplorerAPI - Export Functionality', () => {
 
   describe('Large Dataset Handling', () => {
     test('paginates through large datasets', async () => {
-      let callCount = 0;
-      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
-        const limit = options?.limit || 100;
-        const offset = options?.offset || 0;
-        callCount++;
-        const start = offset || 0;
-        const remaining = Math.max(0, 250 - start);
-        const objectsToReturn = Math.min(limit, remaining);
+      // Mock iterator for large dataset (250 objects)
+      const mockLargeIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          for (let i = 0; i < 250; i++) {
+            yield {
+              uuid: `uuid-${i + 1}`,
+              properties: {
+                title: `Article ${i + 1}`,
+                content: `Content for article ${i + 1}`,
+                count: i + 1,
+              },
+              metadata: {
+                creationTime: new Date('2024-01-01'),
+                updateTime: new Date('2024-01-02'),
+              },
+              vectors: {},
+              vector: undefined,
+            };
+          }
+        },
+      };
 
-        if (remaining === 0) {
-          return Promise.resolve({ objects: [] });
-        }
-
-        return Promise.resolve({
-          objects: createMockObjects(objectsToReturn),
-        });
+      (mockCollection.iterator as any) = jest.fn(() => mockLargeIterator);
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 250,
       });
 
       const params: ExportParams = {
@@ -722,18 +759,32 @@ describe('DataExplorerAPI - Export Functionality', () => {
       const result = await api.exportObjects(params);
 
       expect(result.objectCount).toBe(250);
-      expect(callCount).toBeGreaterThan(2); // Multiple pagination calls
+      expect(mockCollection.iterator).toHaveBeenCalled();
     });
 
     test('truncates at 10,000 objects and sets flag', async () => {
-      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
-        const limit = options?.limit || 100;
-        return Promise.resolve({
-          objects: createMockObjects(limit),
-        });
-      });
+      // Mock large iterator that exceeds limit
+      const mockLargeIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          for (let i = 0; i < 15000; i++) {
+            yield {
+              uuid: `uuid-${i}`,
+              properties: { title: `Article ${i}` },
+              metadata: {
+                creationTime: new Date('2024-01-01'),
+                updateTime: new Date('2024-01-02'),
+              },
+              vectors: {},
+              vector: undefined,
+            };
+          }
+        },
+      };
 
-      (mockCollection.aggregate.overAll.mockResolvedValue as any)({ totalCount: 15000 });
+      (mockCollection.iterator as any) = jest.fn(() => mockLargeIterator);
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 15000,
+      });
 
       const params: ExportParams = {
         collectionName: 'Article',
@@ -756,18 +807,7 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('does not set truncated flag when within limit', async () => {
-      (mockCollection.query.fetchObjects.mockImplementation as any)((options: any) => {
-        const limit = options?.limit || 100;
-        const offset = options?.offset || 0;
-        const start = offset;
-        if (start >= 100) {
-          return Promise.resolve({ objects: [] });
-        }
-        return Promise.resolve({
-          objects: createMockObjects(Math.min(limit, 100 - start)),
-        });
-      });
-
+      // Default mock iterator returns 100 objects (within limit)
       const params: ExportParams = {
         collectionName: 'Article',
         format: 'json',
@@ -812,12 +852,26 @@ describe('DataExplorerAPI - Export Functionality', () => {
     test('cancels export when AbortSignal is triggered during fetch', async () => {
       const abortController = new AbortController();
 
-      (mockCollection.query.fetchObjects.mockImplementation as any)(() => {
-        abortController.abort();
-        return Promise.resolve({
-          objects: createMockObjects(100),
-        });
-      });
+      // Mock iterator that will be aborted
+      const mockAbortIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          abortController.abort();
+          for (let i = 0; i < 100; i++) {
+            yield {
+              uuid: `uuid-${i}`,
+              properties: { title: `Article ${i}` },
+              metadata: {
+                creationTime: new Date('2024-01-01'),
+                updateTime: new Date('2024-01-02'),
+              },
+              vectors: {},
+              vector: undefined,
+            };
+          }
+        },
+      };
+
+      (mockCollection.iterator as any) = jest.fn(() => mockAbortIterator);
 
       const params: ExportParams = {
         collectionName: 'Article',
@@ -979,7 +1033,10 @@ describe('DataExplorerAPI - Export Functionality', () => {
 
   describe('Error Handling', () => {
     test('handles fetch errors gracefully', async () => {
-      mockCollection.query.fetchObjects.mockRejectedValueOnce(new Error('Network error'));
+      // Mock iterator that throws error
+      mockCollection.iterator = jest.fn(() => {
+        throw new Error('Network error');
+      });
 
       const params: ExportParams = {
         collectionName: 'Article',
@@ -997,7 +1054,10 @@ describe('DataExplorerAPI - Export Functionality', () => {
     });
 
     test('handles timeout errors with actionable message', async () => {
-      mockCollection.query.fetchObjects.mockRejectedValueOnce(new Error('Request timed out'));
+      // Mock iterator that throws timeout error
+      mockCollection.iterator = jest.fn(() => {
+        throw new Error('Request timed out');
+      });
 
       const params: ExportParams = {
         collectionName: 'Article',
@@ -1135,6 +1195,242 @@ describe('DataExplorerAPI - Export Functionality', () => {
       const parsed = JSON.parse(result.data);
 
       expect(parsed[0]['level1.level2.level3.level4.value']).toBe('deep value');
+    });
+  });
+
+  describe('Export Scope Methods', () => {
+    test('uses iterator when exporting entire collection (scope: all)', async () => {
+      // Mock iterator
+      const mockIteratorObjects = createMockObjects(50);
+      const mockIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          for (const obj of mockIteratorObjects) {
+            yield {
+              uuid: obj.uuid,
+              properties: obj.properties,
+              metadata: {
+                creationTime: new Date('2024-01-01'),
+                updateTime: new Date('2024-01-02'),
+              },
+              vectors: {},
+              vector: undefined,
+            };
+          }
+        },
+      };
+
+      mockCollection.iterator = jest.fn(() => mockIterator) as any;
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 50,
+      });
+
+      const params: ExportParams = {
+        collectionName: 'Article',
+        format: 'json',
+        scope: 'all',
+        options: {
+          includeMetadata: true,
+          includeProperties: true,
+          includeVectors: false,
+          flattenNested: false,
+        },
+      };
+
+      const result = await api.exportObjects(params);
+
+      // Verify iterator was called with correct options
+      expect(mockCollection.iterator).toHaveBeenCalledWith({
+        includeVector: true,
+        returnMetadata: ['creationTime', 'updateTime'],
+      });
+
+      // Verify result
+      expect(result.objectCount).toBe(50);
+      expect(result.format).toBe('json');
+      expect(result.isTruncated).toBe(false);
+
+      // Verify fetchObjects was NOT called (since we use iterator)
+      expect(mockCollection.query.fetchObjects).not.toHaveBeenCalled();
+    });
+
+    test('calls fetchAllObjects with filters when exporting filtered results', async () => {
+      // Mock fetchObjects to return different results based on filters
+      let fetchObjectsCalls = 0;
+      (mockCollection.query.fetchObjects as any) = jest.fn().mockImplementation((options: any) => {
+        fetchObjectsCalls++;
+        const mockData = createMockObjects(25);
+        return Promise.resolve({
+          objects: mockData,
+        });
+      });
+
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 25,
+      });
+
+      const whereConditions = [
+        { id: '1', path: 'status', operator: 'Equal' as const, value: 'published' },
+        { id: '2', path: 'featured', operator: 'Equal' as const, value: true },
+      ];
+
+      const params: ExportParams = {
+        collectionName: 'Article',
+        format: 'json',
+        scope: 'filtered',
+        where: whereConditions,
+        matchMode: 'AND',
+        options: {
+          includeMetadata: true,
+          includeProperties: true,
+          includeVectors: false,
+          flattenNested: false,
+        },
+      };
+
+      const result = await api.exportObjects(params);
+
+      // Verify fetchObjects was called (pagination through filtered results)
+      expect(mockCollection.query.fetchObjects).toHaveBeenCalled();
+      expect(fetchObjectsCalls).toBeGreaterThan(0);
+
+      // Verify filter was built
+      expect(mockCollection.filter.byProperty).toHaveBeenCalled();
+
+      // Verify result
+      expect(result.objectCount).toBe(25);
+      expect(result.format).toBe('json');
+
+      // Verify iterator was NOT called (since we use fetchAllObjects for filtered)
+      expect(mockCollection.iterator).not.toHaveBeenCalled();
+    });
+
+    test('iterator stops at 10,000 object limit for safety', async () => {
+      // Create a large iterator that would exceed the limit
+      const mockLargeIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          for (let i = 0; i < 15000; i++) {
+            yield {
+              uuid: `uuid-${i}`,
+              properties: { title: `Article ${i}` },
+              metadata: {
+                creationTime: new Date('2024-01-01'),
+                updateTime: new Date('2024-01-02'),
+              },
+              vectors: {},
+              vector: undefined,
+            };
+          }
+        },
+      };
+
+      mockCollection.iterator = jest.fn(() => mockLargeIterator) as any;
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 15000,
+      });
+
+      const params: ExportParams = {
+        collectionName: 'Article',
+        format: 'json',
+        scope: 'all',
+        options: {
+          includeMetadata: false,
+          includeProperties: true,
+          includeVectors: false,
+          flattenNested: false,
+        },
+      };
+
+      const result = await api.exportObjects(params);
+
+      // Verify truncation
+      expect(result.objectCount).toBe(10000);
+      expect(result.isTruncated).toBe(true);
+      expect(result.truncationLimit).toBe(10000);
+      expect(result.totalCount).toBe(15000);
+    });
+
+    test('iterator includes vectors when includeVectors is true', async () => {
+      const mockVectorObjects = [
+        {
+          uuid: 'vec-1',
+          properties: { title: 'Test' },
+          metadata: {
+            creationTime: new Date('2024-01-01'),
+            updateTime: new Date('2024-01-02'),
+          },
+          vectors: { default: [0.1, 0.2, 0.3] },
+          vector: undefined,
+        },
+      ];
+
+      const mockIterator = {
+        [Symbol.asyncIterator]: async function* () {
+          for (const obj of mockVectorObjects) {
+            yield obj;
+          }
+        },
+      };
+
+      mockCollection.iterator = jest.fn(() => mockIterator) as any;
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 1,
+      });
+
+      const params: ExportParams = {
+        collectionName: 'Article',
+        format: 'json',
+        scope: 'all',
+        options: {
+          includeMetadata: true,
+          includeProperties: true,
+          includeVectors: true,
+          flattenNested: false,
+        },
+      };
+
+      const result = await api.exportObjects(params);
+      const parsed = JSON.parse(result.data);
+
+      // Verify vectors are included
+      expect(parsed[0]).toHaveProperty('vectors');
+      expect(parsed[0].vectors).toEqual({ default: [0.1, 0.2, 0.3] });
+    });
+
+    test('applies matchMode OR when exporting filtered results', async () => {
+      (mockCollection.query.fetchObjects as any) = jest.fn().mockImplementation(() => {
+        return Promise.resolve({
+          objects: createMockObjects(10),
+        });
+      });
+
+      (mockCollection.aggregate.overAll as any) = (jest.fn() as any).mockResolvedValue({
+        totalCount: 10,
+      });
+
+      const whereConditions = [
+        { id: '1', path: 'category', operator: 'Equal' as const, value: 'tech' },
+        { id: '2', path: 'category', operator: 'Equal' as const, value: 'science' },
+      ];
+
+      const params: ExportParams = {
+        collectionName: 'Article',
+        format: 'json',
+        scope: 'filtered',
+        where: whereConditions,
+        matchMode: 'OR',
+        options: {
+          includeMetadata: false,
+          includeProperties: true,
+          includeVectors: false,
+          flattenNested: false,
+        },
+      };
+
+      const result = await api.exportObjects(params);
+
+      // Verify filter was built with OR logic
+      expect(mockCollection.filter.byProperty).toHaveBeenCalled();
+      expect(result.objectCount).toBe(10);
     });
   });
 });

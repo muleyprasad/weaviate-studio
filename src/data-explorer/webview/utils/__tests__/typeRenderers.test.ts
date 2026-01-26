@@ -190,24 +190,24 @@ describe('typeRenderers', () => {
   describe('formatUuid', () => {
     it('formats standard UUID', () => {
       const uuid = '123e4567-e89b-12d3-a456-426614174000';
-      expect(formatUuid(uuid)).toBe('123e4567...');
+      expect(formatUuid(uuid)).toBe('123e4567-e89b...');
     });
 
     it('returns short strings unchanged', () => {
       expect(formatUuid('12345')).toBe('12345');
-      expect(formatUuid('12345678')).toBe('12345678');
+      expect(formatUuid('1234567890123')).toBe('1234567890123');
     });
 
     it('handles empty string', () => {
       expect(formatUuid('')).toBe('');
     });
 
-    it('handles exactly 8 characters', () => {
-      expect(formatUuid('12345678')).toBe('12345678');
+    it('handles exactly 13 characters', () => {
+      expect(formatUuid('1234567890123')).toBe('1234567890123');
     });
 
-    it('handles 9 characters', () => {
-      expect(formatUuid('123456789')).toBe('12345678...');
+    it('handles 14 characters', () => {
+      expect(formatUuid('12345678901234')).toBe('1234567890123...');
     });
   });
 
@@ -542,7 +542,7 @@ describe('typeRenderers', () => {
       it('renders UUID', () => {
         const uuid = '123e4567-e89b-12d3-a456-426614174000';
         const result = renderCellValue(uuid);
-        expect(result.displayValue).toBe('123e4567...');
+        expect(result.displayValue).toBe('123e4567-e89b...');
         expect(result.dataType).toBe('uuid');
         expect(result.isExpandable).toBe(false);
       });
