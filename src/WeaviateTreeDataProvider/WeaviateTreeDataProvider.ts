@@ -2734,6 +2734,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
+   * Sorts aliases by alias name, then by collection name
+   * @param aliases - Array of alias items to sort
+   * @returns Sorted array of alias items
+   */
+  private sortAliases(aliases: AliasItem[]): AliasItem[] {
+    return [...aliases].sort((a, b) => {
+      const aliasCompare = a.alias.localeCompare(b.alias);
+      if (aliasCompare !== 0) {
+        return aliasCompare;
+      }
+      return a.collection.localeCompare(b.collection);
+    });
+  }
+
+  /**
    * Fetches aliases and populates the cache
    * @param connectionId - The ID of the connection
    */
