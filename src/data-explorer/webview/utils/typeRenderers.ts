@@ -81,13 +81,13 @@ export function truncateText(text: string, maxLength: number = 100): string {
 }
 
 /**
- * Formats a UUID for display (first 8 chars + ...)
+ * Formats a UUID for display (first 13 chars to show first segment)
  */
 export function formatUuid(uuid: string): string {
-  if (uuid.length <= 8) {
+  if (uuid.length <= 13) {
     return uuid;
   }
-  return uuid.substring(0, 8) + '...';
+  return uuid.substring(0, 13) + '...';
 }
 
 /**

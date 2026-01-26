@@ -4,7 +4,8 @@
  */
 
 import React, { useCallback } from 'react';
-import { useUIState, useUIActions } from '../../context';
+import { useUIState, useUIActions, useDataState } from '../../context';
+import { isSortableColumn, getSortabilityMessage } from '../../utils/sortingUtils';
 
 interface TableHeaderProps {
   onSelectAll: (selected: boolean) => void;
@@ -21,9 +22,23 @@ export function TableHeader({
 }: TableHeaderProps) {
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const dataState = useDataState();
+
+  // Check if a column is sortable based on its data type
+  const isSortable = useCallback(
+    (column: string) => {
+      return isSortableColumn(column, dataState.schema);
+    },
+    [dataState.schema]
+  );
 
   const handleSort = useCallback(
     (column: string) => {
+      // Validate sortability before allowing sort
+      if (!isSortable(column)) {
+        return;
+      }
+
       const currentSort = uiState.sortBy;
 
       if (currentSort?.field === column) {
@@ -38,15 +53,37 @@ export function TableHeader({
         uiActions.setSortBy({ field: column, direction: 'asc' });
       }
     },
-    [uiState.sortBy, uiActions]
+    [uiState.sortBy, uiActions, isSortable]
   );
 
   const getSortIndicator = (column: string) => {
-    if (uiState.sortBy?.field !== column) {
-      return <span className="sort-indicator inactive">↕</span>;
+    const isActive = uiState.sortBy?.field === column;
+    const canSort = isSortable(column);
+
+    // Don't show indicator for non-sortable columns
+    if (!canSort) {
+      return null;
     }
+
+    if (!isActive) {
+      // Show only on hover (controlled by CSS)
+      return (
+        <span className="sort-indicator inactive" aria-hidden="true">
+          ↕
+        </span>
+      );
+    }
+
+    if (!uiState.sortBy) {
+      return null;
+    }
+
     return (
-      <span className="sort-indicator active">
+      <span
+        className="sort-indicator active"
+        role="img"
+        aria-label={`Sorted ${uiState.sortBy.direction}ending`}
+      >
         {uiState.sortBy.direction === 'asc' ? '↑' : '↓'}
       </span>
     );
@@ -58,44 +95,60 @@ export function TableHeader({
     <thead className="data-table-header">
       <tr role="row">
         {/* Data columns */}
-        {displayedColumns.map((column) => (
-          <th
-            key={column}
-            className={`header-cell ${isPinned(column) ? 'pinned' : ''}`}
-            role="columnheader"
-            aria-sort={
-              uiState.sortBy?.field === column
-                ? uiState.sortBy.direction === 'asc'
-                  ? 'ascending'
-                  : 'descending'
-                : 'none'
-            }
-            style={{
-              width: uiState.columnWidths[column] ? `${uiState.columnWidths[column]}px` : undefined,
-            }}
-          >
-            <button
-              className="header-button"
-              onClick={() => handleSort(column)}
-              title={`Sort by ${column}`}
-              aria-label={`Sort by ${column}`}
+        {displayedColumns.map((column) => {
+          const canSort = isSortable(column);
+          const sortabilityMsg = getSortabilityMessage(column, dataState.schema);
+
+          const isSorted = uiState.sortBy?.field === column;
+
+          return (
+            <th
+              key={column}
+              className={`header-cell ${isPinned(column) ? 'pinned' : ''}`}
+              role="columnheader"
+              aria-sort={
+                isSorted && uiState.sortBy
+                  ? uiState.sortBy.direction === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none'
+              }
+              style={{
+                width: uiState.columnWidths[column]
+                  ? `${uiState.columnWidths[column]}px`
+                  : undefined,
+                backgroundColor: 'transparent',
+                borderBottom: isSorted
+                  ? '3px solid var(--vscode-textLink-foreground, #3794ff)'
+                  : '2px solid var(--vscode-panel-border, #333)',
+              }}
             >
-              <span className="header-label">
-                {isPinned(column) && (
-                  <span className="pin-icon" title="Pinned column">
-                    📌
-                  </span>
-                )}
-                {column === 'uuid' ? '_id' : column}
-              </span>
-              {getSortIndicator(column)}
-            </button>
-          </th>
-        ))}
+              <button
+                className={`header-button ${!canSort ? 'non-sortable' : ''}`}
+                onClick={() => handleSort(column)}
+                disabled={!canSort}
+                title={canSort ? `Sort by ${column}` : sortabilityMsg || 'Cannot sort this column'}
+                aria-label={canSort ? `Sort by ${column}` : `${column} - ${sortabilityMsg}`}
+              >
+                <span className="header-label">
+                  {isPinned(column) && (
+                    <span className="pin-icon" title="Pinned column">
+                      📌
+                    </span>
+                  )}
+                  {column === 'uuid' ? 'ID' : column}
+                </span>
+                {getSortIndicator(column)}
+              </button>
+            </th>
+          );
+        })}
 
         {/* Actions column */}
-        <th className="header-cell actions-cell" role="columnheader" aria-label="Actions">
-          ACTIONS
+        <th className="header-cell actions-cell" role="columnheader">
+          <div className="actions-header" aria-label="Actions">
+            <span className="codicon codicon-gear" aria-hidden="true"></span>
+          </div>
         </th>
       </tr>
     </thead>

@@ -3,6 +3,18 @@
  * VS Code theme-aware styling for the Data Explorer webview
  */
 
+/* ===== Codicon Font ===== */
+.codicon {
+    font-family: codicon;
+    font-style: normal;
+    font-weight: normal;
+    font-size: inherit;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    display: inline-block;
+}
+
 /* ===== Layout ===== */
 .data-explorer {
     display: flex;
@@ -220,20 +232,21 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--vscode-foreground);
-    background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
+    background-color: transparent;
     white-space: nowrap;
     border-bottom: 2px solid var(--vscode-panel-border, #333);
     vertical-align: middle;
     box-sizing: border-box;
 }
 
-.header-cell.checkbox-cell {
-    width: 48px;
-    min-width: 48px;
-    max-width: 48px;
-    text-align: center;
-    padding: 8px 8px;
+/* Ensure sorted columns remain readable - NO blue background */
+.header-cell[aria-sort="ascending"],
+.header-cell[aria-sort="descending"] {
+    background-color: transparent;
+    border-bottom: 3px solid var(--vscode-textLink-foreground, #3794ff);
 }
+
+/* Removed - checkboxes not needed */
 
 .header-cell.actions-cell {
     width: 100px;
@@ -243,12 +256,7 @@
     padding: 8px 12px;
 }
 
-.header-cell.checkbox-cell input[type="checkbox"] {
-    cursor: pointer;
-    width: 16px;
-    height: 16px;
-    margin: 0;
-}
+/* Removed - checkboxes not needed */
 
 .header-cell.pinned {
     position: sticky;
@@ -262,30 +270,67 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    background: none;
+    background: transparent !important;
     border: none;
-    color: inherit;
+    color: var(--vscode-foreground);
     font: inherit;
     cursor: pointer;
     padding: 4px 6px;
     margin: -4px -6px;
     width: calc(100% + 12px);
     border-radius: 4px;
-    transition: background-color 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .header-button:hover {
-    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+    background-color: transparent !important;
+    text-decoration: underline;
+    text-decoration-color: var(--vscode-textLink-foreground, #3794ff);
+    text-underline-offset: 4px;
+}
+
+.header-button:focus {
+    background-color: transparent !important;
+}
+
+.header-button:active {
+    background-color: transparent !important;
+}
+
+.header-button:hover .header-label {
+    /* Keep text color the same for readability */
+    color: var(--vscode-foreground);
+}
+
+.header-button:focus-visible {
+    outline: 2px solid var(--vscode-focusBorder, #007ACC);
+    outline-offset: 2px;
 }
 
 .header-button:hover .sort-indicator {
     opacity: 1;
 }
 
+/* Non-sortable columns styling */
+.header-button.non-sortable {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.header-button.non-sortable:hover {
+    background-color: transparent;
+}
+
+.header-button.non-sortable .sort-indicator {
+    display: none;
+}
+
 .header-label {
     display: flex;
     align-items: center;
     gap: 4px;
+    color: inherit;
+    font-weight: 500;
 }
 
 .pin-icon {
@@ -298,11 +343,26 @@
 }
 
 .sort-indicator.inactive {
-    opacity: 0.3;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.header-button:hover .sort-indicator.inactive {
+    opacity: 0.5;
 }
 
 .sort-indicator.active {
+    opacity: 1;
     color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+/* Actions column header */
+.actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-descriptionForeground);
+    font-size: 14px;
 }
 
 /* ===== Table Body ===== */
@@ -339,20 +399,7 @@
     box-sizing: border-box;
 }
 
-.data-cell.checkbox-cell {
-    width: 48px;
-    min-width: 48px;
-    max-width: 48px;
-    text-align: center;
-    padding: 10px 8px;
-}
-
-.data-cell.checkbox-cell input[type="checkbox"] {
-    cursor: pointer;
-    width: 16px;
-    height: 16px;
-    margin: 0;
-}
+/* Removed - checkboxes not needed */
 
 .data-cell.actions-cell {
     width: 100px;
@@ -450,14 +497,35 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 2px 4px;
-    font-size: 12px;
-    opacity: 0.6;
-    transition: opacity 0.15s ease;
+    padding: 4px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+    border-radius: 3px;
+    color: var(--vscode-foreground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
 }
 
 .cell-action-btn:hover {
     opacity: 1;
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* Show copy button on UUID cell hover */
+.cell-uuid:hover .uuid-copy-btn {
+    opacity: 0.7;
+}
+
+.cell-uuid .uuid-copy-btn:hover {
+    opacity: 1 !important;
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+.cell-uuid .uuid-copy-btn svg {
+    color: var(--vscode-descriptionForeground, #888);
 }
 
 .cell-expanded-content {
@@ -494,12 +562,22 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 6px 8px;
-    font-size: 14px;
+    padding: 6px;
+    font-size: 16px;
     opacity: 0.7;
     transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
     border-radius: 4px;
     color: var(--vscode-foreground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+}
+
+.row-action-btn .codicon {
+    font-size: 16px;
+    display: inline-block;
 }
 
 .row-action-btn:hover {
