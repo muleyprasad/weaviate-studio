@@ -232,6 +232,14 @@ export class DataExplorerPanel {
           await this._handleGetSchema();
           break;
 
+        case 'getTenants':
+          await this._handleGetTenants();
+          break;
+
+        case 'setTenant':
+          await this._handleSetTenant(message);
+          break;
+
         case 'getObjectDetail':
           // Validate uuid field
           if (!message.uuid || typeof message.uuid !== 'string') {
@@ -341,6 +349,7 @@ export class DataExplorerPanel {
     try {
       const result = await this._api.fetchObjects({
         collectionName: this._collectionName,
+        tenant: message.tenant,
         limit: message.limit || 20,
         offset: message.offset || 0,
         properties: message.properties,
@@ -406,7 +415,82 @@ export class DataExplorerPanel {
       object,
     });
   }
+  /**
+   * Handles get tenants request for multi-tenant collections
+   */
+  private async _handleGetTenants(): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
+      return;
+    }
 
+    try {
+      const schema = await this._api.getCollectionSchema(this._collectionName);
+      const isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
+
+      if (!isMultiTenant) {
+        this.postMessage({
+          command: 'tenantsLoaded',
+          tenants: [],
+          isMultiTenant: false,
+        });
+        return;
+      }
+
+      const tenants = await this._api.getTenants(this._collectionName);
+      this.postMessage({
+        command: 'tenantsLoaded',
+        tenants,
+        isMultiTenant: true,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get tenants';
+      console.error('DataExplorerPanel get tenants error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Handles set tenant request - updates the selected tenant and reloads data
+   */
+  private async _handleSetTenant(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+      });
+      return;
+    }
+
+    try {
+      // Fetch initial objects with the new tenant
+      const result = await this._api.fetchObjects({
+        collectionName: this._collectionName,
+        tenant: message.tenant,
+      });
+
+      this.postMessage({
+        command: 'tenantChanged',
+        tenant: message.tenant,
+        objects: result.objects,
+        total: result.total,
+        unfilteredTotal: result.unfilteredTotal,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set tenant';
+      console.error('DataExplorerPanel set tenant error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+      });
+    }
+  }
   // =====================================================
   // Phase 5: Aggregation and Export Handlers
   // =====================================================

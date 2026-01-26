@@ -79,6 +79,41 @@ export function useDataFetch() {
               previousCollectionRef.current = message.collectionName;
               dataActions.setCollection(message.collectionName);
               dataActions.setSchema(message.schema);
+
+              // Check if multi-tenant and request tenants
+              const isMultiTenant = !!(message.schema.multiTenancy as any)?.enabled;
+              if (isMultiTenant) {
+                postMessage({ command: 'getTenants' });
+              } else {
+                dataActions.setTenants([], false);
+              }
+            }
+            break;
+
+          case 'tenantsLoaded':
+            if (message.tenants !== undefined && message.isMultiTenant !== undefined) {
+              dataActions.setTenants(message.tenants, message.isMultiTenant);
+
+              // If multi-tenant and no tenant selected yet, stop here
+              // User needs to select a tenant before loading data
+              if (
+                message.isMultiTenant &&
+                message.tenants.length > 0 &&
+                !dataState.selectedTenant
+              ) {
+                dataActions.setLoading(false);
+                // Modal will be shown by the UI component
+                return;
+              }
+            }
+            break;
+
+          case 'tenantChanged':
+            if (message.tenant !== undefined) {
+              dataActions.setSelectedTenant(message.tenant);
+              if (message.objects && message.total !== undefined) {
+                dataActions.setData(message.objects, message.total, message.unfilteredTotal);
+              }
             }
             break;
 
@@ -141,6 +176,7 @@ export function useDataFetch() {
       postMessage({
         command: 'fetchObjects',
         collectionName: dataState.collectionName,
+        tenant: dataState.selectedTenant || undefined,
         limit: pageSize,
         offset,
         sortBy,
@@ -152,6 +188,7 @@ export function useDataFetch() {
     [
       postMessage,
       dataState.collectionName,
+      dataState.selectedTenant,
       dataActions,
       filterState.activeFilters,
       filterState.matchMode,

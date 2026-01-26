@@ -129,18 +129,21 @@ export class DataExplorerAPI {
    */
   async fetchObjects(params: FetchObjectsParams): Promise<FetchObjectsResponse> {
     try {
-      const collection = this.client.collections.get(params.collectionName);
+      // Get collection - use tenant-aware method if tenant is specified
+      const collection = params.tenant
+        ? this.client.collections.use(params.collectionName).withTenant(params.tenant)
+        : this.client.collections.get(params.collectionName);
 
       // Build common query options using Weaviate types
       const baseOptions: WeaviateQueryOptions = {
-        limit: params.limit,
+        limit: params.limit ?? 20,
         returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'],
         includeVector: true,
       };
 
       // Add offset for non-vector search queries (vector search uses limit only)
       if (!params.vectorSearch || params.vectorSearch.type === 'none') {
-        baseOptions.offset = params.offset;
+        baseOptions.offset = params.offset ?? 0;
       }
 
       // Add properties if specified
@@ -670,6 +673,29 @@ export class DataExplorerAPI {
       }
       throw new Error(
         `Failed to get count for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Gets the list of tenants for a multi-tenant collection
+   */
+  async getTenants(
+    collectionName: string
+  ): Promise<Array<{ name: string; activityStatus?: string }>> {
+    try {
+      const collection = this.client.collections.use(collectionName);
+      const tenants = await collection.tenants.get();
+
+      // Transform tenants object to array
+      return Object.entries(tenants).map(([name, info]: [string, any]) => ({
+        name,
+        activityStatus: info.activityStatus,
+      }));
+    } catch (error) {
+      console.error('Error getting tenants:', error);
+      throw new Error(
+        `Failed to get tenants for collection "${collectionName}": ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

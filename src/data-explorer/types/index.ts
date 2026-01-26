@@ -58,6 +58,12 @@ export interface WeaviateObjectMetadata {
   explainScore?: string | HybridExplainScoreDetails; // Can be string or structured object
 }
 
+// Tenant information
+export interface TenantInfo {
+  name: string;
+  activityStatus?: string; // Can be ACTIVE, INACTIVE, HOT, COLD, FROZEN, UNFROZEN
+}
+
 // Collection schema types
 export interface CollectionConfig {
   name: string;
@@ -113,6 +119,11 @@ export interface DataExplorerState {
   // Collection
   collectionName: string;
   schema: CollectionConfig | null;
+
+  // Multi-tenancy
+  availableTenants: TenantInfo[];
+  selectedTenant: string | null;
+  isMultiTenant: boolean;
 
   // Data
   objects: WeaviateObject[];
@@ -210,8 +221,9 @@ export interface VectorSearchParams {
 // Fetch params for API
 export interface FetchObjectsParams {
   collectionName: string;
-  limit: number;
-  offset: number;
+  tenant?: string; // For multi-tenant collections
+  limit?: number;
+  offset?: number;
   properties?: string[];
   sortBy?: SortState;
   where?: FilterCondition[]; // Phase 2: Filter support
@@ -236,6 +248,9 @@ export type ExtensionMessageCommand =
   | 'updateData'
   | 'refresh'
   | 'connectionStatus' // Connection state updates
+  // Multi-tenancy
+  | 'tenantsLoaded'
+  | 'tenantChanged'
   // Phase 5: Aggregations and Export
   | 'aggregationsLoaded'
   | 'exportComplete'
@@ -248,6 +263,9 @@ export type WebviewMessageCommand =
   | 'getSchema'
   | 'getObjectDetail'
   | 'refresh'
+  // Multi-tenancy
+  | 'getTenants'
+  | 'setTenant'
   // Phase 5: Aggregations and Export
   | 'getAggregations'
   | 'exportObjects'
@@ -267,6 +285,10 @@ export interface ExtensionMessage {
   // Connection status
   status?: 'connecting' | 'connected' | 'disconnected';
   message?: string;
+  // Multi-tenancy
+  tenants?: TenantInfo[];
+  tenant?: string;
+  isMultiTenant?: boolean;
   // Phase 5: Aggregations and Export
   aggregations?: AggregationResult;
   exportResult?: ExportResult;
@@ -289,6 +311,8 @@ export interface WebviewMessage {
   matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
   vectorSearch?: VectorSearchParams; // Phase 3: Vector search parameters
   requestId?: string; // For tracking and cancelling requests
+  // Multi-tenancy
+  tenant?: string;
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;

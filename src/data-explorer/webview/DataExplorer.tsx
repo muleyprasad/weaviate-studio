@@ -24,6 +24,7 @@ import { VectorSearchPanel } from './components/VectorSearch';
 import { ExportDialog, ExportButton } from './components/Export';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KeyboardShortcutsHelp } from './components/common';
+import { TenantSelector, TenantSelectionModal } from './components/TenantSelector';
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
 import { useDataExplorerShortcuts } from './hooks/useKeyboardShortcuts';
@@ -179,6 +180,9 @@ function DataExplorerContent() {
           </div>
         </div>
         <div className="header-right">
+          {/* Tenant selector for multi-tenant collections */}
+          <TenantSelector />
+
           {/* Vector Search button */}
           <button
             type="button"
@@ -303,6 +307,9 @@ function DataExplorerContent() {
         where={filterState.activeFilters}
         matchMode={filterState.matchMode}
       />
+
+      {/* Tenant selection modal for multi-tenant collections */}
+      <TenantSelectionModal />
     </div>
   );
 }
