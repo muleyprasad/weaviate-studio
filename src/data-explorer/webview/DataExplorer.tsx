@@ -297,8 +297,11 @@ function DataExplorerContent() {
         currentPageCount={dataState.objects.length}
         filteredCount={dataState.totalCount}
         totalCount={dataState.totalCount}
+        unfilteredTotalCount={dataState.unfilteredTotalCount}
         currentObjects={dataState.objects}
         hasFilters={filterState.activeFilters.length > 0}
+        where={filterState.activeFilters}
+        matchMode={filterState.matchMode}
       />
     </div>
   );

@@ -28,7 +28,7 @@
  * - Aggregations return null: Enables partial results for mixed property types
  */
 
-import type { WeaviateClient, Collection } from 'weaviate-client';
+import type { WeaviateClient, Collection, Vectors } from 'weaviate-client';
 import { Filters } from 'weaviate-client';
 import type {
   WeaviateObject,
@@ -135,6 +135,7 @@ export class DataExplorerAPI {
       const baseOptions: WeaviateQueryOptions = {
         limit: params.limit,
         returnMetadata: ['creationTime', 'updateTime', 'distance', 'certainty'],
+        includeVector: true,
       };
 
       // Add offset for non-vector search queries (vector search uses limit only)
@@ -180,6 +181,7 @@ export class DataExplorerAPI {
             distance?: number;
             certainty?: number;
           };
+          vector?: number[];
           vectors?: Record<string, number[]>;
         }) => ({
           uuid: obj.uuid,
@@ -191,11 +193,14 @@ export class DataExplorerAPI {
             distance: obj.metadata?.distance,
             certainty: obj.metadata?.certainty,
           },
+          vector: obj.vector,
+          vectors: obj.vectors,
         })
       );
 
       // Get total count using cached aggregate (with filter consideration)
       let total = 0;
+      let unfilteredTotal: number | undefined = undefined;
       const hasFilters = params.where && params.where.length > 0;
       const cacheKey = hasFilters
         ? `${params.collectionName}:filtered:${JSON.stringify(params.where)}:${params.matchMode || 'AND'}`
@@ -242,7 +247,32 @@ export class DataExplorerAPI {
         }
       }
 
-      return { objects, total };
+      // Get unfiltered total count when filters are active
+      if (hasFilters) {
+        const unfilteredCacheKey = params.collectionName;
+        const unfilteredCached = this.countCache.get(unfilteredCacheKey);
+
+        if (unfilteredCached && now - unfilteredCached.timestamp < this.CACHE_TTL) {
+          // Use cached unfiltered count
+          unfilteredTotal = unfilteredCached.count;
+        } else {
+          // Fetch fresh unfiltered count
+          try {
+            const aggregateResult = await collection.aggregate.overAll();
+            unfilteredTotal = aggregateResult.totalCount ?? total;
+            this.countCache.set(unfilteredCacheKey, { count: unfilteredTotal, timestamp: now });
+          } catch (aggregateError) {
+            console.warn('Failed to get unfiltered aggregate count:', aggregateError);
+            // Use cached value if available
+            if (unfilteredCached) {
+              unfilteredTotal = unfilteredCached.count;
+            }
+            // If no cache, don't set unfilteredTotal (will be undefined)
+          }
+        }
+      }
+
+      return { objects, total, unfilteredTotal };
     } catch (error) {
       console.error('Error fetching objects from collection:', {
         collection: params.collectionName,
@@ -604,15 +634,6 @@ export class DataExplorerAPI {
         throw new Error(`Object with UUID ${uuid} not found`);
       }
 
-      // Handle vector types - could be number[] or number[][]
-      let vector: number[] | undefined;
-      if (obj.vectors?.default) {
-        const defaultVector = obj.vectors.default;
-        if (Array.isArray(defaultVector) && typeof defaultVector[0] === 'number') {
-          vector = defaultVector as number[];
-        }
-      }
-
       return {
         uuid: obj.uuid,
         properties: this._validateProperties(obj.properties),
@@ -621,8 +642,8 @@ export class DataExplorerAPI {
           creationTime: obj.metadata?.creationTime?.toISOString(),
           lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
         },
-        vector,
-        vectors: undefined, // Skip named vectors for now
+        vector: (obj as any).vector,
+        vectors: obj.vectors,
       };
     } catch (error) {
       console.error('Error fetching object by UUID:', error);
@@ -1132,13 +1153,8 @@ export class DataExplorerAPI {
           break;
 
         case 'all':
-          // Fetch all objects from collection
-          const allResult = await this.fetchAllObjects(
-            params.collectionName,
-            undefined,
-            undefined,
-            signal
-          );
+          // Use collection.iterator() for entire collection - more efficient for large datasets
+          const allResult = await this.fetchAllObjectsWithIterator(params.collectionName, signal);
           objects = allResult.objects;
           isTruncated = allResult.isTruncated;
           totalCount = allResult.totalCount;
@@ -1244,6 +1260,72 @@ export class DataExplorerAPI {
   }
 
   /**
+   * Fetches all objects from a collection using iterator (more efficient for entire collections)
+   * Uses collection.iterator() which is optimized for scanning entire collections
+   * Returns objects and truncation info
+   */
+  private async fetchAllObjectsWithIterator(
+    collectionName: string,
+    signal?: AbortSignal
+  ): Promise<{ objects: WeaviateObject[]; isTruncated: boolean; totalCount?: number }> {
+    const allObjects: WeaviateObject[] = [];
+    const maxObjects = 10000; // Safety limit
+    let isTruncated = false;
+    let totalCount: number | undefined;
+
+    try {
+      const collection = this.client.collections.get(collectionName);
+
+      // Get total count first
+      try {
+        const aggregateResult = await collection.aggregate.overAll();
+        totalCount = aggregateResult.totalCount ?? 0;
+      } catch (aggregateError) {
+        console.warn('Failed to get total count:', aggregateError);
+      }
+
+      // Use iterator for efficient scanning
+      const iterator = collection.iterator({
+        includeVector: true,
+        returnMetadata: ['creationTime', 'updateTime'],
+      });
+
+      for await (const obj of iterator) {
+        // Check if export was cancelled
+        if (signal?.aborted) {
+          throw new Error('Export cancelled');
+        }
+
+        // Check safety limit
+        if (allObjects.length >= maxObjects) {
+          isTruncated = true;
+          break;
+        }
+
+        allObjects.push({
+          uuid: obj.uuid,
+          properties: this._validateProperties(obj.properties),
+          metadata: {
+            uuid: obj.uuid,
+            creationTime: obj.metadata?.creationTime?.toISOString(),
+            lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
+          },
+          vector: (obj as any).vector,
+          vectors: obj.vectors,
+        });
+      }
+
+      return { objects: allObjects, isTruncated, totalCount };
+    } catch (error) {
+      if (signal?.aborted || (error instanceof Error && error.message === 'Export cancelled')) {
+        throw new Error('Export cancelled');
+      }
+      console.error('Error fetching objects with iterator:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Converts objects to JSON format
    */
   private toJSON(objects: WeaviateObject[], options: ExportOptions): string {
@@ -1271,11 +1353,13 @@ export class DataExplorerAPI {
       }
 
       // Add vectors if requested
-      if (options.includeVectors && obj.vector) {
-        result.vector = obj.vector;
-      }
-      if (options.includeVectors && obj.vectors) {
-        result.vectors = obj.vectors;
+      if (options.includeVectors) {
+        if (obj.vector) {
+          result.vector = obj.vector;
+        }
+        if (obj.vectors) {
+          result.vectors = obj.vectors;
+        }
       }
 
       return result;

@@ -84,7 +84,7 @@ export function useDataFetch() {
 
           case 'objectsLoaded':
             if (message.objects && message.total !== undefined) {
-              dataActions.setData(message.objects, message.total);
+              dataActions.setData(message.objects, message.total, message.unfilteredTotal);
             }
             break;
 

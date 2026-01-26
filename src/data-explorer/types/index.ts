@@ -3,13 +3,15 @@
  * Defines interfaces for state management, API responses, and UI components
  */
 
+import type { Vectors } from 'weaviate-client';
+
 // Weaviate object structure
 export interface WeaviateObject {
   uuid: string;
   properties: Record<string, unknown>;
   metadata?: WeaviateObjectMetadata;
   vector?: number[];
-  vectors?: Record<string, number[]>;
+  vectors?: Vectors;
 }
 
 export interface HybridExplainScoreDetails {
@@ -115,6 +117,7 @@ export interface DataExplorerState {
   // Data
   objects: WeaviateObject[];
   totalCount: number;
+  unfilteredTotalCount: number; // Total count without filters applied
   loading: boolean;
   error: string | null;
 
@@ -220,6 +223,7 @@ export interface FetchObjectsParams {
 export interface FetchObjectsResponse {
   objects: WeaviateObject[];
   total: number;
+  unfilteredTotal?: number; // Total count without filters (only set when filters are active)
 }
 
 // Message types for extension <-> webview communication
@@ -258,6 +262,7 @@ export interface ExtensionMessage {
   schema?: CollectionConfig;
   object?: WeaviateObject;
   total?: number;
+  unfilteredTotal?: number; // Total count without filters
   requestId?: string; // Match with request ID
   // Connection status
   status?: 'connecting' | 'connected' | 'disconnected';

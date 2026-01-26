@@ -22,6 +22,7 @@ export interface DataContextState {
   schema: CollectionConfig | null;
   objects: WeaviateObject[];
   totalCount: number;
+  unfilteredTotalCount: number;
   loading: boolean;
   error: string | null;
 }
@@ -33,7 +34,7 @@ export interface DataContextState {
 type DataAction =
   | { type: 'SET_COLLECTION'; collectionName: string }
   | { type: 'SET_SCHEMA'; schema: CollectionConfig }
-  | { type: 'SET_DATA'; objects: WeaviateObject[]; total: number }
+  | { type: 'SET_DATA'; objects: WeaviateObject[]; total: number; unfilteredTotal?: number }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'CLEAR_ERROR' }
@@ -48,6 +49,7 @@ const initialState: DataContextState = {
   schema: null,
   objects: [],
   totalCount: 0,
+  unfilteredTotalCount: 0,
   loading: false,
   error: null,
 };
@@ -60,6 +62,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         collectionName: action.collectionName,
         objects: [],
         totalCount: 0,
+        unfilteredTotalCount: 0,
         schema: null,
         error: null,
       };
@@ -75,6 +78,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         ...state,
         objects: action.objects,
         totalCount: action.total,
+        unfilteredTotalCount: action.unfilteredTotal ?? action.total,
         loading: false,
         error: null,
       };
@@ -117,7 +121,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
 export interface DataContextActions {
   setCollection: (collectionName: string) => void;
   setSchema: (schema: CollectionConfig) => void;
-  setData: (objects: WeaviateObject[], total: number) => void;
+  setData: (objects: WeaviateObject[], total: number, unfilteredTotal?: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -161,8 +165,8 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
         dispatch({ type: 'SET_SCHEMA', schema });
       },
 
-      setData: (objects: WeaviateObject[], total: number) => {
-        dispatch({ type: 'SET_DATA', objects, total });
+      setData: (objects: WeaviateObject[], total: number, unfilteredTotal?: number) => {
+        dispatch({ type: 'SET_DATA', objects, total, unfilteredTotal });
       },
 
       setLoading: (loading: boolean) => {

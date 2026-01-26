@@ -320,6 +320,7 @@ export class DataExplorerPanel {
       command: 'objectsLoaded',
       objects: result.objects,
       total: result.total,
+      unfilteredTotal: result.unfilteredTotal,
       // No requestId for initial load - it's not cancellable
     });
   }
@@ -353,6 +354,7 @@ export class DataExplorerPanel {
         command: 'objectsLoaded',
         objects: result.objects,
         total: result.total,
+        unfilteredTotal: result.unfilteredTotal,
         requestId: message.requestId, // Echo back request ID
       });
     } catch (error) {
