@@ -1044,24 +1044,33 @@ export function activate(context: vscode.ExtensionContext) {
   ) {
     return {
       onCreate: async (aliasData: AliasCreateData) => {
-        await client.alias.create({
-          alias: aliasData.alias,
-          collection: aliasData.collection,
-        });
-        await treeProvider.refreshAliases(connectionId, true);
+        try {
+          await client.alias.create({
+            alias: aliasData.alias,
+            collection: aliasData.collection,
+          });
+        } finally {
+          await treeProvider.refreshAliases(connectionId, true);
+        }
       },
       onUpdate: async (aliasData: AliasUpdateData) => {
-        await client.alias.update({
-          alias: aliasData.alias,
-          newTargetCollection: aliasData.newTargetCollection,
-        });
-        await treeProvider.refreshAliases(connectionId, true);
+        try {
+          await client.alias.update({
+            alias: aliasData.alias,
+            newTargetCollection: aliasData.newTargetCollection,
+          });
+        } finally {
+          await treeProvider.refreshAliases(connectionId, true);
+        }
       },
       onDelete: async (alias: string) => {
-        await client.alias.delete(alias);
-        await treeProvider.refreshAliases(connectionId, true);
-        // Close the panel for this alias
-        AliasPanel.closeForAlias(connectionId, alias);
+        try {
+          await client.alias.delete(alias);
+        } finally {
+          await treeProvider.refreshAliases(connectionId, true);
+          // Close the panel for this alias
+          AliasPanel.closeForAlias(connectionId, alias);
+        }
       },
       onMessage: async (message: any, postMessage: any) => {
         if (message.command === 'fetchAliases') {
