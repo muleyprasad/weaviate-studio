@@ -25,6 +25,8 @@ export function useDataFetch() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
+  const initialFetchDoneRef = useRef(false); // Track if initial fetch completed
+  const skipNextFetchRef = useRef(true); // Skip the first triggered fetch after init
   const currentRequestIdRef = useRef<string | null>(null); // Track current request ID
   const previousCollectionRef = useRef<string | null>(null); // Track collection changes
 
@@ -125,6 +127,8 @@ export function useDataFetch() {
           case 'objectsLoaded':
             if (message.objects && message.total !== undefined) {
               dataActions.setData(message.objects, message.total, message.unfilteredTotal);
+              // Mark initial fetch as done to prevent duplicate fetches
+              initialFetchDoneRef.current = true;
             }
             break;
 
@@ -261,21 +265,25 @@ export function useDataFetch() {
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {
-    if (initializedRef.current && dataState.collectionName) {
-      // Debounce page changes
-      const timeoutId = setTimeout(() => {
-        if (fetchObjectsRef.current) {
-          fetchObjectsRef.current(
-            uiState.currentPage,
-            uiState.pageSize,
-            uiState.sortBy || undefined
-          );
-        }
-      }, 100);
-
-      return () => clearTimeout(timeoutId);
+    // Skip if not initialized yet or if initial fetch hasn't completed
+    if (!initializedRef.current || !initialFetchDoneRef.current || !dataState.collectionName) {
+      return undefined;
     }
-    return undefined;
+
+    // Skip the first run after initialization (it's a duplicate)
+    if (skipNextFetchRef.current) {
+      skipNextFetchRef.current = false;
+      return undefined;
+    }
+
+    // Debounce page changes
+    const timeoutId = setTimeout(() => {
+      if (fetchObjectsRef.current) {
+        fetchObjectsRef.current(uiState.currentPage, uiState.pageSize, uiState.sortBy || undefined);
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [
     uiState.currentPage,
     uiState.pageSize,

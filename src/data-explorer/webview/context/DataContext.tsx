@@ -61,7 +61,7 @@ const initialState: DataContextState = {
   objects: [],
   totalCount: 0,
   unfilteredTotalCount: 0,
-  loading: false,
+  loading: true,
   error: null,
 };
 

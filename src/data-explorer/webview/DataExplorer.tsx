@@ -234,11 +234,9 @@ function DataExplorerContent() {
           {/* Keyboard shortcuts help - with visible icon */}
           <KeyboardShortcutsHelp />
 
-          {!isLoading && (
-            <span className="object-count-badge">
-              {dataState.totalCount.toLocaleString()} objects
-            </span>
-          )}
+          <span className="object-count-badge">
+            {isLoading ? '...' : dataState.totalCount.toLocaleString()} objects
+          </span>
         </div>
       </header>
 
