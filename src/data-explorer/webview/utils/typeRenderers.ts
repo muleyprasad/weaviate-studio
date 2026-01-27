@@ -81,7 +81,18 @@ export function truncateText(text: string, maxLength: number = 100): string {
 }
 
 /**
- * Formats a UUID for display (first 13 chars to show first segment)
+ * Formats a UUID by truncating it for display
+ *
+ * Uses 13 characters to show the first two segments of a standard UUID
+ * (e.g., "123e4567-e89b..." from "123e4567-e89b-12d3-a456-426614174000")
+ *
+ * This provides enough context for visual identification while saving space:
+ * - First segment (8 chars): Primary identification
+ * - Hyphen (1 char): Visual separator
+ * - Second segment start (4 chars): Additional context
+ *
+ * @param uuid - The UUID string to format
+ * @returns Truncated UUID with ellipsis if longer than 13 characters
  */
 export function formatUuid(uuid: string): string {
   if (uuid.length <= 13) {

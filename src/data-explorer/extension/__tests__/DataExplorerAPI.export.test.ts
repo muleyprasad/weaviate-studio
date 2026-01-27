@@ -671,8 +671,8 @@ describe('DataExplorerAPI - Export Functionality', () => {
       expect(mockCollection.query.fetchObjects).not.toHaveBeenCalled();
     });
 
-    test('exports all objects scope', async () => {
-      // This test should now verify that iterator is used, not fetchObjects
+    test('uses iterator for entire collection export (scope: all)', async () => {
+      // Verify that collection.iterator() is used for efficient scanning of entire collections
       const params: ExportParams = {
         collectionName: 'Article',
         format: 'json',
@@ -716,7 +716,7 @@ describe('DataExplorerAPI - Export Functionality', () => {
   });
 
   describe('Large Dataset Handling', () => {
-    test('paginates through large datasets', async () => {
+    test('processes large datasets using iterator (250 objects)', async () => {
       // Mock iterator for large dataset (250 objects)
       const mockLargeIterator = {
         [Symbol.asyncIterator]: async function* () {
