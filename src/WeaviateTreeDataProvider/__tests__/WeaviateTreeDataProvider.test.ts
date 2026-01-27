@@ -991,6 +991,9 @@ describe('WeaviateTreeDataProvider', () => {
       expect(fireEventSpy).toHaveBeenCalledTimes(3);
 
       fireEventSpy.mockRestore();
+    });
+  });
+
   describe('sortAliases', () => {
     it('should sort aliases alphabetically by alias name', () => {
       const aliases = [
