@@ -93,7 +93,19 @@ describe('Add Collection', () => {
     capturedOnMessage = undefined;
     postMessageSpy = jest.fn();
 
-    provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(mockCtx);
+    // Garante que getClient sempre retorna um mock completo e tipado como any
+    mockConnectionManager.getClient.mockImplementation((): any => ({
+      // @ts-expect-error
+      alias: { listAll: jest.fn().mockResolvedValue([] as any) },
+      // @ts-expect-error
+      getMeta: jest.fn().mockResolvedValue({} as any),
+      // @ts-expect-error
+      cluster: { nodes: jest.fn().mockResolvedValue({ nodes: [] as any }) },
+    }));
+
+    provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(
+      mockCtx as any
+    );
 
     // Mock fetchCollectionsData to prevent real network calls
     jest.spyOn(provider, 'fetchCollectionsData').mockResolvedValue();
@@ -160,7 +172,7 @@ describe('Add Collection', () => {
     it('handles getCollections message', async () => {
       // Mock collections data
       (provider as any).collections = {
-        conn1: [{ label: 'Collection1' }, { label: 'Collection2' }],
+        conn1: [{ label: 'Collection1' }, { label: 'Collection2' }] as any[],
       };
 
       await capturedOnMessage!({ command: 'getCollections' }, postMessageSpy);
@@ -264,7 +276,7 @@ describe('Add Collection', () => {
               properties: [{ name: 'title', dataType: ['text'] }],
             },
           },
-        ],
+        ] as any[],
       };
 
       // Re-render clone view and capture clone handlers
@@ -315,7 +327,7 @@ describe('Add Collection', () => {
               properties: [{ name: 'title', dataType: ['text'] }],
             },
           },
-        ],
+        ] as any[],
       };
 
       // Navigate to clone view and trigger clone
