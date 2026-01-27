@@ -304,7 +304,9 @@ function NodeComponent({
                 .sort((a, b) => {
                   // First sort by collection name
                   const collectionCompare = a.class.localeCompare(b.class);
-                  if (collectionCompare !== 0) return collectionCompare;
+                  if (collectionCompare !== 0) {
+                    return collectionCompare;
+                  }
                   // Then sort by shard name
                   return a.name.localeCompare(b.name);
                 })

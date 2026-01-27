@@ -2,7 +2,7 @@
   "name": "weaviate-studio",
   "displayName": "Weaviate Studio",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
   "publisher": "prasadmuley",
@@ -110,6 +110,30 @@
         "command": "weaviate.refreshBackups",
         "title": "Refresh Backups",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "weaviate.manageAliases",
+        "title": "Create Alias",
+        "category": "Weaviate",
+        "icon": "$(add)"
+      },
+      {
+        "command": "weaviate.editAlias",
+        "title": "Edit Alias",
+        "category": "Weaviate",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "weaviate.refreshAliases",
+        "title": "Refresh Aliases",
+        "category": "Weaviate",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "weaviate.deleteAlias",
+        "title": "Delete Alias",
+        "category": "Weaviate",
+        "icon": "$(trash)"
       },
       {
         "command": "weaviate.refreshCollections",
@@ -326,6 +350,26 @@
           "group": "inline@2"
         },
         {
+          "command": "weaviate.refreshAliases",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliases",
+          "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.manageAliases",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliases",
+          "group": "navigation@2"
+        },
+        {
+          "command": "weaviate.refreshAliases",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliases",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.manageAliases",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliases",
+          "group": "inline@2"
+        },
+        {
           "command": "weaviate.refreshCollections",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "navigation@1"
@@ -425,6 +469,26 @@
           "when": "view == weaviateConnectionsView && viewItem == weaviateBackupInProgress",
           "group": "inline@1",
           "icon": "$(close)"
+        },
+        {
+          "command": "weaviate.editAlias",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliasItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.deleteAlias",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliasItem",
+          "group": "inline@2"
+        },
+        {
+          "command": "weaviate.editAlias",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliasItem",
+          "group": "1_alias_actions@1"
+        },
+        {
+          "command": "weaviate.deleteAlias",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateAliasItem",
+          "group": "1_alias_actions@2"
         }
       ]
     }

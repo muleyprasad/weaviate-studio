@@ -36,11 +36,12 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ## Top Features
 
 - **Multiple Connections:** Manage several Weaviate instances at once
-- **Schema Explorer:** Visualize and browse collections, properties, and relationships
-- **Advanced Query Editor:** Monaco-powered GraphQL editor with auto-complete and validation
+- **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
+- **Cluster Management:** Comprehensive cluster information panel with health monitoring
+- **Schema Explorer:** Visualize and browse collections, properties, and nested object structures
+- **Advanced Query Editor:** Monaco-powered GraphQL editor with intelligent, schema-aware templates
 - **Live Results:** Table and JSON views for query results
-- **Comprehensive Templates:** Built-in, schema-aware GraphQL templates for all major operations
-- **Secure Storage:** Credentials stored with VS Code’s secret storage
+- **Secure Storage:** Credentials stored with VS Code's secret storage
 - **Modern UI:** Responsive, dark-theme optimized interface
 
 ---
@@ -57,7 +58,7 @@ docker-compose up -d
 python3 populate.py
 ```
 
-This spins up a fully-configured Weaviate instance with sample jeopardy questions and vector embeddings. [Learn more →](sandbox/readme.md)
+This spins up a fully-configured Weaviate instance with sample jeopardy questions, vector embeddings, and backup support enabled. [Learn more →](sandbox/readme.md)
 
 ### Connecting to Weaviate
 
@@ -92,23 +93,44 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 
 - Monaco Editor with full GraphQL syntax support
 - Auto-completion and context-aware suggestions
-- Schema-aware query generation
+- Intelligent, schema-aware query generation that adapts to your collection schema
+- Dynamic query templates with auto-populated properties and accurate vector dimensions
 - Real-time validation and error highlighting
-- Enhanced query templates for all major Weaviate operations
+- Enhanced query templates for all major Weaviate operations with comprehensive error handling
 - Reference field support and type-safe generation
 
 ### Schema Management
 
 - Browse collections and their properties
 - View detailed schema information, data types, and relationships
-- Support for cross-references and nested object structures
-- Visual representation of your data model
+- Support for cross-references and nested object structures with recursive navigation
+- Visual property type icons (text, number, boolean, date, object, geo coordinates, phone, blob)
+- Visual representation of your data model with hierarchical nested property display
 - Create collections via three paths: From scratch, Copy from existing, or Import from JSON schema
+
+### Cluster Management
+
+- Comprehensive Cluster Information Panel with real-time monitoring
+- Auto-opens on connection by default (configurable)
+- "Save and Connect" workflow for streamlined connection setup
+- Cluster health and status monitoring
+- Node information and statistics
+
+### Backup & Restore
+
+- Create backups with real-time progress tracking
+- Monitor backup status (in-progress, success, failed)
+- Restore backups from any available backend
+- Retry failed backups or cancel in-progress operations
+- Multi-backend support: filesystem, S3, GCS, Azure
+- Automatic detection of available backup modules
+- Advanced configuration: include/exclude collections, custom paths
+- Independent refresh controls for backups, collections, nodes, and metadata
 
 ### Tree View
 
-- Connection-level: Server info, cluster health, modules, collections overview
-- Collection-level: Properties, vectors (with count), inverted index, generative config, statistics, sharding, replication, multi‑tenancy
+- Connection-level: Cluster information panel, backups, modules, collections overview
+- Collection-level: Properties (with nested object support), vectors (with count), inverted index, generative config, statistics, sharding, replication, multi‑tenancy
 
 ### Schema Analysis
 
@@ -124,7 +146,11 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 
 - Core: Basic Get, Vector Search, Semantic Search, Hybrid Search
 - Advanced: Filter, Aggregation, Relationship, Sort, Explore
-- Schema-aware, type-safe, and educational templates
+- Intelligent, schema-aware templates that dynamically adapt to your collection's actual schema
+- Auto-populated properties based on data types (primitives, geo coordinates, references)
+- Support for 15+ popular embedding models with automatic dimension detection
+- Comprehensive error handling with graceful fallback system
+- Visual decision tree and troubleshooting guide for 41 common mistakes
 
 See the GraphQL Templates Guide for detailed usage, examples, and best practices: [docs/GRAPHQL_TEMPLATES.md](docs/GRAPHQL_TEMPLATES.md)
 
