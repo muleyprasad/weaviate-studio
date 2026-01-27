@@ -31,6 +31,16 @@ export function FilterPanel({ isOpen, properties }: FilterPanelProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, actions]);
 
+  // Auto-add a default filter when panel opens with no filters
+  useEffect(() => {
+    if (isOpen && pendingFilters.length === 0 && properties.length > 0) {
+      const defaultProperty = properties[0]?.name || '';
+      const defaultDataType = properties[0]?.dataType?.[0] || 'text';
+      const newFilter = createEmptyFilter(defaultProperty, defaultDataType);
+      actions.addPendingFilter(newFilter);
+    }
+  }, [isOpen, pendingFilters.length, properties, actions]);
+
   // Add new filter
   const handleAddFilter = useCallback(() => {
     const defaultProperty = properties[0]?.name || '';

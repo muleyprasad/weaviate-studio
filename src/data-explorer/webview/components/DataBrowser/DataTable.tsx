@@ -227,22 +227,10 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
 
   return (
     <div className="data-table-container">
-      {/* Loading overlay for filter transitions */}
-      {isLoading && dataState.objects.length > 0 && (
-        <div
-          className="data-table-loading-overlay"
-          role="status"
-          aria-label="Loading filtered results"
-        >
-          <div className="loading-spinner" />
-          <span className="loading-text">Applying filters...</span>
-        </div>
-      )}
-
       {/* Table */}
       <div
         ref={tableBodyRef}
-        className={`data-table-wrapper ${isLoading && dataState.objects.length > 0 ? 'loading' : ''}`}
+        className="data-table-wrapper"
         role="grid"
         aria-label="Data table"
         aria-rowcount={dataState.objects.length}
