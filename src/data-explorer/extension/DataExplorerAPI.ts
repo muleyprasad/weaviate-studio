@@ -650,6 +650,15 @@ export class DataExplorerAPI {
         throw new Error(`Object with UUID ${uuid} not found`);
       }
 
+      // Extract default vector from vectors if available
+      let defaultVector: number[] | undefined;
+      if (obj.vectors?.default) {
+        const vecData = obj.vectors.default;
+        if (Array.isArray(vecData) && vecData.length > 0 && typeof vecData[0] === 'number') {
+          defaultVector = vecData as number[];
+        }
+      }
+
       return {
         uuid: obj.uuid,
         properties: this._validateProperties(obj.properties),
@@ -658,7 +667,7 @@ export class DataExplorerAPI {
           creationTime: obj.metadata?.creationTime?.toISOString(),
           lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
         },
-        vector: obj.vector as number[] | undefined,
+        vector: defaultVector,
         vectors: obj.vectors,
       };
     } catch (error) {
@@ -1356,6 +1365,15 @@ export class DataExplorerAPI {
           break;
         }
 
+        // Extract default vector from vectors if available
+        let defaultVector: number[] | undefined;
+        if (obj.vectors?.default) {
+          const vecData = obj.vectors.default;
+          if (Array.isArray(vecData) && vecData.length > 0 && typeof vecData[0] === 'number') {
+            defaultVector = vecData as number[];
+          }
+        }
+
         allObjects.push({
           uuid: obj.uuid,
           properties: this._validateProperties(obj.properties),
@@ -1364,7 +1382,7 @@ export class DataExplorerAPI {
             creationTime: obj.metadata?.creationTime?.toISOString(),
             lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
           },
-          vector: obj.vector as number[] | undefined,
+          vector: defaultVector,
           vectors: obj.vectors,
         });
       }
