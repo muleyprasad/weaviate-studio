@@ -528,8 +528,11 @@ export class DataExplorerAPI {
           return filterBuilder.lessOrEqual(this.coerceValue(value, valueType) as number | Date);
 
         case 'Like':
-          // Like uses wildcard patterns - wrap with * for "contains" behavior
-          return filterBuilder.like(`*${String(value)}*`);
+          // Like uses wildcard patterns - if user provides wildcards, use as-is; otherwise wrap for "contains" behavior
+          const likeValue = String(value);
+          const hasWildcard = likeValue.includes('*') || likeValue.includes('?');
+          const pattern = hasWildcard ? likeValue : `*${likeValue}*`;
+          return filterBuilder.like(pattern);
 
         case 'ContainsAny':
           // ContainsAny expects an array
