@@ -651,41 +651,42 @@ function ClusterPanelWebview() {
     });
   }, []);
 
-  const handleNodeSelect = (nodeName: string) => {
-    setSelectedNodeName(nodeName === selectedNodeName ? null : nodeName);
-    setSelectedShardName(null); // Reset shard selection when changing nodes
-  };
+  const handleNodeSelect = useCallback((nodeName: string) => {
+    setSelectedNodeName((prev) => (prev === nodeName ? null : nodeName));
+    setSelectedShardName(null);
+  }, []);
 
-  const handleShardSelect = (shardName: string) => {
-    setSelectedShardName(shardName === selectedShardName ? null : shardName);
-  };
+  const handleShardSelect = useCallback((shardName: string) => {
+    setSelectedShardName((prev) => (prev === shardName ? null : shardName));
+  }, []);
 
-  const handleCollectionSelect = (collectionName: string) => {
-    setSelectedCollectionName(collectionName === selectedCollectionName ? null : collectionName);
-    setSelectedNodeName(null); // Reset node selection when changing collections
-    setSelectedShardName(null); // Reset shard selection when changing collections
-  };
+  const handleCollectionSelect = useCallback((collectionName: string) => {
+    setSelectedCollectionName((prev) => (prev === collectionName ? null : collectionName));
+    setSelectedNodeName(null);
+    setSelectedShardName(null);
+  }, []);
 
-  const handleToggleAutoOpen = () => {
-    const newValue = !openClusterViewOnConnect;
-    setOpenClusterViewOnConnect(newValue);
-    vscode.postMessage({
-      command: 'toggleAutoOpen',
-      value: newValue,
+  const handleToggleAutoOpen = useCallback(() => {
+    setOpenClusterViewOnConnect((prev) => {
+      const newValue = !prev;
+      vscode.postMessage({
+        command: 'toggleAutoOpen',
+        value: newValue,
+      });
+      return newValue;
     });
-  };
+  }, []);
 
-  const handleAutoRefreshChange = (interval: 'off' | '5s' | '10s' | '30s') => {
+  const handleAutoRefreshChange = useCallback((interval: 'off' | '5s' | '10s' | '30s') => {
     console.log('Auto-refresh interval changed to:', interval);
     setAutoRefreshInterval(interval);
     setShowAutoRefreshMenu(false);
-  };
+  }, []);
 
-  const toggleAutoRefreshMenu = (event: React.MouseEvent) => {
+  const toggleAutoRefreshMenu = useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
-    console.log('Dropdown clicked, current state:', showAutoRefreshMenu);
-    setShowAutoRefreshMenu(!showAutoRefreshMenu);
-  };
+    setShowAutoRefreshMenu((prev) => !prev);
+  }, []);
 
   const getAutoRefreshLabel = () => {
     if (autoRefreshInterval === 'off') return 'Off';
