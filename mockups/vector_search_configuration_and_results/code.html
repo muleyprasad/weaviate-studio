@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vector Search Configuration and Results</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3399ff",
+                        "background-light": "#ffffff",
+                        "background-dark": "#1f1f1f",
+                        "panel-dark": "#2d2d2d",
+                        "border-dark": "#3d3d3d",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        /* Custom scrollbar for VS Code feel */
+        ::-webkit-scrollbar {
+            width: 10px;
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3d3d3d;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4d4d4d;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between border-b border-border-dark px-6 py-2 h-14 bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-4">
+<div class="text-primary">
+<svg fill="none" height="24" viewbox="0 0 48 48" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.57829 8.57829C5.52816 11.6284 3.451 15.5145 2.60947 19.7452C1.76794 23.9758 2.19984 28.361 3.85056 32.3462C5.50128 36.3314 8.29667 39.7376 11.8832 42.134C15.4698 44.5305 19.6865 45.8096 24 45.8096C28.3135 45.8096 32.5302 44.5305 36.1168 42.134C39.7033 39.7375 42.4987 36.3314 44.1494 32.3462C45.8002 28.361 46.2321 23.9758 45.3905 19.7452C44.549 15.5145 42.4718 11.6284 39.4217 8.57829L24 24L8.57829 8.57829Z" fill="currentColor"></path>
+</svg>
+</div>
+<h1 class="text-lg font-bold tracking-tight">Weaviate Studio</h1>
+<div class="h-4 w-px bg-border-dark mx-2"></div>
+<nav class="flex gap-4">
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Collections</a>
+<a class="text-sm font-bold text-primary border-b-2 border-primary pb-1 mt-1" href="#">Query</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Schema</a>
+</nav>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 hover:bg-panel-dark rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">notifications</span>
+</button>
+<button class="p-2 hover:bg-panel-dark rounded-lg transition-colors">
+<span class="material-symbols-outlined text-xl">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50">
+<span class="material-symbols-outlined text-lg text-primary">person</span>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex flex-1 overflow-hidden">
+<!-- Left Sidebar: Configuration -->
+<aside class="w-[380px] border-r border-border-dark bg-background-light dark:bg-background-dark flex flex-col">
+<!-- Breadcrumbs in sidebar for context -->
+<div class="px-6 py-4 flex items-center gap-2 text-sm text-gray-500">
+<span class="material-symbols-outlined text-sm">database</span>
+<span>Articles</span>
+<span class="text-xs">/</span>
+<span class="text-gray-200">Vector Search</span>
+</div>
+<!-- Tabs -->
+<div class="px-6 border-b border-border-dark">
+<div class="flex gap-6">
+<button class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-300">Text</button>
+<button class="pb-3 text-sm font-bold text-primary border-b-2 border-primary">Similar Object</button>
+<button class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-300">Vector</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-8">
+<!-- Select Reference Object Section -->
+<section>
+<h3 class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Reference Object</h3>
+<div class="bg-panel-dark p-4 rounded-lg border border-border-dark group hover:border-primary/50 transition-all">
+<div class="flex justify-between items-start mb-3">
+<div>
+<p class="text-xs font-mono text-primary mb-1">abc-123-def-456</p>
+<p class="text-base font-bold leading-tight">AI Advances in Healthcare</p>
+</div>
+<span class="material-symbols-outlined text-gray-500 group-hover:text-primary transition-colors">info</span>
+</div>
+<div class="w-full h-24 bg-background-dark rounded border border-border-dark mb-3 overflow-hidden">
+<div class="w-full h-full opacity-40 bg-cover bg-center" data-alt="Microscopic view of medical data structures" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBTUCpR2k7CKK2AyCU0KmHN2H5DgZBigicGQ0Qdm2h5wCL01ZftTwoaPXDs9LQF9OJR8WZiPMBYExdhvJ273J9W-nUg0ewmIPtvcloFlRov9h0GcH62EbnvHxMoteepzYPj0UsZquNXuravYRMlCrqZcDWx_s6DGatR9sgO2Tigjs8n_cf1XefP4BT6dIUDp_snnKTTdKkRknWnN-PnO1fez1_6qN8uc6WKDCJBBDOk3NSugWeCJetE6JfjjTpbhEoTnWEL0WPJnECB')"></div>
+</div>
+<button class="w-full py-2 bg-background-dark hover:bg-border-dark text-xs font-bold rounded border border-border-dark transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">swap_horiz</span>
+                            Change Object
+                        </button>
+</div>
+</section>
+<!-- Configuration Controls -->
+<section class="space-y-6">
+<!-- Distance Metric -->
+<div class="space-y-3">
+<label class="text-xs font-bold uppercase tracking-wider text-gray-400">Distance Metric</label>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 px-3 text-xs font-bold bg-primary text-white rounded border border-primary">Euclidean</button>
+<button class="py-2 px-3 text-xs font-bold bg-background-dark text-gray-400 rounded border border-border-dark hover:border-gray-500">Cosine</button>
+<button class="py-2 px-3 text-xs font-bold bg-background-dark text-gray-400 rounded border border-border-dark hover:border-gray-500">Manhattan</button>
+<button class="py-2 px-3 text-xs font-bold bg-background-dark text-gray-400 rounded border border-border-dark hover:border-gray-500">Dot Product</button>
+</div>
+</div>
+<!-- Max Distance Slider -->
+<div class="space-y-3">
+<div class="flex justify-between items-end">
+<label class="text-xs font-bold uppercase tracking-wider text-gray-400">Max Distance</label>
+<span class="text-lg font-mono font-bold text-primary">0.50</span>
+</div>
+<input class="w-full h-1.5 bg-border-dark rounded-full appearance-none cursor-pointer accent-primary" max="2" min="0" step="0.1" type="range" value="0.5"/>
+<div class="flex justify-between text-[10px] text-gray-500 font-mono">
+<span>0.0</span>
+<span>1.0</span>
+<span>2.0</span>
+</div>
+</div>
+<!-- Limit -->
+<div class="space-y-3">
+<label class="text-xs font-bold uppercase tracking-wider text-gray-400">Result Limit</label>
+<div class="relative">
+<select class="w-full bg-background-dark border-border-dark text-sm rounded-lg py-2.5 px-4 appearance-none focus:ring-1 focus:ring-primary focus:border-primary">
+<option>Top 10 results</option>
+<option selected="">Top 25 results</option>
+<option>Top 50 results</option>
+<option>Top 100 results</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-2.5 pointer-events-none text-gray-500">expand_more</span>
+</div>
+</div>
+</section>
+<div class="pt-4">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all">
+<span class="material-symbols-outlined">search</span>
+                        Run Vector Search
+                    </button>
+</div>
+</div>
+</aside>
+<!-- Right Panel: Search Results -->
+<section class="flex-1 bg-background-dark p-8 overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h2 class="text-2xl font-bold">Search Results</h2>
+<p class="text-sm text-gray-500">Found 3 objects within distance threshold 0.5</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-panel-dark rounded border border-border-dark">
+<span class="material-symbols-outlined text-xl">view_list</span>
+</button>
+<button class="p-2 bg-panel-dark rounded border border-primary/50">
+<span class="material-symbols-outlined text-xl text-primary">grid_view</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<!-- Result Card 1 -->
+<div class="bg-panel-dark border border-border-dark p-6 rounded-xl hover:border-primary/50 transition-all group">
+<div class="flex gap-6">
+<div class="w-32 h-32 rounded-lg bg-background-dark flex-shrink-0 border border-border-dark overflow-hidden">
+<div class="w-full h-full bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="Microscope lens and laboratory glassware" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBPgiPEP375WkrDE9nSizhXKZsL95jB5x_cQ0tQtQJiYwuXRkavxjKnd91IZKi2wE_yNMGYtZ6DtaXOwusDtHa9vZSKcFmf8WQ0xrVjlGC4cCQ5FaKkECXvj_4ID0dIT9Cn2pVVtM8eIBV7TvzjzNfUefpij_BN4wd42_fX0wEYNjfFXUy94YpZ0yNqR3k-yPd2UST0CLn-s9AasbC32cfkvcjTdN5qyCVkQckoVgyeA5rQYMEiN0l2Qeeu7eCqecUfqidOgviaWgxb')"></div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-xl font-bold text-white group-hover:text-primary transition-colors">Machine Learning in Diagnostics</h3>
+<div class="text-right">
+<p class="text-xs font-mono text-gray-500">Distance</p>
+<p class="text-lg font-mono font-bold text-white">0.12</p>
+</div>
+</div>
+<p class="text-sm text-gray-400 line-clamp-2 mb-4 leading-relaxed">
+                                        Exploring the efficacy of supervised learning models in identifying early-stage anomalies within high-resolution medical imaging datasets.
+                                    </p>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-1.5 bg-background-dark rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[95%]"></div>
+</div>
+<span class="text-xs font-bold text-primary">95% Match</span>
+</div>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                                            View Object
+                                        </button>
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">share</span>
+                                            Find Similar
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Result Card 2 -->
+<div class="bg-panel-dark border border-border-dark p-6 rounded-xl hover:border-primary/50 transition-all group">
+<div class="flex gap-6">
+<div class="w-32 h-32 rounded-lg bg-background-dark flex-shrink-0 border border-border-dark overflow-hidden">
+<div class="w-full h-full bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="Abstract digital charts and graphs" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCjqwnchDkLPzxW9cwrCcqBz4RYNAt4mA4Gx6X6-SWMdzP4DVaONL1nnaGUYTjNpt37WQWOWfxlDy07kmeDW0CpGT9HUBRZJqHmOfNS2xitB73ix0aCNyQeXmRVYr2ttaHdeRht-F9X7QHBoqMI--C07AchN-Cv-muY1bUuLO23r4-tZ-XXkLgGDsde7amy1HQcFC_y9i-VhvmKK2p-ckAxR5PNivYOkpr4vQ5wLPZVE_xpU0SDcstAY27Mu9iJdJ3wnFrSs9LK_xjW')"></div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-xl font-bold text-white group-hover:text-primary transition-colors">Digital Health Trends 2024</h3>
+<div class="text-right">
+<p class="text-xs font-mono text-gray-500">Distance</p>
+<p class="text-lg font-mono font-bold text-white">0.28</p>
+</div>
+</div>
+<p class="text-sm text-gray-400 line-clamp-2 mb-4 leading-relaxed">
+                                        Annual report on the integration of AI agents in patient management systems and the shift towards decentralized healthcare protocols.
+                                    </p>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-1.5 bg-background-dark rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[88%]"></div>
+</div>
+<span class="text-xs font-bold text-primary">88% Match</span>
+</div>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                                            View Object
+                                        </button>
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">share</span>
+                                            Find Similar
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Result Card 3 -->
+<div class="bg-panel-dark border border-border-dark p-6 rounded-xl hover:border-primary/50 transition-all group">
+<div class="flex gap-6">
+<div class="w-32 h-32 rounded-lg bg-background-dark flex-shrink-0 border border-border-dark overflow-hidden">
+<div class="w-full h-full bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="Neural network brain visualization" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCSJzK9Pfss0_RDwIyTgGsgHGi5y583NFg_BzkjbTD5_tmquCtO3VvQY6BOiTTxltHN5yTwp5zfV-hUPwYIcis9Gd0SdA8dHawGhNZylg87M7A13EY1F88HRAXdiEOg5Pv7kADOMiJNbCfAUQ-VzFWxHCt0lF0eYVrhjiXROPOkTZ_fq5uT3PPIRqWq173hULwWl8Y7vOer5-3WoIwys77PH-7BWkSyiYrwSF2nejfSC-Y7sKWyuGrz3Ewvmqio7aEZ-ck5beLfdgHb')"></div>
+</div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-xl font-bold text-white group-hover:text-primary transition-colors">Neural Networks for MRI</h3>
+<div class="text-right">
+<p class="text-xs font-mono text-gray-500">Distance</p>
+<p class="text-lg font-mono font-bold text-white">0.41</p>
+</div>
+</div>
+<p class="text-sm text-gray-400 line-clamp-2 mb-4 leading-relaxed">
+                                        A deep dive into convolutional architectures designed specifically for volumetric MRI reconstruction and noise reduction.
+                                    </p>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-1.5 bg-background-dark rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+<span class="text-xs font-bold text-primary">82% Match</span>
+</div>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                                            View Object
+                                        </button>
+<button class="text-xs font-bold px-4 py-1.5 bg-background-dark hover:bg-border-dark border border-border-dark rounded flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-sm">share</span>
+                                            Find Similar
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Status -->
+<div class="mt-8 pt-8 border-t border-border-dark flex justify-between items-center text-xs text-gray-500 font-mono">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> System Ready</span>
+<span>Latency: 42ms</span>
+</div>
+<div>
+                        Page 1 of 1 (3 items total)
+                    </div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

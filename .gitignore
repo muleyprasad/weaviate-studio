@@ -6,3 +6,4 @@ node_modules
 coverage
 .DS_Store
 .weaviate-samples/
+firebase-debug.log

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Weaviate Studio - Hybrid Search Configuration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#5346e7",
+                        "secondary": "#3B82F6",
+                        "background-light": "#fafafa",
+                        "background-dark": "#151619",
+                        "panel-dark": "#1c1d21",
+                        "border-dark": "#32343d",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "sans": ["Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #32343d;
+            border-radius: 10px;
+        }
+        .alpha-gradient {
+            background: linear-gradient(90deg, #3B82F6 0%, #5346e7 100%);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-200 antialiased overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- Sidebar Navigation -->
+<aside class="w-16 flex flex-col items-center py-4 bg-[#0d0e11] border-r border-border-dark">
+<div class="mb-8">
+<div class="size-10 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-2xl">database</span>
+</div>
+</div>
+<nav class="flex flex-col gap-6">
+<button class="text-primary"><span class="material-symbols-outlined">search</span></button>
+<button class="text-slate-500 hover:text-white"><span class="material-symbols-outlined">schema</span></button>
+<button class="text-slate-500 hover:text-white"><span class="material-symbols-outlined">analytics</span></button>
+<button class="text-slate-500 hover:text-white"><span class="material-symbols-outlined">settings</span></button>
+</nav>
+<div class="mt-auto">
+<div class="size-8 rounded-full bg-slate-700 overflow-hidden" data-alt="user avatar" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBHa5vq6T06YoisUIL9yz4FyiZ6ODH71pLmct92wjyqzAYmnwrN8lpw2yF4VnHdYiVzP445eTh4fZaMI3cW5vqu6xdrt9Uuz9CmqD_NQRTHjUeeY_inH_TVNyJLJQqdycIxJJMBkXl_hKo3sbzW6f1QPXZBFOX48zFtiqCERGVNNSfZ5bMcRdn10_wBEjrpFRc4WVsKF6S1o1y-IKpCYcgObRBFGAxqPvJWBHrJ1pjeb1Bsr-VVIp6XlY1LrISAiZr9RcAa0ImlFDWc')"></div>
+</div>
+</aside>
+<!-- Main Layout Container -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Top Navigation Bar -->
+<header class="h-14 flex items-center justify-between px-6 bg-background-light dark:bg-background-dark border-b border-border-dark">
+<div class="flex items-center gap-3">
+<h2 class="font-display font-bold text-lg tracking-tight uppercase">Hybrid Search Configuration</h2>
+<span class="px-2 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest">v1.23.0</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-6 mr-6">
+<a class="text-primary text-sm font-medium" href="#">Query</a>
+<a class="text-slate-400 text-sm font-medium hover:text-white" href="#">Results</a>
+<a class="text-slate-400 text-sm font-medium hover:text-white" href="#">Metrics</a>
+</div>
+<button class="flex h-9 items-center justify-center rounded bg-primary px-4 text-white text-sm font-bold tracking-wide hover:bg-primary/90 transition-colors">
+<span>Run Search</span>
+</button>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Configuration Panel -->
+<section class="w-[380px] bg-panel-dark border-r border-border-dark flex flex-col overflow-y-auto custom-scrollbar">
+<div class="p-5 flex flex-col gap-6">
+<!-- Search Query Input -->
+<div>
+<label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Search Query</label>
+<div class="relative group">
+<textarea class="w-full h-32 bg-background-dark border border-border-dark rounded-lg p-4 text-sm font-medium focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all resize-none" placeholder="Enter query terms...">climate change policy</textarea>
+<div class="absolute bottom-3 right-3 opacity-50 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-sm">auto_fix_high</span>
+</div>
+</div>
+</div>
+<!-- Search Strategy Slider (Alpha) -->
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<label class="text-xs font-bold uppercase tracking-wider text-slate-500 uppercase tracking-widest">Search Strategy (Alpha)</label>
+<span class="text-primary font-display font-bold text-lg">0.75</span>
+</div>
+<div class="space-y-3">
+<div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
+<div class="h-full bg-secondary" style="width: 25%"></div>
+<div class="h-full bg-primary" style="width: 75%"></div>
+</div>
+<div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter text-slate-500">
+<span class="text-secondary">Keyword (BM25)</span>
+<span class="text-primary">Semantic (Vector)</span>
+</div>
+</div>
+</div>
+<!-- Configuration Toggles -->
+<div class="pt-2 flex flex-col gap-4">
+<label class="flex items-center gap-3 cursor-pointer group">
+<div class="relative flex items-center justify-center">
+<input checked="" class="peer sr-only" type="checkbox"/>
+<div class="size-5 bg-background-dark border border-border-dark rounded peer-checked:bg-primary peer-checked:border-primary transition-all"></div>
+<span class="material-symbols-outlined absolute text-white text-sm opacity-0 peer-checked:opacity-100 transition-opacity">check</span>
+</div>
+<span class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Enable query rewriting</span>
+</label>
+</div>
+<!-- Property Selector -->
+<div class="pt-4">
+<label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Target Properties</label>
+<div class="flex flex-wrap gap-2">
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/30 text-primary text-[11px] font-bold uppercase tracking-wide">
+<span>title</span>
+<span class="material-symbols-outlined text-[12px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/30 text-primary text-[11px] font-bold uppercase tracking-wide">
+<span>content</span>
+<span class="material-symbols-outlined text-[12px] cursor-pointer">close</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 border border-border-dark text-slate-400 text-[11px] font-bold uppercase tracking-wide hover:border-slate-500 transition-colors cursor-pointer">
+<span>summary</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 border border-border-dark text-slate-400 text-[11px] font-bold uppercase tracking-wide hover:border-slate-500 transition-colors cursor-pointer">
+<span>tags</span>
+</div>
+<button class="size-6 rounded-full border border-dashed border-slate-600 flex items-center justify-center text-slate-500 hover:text-white hover:border-white transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer Info -->
+<div class="mt-auto p-5 border-t border-border-dark bg-background-dark/30">
+<div class="flex items-center justify-between text-[11px] text-slate-500">
+<span>Collection: <b class="text-slate-300">SustainabilityDocs</b></span>
+<span>v4.2.1</span>
+</div>
+</div>
+</section>
+<!-- Right Workspace Panel (Results) -->
+<section class="flex-1 bg-background-dark p-6 overflow-y-auto custom-scrollbar">
+<div class="max-w-4xl mx-auto flex flex-col gap-6">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-display font-bold text-xl tracking-tight">Search Results <span class="text-slate-500 font-normal text-sm ml-2">Found 24 matches</span></h3>
+<div class="flex gap-2">
+<button class="size-8 rounded border border-border-dark flex items-center justify-center text-slate-400 hover:text-white"><span class="material-symbols-outlined text-lg">sort</span></button>
+<button class="size-8 rounded border border-border-dark flex items-center justify-center text-slate-400 hover:text-white"><span class="material-symbols-outlined text-lg">view_agenda</span></button>
+</div>
+</div>
+<!-- Result Card 1 -->
+<article class="bg-panel-dark border border-border-dark rounded-xl p-6 hover:border-primary/50 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<div class="space-y-1">
+<h4 class="text-lg font-bold font-display leading-tight group-hover:text-primary transition-colors">Global <mark class="bg-transparent text-secondary border-b-2 border-secondary font-bold">Climate</mark> Policy 2024: A Framework for Reform</h4>
+<div class="flex gap-3 text-xs text-slate-500 uppercase tracking-widest font-bold">
+<span>PDF Report</span>
+<span>•</span>
+<span>Updated 2 days ago</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<div class="text-2xl font-display font-bold text-white leading-none">0.78</div>
+<div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Score</div>
+</div>
+</div>
+<!-- Match Breakdown -->
+<div class="bg-background-dark/50 rounded-lg p-4 border border-border-dark/50">
+<div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">analytics</span> Match Breakdown
+                                </div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Semantic Score -->
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase">
+<span class="text-primary">Semantic</span>
+<span class="text-slate-300">0.89</span>
+</div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 89%"></div>
+</div>
+</div>
+<!-- Keyword Score -->
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase">
+<span class="text-secondary">Keyword</span>
+<span class="text-slate-300">0.45</span>
+</div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-secondary" style="width: 45%"></div>
+</div>
+</div>
+<!-- Combined Score -->
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase">
+<span class="text-white">Combined</span>
+<span class="text-white">0.78</span>
+</div>
+<div class="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-white" style="width: 78%"></div>
+</div>
+</div>
+</div>
+<div class="mt-4 pt-3 border-t border-border-dark/30 flex gap-4">
+<span class="text-[11px] text-slate-400">Matched terms: <mark class="bg-secondary/10 text-secondary px-1 rounded">climate</mark> in title, <mark class="bg-primary/10 text-primary px-1 rounded">policy reform</mark> (semantic context)</span>
+</div>
+</div>
+</article>
+<!-- Result Card 2 -->
+<article class="bg-panel-dark border border-border-dark rounded-xl p-6 hover:border-primary/50 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<div class="space-y-1">
+<h4 class="text-lg font-bold font-display leading-tight group-hover:text-primary transition-colors"><mark class="bg-transparent text-secondary border-b-2 border-secondary font-bold">Climate</mark> Change and Economic Impact on Global Trade</h4>
+<div class="flex gap-3 text-xs text-slate-500 uppercase tracking-widest font-bold">
+<span>Journal Article</span>
+<span>•</span>
+<span>Mar 12, 2024</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<div class="text-2xl font-display font-bold text-white leading-none">0.76</div>
+<div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Score</div>
+</div>
+</div>
+<div class="bg-background-dark/50 rounded-lg p-4 border border-border-dark/50">
+<div class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">analytics</span> Match Breakdown
+                                </div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase text-primary"><span>Semantic</span><span>0.82</span></div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-primary" style="width: 82%"></div></div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase text-secondary"><span>Keyword</span><span>0.70</span></div>
+<div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-secondary" style="width: 70%"></div></div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[11px] font-bold uppercase text-white"><span>Combined</span><span>0.76</span></div>
+<div class="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden"><div class="h-full bg-white" style="width: 76%"></div></div>
+</div>
+</div>
+</div>
+</article>
+</div>
+</section>
+</div>
+</main>
+</div>
+</body></html>

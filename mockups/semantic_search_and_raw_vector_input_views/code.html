@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Weaviate Studio - Vector Search</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3399ff",
+                        "background-light": "#f0f2f4",
+                        "background-dark": "#1a1d23",
+                        "panel-dark": "#23272e",
+                        "border-dark": "#2e343d",
+                        "success": "#428C5D"
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: "Space Grotesk", sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: #3e4348 transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #3e4348;
+            border-radius: 10px;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-border-dark bg-white dark:bg-background-dark px-4 py-2 z-10">
+<div class="flex items-center gap-3">
+<div class="size-6 text-primary">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.57829 8.57829C5.52816 11.6284 3.451 15.5145 2.60947 19.7452C1.76794 23.9758 2.19984 28.361 3.85056 32.3462C5.50128 36.3314 8.29667 39.7376 11.8832 42.134C15.4698 44.5305 19.6865 45.8096 24 45.8096C28.3135 45.8096 32.5302 44.5305 36.1168 42.134C39.7033 39.7375 42.4987 36.3314 44.1494 32.3462C45.8002 28.361 46.2321 23.9758 45.3905 19.7452C44.549 15.5145 42.4718 11.6284 39.4217 8.57829L24 24L8.57829 8.57829Z" fill="currentColor"></path>
+</svg>
+</div>
+<h1 class="text-sm font-bold tracking-tight">Weaviate Studio</h1>
+<div class="h-4 w-px bg-slate-300 dark:bg-border-dark mx-2"></div>
+<nav class="flex gap-4">
+<a class="text-xs font-medium text-slate-500 hover:text-primary transition-colors" href="#">Collections</a>
+<a class="text-xs font-medium text-primary" href="#">Query</a>
+<a class="text-xs font-medium text-slate-500 hover:text-primary transition-colors" href="#">Schema</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center bg-slate-100 dark:bg-panel-dark px-2 py-1 rounded border border-slate-200 dark:border-border-dark">
+<span class="material-symbols-outlined text-sm mr-2 opacity-60">database</span>
+<span class="text-[11px] font-mono">cluster-prod-01</span>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">play_arrow</span>
+                Execute Search
+            </button>
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-indigo-500 border border-white/20" data-alt="User profile avatar circular gradient"></div>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex flex-1 overflow-hidden">
+<!-- Left Panel: Configuration -->
+<aside class="w-[420px] border-r border-slate-200 dark:border-border-dark bg-white dark:bg-background-dark flex flex-col">
+<!-- Tabs Segmented Control -->
+<div class="p-4 border-b border-slate-200 dark:border-border-dark">
+<div class="flex bg-slate-100 dark:bg-panel-dark p-1 rounded-lg">
+<button class="flex-1 py-1.5 text-[11px] font-bold rounded-md bg-white dark:bg-background-dark shadow-sm border border-slate-200 dark:border-border-dark">
+                        Text (Semantic)
+                    </button>
+<button class="flex-1 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
+                        Raw Vector Input
+                    </button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Semantic Query Section -->
+<section class="p-4 border-b border-slate-200 dark:border-border-dark">
+<div class="flex items-center justify-between mb-2">
+<label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Semantic Query</label>
+<span class="text-[10px] mono-font text-primary/80">text2vec-openai</span>
+</div>
+<textarea class="w-full h-32 bg-slate-50 dark:bg-panel-dark border border-slate-200 dark:border-border-dark rounded-lg p-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none mono-font" placeholder="Describe what you are looking for...">artificial intelligence healthcare</textarea>
+<p class="mt-2 text-[10px] text-slate-400">Using: <span class="text-slate-200">gpt-4-embedding</span> • tokens: 3</p>
+</section>
+<!-- Raw Vector View (Secondary Panel Reference) -->
+<section class="p-4 border-b border-slate-200 dark:border-border-dark opacity-50 grayscale hover:grayscale-0 transition-all">
+<div class="flex items-center justify-between mb-2">
+<label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Raw Vector Input</label>
+<div class="flex items-center gap-1 text-[10px] text-success">
+<span>Dimensions: 768 / 768</span>
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+</div>
+</div>
+<div class="w-full h-20 bg-slate-50 dark:bg-panel-dark/50 border border-slate-200 dark:border-border-dark rounded-lg p-3 text-[11px] mono-font overflow-hidden text-slate-500 italic">
+                        [0.0125, -0.0482, 0.9912, 0.3421, -0.1102, 0.0045, 0.7782, -0.2193, 0.5512, 0.1234, ...]
+                    </div>
+</section>
+<!-- Advanced Options Accordion -->
+<section class="p-4">
+<details class="group bg-slate-50 dark:bg-panel-dark/30 rounded-lg border border-slate-200 dark:border-border-dark overflow-hidden" open="">
+<summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-panel-dark transition-colors list-none">
+<span class="text-[11px] font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm text-primary">settings_input_component</span>
+                                Advanced Options (Hybrid Search)
+                            </span>
+<span class="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="px-4 pb-4 space-y-4">
+<div>
+<div class="flex justify-between mb-1">
+<span class="text-[10px] text-slate-400">Alpha (Vector vs Keyword)</span>
+<span class="text-[10px] font-mono text-primary">0.5</span>
+</div>
+<input class="w-full h-1 bg-slate-200 dark:bg-border-dark rounded-lg appearance-none cursor-pointer accent-primary" type="range"/>
+</div>
+<div>
+<label class="text-[10px] text-slate-400 block mb-1">Filters</label>
+<div class="bg-white dark:bg-background-dark border border-slate-200 dark:border-border-dark rounded p-2 flex items-center justify-between">
+<code class="text-[10px] mono-font">class == "Document"</code>
+<button class="material-symbols-outlined text-xs text-slate-400 hover:text-red-400">close</button>
+</div>
+</div>
+</div>
+</details>
+</section>
+</div>
+<!-- Footer Controls -->
+<div class="p-4 bg-slate-50 dark:bg-panel-dark/40 border-t border-slate-200 dark:border-border-dark flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-slate-400">Limit</span>
+<input class="w-12 bg-white dark:bg-background-dark border border-slate-200 dark:border-border-dark rounded px-1 py-0.5 text-[10px] text-center" type="number" value="25"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">history</span>
+</button>
+<button class="p-1 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg">save</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Right Panel: Results -->
+<section class="flex-1 flex flex-col bg-slate-50 dark:bg-background-dark/50">
+<!-- Results Header -->
+<div class="h-12 border-b border-slate-200 dark:border-border-dark flex items-center justify-between px-6 bg-white dark:bg-background-dark">
+<div class="flex items-center gap-4">
+<h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">Search Results</h2>
+<span class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono">12 found in 42ms</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="material-symbols-outlined text-sm p-1 rounded hover:bg-slate-100 dark:hover:bg-panel-dark">view_headline</button>
+<button class="material-symbols-outlined text-sm p-1 rounded hover:bg-slate-100 dark:hover:bg-panel-dark text-primary">view_agenda</button>
+<div class="w-px h-4 bg-slate-200 dark:bg-border-dark mx-1"></div>
+<button class="material-symbols-outlined text-sm p-1 rounded hover:bg-slate-100 dark:hover:bg-panel-dark">download</button>
+</div>
+</div>
+<!-- Scrollable Results Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
+<!-- Result Card 1 -->
+<div class="group relative flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-panel-dark border border-slate-200 dark:border-border-dark hover:border-primary/50 transition-all cursor-pointer">
+<div class="flex flex-col items-center gap-1 min-w-[50px]">
+<span class="text-[10px] font-bold text-success">98.2%</span>
+<div class="w-1 h-12 bg-slate-100 dark:bg-border-dark rounded-full overflow-hidden relative">
+<div class="absolute top-0 w-full bg-success rounded-full" style="height: 98.2%"></div>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">ID: a1-b2-c3</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">Document</span>
+</div>
+<h3 class="text-sm font-semibold mb-1 truncate group-hover:text-primary transition-colors">AI applications in radiology: A systematic review</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">Recent advancements in deep learning have transformed radiological imaging processing, enabling faster diagnostic cycles and higher accuracy in early-stage tumor detection...</p>
+<div class="mt-3 flex flex-wrap gap-3">
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Author:</span>
+<span class="text-[10px] font-medium">Dr. Elena Rodriguez</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Published:</span>
+<span class="text-[10px] font-medium">Oct 2023</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Vector Dim:</span>
+<span class="text-[10px] font-medium">768</span>
+</div>
+</div>
+</div>
+<button class="opacity-0 group-hover:opacity-100 material-symbols-outlined text-lg p-2 text-slate-400 hover:text-white transition-all">chevron_right</button>
+</div>
+<!-- Result Card 2 -->
+<div class="group relative flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-panel-dark border border-slate-200 dark:border-border-dark hover:border-primary/50 transition-all cursor-pointer">
+<div class="flex flex-col items-center gap-1 min-w-[50px]">
+<span class="text-[10px] font-bold text-success/80">94.7%</span>
+<div class="w-1 h-12 bg-slate-100 dark:bg-border-dark rounded-full overflow-hidden relative">
+<div class="absolute top-0 w-full bg-success/80 rounded-full" style="height: 94.7%"></div>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">ID: d4-e5-f6</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">Document</span>
+</div>
+<h3 class="text-sm font-semibold mb-1 truncate group-hover:text-primary transition-colors">Ethical Frameworks for ML in Clinical Settings</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">This paper explores the intersection of medical ethics and machine learning, focusing specifically on patient privacy and bias mitigation in health-tech algorithms...</p>
+<div class="mt-3 flex flex-wrap gap-3">
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Author:</span>
+<span class="text-[10px] font-medium">Jameson, et al.</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Category:</span>
+<span class="text-[10px] font-medium">Ethics</span>
+</div>
+</div>
+</div>
+<button class="opacity-0 group-hover:opacity-100 material-symbols-outlined text-lg p-2 text-slate-400 hover:text-white transition-all">chevron_right</button>
+</div>
+<!-- Result Card 3 -->
+<div class="group relative flex items-start gap-4 p-4 rounded-xl bg-white dark:bg-panel-dark border border-slate-200 dark:border-border-dark hover:border-primary/50 transition-all cursor-pointer opacity-80">
+<div class="flex flex-col items-center gap-1 min-w-[50px]">
+<span class="text-[10px] font-bold text-amber-500">88.1%</span>
+<div class="w-1 h-12 bg-slate-100 dark:bg-border-dark rounded-full overflow-hidden relative">
+<div class="absolute top-0 w-full bg-amber-500 rounded-full" style="height: 88.1%"></div>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded">ID: g7-h8-i9</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">Document</span>
+</div>
+<h3 class="text-sm font-semibold mb-1 truncate group-hover:text-primary transition-colors">Natural Language Processing for Patient Records</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">Analyzing electronic health records (EHR) using transformers can unlock hidden patterns in patient history and improve treatment outcomes for chronic diseases...</p>
+<div class="mt-3 flex flex-wrap gap-3">
+<div class="flex items-center gap-1">
+<span class="text-[9px] text-slate-400 uppercase">Field:</span>
+<span class="text-[10px] font-medium">NLP</span>
+</div>
+</div>
+</div>
+<button class="opacity-0 group-hover:opacity-100 material-symbols-outlined text-lg p-2 text-slate-400 hover:text-white transition-all">chevron_right</button>
+</div>
+</div>
+</section>
+<!-- Sidebar Activity Bar (VS Code Style) -->
+<nav class="w-12 flex flex-col items-center py-4 gap-4 border-l border-slate-200 dark:border-border-dark bg-white dark:bg-background-dark">
+<button class="text-primary hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-2xl">search</span>
+</button>
+<button class="text-slate-400 hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-2xl">schema</span>
+</button>
+<button class="text-slate-400 hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-2xl">storage</span>
+</button>
+<button class="text-slate-400 hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-2xl">terminal</span>
+</button>
+<div class="mt-auto flex flex-col gap-4">
+<button class="text-slate-400 hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-2xl">settings</span>
+</button>
+<button class="text-slate-400 hover:text-slate-200 transition-colors">
+<span class="material-symbols-outlined text-2xl">account_circle</span>
+</button>
+</div>
+</nav>
+</main>
+<!-- Bottom Status Bar -->
+<footer class="h-6 bg-primary text-white flex items-center justify-between px-3 text-[10px]">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 cursor-pointer hover:bg-white/10 px-1">
+<span class="material-symbols-outlined text-[12px]">cloud_done</span>
+<span>Connected: local-weaviate</span>
+</div>
+<div class="flex items-center gap-1 cursor-pointer hover:bg-white/10 px-1">
+<span class="material-symbols-outlined text-[12px]">error</span>
+<span>0</span>
+<span class="material-symbols-outlined text-[12px]">warning</span>
+<span>2</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="cursor-pointer hover:bg-white/10 px-1">UTF-8</span>
+<span class="cursor-pointer hover:bg-white/10 px-1">Weaviate v1.22.4</span>
+<span class="material-symbols-outlined text-[12px] cursor-pointer hover:bg-white/10 px-1">notifications</span>
+</div>
+</footer>
+</body></html>
