@@ -15,11 +15,15 @@ declare global {
 }
 
 // Get VS Code API reference for messaging
-let vscode: any;
+let vscode: ReturnType<typeof window.acquireVsCodeApi>;
 try {
   vscode = window.acquireVsCodeApi();
 } catch (error) {
-  console.error('Failed to acquire VS Code API', error);
+  document.body.innerHTML = `<div style="padding: 20px; color: var(--vscode-errorForeground, #f44);">
+    <h3>Failed to initialize Cluster Panel</h3>
+    <p>Please reload the panel or restart VS Code.</p>
+  </div>`;
+  throw error;
 }
 
 // Types
