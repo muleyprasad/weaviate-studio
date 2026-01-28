@@ -1196,4 +1196,199 @@ describe('ConnectionManager', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('Connection Status Management', () => {
+    test('supports connecting status', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      expect(conn.status).toBe('disconnected');
+
+      // Update status to connecting
+      const updated = await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(updated?.status).toBe('connecting');
+
+      // Verify it persists
+      const retrieved = mgr.getConnection(conn.id);
+      expect(retrieved?.status).toBe('connecting');
+    });
+
+    test('transitions through connection states correctly', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'State Transition Test',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Initial state
+      expect(conn.status).toBe('disconnected');
+
+      // Move to connecting
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connecting');
+
+      // Move to connected
+      await mgr.updateConnection(conn.id, { status: 'connected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connected');
+
+      // Move back to disconnected
+      await mgr.updateConnection(conn.id, { status: 'disconnected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('disconnected');
+    });
+
+    test('handles failed connection by reverting to disconnected', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Failed Connection Test',
+        type: 'custom',
+        httpHost: 'invalid-host-that-does-not-exist',
+        httpPort: 8080,
+        grpcHost: 'invalid-host',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Set to connecting
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('connecting');
+
+      // Simulate connection failure - revert to disconnected
+      await mgr.updateConnection(conn.id, { status: 'disconnected' });
+      expect(mgr.getConnection(conn.id)?.status).toBe('disconnected');
+    });
+
+    test('connecting status is persisted to global state', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Persist Test',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Update to connecting
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+
+      // Verify globalState.update was called with connecting status
+      expect(globalState.update).toHaveBeenCalled();
+      const lastUpdateCall =
+        globalState.update.mock.calls[globalState.update.mock.calls.length - 1];
+      const savedConnections = lastUpdateCall[1];
+      const savedConn = savedConnections.find((c: any) => c.id === conn.id);
+      expect(savedConn?.status).toBe('connecting');
+    });
+
+    test('connecting status can be updated along with other properties', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Multi Update Test',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+        autoConnect: false,
+      });
+
+      // Update both status and autoConnect at once
+      const updated = await mgr.updateConnection(conn.id, {
+        status: 'connecting',
+        autoConnect: true,
+      });
+
+      expect(updated?.status).toBe('connecting');
+      expect(updated?.autoConnect).toBe(true);
+    });
+
+    test('connection status does not affect other connections', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn1 = await mgr.addConnection({
+        name: 'Connection 1',
+        type: 'custom',
+        httpHost: 'host1',
+        httpPort: 8080,
+        grpcHost: 'host1',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      const conn2 = await mgr.addConnection({
+        name: 'Connection 2',
+        type: 'custom',
+        httpHost: 'host2',
+        httpPort: 8080,
+        grpcHost: 'host2',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Set conn1 to connecting
+      await mgr.updateConnection(conn1.id, { status: 'connecting' });
+
+      // Verify conn1 is connecting and conn2 is still disconnected
+      expect(mgr.getConnection(conn1.id)?.status).toBe('connecting');
+      expect(mgr.getConnection(conn2.id)?.status).toBe('disconnected');
+
+      // Set conn1 to connected
+      await mgr.updateConnection(conn1.id, { status: 'connected' });
+
+      // Verify statuses are independent
+      expect(mgr.getConnection(conn1.id)?.status).toBe('connected');
+      expect(mgr.getConnection(conn2.id)?.status).toBe('disconnected');
+    });
+
+    test('rapid status transitions are handled correctly', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const conn = await mgr.addConnection({
+        name: 'Rapid Transition Test',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+      });
+
+      // Rapidly transition through states
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+      await mgr.updateConnection(conn.id, { status: 'connected' });
+      await mgr.updateConnection(conn.id, { status: 'disconnected' });
+      await mgr.updateConnection(conn.id, { status: 'connecting' });
+
+      // Final state should be connecting
+      expect(mgr.getConnection(conn.id)?.status).toBe('connecting');
+    });
+  });
 });
