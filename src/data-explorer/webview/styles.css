@@ -1055,6 +1055,7 @@ body:has(.vector-search-panel.open) .detail-panel {
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
     flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
 }
 
 .detail-panel-header h2 {
@@ -1615,6 +1616,7 @@ input[type="checkbox"]:focus-visible {
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
     flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(232, 171, 83, 0.1) 0%, rgba(232, 171, 83, 0.05) 100%);
 }
 
 .filter-panel-title {
