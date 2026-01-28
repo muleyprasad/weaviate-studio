@@ -678,7 +678,6 @@ function ClusterPanelWebview() {
   }, []);
 
   const handleAutoRefreshChange = useCallback((interval: 'off' | '5s' | '10s' | '30s') => {
-    console.log('Auto-refresh interval changed to:', interval);
     setAutoRefreshInterval(interval);
     setShowAutoRefreshMenu(false);
   }, []);
