@@ -581,6 +581,7 @@ function ClusterPanelWebview() {
   const autoRefreshMenuRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const prevNodeStatusDataRef = useRef<Node[]>([]);
 
   useEffect(() => {
     // Handle messages from the extension
@@ -590,12 +591,14 @@ function ClusterPanelWebview() {
       switch (message.command) {
         case 'init':
         case 'updateData':
-          // Only update if data has actually changed
+          // Only update if data has actually changed (using ref to avoid stale closure)
           const newData = message.nodeStatusData || [];
-          const hasDataChanged = JSON.stringify(newData) !== JSON.stringify(nodeStatusData);
+          const hasDataChanged =
+            JSON.stringify(newData) !== JSON.stringify(prevNodeStatusDataRef.current);
 
           // Only update state if there are actual changes
-          if (hasDataChanged || nodeStatusData.length === 0) {
+          if (hasDataChanged || prevNodeStatusDataRef.current.length === 0) {
+            prevNodeStatusDataRef.current = newData;
             setNodeStatusData(newData);
 
             // Update openClusterViewOnConnect state
