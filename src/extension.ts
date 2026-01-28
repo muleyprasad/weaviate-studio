@@ -158,17 +158,33 @@ export function activate(context: vscode.ExtensionContext) {
     // Handle connection expansion - show dialog if disconnected
     if (item.itemType === 'connection' && item.connectionId) {
       const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
+      const connectionManager = weaviateTreeDataProvider.getConnectionManager();
 
       // If disconnected, check autoConnect setting
       if (connection && connection.status !== 'connected') {
         // If autoConnect is enabled, connect automatically without showing dialog
         if (connection.autoConnect) {
-          // Set status to connecting before starting connection
-          const connectionManager = weaviateTreeDataProvider.getConnectionManager();
-          await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
-          // Force immediate update of local connections list
-          await weaviateTreeDataProvider.forceRefresh();
-          await weaviateTreeDataProvider.connect(item.connectionId);
+          try {
+            // Set status to connecting before starting connection
+            await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
+            // Force immediate update of local connections list
+            await weaviateTreeDataProvider.forceRefresh();
+            const success = await weaviateTreeDataProvider.connect(item.connectionId);
+
+            if (!success) {
+              await connectionManager.updateConnection(item.connectionId, {
+                status: 'disconnected',
+              });
+              await weaviateTreeDataProvider.forceRefresh();
+            }
+          } catch (error) {
+            // Reset status on error
+            await connectionManager.updateConnection(item.connectionId, { status: 'disconnected' });
+            await weaviateTreeDataProvider.forceRefresh();
+            vscode.window.showErrorMessage(
+              `Failed to connect: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
         } else {
           // Show dialog asking to connect with option to enable auto-connect
           const result = await vscode.window.showInformationMessage(
@@ -179,25 +195,60 @@ export function activate(context: vscode.ExtensionContext) {
           );
 
           if (result === 'Connect') {
-            // Set status to connecting after user confirms
-            const connectionManager = weaviateTreeDataProvider.getConnectionManager();
-            await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
-            // Force immediate update of local connections list
-            await weaviateTreeDataProvider.forceRefresh();
-            await weaviateTreeDataProvider.connect(item.connectionId);
+            try {
+              // Set status to connecting after user confirms
+              await connectionManager.updateConnection(item.connectionId, { status: 'connecting' });
+              // Force immediate update of local connections list
+              await weaviateTreeDataProvider.forceRefresh();
+              const success = await weaviateTreeDataProvider.connect(item.connectionId);
+
+              if (!success) {
+                await connectionManager.updateConnection(item.connectionId, {
+                  status: 'disconnected',
+                });
+                await weaviateTreeDataProvider.forceRefresh();
+              }
+            } catch (error) {
+              // Reset status on error
+              await connectionManager.updateConnection(item.connectionId, {
+                status: 'disconnected',
+              });
+              await weaviateTreeDataProvider.forceRefresh();
+              vscode.window.showErrorMessage(
+                `Failed to connect: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
           } else if (result === 'Connect & Auto Connect for This Cluster') {
-            // Enable auto-connect for this connection
-            const connectionManager = weaviateTreeDataProvider.getConnectionManager();
-            await connectionManager.updateConnection(item.connectionId, {
-              autoConnect: true,
-              status: 'connecting',
-            });
-            // Force immediate update of local connections list
-            await weaviateTreeDataProvider.forceRefresh();
-            await weaviateTreeDataProvider.connect(item.connectionId);
-            vscode.window.showInformationMessage(
-              `Auto Connect enabled for "${connection.name}". This cluster will now connect automatically when expanded.`
-            );
+            try {
+              // Enable auto-connect for this connection
+              await connectionManager.updateConnection(item.connectionId, {
+                autoConnect: true,
+                status: 'connecting',
+              });
+              // Force immediate update of local connections list
+              await weaviateTreeDataProvider.forceRefresh();
+              const success = await weaviateTreeDataProvider.connect(item.connectionId);
+
+              if (success) {
+                vscode.window.showInformationMessage(
+                  `Auto Connect enabled for "${connection.name}". This cluster will now connect automatically when expanded.`
+                );
+              } else {
+                await connectionManager.updateConnection(item.connectionId, {
+                  status: 'disconnected',
+                });
+                await weaviateTreeDataProvider.forceRefresh();
+              }
+            } catch (error) {
+              // Reset status on error (keep autoConnect enabled)
+              await connectionManager.updateConnection(item.connectionId, {
+                status: 'disconnected',
+              });
+              await weaviateTreeDataProvider.forceRefresh();
+              vscode.window.showErrorMessage(
+                `Failed to connect: ${error instanceof Error ? error.message : String(error)}`
+              );
+            }
           }
         }
       }
