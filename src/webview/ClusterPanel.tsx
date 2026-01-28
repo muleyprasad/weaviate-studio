@@ -361,39 +361,39 @@ function CollectionView({
   onShardSelect,
   onCollectionSelect,
 }: CollectionViewProps) {
-  // Group shards by collection
-  const collectionMap = new Map<string, CollectionData>();
+  // Memoize collection grouping to avoid recomputation on every render
+  const collections = useMemo(() => {
+    const collectionMap = new Map<string, CollectionData>();
 
-  nodeStatusData.forEach((node) => {
-    node.shards.forEach((shard) => {
-      if (!collectionMap.has(shard.class)) {
-        collectionMap.set(shard.class, {
-          name: shard.class,
-          totalObjects: 0,
-          nodes: [],
-        });
-      }
+    nodeStatusData.forEach((node) => {
+      node.shards.forEach((shard) => {
+        if (!collectionMap.has(shard.class)) {
+          collectionMap.set(shard.class, {
+            name: shard.class,
+            totalObjects: 0,
+            nodes: [],
+          });
+        }
 
-      const collection = collectionMap.get(shard.class)!;
-      collection.totalObjects += shard.objectCount;
+        const collection = collectionMap.get(shard.class)!;
+        collection.totalObjects += shard.objectCount;
 
-      let nodeData = collection.nodes.find((n) => n.nodeName === node.name);
-      if (!nodeData) {
-        nodeData = {
-          nodeName: node.name,
-          nodeStatus: node.status,
-          shards: [],
-        };
-        collection.nodes.push(nodeData);
-      }
+        let nodeData = collection.nodes.find((n) => n.nodeName === node.name);
+        if (!nodeData) {
+          nodeData = {
+            nodeName: node.name,
+            nodeStatus: node.status,
+            shards: [],
+          };
+          collection.nodes.push(nodeData);
+        }
 
-      nodeData.shards.push(shard);
+        nodeData.shards.push(shard);
+      });
     });
-  });
 
-  const collections = Array.from(collectionMap.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+    return Array.from(collectionMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [nodeStatusData]);
 
   const handleCollectionSelect = (collectionName: string) => {
     onCollectionSelect(collectionName === selectedCollectionName ? '' : collectionName);
