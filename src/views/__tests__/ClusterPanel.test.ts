@@ -287,6 +287,93 @@ describe('ClusterPanel', () => {
         })
       );
     });
+
+    test('handles refresh command from webview', async () => {
+      const onMessageCallback = jest.fn().mockResolvedValue(undefined);
+      const connectionId = 'test-connection-123';
+      const nodeStatusData = { nodes: [] };
+
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        nodeStatusData,
+        'Test Connection',
+        onMessageCallback
+      );
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate refresh command from webview (triggered by auto-refresh)
+      await messageHandler({ command: 'refresh' });
+
+      expect(onMessageCallback).toHaveBeenCalledWith({ command: 'refresh' }, expect.any(Function));
+    });
+
+    test('panel can receive updated data multiple times for auto-refresh', () => {
+      const connectionId = 'test-connection-123';
+      const data1 = { nodes: [{ name: 'node1', objectCount: 100 }] };
+      const data2 = { nodes: [{ name: 'node1', objectCount: 200 }] };
+      const data3 = { nodes: [{ name: 'node1', objectCount: 300 }] };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, data1, 'Test Connection');
+
+      mockPanel.webview.postMessage.mockClear();
+
+      // Simulate multiple auto-refresh updates
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, data2, 'Test Connection');
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'updateData',
+          nodeStatusData: data2,
+        })
+      );
+
+      mockPanel.webview.postMessage.mockClear();
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, data3, 'Test Connection');
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'updateData',
+          nodeStatusData: data3,
+        })
+      );
+    });
+
+    test('panel update preserves openClusterViewOnConnect setting', () => {
+      const connectionId = 'test-connection-123';
+      const initialData = { nodes: [] };
+      const updatedData = { nodes: [{ name: 'node1' }] };
+
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        initialData,
+        'Test Connection',
+        undefined,
+        false // openClusterViewOnConnect = false
+      );
+
+      mockPanel.webview.postMessage.mockClear();
+
+      // Update with new data
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        updatedData,
+        'Test Connection',
+        undefined,
+        false
+      );
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'updateData',
+          openClusterViewOnConnect: false,
+        })
+      );
+    });
   });
 
   describe('View type support', () => {
@@ -350,6 +437,103 @@ describe('ClusterPanel', () => {
 
       expect(initCall).toBeDefined();
       expect(initCall[0].nodeStatusData).toEqual(complexData);
+    });
+
+    test('data supports collection grouping with multiple nodes per collection', () => {
+      const connectionId = 'test-connection-123';
+      const multiNodeCollectionData = {
+        nodes: [
+          {
+            name: 'node-1',
+            status: 'HEALTHY',
+            shards: [
+              {
+                name: 'shard-1',
+                class: 'SharedCollection',
+                objectCount: 100,
+                vectorIndexingStatus: 'READY',
+              },
+            ],
+          },
+          {
+            name: 'node-2',
+            status: 'HEALTHY',
+            shards: [
+              {
+                name: 'shard-2',
+                class: 'SharedCollection',
+                objectCount: 150,
+                vectorIndexingStatus: 'READY',
+              },
+            ],
+          },
+          {
+            name: 'node-3',
+            status: 'HEALTHY',
+            shards: [
+              {
+                name: 'shard-3',
+                class: 'SharedCollection',
+                objectCount: 200,
+                vectorIndexingStatus: 'READY',
+              },
+            ],
+          },
+        ],
+      };
+
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        multiNodeCollectionData,
+        'Test Connection'
+      );
+
+      const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
+      const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
+
+      expect(initCall).toBeDefined();
+      expect(initCall[0].nodeStatusData.nodes).toHaveLength(3);
+
+      // Verify all nodes have shards for the same collection
+      const allShards = initCall[0].nodeStatusData.nodes.flatMap((n: any) => n.shards);
+      expect(allShards.every((s: any) => s.class === 'SharedCollection')).toBe(true);
+    });
+
+    test('data supports READONLY shard status detection', () => {
+      const connectionId = 'test-connection-123';
+      const mixedStatusData = {
+        nodes: [
+          {
+            name: 'node-1',
+            status: 'HEALTHY',
+            shards: [
+              {
+                name: 'shard-1',
+                class: 'Collection1',
+                objectCount: 100,
+                vectorIndexingStatus: 'READY',
+              },
+              {
+                name: 'shard-2',
+                class: 'Collection1',
+                objectCount: 50,
+                vectorIndexingStatus: 'READONLY',
+              },
+            ],
+          },
+        ],
+      };
+
+      ClusterPanel.createOrShow(mockExtensionUri, connectionId, mixedStatusData, 'Test Connection');
+
+      const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
+      const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
+
+      expect(initCall).toBeDefined();
+      const shards = initCall[0].nodeStatusData.nodes[0].shards;
+      expect(shards.some((s: any) => s.vectorIndexingStatus === 'READONLY')).toBe(true);
+      expect(shards.some((s: any) => s.vectorIndexingStatus === 'READY')).toBe(true);
     });
   });
 

@@ -992,6 +992,32 @@ describe('WeaviateTreeDataProvider', () => {
 
       fireEventSpy.mockRestore();
     });
+
+    it('should not affect collections cache when forcing refresh', async () => {
+      // Set up some collections in cache
+      const testCollections = [{ label: 'TestCollection' }];
+      (provider as any).collections['2'] = testCollections;
+
+      await provider.forceRefresh();
+
+      // Verify collections cache is preserved
+      expect((provider as any).collections['2']).toEqual(testCollections);
+    });
+
+    it('should update connections list from ConnectionManager', async () => {
+      const fireEventSpy = jest.spyOn((provider as any)._onDidChangeTreeData, 'fire');
+
+      // Get initial connection count
+      const initialCount = (provider as any).connections.length;
+
+      await provider.forceRefresh();
+
+      // Verify connections are still available after refresh
+      expect((provider as any).connections.length).toBe(initialCount);
+      expect(fireEventSpy).toHaveBeenCalled();
+
+      fireEventSpy.mockRestore();
+    });
   });
 
   describe('sortAliases', () => {
