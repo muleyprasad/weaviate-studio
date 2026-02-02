@@ -96,8 +96,11 @@ describe('WeaviateTreeDataProvider', () => {
   it('getStatusIcon returns correct icon for statuses', () => {
     const iconConnected: any = provider.getStatusIcon('connected');
     const iconDisconnected: any = provider.getStatusIcon('disconnected');
+    const iconConnecting: any = provider.getStatusIcon('connecting');
     expect(iconConnected.id).toBe('circle-filled');
     expect(iconConnected.color.id).toBe('testing.iconPassed');
+    expect(iconConnecting.id).toBe('sync~spin');
+    expect(iconDisconnected.id).toBe('circle-outline');
     expect(iconDisconnected.id).toBe('circle-outline');
     expect(iconDisconnected.color).toBeUndefined();
   });
@@ -952,6 +955,68 @@ describe('WeaviateTreeDataProvider', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('forceRefresh', () => {
+    it('should update connections from ConnectionManager and fire tree data change event', async () => {
+      const fireEventSpy = jest.spyOn((provider as any)._onDidChangeTreeData, 'fire');
+
+      // Initial connections
+      const initialConnections = (provider as any).connections;
+      expect(initialConnections).toHaveLength(mockConnections.length);
+
+      // Call forceRefresh
+      await provider.forceRefresh();
+
+      // Verify connections were updated
+      const updatedConnections = (provider as any).connections;
+      expect(updatedConnections).toHaveLength(mockConnections.length);
+
+      // Verify event was fired
+      expect(fireEventSpy).toHaveBeenCalled();
+
+      fireEventSpy.mockRestore();
+    });
+
+    it('should bypass debounce mechanism when forcing refresh', async () => {
+      const fireEventSpy = jest.spyOn((provider as any)._onDidChangeTreeData, 'fire');
+
+      // Call forceRefresh multiple times rapidly
+      await provider.forceRefresh();
+      await provider.forceRefresh();
+      await provider.forceRefresh();
+
+      // Verify event was fired for each call (no debouncing)
+      expect(fireEventSpy).toHaveBeenCalledTimes(3);
+
+      fireEventSpy.mockRestore();
+    });
+
+    it('should not affect collections cache when forcing refresh', async () => {
+      // Set up some collections in cache
+      const testCollections = [{ label: 'TestCollection' }];
+      (provider as any).collections['2'] = testCollections;
+
+      await provider.forceRefresh();
+
+      // Verify collections cache is preserved
+      expect((provider as any).collections['2']).toEqual(testCollections);
+    });
+
+    it('should update connections list from ConnectionManager', async () => {
+      const fireEventSpy = jest.spyOn((provider as any)._onDidChangeTreeData, 'fire');
+
+      // Get initial connection count
+      const initialCount = (provider as any).connections.length;
+
+      await provider.forceRefresh();
+
+      // Verify connections are still available after refresh
+      expect((provider as any).connections.length).toBe(initialCount);
+      expect(fireEventSpy).toHaveBeenCalled();
+
+      fireEventSpy.mockRestore();
     });
   });
 

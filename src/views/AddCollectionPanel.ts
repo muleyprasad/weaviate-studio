@@ -132,6 +132,10 @@ export class AddCollectionPanel {
             schema: this._initialSchema,
           });
         }
+        // Delegate to the optional message callback for additional ready handling
+        if (this.onMessageCallback) {
+          await this.onMessageCallback(message, (msg) => this.postMessage(msg));
+        }
         break;
       case 'create':
         try {
