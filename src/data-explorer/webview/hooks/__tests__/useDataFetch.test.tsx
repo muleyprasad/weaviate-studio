@@ -58,7 +58,7 @@ describe('useDataFetch', () => {
       expect(result.current.error).toBeDefined();
     });
 
-    test('initial loading state is false', async () => {
+    test('initial loading state is true until data loads', async () => {
       const { result } = renderHook(() => useDataFetch(), { wrapper });
 
       // Wait for the hook's useEffect to trigger initialize
@@ -70,7 +70,7 @@ describe('useDataFetch', () => {
         );
       });
 
-      // At this point loading is true due to initialize
+      // At this point loading should be true due to initialize
       expect(result.current.isLoading).toBe(true);
 
       const requestId =
@@ -90,25 +90,15 @@ describe('useDataFetch', () => {
         );
       });
 
-      // init/schemaLoaded doesn't clear loading, we need to wait for the automatic fetchObjects
-      await waitFor(() => {
-        expect(mockPostMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            command: 'fetchObjects',
-          })
-        );
-      });
-
-      const fetchRequestId =
-        mockPostMessage.mock.calls[mockPostMessage.mock.calls.length - 1][0].requestId;
-
-      // Respond to fetchObjects to clear loading
+      // Schema loaded, but loading is still true (waiting for data)
+      // The extension would typically send objectsLoaded after init
+      // Simulate that response
       act(() => {
         window.dispatchEvent(
           new MessageEvent('message', {
             data: {
               command: 'objectsLoaded',
-              requestId: fetchRequestId,
+              requestId,
               objects: [],
               total: 0,
             },

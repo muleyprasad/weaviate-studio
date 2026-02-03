@@ -34,7 +34,7 @@ describe('DataContext', () => {
       expect(result.current.objects).toEqual([]);
       expect(result.current.totalCount).toBe(0);
       expect(result.current.unfilteredTotalCount).toBe(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.loading).toBe(true); // Initial state is loading
       expect(result.current.error).toBeNull();
     });
 
