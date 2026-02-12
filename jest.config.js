@@ -5,7 +5,8 @@ module.exports = {
   moduleNameMapper: {
     '^monaco-editor$': '<rootDir>/src/test/mocks/monaco-editor.ts',
     '^vscode$': '<rootDir>/src/test/mocks/vscode.ts',
-    '^weaviate-client$': '<rootDir>/src/test/mocks/weaviate-client.ts'
+    '^weaviate-client$': '<rootDir>/src/test/mocks/weaviate-client.ts',
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
   },
   testMatch: ['**/__tests__/**/*.test.(ts|tsx)', '**/?(*.)+(test).(ts|tsx)'],
   transform: {
