@@ -184,12 +184,15 @@ function NodeComponent({
   selectedShardName,
   onShardSelect,
 }: NodeComponentProps) {
+  // Ensure shards is always an array
+  const shards = node.shards || [];
+
   // Calculate unique collections
-  const uniqueCollections = new Set(node.shards.map((shard) => shard.class));
+  const uniqueCollections = new Set(shards.map((shard) => shard.class));
   const uniqueCollectionCount = uniqueCollections.size;
 
   // Group shards by status (excluding READY)
-  const nonReadyShards = node.shards.filter((shard) => shard.vectorIndexingStatus !== 'READY');
+  const nonReadyShards = shards.filter((shard) => shard.vectorIndexingStatus !== 'READY');
   const statusGroups = nonReadyShards.reduce(
     (acc, shard) => {
       const status = shard.vectorIndexingStatus;
@@ -202,7 +205,7 @@ function NodeComponent({
   const hasReadonly = statusGroups['READONLY'] > 0;
 
   const handleSetAllReadyToReady = () => {
-    const readonlyShards = node.shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY');
+    const readonlyShards = shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY');
 
     // Group shards by collection
     const shardsByCollection = readonlyShards.reduce(
@@ -302,9 +305,9 @@ function NodeComponent({
           </div>
 
           <div className="shards-container">
-            <h4>Shards ({node.shards.length})</h4>
+            <h4>Shards ({shards.length})</h4>
             <div className="shards-grid">
-              {[...node.shards]
+              {[...shards]
                 .sort((a, b) => {
                   // First sort by collection name
                   const collectionCompare = a.class.localeCompare(b.class);
