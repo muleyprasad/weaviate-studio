@@ -139,7 +139,7 @@ export class ViewRenderer {
   /**
    * Renders detailed schema view with multiple tabs
    */
-  public renderDetailedSchema(schema: CollectionConfig): string {
+  public renderDetailedSchema(schema: CollectionConfig, restApiJson?: any): string {
     const formatDataType = (dataType: string | string[] | undefined): string => {
       if (!dataType) {
         return 'Unknown';
@@ -506,7 +506,6 @@ export class ViewRenderer {
                     <div class="tab" onclick="switchTab('properties')">Properties (${schema.properties?.length || 0})</div>
                     <div class="tab" onclick="switchTab('raw-json')">Raw JSON</div>
                     <div class="tab" onclick="switchTab('api-equivalent')">API Equivalent</div>
-                    <div class="tab" onclick="switchTab('creation-scripts')">Creation Scripts</div>
                 </div>
                 <div id="overview" class="tab-content active">
                     <div class="section-header">Description</div>
@@ -540,13 +539,13 @@ export class ViewRenderer {
                 <!-- Raw JSON Tab -->
                 <div id="raw-json" class="tab-content">
                     <div class="section-header">
-                        <span>Complete Schema Definition</span>
+                        <span>Complete Schema Definition (REST API Format)</span>
                         <div class="buttons">
                             <button class="button" onclick="copyToClipboard('rawSchema')">Copy JSON</button>
                         </div>
                     </div>
                     <div class="section-content">
-                        <pre id="rawSchema"><code>${this.formatJsonClean(schema)}</code></pre>
+                        <pre id="rawSchema"><code>${this.formatJsonClean(restApiJson || schema)}</code></pre>
                     </div>
                 </div>
 
@@ -561,19 +560,6 @@ export class ViewRenderer {
                     <div class="section-content">
                         <p>Use this cURL command to recreate this collection:</p>
                         <pre id="apiCommand"><code>${this.generateCurlCommand(schema)}</code></pre>
-                    </div>
-                </div>
-
-                <!-- Creation Scripts Tab -->
-                <div id="creation-scripts" class="tab-content">
-                    <div class="section-header">
-                        <span>Python Creation Script</span>
-                        <div class="buttons">
-                            <button class="button" onclick="copyToClipboard('creationScript')">Copy Script</button>
-                        </div>
-                    </div>
-                    <div class="section-content">
-                        <pre id="creationScript"><code>${this.generatePythonScript(schema)}</code></pre>
                     </div>
                 </div>
 

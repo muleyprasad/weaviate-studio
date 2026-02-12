@@ -213,6 +213,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return;
       }
 
+      // Fetch the REST API JSON for this collection
+      const baseUrl = this.getWeaviateBaseUrl(item.connectionId);
+      const headers = this.getWeaviateHeaders(item.connectionId);
+
+      const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      let restApiJson: any = null;
+      if (response.ok) {
+        restApiJson = await response.json();
+      } else {
+        console.warn('Failed to fetch REST API schema, will show SDK format only');
+      }
+
       // Create and show a webview with the detailed schema
       const panel = vscode.window.createWebviewPanel(
         'weaviateDetailedSchema',
@@ -224,8 +240,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       );
 
-      // Format the schema as HTML
-      panel.webview.html = this.getDetailedSchemaHtml(collection.schema);
+      // Format the schema as HTML, passing both SDK format and REST API JSON
+      panel.webview.html = this.getDetailedSchemaHtml(collection.schema, restApiJson);
     } catch (error) {
       console.error('Error viewing detailed schema:', error);
       vscode.window.showErrorMessage(
@@ -236,10 +252,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
   /**
    * Generates HTML for displaying detailed schema in a webview
-   * @param schema The schema to display
+   * @param schema The schema to display (SDK format)
+   * @param restApiJson The REST API JSON format (optional)
    */
-  private getDetailedSchemaHtml(schema: CollectionConfig): string {
-    return this.viewRenderer.renderDetailedSchema(schema);
+  private getDetailedSchemaHtml(schema: CollectionConfig, restApiJson?: any): string {
+    return this.viewRenderer.renderDetailedSchema(schema, restApiJson);
   }
 
   // #endregion Command Handlers
@@ -2995,227 +3012,60 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @param schema - The raw schema from Weaviate
    * @returns The formatted schema ready for API consumption
    */
-  private convertSchemaToApiFormat(schema: any): any {
-    // Helper function to recursively process properties and nested properties
-    const processProperty = (prop: any): any => {
-      const dataType = Array.isArray(prop?.dataType)
-        ? prop.dataType
-        : [prop?.dataType].filter(Boolean);
-
-      const { vectorizerConfig, indexInverted, ...rest } = prop || {};
-      const converted: any = {
-        ...rest,
-        dataType,
-      };
-
-      if (vectorizerConfig) {
-        converted.moduleConfig = vectorizerConfig;
-      }
-
-      // If tokenization explicitly 'none', omit it
-      if (converted.tokenization === 'none') {
-        delete converted.tokenization;
-      }
-
-      // Recursively process nested properties for object types
-      if (converted.nestedProperties && Array.isArray(converted.nestedProperties)) {
-        converted.nestedProperties = converted.nestedProperties.map(processProperty);
-      }
-
-      return converted;
-    };
-
-    // Convert properties to request format: ensure dataType is array, move vectorizerConfig -> moduleConfig, drop indexInverted
-    const fixed_properties = (schema.properties || []).map(processProperty);
-
-    // Convert vectorizers -> vectorConfig with proper index mapping
-    const fixed_vectorConfig = schema.vectorizers
-      ? Object.fromEntries(
-          Object.entries(schema.vectorizers).map(([key, vec]: [string, any]) => {
-            // vectorizer
-            const vectorizerName = vec?.vectorizer?.name || 'none';
-            const vCfg: any = { ...(vec?.vectorizer?.config || {}) };
-            // rename vectorizeCollectionName -> vectorizeClassName if present
-            if (vCfg.vectorizeCollectionName !== undefined) {
-              vCfg.vectorizeClassName = vCfg.vectorizeCollectionName;
-              delete vCfg.vectorizeCollectionName;
-            }
-            // attach properties if present at this level
-            if (Array.isArray(vec?.properties) && vec.properties.length > 0) {
-              vCfg.properties = vec.properties;
-            }
-
-            // index type and config
-            const vectorIndexType = vec?.indexType || vec?.indexConfig?.type || 'hnsw';
-            const vectorIndexConfig: any = {};
-            const srcIdx = vec?.indexConfig || {};
-
-            // top-level distance
-            if (srcIdx.distance) {
-              vectorIndexConfig.distanceMetric = srcIdx.distance;
-            }
-            if (srcIdx.threshold !== undefined) {
-              vectorIndexConfig.threshold = srcIdx.threshold;
-            }
-            if (srcIdx.skip !== undefined) {
-              vectorIndexConfig.skip = srcIdx.skip;
-            }
-
-            // hnsw - check both nested structure and flat structure
-            if (srcIdx.hnsw) {
-              // Nested structure: indexConfig.hnsw contains the config
-              const h: any = { ...srcIdx.hnsw };
-              if (h.distance) {
-                h.distanceMetric = h.distance;
-                delete h.distance;
-              }
-              if (h.quantizer) {
-                const q = h.quantizer;
-                if (q.type === 'pq') {
-                  h.pq = {
-                    enabled: true,
-                    internalBitCompression: q.bitCompression || false,
-                    segments: q.segments,
-                    centroids: q.centroids,
-                    trainingLimit: q.trainingLimit,
-                    encoder: q.encoder,
-                  };
-                } else if (q.type === 'rq') {
-                  h.rq = {
-                    enabled: true,
-                    bits: q.bits,
-                    rescoreLimit: q.rescoreLimit,
-                  };
-                }
-                delete h.quantizer;
-              }
-              if (h.type) {
-                delete h.type;
-              }
-              vectorIndexConfig.hnsw = h;
-            } else if (vectorIndexType === 'hnsw' && Object.keys(srcIdx).length > 0) {
-              // Flat structure: all HNSW properties are directly in indexConfig
-              const h: any = { ...srcIdx };
-
-              // Remove fields that are not part of HNSW config
-              delete h.type;
-
-              if (h.distance) {
-                h.distanceMetric = h.distance;
-                delete h.distance;
-              }
-
-              // Handle quantizer if present
-              if (h.quantizer) {
-                const q = h.quantizer;
-                if (q.type === 'pq') {
-                  h.pq = {
-                    enabled: true,
-                    internalBitCompression: q.bitCompression || false,
-                    segments: q.segments,
-                    centroids: q.centroids,
-                    trainingLimit: q.trainingLimit,
-                    encoder: q.encoder,
-                  };
-                } else if (q.type === 'rq') {
-                  h.rq = {
-                    enabled: true,
-                    bits: q.bits,
-                    rescoreLimit: q.rescoreLimit,
-                  };
-                }
-                delete h.quantizer;
-              }
-
-              // Only add to vectorIndexConfig if there are actual config values
-              if (Object.keys(h).length > 0) {
-                vectorIndexConfig.hnsw = h;
-              }
-            }
-
-            // flat
-            if (srcIdx.flat) {
-              const f: any = { ...srcIdx.flat };
-              if (f.distance) {
-                f.distanceMetric = f.distance;
-                delete f.distance;
-              }
-              if (f.quantizer) {
-                const q = f.quantizer;
-                if (q.type === 'bq') {
-                  f.bq = {
-                    enabled: true,
-                    cache: q.cache || false,
-                    rescoreLimit: q.rescoreLimit ?? -1,
-                  };
-                }
-                delete f.quantizer;
-              }
-              if (f.type) {
-                delete f.type;
-              }
-              vectorIndexConfig.flat = f;
-            }
-
-            return [
-              key,
-              {
-                vectorizer: { [vectorizerName]: vCfg },
-                vectorIndexType,
-                vectorIndexConfig,
-              },
-            ];
-          })
-        )
-      : undefined;
-
-    // Build final API schema from scratch (no spread) to avoid server-only fields
-    const apiSchema: any = {
-      class: schema.name,
-      properties: fixed_properties,
-    };
-
-    // Add description if it exists
-    if (schema.description) {
-      apiSchema.description = schema.description;
+  /**
+   * Builds the base URL for Weaviate REST API calls
+   * @param connectionId - The ID of the connection
+   * @returns The base URL string (e.g., "http://localhost:8080" or "https://instance.weaviate.network")
+   */
+  private getWeaviateBaseUrl(connectionId: string): string {
+    const connection = this.connectionManager.getConnection(connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
     }
 
-    if (schema.invertedIndex) {
-      apiSchema.invertedIndexConfig = schema.invertedIndex;
-    }
-    if (schema.multiTenancy) {
-      apiSchema.multiTenancyConfig = schema.multiTenancy;
-    }
-    if (schema.replication) {
-      apiSchema.replicationConfig = schema.replication;
-    }
-    if (schema.sharding) {
-      const { actualCount, actualVirtualCount, ...shardingConfig } = schema.sharding;
-      apiSchema.shardingConfig = shardingConfig;
-    }
-    if (fixed_vectorConfig) {
-      apiSchema.vectorConfig = fixed_vectorConfig;
-    }
-    if (schema.generative) {
-      apiSchema.moduleConfig = schema.generative;
+    if (connection.type === 'cloud' && connection.cloudUrl) {
+      // Cloud URL is already complete
+      return connection.cloudUrl.replace(/\/$/, ''); // Remove trailing slash
+    } else if (connection.type === 'custom') {
+      // Build URL from custom connection parts
+      const protocol = connection.httpSecure ? 'https' : 'http';
+      const host = connection.httpHost || 'localhost';
+      const port = connection.httpPort || 8080;
+      return `${protocol}://${host}:${port}`;
     }
 
-    return apiSchema;
+    throw new Error('Invalid connection configuration');
   }
 
   /**
-   * Exports a collection schema to a file
+   * Builds headers for Weaviate REST API calls
+   * @param connectionId - The ID of the connection
+   * @returns Headers object with authorization if API key is present
+   */
+  private getWeaviateHeaders(connectionId: string): Record<string, string> {
+    const connection = this.connectionManager.getConnection(connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (connection.apiKey) {
+      headers['Authorization'] = `Bearer ${connection.apiKey}`;
+    }
+
+    return headers;
+  }
+
+  /**
+   * Exports a collection schema to a file using Weaviate REST API
    * @param connectionId - The ID of the connection
    * @param collectionName - The name of the collection to export
    */
   async exportSchema(connectionId: string, collectionName: string): Promise<void> {
     try {
-      // Get the Weaviate client
-      const client = this.connectionManager.getClient(connectionId);
-      if (!client) {
-        throw new Error('Client not found');
-      }
-
       // Show save dialog
       const saveUri = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(`${collectionName}_weaviate_schema.json`),
@@ -3229,10 +3079,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return; // User cancelled
       }
 
-      // Export collection using client.collections.export() and convert to API format
-      const exportedSchema = await client.collections.export(collectionName);
-      const apiSchema = this.convertSchemaToApiFormat(exportedSchema);
-      const schemaJson = JSON.stringify(apiSchema, null, 2);
+      // Use direct REST API to get collection schema
+      const baseUrl = this.getWeaviateBaseUrl(connectionId);
+      const headers = this.getWeaviateHeaders(connectionId);
+
+      const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch schema: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const schema = await response.json();
+      const schemaJson = JSON.stringify(schema, null, 2);
       await vscode.workspace.fs.writeFile(saveUri, Buffer.from(schemaJson, 'utf8'));
 
       console.log(`Collection "${collectionName}" exported successfully to ${saveUri.fsPath}`);
@@ -3344,21 +3208,28 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               break;
             case 'getSchema':
               try {
-                const collections = this.collections[connectionId] || [];
-                const targetCollection = collections.find(
-                  (col: any) => col.label === message.collectionName
-                );
+                // Use direct REST API to get collection schema
+                const baseUrl = this.getWeaviateBaseUrl(connectionId);
+                const headers = this.getWeaviateHeaders(connectionId);
+                const collectionName = message.collectionName;
 
-                if (!targetCollection) {
-                  throw new Error(`Collection "${message.collectionName}" not found`);
+                const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
+                  method: 'GET',
+                  headers: headers,
+                });
+
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(
+                    `Failed to fetch schema: ${response.status} ${response.statusText} - ${errorText}`
+                  );
                 }
 
-                // Convert the raw schema to API format for the clone operation
-                const convertedSchema = this.convertSchemaToApiFormat(targetCollection.schema);
+                const schema = await response.json();
 
                 postMessage({
                   command: 'schema',
-                  schema: convertedSchema,
+                  schema: schema,
                 });
               } catch (error) {
                 postMessage({
@@ -3379,80 +3250,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
-   * Creates a new collection using the Weaviate API
+   * Creates a new collection using the Weaviate REST API
    * @param connectionId - The ID of the connection
    * @param schema - The collection schema to create
    */
   private async createCollection(connectionId: string, schema: any): Promise<void> {
-    const client = this.connectionManager.getClient(connectionId);
-    if (!client) {
-      throw new Error('Client not initialized');
-    }
-
     // Basic validation
     if (!schema.class) {
       throw new Error('Collection name is required');
     }
 
-    // Determine server major version to pick schema format (v1 vs v2)
-    const serverVersion = this.clusterMetadataCache[connectionId]?.version || '';
-    const serverMajor = parseInt(serverVersion.split('.')[0] || '0', 10);
-    const useV2Types = serverMajor >= 2; // v2 uses string dataType; v1 uses string[]
+    // Use direct REST API to create collection
+    const baseUrl = this.getWeaviateBaseUrl(connectionId);
+    const headers = this.getWeaviateHeaders(connectionId);
 
-    // Build schema object
-    const schemaObject = {
-      class: schema.class,
-      properties: (schema.properties || []).map((p: any) => {
-        // Normalize incoming dataType to canonical string with [] suffix for arrays
-        let dt: any = p?.dataType;
-        if (Array.isArray(dt)) {
-          dt = dt[0];
-        }
-        // Ensure string
-        dt = String(dt);
-        // For v1, wrap in array; for v2, keep as string
-        const normalizedDt = useV2Types ? dt : [dt];
-        return { ...p, dataType: normalizedDt };
-      }), // Include properties from the form
-    } as any;
-
-    // Add description if provided (don't include if empty to avoid sending empty strings)
-    if (schema.description && schema.description.trim()) {
-      schemaObject.description = schema.description;
-    }
-
-    // Handle vectorConfig (new multi-vectorizer format)
-    if (schema.vectorConfig) {
-      schemaObject.vectorConfig = schema.vectorConfig;
-    }
-    // Handle legacy single vectorizer format for backward compatibility
-    else if (schema.vectorizer && schema.vectorizer !== 'none') {
-      schemaObject.vectorizer = schema.vectorizer;
-      if (schema.vectorIndexType) {
-        schemaObject.vectorIndexType = schema.vectorIndexType;
-      }
-      if (schema.vectorIndexConfig) {
-        schemaObject.vectorIndexConfig = schema.vectorIndexConfig;
-      }
-      if (schema.moduleConfig) {
-        schemaObject.moduleConfig = schema.moduleConfig;
-      }
-    }
-
-    // Handle multiTenancyConfig
-    if (schema.multiTenancyConfig) {
-      schemaObject.multiTenancyConfig = schema.multiTenancyConfig;
-    }
-
-    // Handle replicationConfig
-    if (schema.replicationConfig) {
-      schemaObject.replicationConfig = schema.replicationConfig;
-    }
-
-    // Create the collection using the schema API
-    // return if any error here
     try {
-      await client.collections.createFromSchema(schemaObject);
+      const response = await fetch(`${baseUrl}/v1/schema`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(schema),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `${response.status} ${response.statusText}`;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error && errorJson.error[0]?.message) {
+            errorMessage = errorJson.error[0].message;
+          }
+        } catch {
+          // If parsing fails, use the raw text
+          if (errorText) {
+            errorMessage += ` - ${errorText}`;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      console.log(`Collection "${schema.class}" created successfully`);
     } catch (error) {
       // on error, show dialog with error message
       console.error('Error creating collection:', error);
