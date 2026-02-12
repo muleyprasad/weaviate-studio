@@ -46,6 +46,9 @@ class InjectCssPlugin {
             { path: path.resolve(__dirname, 'node_modules/weaviate-add-collection/src/styles.css'), name: 'Component Library Styles', required: true },
             { path: path.resolve(__dirname, 'src/webview/AddCollection.override.css'), name: 'VS Code Theme Overrides', required: true },
             { path: path.resolve(__dirname, 'src/webview/AddCollection.css'), name: 'Custom Webview Styles', required: true },
+            { path: path.resolve(__dirname, 'src/webview/components/SelectCreateMode.css'), name: 'SelectCreateMode Component Styles', required: true },
+            { path: path.resolve(__dirname, 'src/webview/components/FileUpload.css'), name: 'FileUpload Component Styles', required: true },
+            { path: path.resolve(__dirname, 'src/webview/components/CloneCollection.css'), name: 'CloneCollection Component Styles', required: true },
           ];
 
           try {

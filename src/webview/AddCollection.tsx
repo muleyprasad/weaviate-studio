@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 // @ts-ignore - JSX component without type declarations
 import Collection from 'weaviate-add-collection';
+import { SelectCreateMode, CreationMode } from './components/SelectCreateMode';
+import { FileUpload } from './components/FileUpload';
+import { CloneCollection } from './components/CloneCollection';
+import { getVscodeApi } from './vscodeApi';
 
 // Setup VS Code API for message passing with the extension host
 declare global {
@@ -14,25 +18,18 @@ declare global {
   }
 }
 
-// Get VS Code API reference for messaging
-let vscode: any;
-try {
-  vscode = window.acquireVsCodeApi();
-} catch (error) {
-  console.error('Failed to acquire VS Code API', error);
-}
+// Get VS Code API reference for messaging (shared across all components)
+const vscode = getVscodeApi();
 
-interface AddCollectionProps {
-  connectionId?: string;
-  initialSchema?: any;
-  availableModules?: any;
-}
+type AppMode = 'select' | CreationMode;
 
 function AddCollectionWebview() {
+  const [mode, setMode] = useState<AppMode>('select');
   const [initialSchema, setInitialSchema] = useState<any>(null);
   const [availableModules, setAvailableModules] = useState<any>(null);
   const [nodesNumber, setNodesNumber] = useState<number>(1);
   const [currentSchema, setCurrentSchema] = useState<any>(null);
+  const [hasCollections, setHasCollections] = useState<boolean>(false);
 
   useEffect(() => {
     // Request initial data from extension
@@ -57,9 +54,16 @@ function AddCollectionWebview() {
           break;
         case 'initialSchema':
           setInitialSchema(message.schema);
+          // If we receive an initial schema, go straight to fromScratch mode
+          if (message.schema) {
+            setMode('fromScratch');
+          }
           break;
         case 'nodesNumber':
           setNodesNumber(message.nodesNumber || 1);
+          break;
+        case 'hasCollections':
+          setHasCollections(message.hasCollections || false);
           break;
         case 'error':
           alert(`Error: ${message.message}`);
@@ -70,6 +74,25 @@ function AddCollectionWebview() {
     window.addEventListener('message', messageHandler);
     return () => window.removeEventListener('message', messageHandler);
   }, []);
+
+  const handleModeSelect = (selectedMode: CreationMode) => {
+    setMode(selectedMode);
+  };
+
+  const handleFileLoaded = (schema: any, action: 'edit' | 'create') => {
+    if (action === 'edit') {
+      setInitialSchema(schema);
+      setMode('fromScratch');
+    } else if (action === 'create') {
+      // Create directly without editing
+      if (vscode) {
+        vscode.postMessage({
+          command: 'create',
+          schema: schema,
+        });
+      }
+    }
+  };
 
   const handleCreate = () => {
     // Use the schema from the onChange/onSubmit callback
@@ -106,6 +129,39 @@ function AddCollectionWebview() {
     }
   };
 
+  const handleBack = () => {
+    setMode('select');
+    setInitialSchema(null);
+  };
+
+  // Render based on current mode
+  if (mode === 'select') {
+    return (
+      <SelectCreateMode
+        hasCollections={hasCollections}
+        onSelectMode={handleModeSelect}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  if (mode === 'importFromFile') {
+    return (
+      <FileUpload onSchemaLoaded={handleFileLoaded} onBack={handleBack} onCancel={handleCancel} />
+    );
+  }
+
+  if (mode === 'cloneExisting') {
+    return (
+      <CloneCollection
+        onSchemaLoaded={handleFileLoaded}
+        onBack={handleBack}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  // Default: fromScratch mode
   return (
     <div className="add-collection-container">
       <div className="add-collection-header">
@@ -127,6 +183,9 @@ function AddCollectionWebview() {
       <div className="add-collection-actions">
         <button className="action-button action-button-primary" onClick={handleCreate}>
           Create Collection
+        </button>
+        <button className="action-button action-button-secondary" onClick={handleBack}>
+          Back
         </button>
         <button className="action-button action-button-secondary" onClick={handleCancel}>
           Cancel
