@@ -465,26 +465,28 @@ function BackupRestoreWebview() {
             </select>
           </div>
 
-          {collectionMode !== 'all' && collections.length > 0 && (
-            <div className="form-section">
-              <label className="form-label">
-                Select Collections to {collectionMode === 'include' ? 'Include' : 'Exclude'}:
-              </label>
-              <div className="collections-list">
-                {collections.map((collection) => (
-                  <label key={collection} className="collection-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedCollections.includes(collection)}
-                      onChange={() => handleCollectionToggle(collection)}
-                      disabled={isRestoring}
-                    />
-                    <span>{collection}</span>
-                  </label>
-                ))}
+          {collectionMode !== 'all' &&
+            backupDetails?.classes &&
+            backupDetails.classes.length > 0 && (
+              <div className="form-section">
+                <label className="form-label">
+                  Select Collections to {collectionMode === 'include' ? 'Include' : 'Exclude'}:
+                </label>
+                <div className="collections-list">
+                  {backupDetails.classes.map((collection) => (
+                    <label key={collection} className="collection-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedCollections.includes(collection)}
+                        onChange={() => handleCollectionToggle(collection)}
+                        disabled={isRestoring}
+                      />
+                      <span>{collection}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div className="form-section">
             <label className="form-label checkbox-label">
