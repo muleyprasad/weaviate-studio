@@ -940,22 +940,6 @@ print(f"Collection '{schema.class}' created successfully!")`;
     -d '${JSON.stringify(apiEquivalent, null, 2)}'`;
   }
 
-  private generatePythonScript(schema: any): string {
-    const apiEquivalent = this.convertToApiFormat(schema);
-    return `import weaviate
-
-const client = await weaviate.connectToLocal({
-    host: process.env.WEAVIATE_HOST || 'localhost',
-    port: parseInt(process.env.WEAVIATE_PORT || '8080'),
-    grpcPort: parseInt(process.env.WEAVIATE_GRPC_PORT || '50051'),
-    headers: { 'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY as string }, // Replace with your inference API key
-  });
-
-schema = ${JSON.stringify(apiEquivalent, null, 2)}
-
-client.collections.createFromSchema(schema)`;
-  }
-
   private convertToApiFormat(schema: any): any {
     // Remove internal fields and format for API
     // if tokenization for "none", make undefined
