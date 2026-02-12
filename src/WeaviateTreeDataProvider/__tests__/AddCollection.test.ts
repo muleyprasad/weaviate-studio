@@ -1,6 +1,9 @@
 import { jest } from '@jest/globals';
 import * as vscode from 'vscode';
 
+// Mock fetch globally for tests
+global.fetch = jest.fn() as any;
+
 // Mock ConnectionManager
 const mockConnectionManager = {
   getConnection: jest.fn(),
@@ -379,14 +382,23 @@ describe('Add Collection', () => {
     });
 
     it('builds correct schema object', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
+      // Mock connection with REST API details
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        status: 'connected',
+      });
+
+      // Mock fetch to return success
+      const mockFetch = global.fetch as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      });
 
       const inputSchema = {
         class: 'TestCollection',
@@ -404,38 +416,53 @@ describe('Add Collection', () => {
 
       await (provider as any).createCollection('conn1', inputSchema);
 
-      expect(mockCreateFromSchema).toHaveBeenCalledWith({
-        class: 'TestCollection',
-        description: 'Test description',
-        vectorizer: 'text2vec-openai',
-        vectorIndexType: 'hnsw',
-        properties: [
-          {
-            name: 'title',
-            dataType: ['text'],
-            description: 'Title field',
-          },
-        ],
-      });
+      // Verify fetch was called with correct parameters
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/v1/schema',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify(inputSchema),
+        })
+      );
     });
 
     it('handles vectorizer "none" correctly', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
-
-      await (provider as any).createCollection('conn1', {
-        class: 'TestCollection',
-        vectorizer: 'none',
+      // Mock connection with REST API details
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        status: 'connected',
       });
 
-      const calledSchema = mockCreateFromSchema.mock.calls[0][0] as any;
-      expect(calledSchema.vectorizer).toBeUndefined();
+      // Mock fetch to return success
+      const mockFetch = global.fetch as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      const inputSchema = {
+        class: 'TestCollection',
+        vectorizer: 'none',
+      };
+
+      await (provider as any).createCollection('conn1', inputSchema);
+
+      // Verify fetch was called with the schema as-is (REST API handles it)
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/v1/schema',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(inputSchema),
+        })
+      );
     });
   });
 

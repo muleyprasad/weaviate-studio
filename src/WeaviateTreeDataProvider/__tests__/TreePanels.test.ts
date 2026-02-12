@@ -1,10 +1,27 @@
 import { jest } from '@jest/globals';
 import * as vscode from 'vscode';
 
+// Mock fetch globally for tests
+global.fetch = jest.fn() as any;
+
 // Mock ConnectionManager to avoid side-effects
+const mockConnectionManager = {
+  getConnections: () => [],
+  onConnectionsChanged: () => {},
+  getConnection: jest.fn(() => ({
+    id: 'c1',
+    name: 'Test Connection',
+    type: 'custom',
+    httpHost: 'localhost',
+    httpPort: 8080,
+    httpSecure: false,
+    status: 'connected',
+  })),
+};
+
 jest.mock('../../services/ConnectionManager', () => ({
   ConnectionManager: {
-    getInstance: () => ({ getConnections: () => [], onConnectionsChanged: () => {} }),
+    getInstance: () => mockConnectionManager,
   },
 }));
 
@@ -53,6 +70,13 @@ describe('Tree panel webview options', () => {
   it('detailed schema panel includes retainContextWhenHidden', async () => {
     const capture = jest.fn(() => ({ webview: {}, reveal: jest.fn(), dispose: jest.fn() }));
     vsMock.window.createWebviewPanel.mockImplementation(capture);
+
+    // Mock fetch to return a successful response with schema
+    const mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ class: 'ColA', properties: [] }),
+    });
 
     await provider.handleViewDetailedSchema(makeItem('ColA'));
 
