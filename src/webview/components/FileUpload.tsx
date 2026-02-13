@@ -35,7 +35,12 @@ export function FileUpload({ onSchemaLoaded, onBack, onCancel, externalError }: 
       setValidSchema(schema);
       setJsonText(JSON.stringify(schema, null, 2));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid JSON');
+      // Provide consistent error message for JSON parse errors
+      if (err instanceof SyntaxError) {
+        setError('Input is not valid JSON. Please check your syntax.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Invalid JSON');
+      }
       setValidSchema(null);
     }
   };

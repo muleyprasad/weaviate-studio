@@ -41,8 +41,7 @@ describe('FileUpload', () => {
     fireEvent.change(textarea, { target: { value: 'invalid json' } });
 
     await waitFor(() => {
-      // Error message includes the full JSON parse error
-      expect(screen.getByText(/not valid JSON/i)).toBeInTheDocument();
+      expect(screen.getByText(/Input is not valid JSON/i)).toBeInTheDocument();
     });
   });
 
