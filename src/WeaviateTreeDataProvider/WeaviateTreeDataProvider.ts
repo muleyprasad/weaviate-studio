@@ -2931,6 +2931,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       // Refresh the tree view
       this.refresh();
+
+      // Update cluster panel with latest node/collection stats
+      await this.fetchNodes(connectionId);
+      await this.updateClusterPanelIfOpen(connectionId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteCollection:', error);
@@ -2965,6 +2969,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       // Refresh the tree view
       this.refresh();
+
+      // Update cluster panel with latest node/collection stats
+      await this.fetchNodes(connectionId);
+      await this.updateClusterPanelIfOpen(connectionId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteAllCollections:', error);
@@ -3143,6 +3151,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           // On create callback
           await this.createCollection(connectionId, schema);
           await this.fetchData(connectionId);
+          // Update cluster panel with latest node/collection stats
+          await this.fetchNodes(connectionId);
+          await this.updateClusterPanelIfOpen(connectionId);
         },
         async (message: any, postMessage: (msg: any) => void) => {
           // On message callback for handling webview requests
@@ -3253,6 +3264,41 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error showing add collection dialog:', error);
       throw new Error(`Failed to show add collection dialog: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Updates the cluster panel if it's currently open
+   * @param connectionId - The ID of the connection
+   */
+  private async updateClusterPanelIfOpen(connectionId: string): Promise<void> {
+    try {
+      // Check if cluster panel is open
+      if (!ClusterPanel.currentPanel) {
+        return;
+      }
+
+      // Get the client
+      const client = this.connectionManager.getClient(connectionId);
+      if (!client) {
+        return;
+      }
+
+      // Fetch updated node status data
+      const nodeStatusData = await client.cluster.nodes({ output: 'verbose' });
+
+      // Get connection for settings
+      const connection = this.connectionManager.getConnection(connectionId);
+
+      // Send update to the panel
+      ClusterPanel.currentPanel.postMessage({
+        command: 'updateData',
+        nodeStatusData: nodeStatusData,
+        openClusterViewOnConnect: connection?.openClusterViewOnConnect,
+      });
+    } catch (error) {
+      // Silently fail - don't break collection operations if cluster panel update fails
+      console.error('Error updating cluster panel:', error);
     }
   }
 
