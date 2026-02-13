@@ -184,6 +184,12 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         httpSecure: true,
         grpcSecure: true,
         authCredentials: { key: 'mock-key' },
+        skipInitChecks: undefined,
+        headers: {
+          'X-Weaviate-Client': expect.stringContaining(
+            'weaviate-client-typescript/weaviate-studio@'
+          ),
+        },
         timeout: {
           init: 25,
           query: 55,
@@ -229,6 +235,12 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         'https://mock-cloud.weaviate.network',
         {
           authCredentials: mockApiKeyInstance,
+          skipInitChecks: undefined,
+          headers: {
+            'X-Weaviate-Client': expect.stringContaining(
+              'weaviate-client-typescript/weaviate-studio@'
+            ),
+          },
           timeout: {
             init: 35,
             query: 75,

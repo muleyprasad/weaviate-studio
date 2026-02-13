@@ -613,6 +613,9 @@ describe('Integration Tests - Real-world Weaviate Schemas', () => {
   it('handles invalid QueryConfig gracefully without crashing', () => {
     const { processTemplate: pt } = require('../graphqlTemplates');
 
+    // Mock console.error to suppress expected error logs during this test
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     // Test that invalid config doesn't crash - errors are caught and logged internally
     // The function returns a fallback query instead of throwing
 
@@ -634,5 +637,8 @@ describe('Integration Tests - Real-world Weaviate Schemas', () => {
     });
     expect(result3).toBeTruthy();
     expect(result3).toContain('BlogPost');
+
+    // Restore console.error
+    consoleErrorSpy.mockRestore();
   });
 });

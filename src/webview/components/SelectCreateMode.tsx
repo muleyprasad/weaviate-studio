@@ -38,17 +38,19 @@ export function SelectCreateMode({
         </div>
 
         <div
-          className="option-card"
-          onClick={() => onSelectMode('cloneExisting')}
+          className={`option-card ${!hasCollections ? 'option-card-disabled' : ''}`}
+          onClick={() => hasCollections && onSelectMode('cloneExisting')}
           role="button"
-          tabIndex={0}
-          onKeyPress={(e) => e.key === 'Enter' && onSelectMode('cloneExisting')}
+          tabIndex={hasCollections ? 0 : -1}
+          onKeyPress={(e) => hasCollections && e.key === 'Enter' && onSelectMode('cloneExisting')}
+          aria-disabled={!hasCollections}
         >
           <span className="option-icon">📋</span>
           <div className="option-title">Clone Existing Collection</div>
           <div className="option-description">
-            Create a new collection based on an existing collection's schema and configuration.
-            Perfect for creating similar collections.
+            {hasCollections
+              ? "Create a new collection based on an existing collection's schema and configuration. Perfect for creating similar collections."
+              : 'No collections available to clone. Create a collection first.'}
           </div>
         </div>
 

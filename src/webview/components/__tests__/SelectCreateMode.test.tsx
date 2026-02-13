@@ -158,4 +158,58 @@ describe('SelectCreateMode', () => {
 
     expect(screen.getByText('Clone Existing Collection')).toBeInTheDocument();
   });
+
+  it('disables clone option when hasCollections is false', () => {
+    render(
+      <SelectCreateMode
+        hasCollections={false}
+        onSelectMode={mockOnSelectMode}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    const cloneCard = screen.getByText('Clone Existing Collection').closest('.option-card');
+
+    // Should have disabled class
+    expect(cloneCard).toHaveClass('option-card-disabled');
+
+    // Should have aria-disabled
+    expect(cloneCard).toHaveAttribute('aria-disabled', 'true');
+
+    // Should have tabindex -1
+    expect(cloneCard).toHaveAttribute('tabindex', '-1');
+
+    // Should not call onSelectMode when clicked
+    fireEvent.click(cloneCard!);
+    expect(mockOnSelectMode).not.toHaveBeenCalled();
+
+    // Should show appropriate message
+    expect(screen.getByText(/No collections available to clone/i)).toBeInTheDocument();
+  });
+
+  it('enables clone option when hasCollections is true', () => {
+    render(
+      <SelectCreateMode
+        hasCollections={true}
+        onSelectMode={mockOnSelectMode}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    const cloneCard = screen.getByText('Clone Existing Collection').closest('.option-card');
+
+    // Should not have disabled class
+    expect(cloneCard).not.toHaveClass('option-card-disabled');
+
+    // Should have aria-disabled false
+    expect(cloneCard).toHaveAttribute('aria-disabled', 'false');
+
+    // Should have tabindex 0
+    expect(cloneCard).toHaveAttribute('tabindex', '0');
+
+    // Should call onSelectMode when clicked
+    fireEvent.click(cloneCard!);
+    expect(mockOnSelectMode).toHaveBeenCalledWith('cloneExisting');
+    expect(mockOnSelectMode).toHaveBeenCalledTimes(1);
+  });
 });

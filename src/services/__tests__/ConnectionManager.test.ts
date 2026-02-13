@@ -280,6 +280,12 @@ describe('ConnectionManager', () => {
         httpSecure: false,
         grpcSecure: false,
         authCredentials: { key: 'test-key' },
+        skipInitChecks: undefined,
+        headers: {
+          'X-Weaviate-Client': expect.stringContaining(
+            'weaviate-client-typescript/weaviate-studio@'
+          ),
+        },
         timeout: {
           init: 30,
           query: 60,

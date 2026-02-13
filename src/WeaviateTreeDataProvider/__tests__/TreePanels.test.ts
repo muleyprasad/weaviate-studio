@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import * as vscode from 'vscode';
 
 // Mock fetch globally for tests
-global.fetch = jest.fn() as any;
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 // Mock ConnectionManager to avoid side-effects
 const mockConnectionManager = {
@@ -72,11 +72,13 @@ describe('Tree panel webview options', () => {
     vsMock.window.createWebviewPanel.mockImplementation(capture);
 
     // Mock fetch to return a successful response with schema
-    const mockFetch = global.fetch as jest.Mock;
-    mockFetch.mockResolvedValueOnce({
+    (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ class: 'ColA', properties: [] }),
-    });
+      text: async () => '',
+      status: 200,
+      statusText: 'OK',
+    } as any);
 
     await provider.handleViewDetailedSchema(makeItem('ColA'));
 

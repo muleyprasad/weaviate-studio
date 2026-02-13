@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import * as vscode from 'vscode';
 
 // Mock fetch globally for tests
-global.fetch = jest.fn() as any;
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 // Mock ConnectionManager
 const mockConnectionManager = {
@@ -394,11 +394,14 @@ describe('Add Collection', () => {
       });
 
       // Mock fetch to return success
-      const mockFetch = global.fetch as jest.Mock;
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({}),
-      });
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
 
       const inputSchema = {
         class: 'TestCollection',
@@ -442,11 +445,14 @@ describe('Add Collection', () => {
       });
 
       // Mock fetch to return success
-      const mockFetch = global.fetch as jest.Mock;
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({}),
-      });
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
 
       const inputSchema = {
         class: 'TestCollection',

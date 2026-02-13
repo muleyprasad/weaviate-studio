@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { FileUpload } from '../FileUpload';
 
@@ -198,9 +198,11 @@ describe('FileUpload', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     // Simulate FileReader load event
-    if (mockFileReader.onload) {
-      mockFileReader.onload({ target: { result: JSON.stringify(validSchema) } } as any);
-    }
+    await act(async () => {
+      if (mockFileReader.onload) {
+        mockFileReader.onload({ target: { result: JSON.stringify(validSchema) } } as any);
+      }
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Valid schema loaded: Article/i)).toBeInTheDocument();

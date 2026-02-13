@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import weaviate, { ConnectToCustomOptions, WeaviateClient } from 'weaviate-client';
+import { WEAVIATE_CLIENT_HEADER } from '../constants';
 
 export interface ConnectionLink {
   name: string;
@@ -329,11 +330,14 @@ export class ConnectionManager {
 
     try {
       let client: WeaviateClient | undefined;
+      const headers = {
+        'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+      };
       if (connection.type === 'cloud' && connection.cloudUrl) {
         client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
           authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
           skipInitChecks: connection.skipInitChecks,
-
+          headers: headers,
           timeout: {
             init: connection.timeoutInit,
             query: connection.timeoutQuery,
@@ -348,6 +352,7 @@ export class ConnectionManager {
           httpPort: connection.httpPort,
           httpSecure: connection.httpSecure,
           skipInitChecks: connection.skipInitChecks,
+          headers: headers,
           timeout: {
             init: connection.timeoutInit,
             query: connection.timeoutQuery,
@@ -393,6 +398,9 @@ export class ConnectionManager {
               grpcPort: undefined, // Explicitly set to undefined
               grpcSecure: undefined, // Explicitly set to undefined
               skipInitChecks: true, // Force skip init checks to avoid gRPC compatibility issues
+              headers: {
+                'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+              },
               timeout: {
                 init: connection.timeoutInit,
                 query: connection.timeoutQuery,
