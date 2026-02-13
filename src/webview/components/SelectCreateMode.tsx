@@ -69,12 +69,6 @@ export function SelectCreateMode({
           </div>
         </div>
       </div>
-
-      <div className="button-group">
-        <button type="button" className="cancel-button" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }

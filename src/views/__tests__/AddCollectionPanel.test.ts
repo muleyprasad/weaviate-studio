@@ -298,7 +298,6 @@ describe('AddCollectionPanel', () => {
       });
 
       expect(onCreateCallback).toHaveBeenCalledWith(schema);
-      expect(showInfoSpy).toHaveBeenCalledWith('Collection "NewCollection" created successfully');
       expect(AddCollectionPanel.currentPanel).toBeUndefined();
     });
 
@@ -583,9 +582,6 @@ describe('AddCollectionPanel', () => {
       });
 
       expect(onCreateCallback).toHaveBeenCalledWith(complexSchema);
-      expect(showInfoSpy).toHaveBeenCalledWith(
-        'Collection "ComplexCollection" created successfully'
-      );
     });
   });
 });

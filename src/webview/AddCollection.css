@@ -29,16 +29,22 @@
 .add-collection-content {
   flex: 1;
   padding: 20px 24px;
+  padding-bottom: 80px; /* Add space for fixed button bar */
   overflow-y: auto;
 }
 
 .add-collection-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 16px 24px;
   background-color: var(--vscode-sideBar-background);
   border-top: 1px solid var(--vscode-panel-border);
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  z-index: 1000;
 }
 
 .action-button {

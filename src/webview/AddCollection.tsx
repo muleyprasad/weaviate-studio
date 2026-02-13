@@ -30,6 +30,7 @@ function AddCollectionWebview() {
   const [nodesNumber, setNodesNumber] = useState<number>(1);
   const [currentSchema, setCurrentSchema] = useState<any>(null);
   const [hasCollections, setHasCollections] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     // Request initial data from extension
@@ -66,7 +67,7 @@ function AddCollectionWebview() {
           setHasCollections(message.hasCollections || false);
           break;
         case 'error':
-          alert(`Error: ${message.message}`);
+          setError(message.message || 'An error occurred');
           break;
       }
     };
@@ -76,10 +77,12 @@ function AddCollectionWebview() {
   }, []);
 
   const handleModeSelect = (selectedMode: CreationMode) => {
+    setError('');
     setMode(selectedMode);
   };
 
   const handleFileLoaded = (schema: any, action: 'edit' | 'create') => {
+    setError('');
     if (action === 'edit') {
       setInitialSchema(schema);
       setMode('fromScratch');
@@ -97,6 +100,7 @@ function AddCollectionWebview() {
   const handleCreate = () => {
     // Use the schema from the onChange/onSubmit callback
     if (currentSchema) {
+      setError('');
       if (vscode) {
         vscode.postMessage({
           command: 'create',
@@ -104,7 +108,7 @@ function AddCollectionWebview() {
         });
       }
     } else {
-      alert('No schema found. Please fill in the collection details.');
+      setError('No schema found. Please fill in the collection details.');
     }
   };
 
@@ -130,6 +134,7 @@ function AddCollectionWebview() {
   };
 
   const handleBack = () => {
+    setError('');
     setMode('select');
     setInitialSchema(null);
   };
@@ -137,17 +142,57 @@ function AddCollectionWebview() {
   // Render based on current mode
   if (mode === 'select') {
     return (
-      <SelectCreateMode
-        hasCollections={hasCollections}
-        onSelectMode={handleModeSelect}
-        onCancel={handleCancel}
-      />
+      <>
+        {error && (
+          <div
+            style={{
+              padding: '12px 16px',
+              marginBottom: '20px',
+              background: 'var(--vscode-inputValidation-errorBackground)',
+              border: '1px solid var(--vscode-inputValidation-errorBorder)',
+              borderRadius: '4px',
+              color: 'var(--vscode-errorForeground)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{error}</span>
+            <button
+              onClick={() => setError('')}
+              style={{
+                marginLeft: 'auto',
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '4px 8px',
+              }}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        <SelectCreateMode
+          hasCollections={hasCollections}
+          onSelectMode={handleModeSelect}
+          onCancel={handleCancel}
+        />
+      </>
     );
   }
 
   if (mode === 'importFromFile') {
     return (
-      <FileUpload onSchemaLoaded={handleFileLoaded} onBack={handleBack} onCancel={handleCancel} />
+      <FileUpload
+        onSchemaLoaded={handleFileLoaded}
+        onBack={handleBack}
+        onCancel={handleCancel}
+        externalError={error}
+      />
     );
   }
 
@@ -157,6 +202,7 @@ function AddCollectionWebview() {
         onSchemaLoaded={handleFileLoaded}
         onBack={handleBack}
         onCancel={handleCancel}
+        externalError={error}
       />
     );
   }
@@ -167,6 +213,40 @@ function AddCollectionWebview() {
       <div className="add-collection-header">
         <h1>Add Weaviate Collection</h1>
       </div>
+
+      {error && (
+        <div
+          style={{
+            padding: '12px 16px',
+            marginBottom: '20px',
+            background: 'var(--vscode-inputValidation-errorBackground)',
+            border: '1px solid var(--vscode-inputValidation-errorBorder)',
+            borderRadius: '4px',
+            color: 'var(--vscode-errorForeground)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>⚠️</span>
+          <span>{error}</span>
+          <button
+            onClick={() => setError('')}
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontSize: '16px',
+              padding: '4px 8px',
+            }}
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="add-collection-content">
         <Collection

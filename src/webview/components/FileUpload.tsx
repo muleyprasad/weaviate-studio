@@ -5,14 +5,18 @@ export interface FileUploadProps {
   onSchemaLoaded: (schema: any, action: 'edit' | 'create') => void;
   onBack: () => void;
   onCancel: () => void;
+  externalError?: string;
 }
 
-export function FileUpload({ onSchemaLoaded, onBack, onCancel }: FileUploadProps) {
+export function FileUpload({ onSchemaLoaded, onBack, onCancel, externalError }: FileUploadProps) {
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [validSchema, setValidSchema] = useState<any>(null);
   const [jsonText, setJsonText] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Display external error if provided
+  const displayError = externalError || error;
 
   const validateAndSetSchema = (jsonString: string) => {
     setError('');
@@ -108,10 +112,10 @@ export function FileUpload({ onSchemaLoaded, onBack, onCancel }: FileUploadProps
         <div className="subtitle">Upload a JSON file or paste your collection schema</div>
       </div>
 
-      {error && (
+      {displayError && (
         <div className="error-message">
           <span className="error-icon">⚠️</span>
-          <span>{error}</span>
+          <span>{displayError}</span>
         </div>
       )}
 

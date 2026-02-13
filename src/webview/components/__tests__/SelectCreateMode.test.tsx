@@ -88,21 +88,6 @@ describe('SelectCreateMode', () => {
     expect(mockOnSelectMode).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onCancel when clicking the Cancel button', () => {
-    render(
-      <SelectCreateMode
-        hasCollections={false}
-        onSelectMode={mockOnSelectMode}
-        onCancel={mockOnCancel}
-      />
-    );
-
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    fireEvent.click(cancelButton);
-
-    expect(mockOnCancel).toHaveBeenCalledTimes(1);
-  });
-
   it('handles keyboard interaction with Enter key on From Scratch option', () => {
     render(
       <SelectCreateMode
@@ -129,8 +114,8 @@ describe('SelectCreateMode', () => {
 
     const options = screen.getAllByRole('button');
 
-    // Should have 4 buttons total (3 options + 1 cancel)
-    expect(options).toHaveLength(4);
+    // Should have 3 buttons total (3 options)
+    expect(options).toHaveLength(3);
 
     // Check that option cards have tabIndex
     const fromScratchCard = screen.getByText('From Scratch').closest('.option-card');

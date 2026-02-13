@@ -6,12 +6,18 @@ export interface CloneCollectionProps {
   onSchemaLoaded: (schema: any, action: 'edit' | 'create') => void;
   onBack: () => void;
   onCancel: () => void;
+  externalError?: string;
 }
 
 // Get shared VS Code API instance
 const vscode = getVscodeApi();
 
-export function CloneCollection({ onSchemaLoaded, onBack, onCancel }: CloneCollectionProps) {
+export function CloneCollection({
+  onSchemaLoaded,
+  onBack,
+  onCancel,
+  externalError,
+}: CloneCollectionProps) {
   const [collections, setCollections] = useState<string[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
   const [newCollectionName, setNewCollectionName] = useState<string>('');
@@ -19,6 +25,9 @@ export function CloneCollection({ onSchemaLoaded, onBack, onCancel }: CloneColle
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCollections, setIsLoadingCollections] = useState(true);
+
+  // Display external error if provided
+  const displayError = externalError || error;
 
   useEffect(() => {
     // Request collections list from extension
@@ -136,10 +145,10 @@ export function CloneCollection({ onSchemaLoaded, onBack, onCancel }: CloneColle
         </div>
       </div>
 
-      {error && (
+      {displayError && (
         <div className="error-message">
           <span className="error-icon">⚠️</span>
-          <span>{error}</span>
+          <span>{displayError}</span>
         </div>
       )}
 

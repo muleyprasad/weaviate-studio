@@ -145,9 +145,13 @@ export class AddCollectionPanel {
             `Collection "${message.schema.class}" created successfully`
           );
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          // Show VS Code error notification
+          vscode.window.showErrorMessage(`Failed to create collection: ${errorMessage}`);
+          // Also send error to webview for inline display
           this.postMessage({
             command: 'error',
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage,
           });
         }
         break;
