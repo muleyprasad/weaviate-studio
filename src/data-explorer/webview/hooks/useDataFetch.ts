@@ -26,7 +26,6 @@ export function useDataFetch() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const initialFetchDoneRef = useRef(false); // Track if initial fetch completed
-  const skipNextFetchRef = useRef(true); // Skip the first triggered fetch after init
   const currentRequestIdRef = useRef<string | null>(null); // Track current request ID
   const previousCollectionRef = useRef<string | null>(null); // Track collection changes
 
@@ -125,9 +124,24 @@ export function useDataFetch() {
             break;
 
           case 'objectsLoaded':
-            if (message.objects && message.total !== undefined) {
-              dataActions.setData(message.objects, message.total, message.unfilteredTotal);
-              // Mark initial fetch as done to prevent duplicate fetches
+            // Validate required fields
+            if (!message.objects || message.total === undefined) {
+              console.error('[DataFetch] Invalid objectsLoaded message: missing required fields', {
+                hasObjects: !!message.objects,
+                hasTotal: message.total !== undefined,
+                messageKeys: Object.keys(message),
+              });
+              dataActions.setError(
+                'Failed to load data due to invalid server response. Please try refreshing.'
+              );
+              dataActions.setLoading(false);
+              break;
+            }
+
+            // Process valid message
+            dataActions.setData(message.objects, message.total, message.unfilteredTotal);
+            // Mark initial fetch as done to allow pagination/filter effects to proceed
+            if (!initialFetchDoneRef.current) {
               initialFetchDoneRef.current = true;
             }
             break;
@@ -267,12 +281,6 @@ export function useDataFetch() {
   useEffect(() => {
     // Skip if not initialized yet or if initial fetch hasn't completed
     if (!initializedRef.current || !initialFetchDoneRef.current || !dataState.collectionName) {
-      return undefined;
-    }
-
-    // Skip the first run after initialization (it's a duplicate)
-    if (skipNextFetchRef.current) {
-      skipNextFetchRef.current = false;
       return undefined;
     }
 

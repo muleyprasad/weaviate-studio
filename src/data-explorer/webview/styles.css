@@ -118,6 +118,12 @@
     }
 }
 
+/* Transparent overlay for background loading (pagination, filtering) */
+.loading-overlay.loading-overlay-transparent {
+    background-color: color-mix(in srgb, var(--vscode-editor-background) 30%, transparent);
+    pointer-events: none;
+}
+
 /* ===== Data Table Container ===== */
 .data-table-container {
     display: flex;

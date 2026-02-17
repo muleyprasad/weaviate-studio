@@ -52,11 +52,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Virtual scrolling for collections with 100+ objects
   - React.memo optimization on frequently rendered components (CellRenderer, TableRow)
   - Optimized context subscriptions to prevent cascade re-renders
+  - TableRow context subscription uses props instead of context to prevent cascade re-renders
+  - FilterContext actions use refs to avoid recreation on every state change
+  - CellRenderer memoized to prevent unnecessary re-renders on table updates
+  - Race condition fixes in useDataFetch with proper dependencies
+  - useDebouncedCallback stabilized to avoid recreating functions on every render
+  - Infinite loop fix in data fetching caused by circular dependencies
   - Debounced search and filter inputs
   - Network request timeouts (30 second default)
   - Efficient ref-based state access in hooks
 
 - **User Experience Enhancements**
+
   - Loading skeleton screens with shimmer animation
   - Error boundaries on all major components with recovery options
   - Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E, Ctrl+R, Escape)
@@ -66,37 +73,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accessibility support (ARIA labels, keyboard navigation, focus management)
   - High contrast mode support
   - Reduced motion support for animations
+  - Updated toolbar icons for better visual clarity: Query Editor uses `$(edit)` (pencil) and Data Explorer uses `$(telescope)` (telescope)
+  - Debug console.log statements controlled by DEBUG flag
 
-### Fixed - Data Explorer Security
+- **Error Handling**
 
-- XSS vulnerability in webview initialization (unsafe string interpolation)
-- UUID format validation using regex pattern
-- Vector array size limit enforcement (max 65,536 dimensions)
-- Proper input sanitization in filter values
+  - Silent API failures now throw proper errors with user-facing messages
+  - Silent message handler failures now send error responses to webview
+  - Missing API connection errors display user-friendly messages
+  - postMessage to disposed webview handled gracefully
+  - localStorage quota exceeded errors with automatic recovery
+  - Network timeout handling for slow/unreliable connections
 
-### Fixed - Data Explorer Error Handling
+- **Security Hardening**
 
-- Silent API failures now throw proper errors with user-facing messages
-- Silent message handler failures now send error responses to webview
-- Missing API connection errors now display user-friendly messages
-- postMessage to disposed webview now handled gracefully
-- localStorage quota exceeded errors with automatic recovery
-- Network timeout handling for slow/unreliable connections
-
-### Fixed - Data Explorer Performance Issues
-
-- TableRow context subscription causing cascade re-renders (now uses props)
-- FilterContext actions recreated on every state change (now uses refs)
-- CellRenderer unnecessary re-renders on table updates (now memoized)
-- useDataFetch race conditions with missing dependencies
-- useDebouncedCallback recreating functions on every render
-- Infinite loop in data fetching caused by circular dependencies
-
-### Changed - Data Explorer
-
-- Debug console.log statements now controlled by DEBUG flag
-- Improved error messages throughout the application
-- Enhanced empty state messages with clearer calls-to-action
+  - XSS vulnerability fix in webview initialization (unsafe string interpolation)
+  - UUID format validation using regex pattern
+  - Vector array size limit enforcement (max 65,536 dimensions)
+  - Proper input sanitization in filter values
 
 ## Previous Releases
 

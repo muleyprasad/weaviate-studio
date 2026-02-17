@@ -56,7 +56,7 @@ Four search modes to find similar objects:
 
 1. In the Weaviate sidebar, expand your connection
 2. Right-click on a collection
-3. Select **"Open Data Explorer"** or click the search icon
+3. Select **"Open Data Explorer"** or click the telescope icon
 
 ### Browse Data
 

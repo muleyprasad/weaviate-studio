@@ -80,7 +80,7 @@
       {
         "command": "weaviate.queryCollection",
         "title": "Open Query Editor",
-        "icon": "$(table)"
+        "icon": "$(edit)"
       },
       {
         "command": "weaviate.deleteCollection",
@@ -90,7 +90,7 @@
         "command": "weaviate.openDataExplorer",
         "title": "Open Data Explorer",
         "category": "Weaviate",
-        "icon": "$(search)"
+        "icon": "$(telescope)"
       },
       {
         "command": "weaviate.openQueryEditor",
@@ -421,7 +421,7 @@
           "command": "weaviate.openDataExplorer",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "inline@2",
-          "icon": "$(search)"
+          "icon": "$(telescope)"
         },
         {
           "command": "weaviate.addCollection",

@@ -48,7 +48,7 @@ function DataExplorerContent() {
   const filterActions = useFilterActions();
   const vectorSearchState = useVectorSearchState();
   const vectorSearchActions = useVectorSearchActions();
-  const { isLoading } = useDataFetch();
+  const { isLoading, refresh } = useDataFetch();
   const { executeSearch } = useVectorSearch();
 
   // Phase 5: Export dialog state
@@ -126,9 +126,6 @@ function DataExplorerContent() {
     },
     [vectorSearchActions]
   );
-
-  // Get refresh function from useDataFetch
-  const { refresh } = useDataFetch();
 
   // Close all panels handler
   const handleCloseAllPanels = useCallback(() => {
@@ -251,8 +248,12 @@ function DataExplorerContent() {
       {/* Main content */}
       <main id="main-content" className="data-explorer-main">
         {/* Loading indicator */}
-        {isLoading && dataState.objects.length === 0 && (
-          <div className="loading-overlay" role="status" aria-live="polite">
+        {isLoading && (
+          <div
+            className={`loading-overlay${dataState.objects.length > 0 ? ' loading-overlay-transparent' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
             <div className="loading-spinner" />
             <span className="loading-message">Loading objects...</span>
           </div>
@@ -260,7 +261,12 @@ function DataExplorerContent() {
 
         {/* Data table with error boundary */}
         <ErrorBoundary fallbackMessage="Failed to load data table">
-          <DataTable onOpenDetail={handleOpenDetail} onFindSimilar={handleFindSimilar} />
+          <DataTable
+            onOpenDetail={handleOpenDetail}
+            onFindSimilar={handleFindSimilar}
+            refresh={refresh}
+            isLoading={isLoading}
+          />
         </ErrorBoundary>
       </main>
 

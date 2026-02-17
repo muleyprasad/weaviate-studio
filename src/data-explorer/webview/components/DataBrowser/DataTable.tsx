@@ -17,20 +17,20 @@ import {
   useFilterState,
   useFilterActions,
 } from '../../context';
-import { useDataFetch } from '../../hooks/useDataFetch';
 
 interface DataTableProps {
   onOpenDetail: (uuid: string) => void;
   onFindSimilar?: (uuid: string) => void;
+  refresh: () => void;
+  isLoading: boolean;
 }
 
-export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
+export function DataTable({ onOpenDetail, onFindSimilar, refresh, isLoading }: DataTableProps) {
   const dataState = useDataState();
   const uiState = useUIState();
   const uiActions = useUIActions();
   const filterState = useFilterState();
   const filterActions = useFilterActions();
-  const { refresh, isLoading } = useDataFetch();
 
   // Ref for virtual scrolling container
   const tableBodyRef = useRef<HTMLDivElement>(null);
@@ -280,7 +280,7 @@ export function DataTable({ onOpenDetail, onFindSimilar }: DataTableProps) {
       </div>
 
       {/* Pagination */}
-      {!dataState.error && !isLoading && <Pagination />}
+      {!dataState.error && <Pagination />}
 
       {/* Column Manager Dialog */}
       <ColumnManager
