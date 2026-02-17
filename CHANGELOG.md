@@ -92,6 +92,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vector array size limit enforcement (max 65,536 dimensions)
   - Proper input sanitization in filter values
 
+- **Alias Management** (PR #51, by [@dudanogueira](https://github.com/dudanogueira))
+
+  - Create, edit, and delete collection aliases from the tree view
+  - Inline actions for quick alias operations
+  - Dedicated refresh command for alias list
+  - Comprehensive test coverage
+
+- **Cluster Panel Enhancements** (PR #50, by [@dudanogueira](https://github.com/dudanogueira))
+
+  - Collection view type switching in cluster information panel
+  - Auto-refresh capability (off by default, configurable)
+
 ## [1.3.0] — 2025-12-26
 
 ### Added
