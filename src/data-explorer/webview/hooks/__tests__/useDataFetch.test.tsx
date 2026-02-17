@@ -657,7 +657,9 @@ describe('useDataFetch', () => {
       // by using a Proxy that throws on property access
       const errorMessage = new Proxy({ command: 'objectsLoaded' } as any, {
         get(target: any, prop: string | symbol) {
-          if (prop === 'command') return 'objectsLoaded';
+          if (prop === 'command') {
+            return 'objectsLoaded';
+          }
           if (prop === 'objects' || prop === 'total') {
             throw new Error('Simulated processing error');
           }
