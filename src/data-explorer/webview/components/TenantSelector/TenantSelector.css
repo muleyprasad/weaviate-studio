@@ -1,0 +1,48 @@
+.tenant-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+
+.tenant-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  margin: 0;
+}
+
+.tenant-select {
+  min-width: 150px;
+  max-width: 250px;
+  padding: 4px 8px;
+  font-size: 13px;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+}
+
+.tenant-select:hover:not(:disabled) {
+  background-color: var(--vscode-dropdown-listBackground);
+}
+
+.tenant-select:focus {
+  border-color: var(--vscode-focusBorder);
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.tenant-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tenant-select option {
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+}
