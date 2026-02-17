@@ -13,6 +13,10 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ![Extension Demo](docs/images/extension-demo.gif)
 
+### Data Explorer
+
+![Data Explorer Demo](docs/images/data-explorer-demo.gif)
+
 ---
 
 ## Key Benefits
