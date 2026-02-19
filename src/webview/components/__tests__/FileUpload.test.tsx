@@ -208,6 +208,38 @@ describe('FileUpload', () => {
     });
   });
 
+  it('shows error when FileReader fails to read the file', async () => {
+    render(
+      <FileUpload onSchemaLoaded={mockOnSchemaLoaded} onBack={mockOnBack} onCancel={mockOnCancel} />
+    );
+
+    const file = new File(['content'], 'schema.json', { type: 'application/json' });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const mockFileReader = {
+      readAsText: jest.fn(),
+      onload: null as any,
+      onerror: null as any,
+      result: null,
+    };
+
+    jest.spyOn(global, 'FileReader').mockImplementation(() => mockFileReader as any);
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await act(async () => {
+      if (mockFileReader.onerror) {
+        mockFileReader.onerror(new ProgressEvent('error'));
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to read file/i)).toBeInTheDocument();
+      expect(screen.getByText('Back')).not.toBeDisabled();
+      expect(screen.getByText('Cancel')).not.toBeDisabled();
+    });
+  });
+
   it('shows error for non-JSON file upload', async () => {
     render(
       <FileUpload onSchemaLoaded={mockOnSchemaLoaded} onBack={mockOnBack} onCancel={mockOnCancel} />
