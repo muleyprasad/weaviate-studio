@@ -695,7 +695,9 @@ function ClusterPanelWebview() {
   }, []);
 
   const getAutoRefreshLabel = () => {
-    if (autoRefreshInterval === 'off') return 'Off';
+    if (autoRefreshInterval === 'off') {
+      return 'Off';
+    }
     return autoRefreshInterval.toUpperCase();
   };
 

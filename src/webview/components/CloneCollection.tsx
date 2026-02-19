@@ -116,7 +116,9 @@ export function CloneCollection({
   };
 
   const handleEditBeforeCreate = () => {
-    if (!validateInputs()) return;
+    if (!validateInputs()) {
+      return;
+    }
 
     // Clone the schema with the new name
     const clonedSchema = {
@@ -128,7 +130,9 @@ export function CloneCollection({
   };
 
   const handleCreateDirectly = () => {
-    if (!validateInputs()) return;
+    if (!validateInputs()) {
+      return;
+    }
 
     // Clone the schema with the new name
     const clonedSchema = {
