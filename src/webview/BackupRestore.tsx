@@ -53,7 +53,7 @@ interface RestoreStatus {
   path?: string;
 }
 
-function BackupRestoreWebview() {
+export function BackupRestoreWebview() {
   const [backupId, setBackupId] = useState<string>('');
   const [backend, setBackend] = useState<string>('');
   const [collections, setCollections] = useState<string[]>([]);
