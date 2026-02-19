@@ -266,9 +266,17 @@ export class AliasPanel {
       case 'updateAlias':
         try {
           await this.onUpdateCallback(message.aliasData);
+          // Update internal state to reflect the new target collection
+          if (this._aliasToEdit) {
+            this._aliasToEdit = {
+              ...this._aliasToEdit,
+              collection: message.aliasData.newTargetCollection,
+            };
+          }
           this.postMessage({
             command: 'aliasUpdated',
             alias: message.aliasData.alias,
+            newTargetCollection: message.aliasData.newTargetCollection,
           });
         } catch (error) {
           this.postMessage({

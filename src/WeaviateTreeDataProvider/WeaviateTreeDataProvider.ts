@@ -2034,6 +2034,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         // Add tooltip with full information
         aliasTreeItem.tooltip = `Alias: ${aliasItem.alias}\nTarget Collection: ${aliasItem.collection}`;
 
+        // Double-click opens the edit panel
+        aliasTreeItem.command = {
+          command: 'weaviate.editAlias',
+          title: 'Edit Alias',
+          arguments: [aliasTreeItem],
+        };
+
         return aliasTreeItem;
       });
 

@@ -128,6 +128,10 @@ function AliasWebview() {
           setIsSubmitting(false);
           setSuccess(`Alias "${message.alias}" updated successfully!`);
           setError('');
+          // Update editingAlias so "Current target" reflects the new collection
+          setEditingAlias((prev) =>
+            prev ? { ...prev, collection: message.newTargetCollection } : prev
+          );
           break;
 
         case 'error':
