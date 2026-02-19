@@ -13,13 +13,17 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 ![Extension Demo](docs/images/extension-demo.gif)
 
+### Data Explorer
+
+![Data Explorer Demo](docs/images/data-explorer-demo.gif)
+
 ---
 
 ## Key Benefits
 
 - **Unified Experience:** Manage, query, and monitor Weaviate directly in VS Code—no browser switching.
 - **Works Everywhere:** Connect to local, on-prem, or cloud Weaviate instances.
-- **Visual Data Exploration:** Browse schema, run queries, and view results in rich tables and JSON.
+- **Visual Data Exploration:** Interactive data browser with filtering, vector search, and export. Browse schema, run queries, and view results in rich tables and JSON.
 - **Intelligent GraphQL Editor:** Auto-complete (wip), schema-aware templates, and error highlighting.
 - **Secure & Productive:** Secure credential storage, hot reload, and type-safe development.
 
@@ -36,6 +40,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ## Top Features
 
 - **Multiple Connections:** Manage several Weaviate instances at once
+- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
 - **Cluster Management:** Comprehensive cluster information panel with health monitoring
 - **Schema Explorer:** Visualize and browse collections, properties, and nested object structures
@@ -81,6 +86,18 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Advanced options: per-operation timeouts and skip-initialization checks
 - API keys are not displayed when editing existing connections
 - Optional connect‑on‑expand prompt for disconnected connections
+
+### Data Explorer
+
+- Interactive table browser with sortable columns and pagination
+- Visual filter builder with 10+ operators and AND/OR logic
+- Four vector search modes: Text, Object, Vector, and Hybrid (BM25 + semantic)
+- Alpha slider for balancing keyword vs semantic search
+- Export to JSON/CSV with flexible scopes (current page, filtered results, or entire collection)
+- Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E) for power users
+- User preferences persistence per collection
+- Virtual scrolling for large datasets (1000+ objects)
+- See [Data Explorer README](src/data-explorer/README.md) for full details
 
 ### Data Visualization
 

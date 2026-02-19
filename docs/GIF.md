@@ -19,8 +19,9 @@ This guide explains how to turn a `.mov` screen recording into a high-quality, f
 
 ### 1. Record Your Screen
 
-Use the built-in macOS **Screenshot** tool (`Shift + Command + 5`) and choose **Record Entire Screen** or **Record Selected Portion**.  
-When finished, macOS saves a `.mov` file to your Desktop.
+**Option A (Recommended):** Use the [Chronicler](https://marketplace.visualstudio.com/items?itemName=nicepkg.vscode-chronicler) VS Code extension. It records your editor window directly and saves an `.mp4` file to the workspace root.
+
+**Option B:** Use the built-in macOS **Screenshot** tool (`Shift + Command + 5`) and choose **Record Entire Screen** or **Record Selected Portion**. When finished, macOS saves a `.mov` file to your Desktop.
 
 ### 2. Generate a Color Palette
 

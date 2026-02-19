@@ -1,8 +1,96 @@
-# Change Log
+# Changelog
 
-All notable changes to the "weaviate-studio" extension will be documented in this file.
+All notable changes to the Weaviate Studio extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.4.0] - 2026-02-18
+
+### Added - Data Explorer
+
+- **Interactive Data Browser** - Visual table interface for browsing Weaviate collections
+
+  - Sortable columns with ascending/descending order
+  - Configurable pagination (10, 20, 50, 100 objects per page)
+  - Column visibility management (show, hide, reorder)
+  - Object detail panel with expandable nested properties
+  - Support for all Weaviate data types (text, number, boolean, date, references, geo-coordinates, phone numbers, blobs, vectors)
+
+- **Advanced Filtering System**
+
+  - Visual filter builder with 10+ operators (Equal, Not Equal, Contains, Greater Than, Less Than, Like, ContainsAny, ContainsAll, IsNull, IsNotNull)
+  - AND/OR logic for combining multiple filter conditions
+  - Nested filter groups for complex queries
+  - Filter presets - save, load, and delete frequently used filter combinations
+  - Real-time active filter badges
+  - Match mode toggle (AND/OR)
+
+- **Vector Search (4 Modes)**
+
+  - Text-based semantic search using nearText
+  - Object-based similarity search ("Find Similar" action in object menu)
+  - Direct vector embedding search for advanced users
+  - Hybrid search combining BM25 keyword + vector semantic search
+    - Alpha slider to balance keyword (0.0) vs semantic (1.0) weight
+    - Score breakdown display (keyword score, semantic score, combined score)
+    - Property selection for targeted search
+    - Preset buttons (Keyword Only, Balanced, Semantic Only)
+
+- **Data Export**
+
+  - Export to JSON or CSV formats
+  - Three export scopes: current page, filtered results, or entire collection
+  - Export options: include/exclude metadata, vectors, flatten nested objects
+  - Native VS Code save dialog integration
+  - Large dataset warnings (>10,000 objects)
+  - Progress indicators for long-running exports
+  - Cancellable export operations
+
+- **Performance Optimizations**
+
+  - Virtual scrolling for collections with 100+ objects
+  - React.memo optimization on frequently rendered components (CellRenderer, TableRow)
+  - Optimized context subscriptions to prevent cascade re-renders
+  - TableRow context subscription uses props instead of context to prevent cascade re-renders
+  - FilterContext actions use refs to avoid recreation on every state change
+  - CellRenderer memoized to prevent unnecessary re-renders on table updates
+  - Race condition fixes in useDataFetch with proper dependencies
+  - useDebouncedCallback stabilized to avoid recreating functions on every render
+  - Infinite loop fix in data fetching caused by circular dependencies
+  - Debounced search and filter inputs
+  - Network request timeouts (30 second default)
+  - Efficient ref-based state access in hooks
+
+- **User Experience Enhancements**
+
+  - Loading skeleton screens with shimmer animation
+  - Error boundaries on all major components with recovery options
+  - Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E, Ctrl+R, Escape)
+  - Keyboard shortcuts help tooltip
+  - User preferences persistence per collection (columns, sort, filters, panel states)
+  - Empty states with actionable suggestions
+  - Accessibility support (ARIA labels, keyboard navigation, focus management)
+  - High contrast mode support
+  - Reduced motion support for animations
+  - Updated toolbar icons for better visual clarity: Query Editor uses `$(edit)` (pencil) and Data Explorer uses `$(telescope)` (telescope)
+  - Debug console.log statements controlled by DEBUG flag
+
+- **Error Handling**
+
+  - Silent API failures now throw proper errors with user-facing messages
+  - Silent message handler failures now send error responses to webview
+  - Missing API connection errors display user-friendly messages
+  - postMessage to disposed webview handled gracefully
+  - localStorage quota exceeded errors with automatic recovery
+  - Network timeout handling for slow/unreliable connections
+
+- **Security Hardening**
+
+  - XSS vulnerability fix in webview initialization (unsafe string interpolation)
+  - UUID format validation using regex pattern
+  - Vector array size limit enforcement (max 65,536 dimensions)
+  - Proper input sanitization in filter values
 
 ## [1.3.0] — 2025-12-26
 
@@ -18,25 +106,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Nested Object support with enhanced tree view and Add Collection integration (PR #47):
 
   - Visual property type icons in tree view (text, number, boolean, date, object, geo coordinates, phone, blob)
-  - Recursive property navigation for deeply nested object structures
-  - Tree view displays nested properties hierarchically with type-aware icons
-  - Full nested object support in clone and import collection workflows
 
-- Comprehensive Backup and Restore system with multi-backend support (PR #41):
+- Docker Compose test sandbox for local Weaviate development (PR #46):
 
-  - Create, monitor, restore, retry, and cancel backup operations
-  - Real-time backup progress tracking with status indicators (in-progress, success, failed)
-  - Support for multiple backup backends: filesystem, S3, GCS, Azure
-  - Automatic detection of available backup modules with helpful setup guidance
-  - Advanced backup configuration options (include/exclude collections, custom paths)
-  - Independent refresh controls for backups, collections, nodes, and metadata
-  - Dedicated Backup and Restore UI panels with comprehensive workflow management
-
-- Sandbox environment with filesystem backup support enabled (PR #46):
-
-  - Docker Compose configuration with backup-filesystem module
-  - Persistent backup storage via weaviate_backups volume
-  - Example backup/restore commands in documentation
+  - Pre-configured Weaviate server with text2vec-contextionary module
+  - Automated backup/restore for test data persistence
   - Ready-to-use local development environment with backup capabilities
 
 - React-based Add Collection interface as external module (PR #38):
@@ -212,8 +286,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Efficient GraphQL query execution
 - Lazy loading of collection data
 
-## [Unreleased]
+---
 
-- Additional query templates
-- Enhanced performance optimizations
-- Extended platform support
+## Legend
+
+- **Added** - New features
+- **Changed** - Changes to existing functionality
+- **Deprecated** - Soon-to-be removed features
+- **Removed** - Removed features
+- **Fixed** - Bug fixes
+- **Security** - Security vulnerability fixes

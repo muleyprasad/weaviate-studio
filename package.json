@@ -2,7 +2,7 @@
   "name": "weaviate-studio",
   "displayName": "Weaviate Studio",
   "description": "A VS Code extension for managing Weaviate vector database instances, browsing collections, and visualizing data.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "license": "MIT",
   "icon": "resources/weaviate-studio-color.png",
   "publisher": "prasadmuley",
@@ -80,11 +80,17 @@
       {
         "command": "weaviate.queryCollection",
         "title": "Open Query Editor",
-        "icon": "$(table)"
+        "icon": "$(edit)"
       },
       {
         "command": "weaviate.deleteCollection",
         "title": "Delete Collection"
+      },
+      {
+        "command": "weaviate.openDataExplorer",
+        "title": "Open Data Explorer",
+        "category": "Weaviate",
+        "icon": "$(telescope)"
       },
       {
         "command": "weaviate.openQueryEditor",
@@ -407,6 +413,17 @@
           "icon": "$(edit)"
         },
         {
+          "command": "weaviate.openDataExplorer",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "weaviate.openDataExplorer",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "inline@2",
+          "icon": "$(telescope)"
+        },
+        {
           "command": "weaviate.addCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "inline@1",
@@ -561,6 +578,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.18",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
     "monaco-editor": "^0.52.2",
