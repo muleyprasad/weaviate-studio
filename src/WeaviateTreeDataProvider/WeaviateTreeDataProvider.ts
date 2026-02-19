@@ -228,6 +228,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         restApiJson = await response.json();
       } else {
         console.warn('Failed to fetch REST API schema, will show SDK format only');
+        vscode.window.showWarningMessage(
+          `Could not load REST API schema for "${collectionName}" (HTTP ${response.status} ${response.statusText}). The view will show SDK format only. Check your API key or server status.`
+        );
       }
 
       // Create and show a webview with the detailed schema
