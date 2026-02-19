@@ -609,14 +609,35 @@ function ClusterPanelWebview() {
               setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
             }
 
-            // Auto-select first node only on initial load, not on refresh
-            if (
-              message.nodeStatusData &&
-              message.nodeStatusData.length > 0 &&
-              !selectedNodeName &&
-              !hasInitialized
-            ) {
-              setSelectedNodeName(message.nodeStatusData[0].name);
+            // Auto-select defaults on initial load only, not on refresh
+            if (message.nodeStatusData && message.nodeStatusData.length > 0 && !hasInitialized) {
+              const data: Node[] = message.nodeStatusData;
+
+              // Node view: expand the first node in the list
+              setSelectedNodeName(data[0].name);
+
+              // Collection view: expand the first collection (alphabetically) and its first node
+              const allCollectionNames = new Set<string>();
+              data.forEach((node) => {
+                (node.shards || []).forEach((shard) => allCollectionNames.add(shard.class));
+              });
+              const sortedCollections = Array.from(allCollectionNames).sort((a, b) =>
+                a.localeCompare(b)
+              );
+              if (sortedCollections.length > 0) {
+                const firstCollection = sortedCollections[0];
+                setSelectedCollectionName(firstCollection);
+                // Find the first node (alphabetically) that has shards in this collection
+                const nodesInFirstCollection = data
+                  .filter((node) =>
+                    (node.shards || []).some((shard) => shard.class === firstCollection)
+                  )
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                if (nodesInFirstCollection.length > 0) {
+                  setSelectedNodeName(nodesInFirstCollection[0].name);
+                }
+              }
+
               setHasInitialized(true);
             }
 
