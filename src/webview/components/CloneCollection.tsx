@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import './CloneCollection.css';
-import { getVscodeApi, WeaviateCollectionSchema, ExtensionToWebviewMessage } from '../vscodeApi';
+import {
+  getVscodeApi,
+  WeaviateCollectionSchema,
+  ExtensionToWebviewMessage,
+  SchemaLoadAction,
+} from '../vscodeApi';
 
 export interface CloneCollectionProps {
-  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => void;
+  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: SchemaLoadAction) => void;
   onBack: () => void;
   onCancel: () => void;
   externalError?: string;

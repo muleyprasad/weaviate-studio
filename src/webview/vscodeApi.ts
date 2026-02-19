@@ -18,6 +18,9 @@ export interface WeaviateCollectionSchema {
 /** Available modules map from Weaviate server metadata */
 export type AvailableModules = Record<string, unknown>;
 
+/** Action to take after a schema is loaded from a file or clone */
+export type SchemaLoadAction = 'edit' | 'create';
+
 /**
  * Discriminated union of all messages the extension can send to the webview.
  * Used to type MessageEvent.data in webview message handlers.

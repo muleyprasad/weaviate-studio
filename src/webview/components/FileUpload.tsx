@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import './FileUpload.css';
-import { WeaviateCollectionSchema } from '../vscodeApi';
+import { WeaviateCollectionSchema, SchemaLoadAction } from '../vscodeApi';
 
 export interface FileUploadProps {
-  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => void;
+  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: SchemaLoadAction) => void;
   onBack: () => void;
   onCancel: () => void;
   externalError?: string;

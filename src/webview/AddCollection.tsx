@@ -10,6 +10,7 @@ import {
   WeaviateCollectionSchema,
   AvailableModules,
   ExtensionToWebviewMessage,
+  SchemaLoadAction,
 } from './vscodeApi';
 
 // Get VS Code API reference for messaging (shared across all components)
@@ -75,7 +76,7 @@ function AddCollectionWebview() {
     setMode(selectedMode);
   };
 
-  const handleFileLoaded = (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => {
+  const handleFileLoaded = (schema: WeaviateCollectionSchema, action: SchemaLoadAction) => {
     setError('');
     if (action === 'edit') {
       setInitialSchema(schema);
