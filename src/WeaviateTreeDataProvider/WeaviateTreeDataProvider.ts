@@ -630,18 +630,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const backupsLabel =
         cachedBackups.length > 0 ? `Backups (${cachedBackups.length})` : 'Backups';
 
-      items.push(
-        new WeaviateTreeItem(
-          backupsLabel,
-          vscode.TreeItemCollapsibleState.Collapsed,
-          'backups',
-          element.connectionId,
-          undefined,
-          'backups',
-          new vscode.ThemeIcon('archive'),
-          'weaviateBackups'
-        )
+      const backupsItem = new WeaviateTreeItem(
+        backupsLabel,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'backups',
+        element.connectionId,
+        undefined,
+        'backups',
+        new vscode.ThemeIcon('archive'),
+        'weaviateBackups'
       );
+      backupsItem.id = `${element.connectionId}:backups`;
+      items.push(backupsItem);
 
       return items;
     } else if (element.itemType === 'collectionsGroup' && element.connectionId) {
