@@ -7,6 +7,7 @@
  */
 export interface WeaviateCollectionSchema {
   class: string;
+  name?: string;
   description?: string;
   properties?: Array<{ name: string; dataType: string[]; [key: string]: unknown }>;
   vectorizer?: string;

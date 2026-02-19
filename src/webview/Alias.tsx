@@ -38,16 +38,6 @@ function validateAliasName(aliasName: string): { valid: boolean; error?: string 
   };
 }
 
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 let vscode: any;
 try {
   vscode = window.acquireVsCodeApi();

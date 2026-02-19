@@ -4,17 +4,6 @@ import { BACKUP_CONFIG } from '../constants/backupConfig';
 import './theme.css';
 import './BackupRestore.css';
 
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 // Get VS Code API reference for messaging
 let vscode: any;
 try {

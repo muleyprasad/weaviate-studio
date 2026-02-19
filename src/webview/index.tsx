@@ -27,17 +27,6 @@ interface SchemaClass {
 
 type JsonData = Record<string, any> | null;
 
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 // Get VS Code API reference for messaging
 let vscode: any;
 try {
