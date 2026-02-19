@@ -3262,6 +3262,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                   schema: schema,
                 });
               } catch (error) {
+                console.error('Error fetching collection schema:', error);
                 postMessage({
                   command: 'error',
                   message: `Failed to fetch schema: ${error instanceof Error ? error.message : String(error)}`,
