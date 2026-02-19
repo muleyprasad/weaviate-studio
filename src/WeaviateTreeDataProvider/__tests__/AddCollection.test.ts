@@ -267,7 +267,7 @@ describe('Add Collection', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it.skip('when cloning, should open Add Collection prefilled without creating immediately', async () => {
+    it('when cloning, should open Add Collection prefilled without creating immediately', async () => {
       // Prepare: collections with schema
       (provider as any).collections = {
         conn1: [
@@ -299,6 +299,19 @@ describe('Add Collection', () => {
       await capturedOnMessage!({ command: 'getCollections' }, mockPostMessage);
       expect(capturedCollections).toEqual(['SourceCollection']);
 
+      // The getSchema handler fetches via REST API; return the schema we seeded above
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          class: 'SourceCollection',
+          description: 'desc',
+          properties: [{ name: 'title', dataType: ['text'] }],
+        }),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
+
       // Simulate requesting the schema for cloning
       let capturedSchema: any = null;
       const mockSchemaPostMessage = jest.fn((msg: any) => {
@@ -318,7 +331,7 @@ describe('Add Collection', () => {
       expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
     });
 
-    it.skip('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
+    it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
       // Prepare: collections with multi-tenant schema
       (provider as any).collections = {
         conn1: [
@@ -328,7 +341,6 @@ describe('Add Collection', () => {
               class: 'MultiTenantCollection',
               description: 'Multi-tenant collection',
               multiTenancy: {
-                // Using multiTenancy (not multiTenancyConfig) as shown in user's data
                 enabled: true,
                 autoTenantCreation: true,
                 autoTenantActivation: true,
@@ -344,6 +356,24 @@ describe('Add Collection', () => {
 
       // Get the message handler for the AddCollectionPanel
       expect(capturedOnMessage).toBeDefined();
+
+      // The getSchema handler fetches via REST API; return the schema we seeded above
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          class: 'MultiTenantCollection',
+          description: 'Multi-tenant collection',
+          multiTenancy: {
+            enabled: true,
+            autoTenantCreation: true,
+            autoTenantActivation: true,
+          },
+          properties: [{ name: 'title', dataType: ['text'] }],
+        }),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
 
       // Simulate requesting the schema for cloning
       let capturedSchema: any = null;
