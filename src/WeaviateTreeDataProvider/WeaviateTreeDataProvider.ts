@@ -3103,6 +3103,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   async exportSchema(connectionId: string, collectionName: string): Promise<void> {
     try {
+      // Validate connection before showing the save dialog so the user is not
+      // asked to choose a file location only to be told the connection is invalid.
+      const baseUrl = this.getWeaviateBaseUrl(connectionId);
+      const headers = this.getWeaviateHeaders(connectionId);
+
       // Show save dialog
       const saveUri = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(`${collectionName}_weaviate_schema.json`),
@@ -3115,10 +3120,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       if (!saveUri) {
         return; // User cancelled
       }
-
-      // Use direct REST API to get collection schema
-      const baseUrl = this.getWeaviateBaseUrl(connectionId);
-      const headers = this.getWeaviateHeaders(connectionId);
 
       const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
         method: 'GET',
