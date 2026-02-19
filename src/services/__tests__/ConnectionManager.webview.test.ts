@@ -1,5 +1,12 @@
 import { ConnectionManager, WeaviateConnection } from '../ConnectionManager';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+
+jest.mock('fs');
+
+// Minimal HTML for mocking the webview bundle (must have <head> tag for CSP injection)
+const MOCK_WEBVIEW_HTML =
+  '<!DOCTYPE html><html lang="en"><head><title>Connection</title></head><body><div id="root"></div></body></html>';
 
 interface MockGlobalState {
   storage: Record<string, any>;
@@ -12,6 +19,8 @@ interface MockWebviewPanel {
     html: string;
     onDidReceiveMessage: jest.Mock;
     postMessage: jest.Mock;
+    cspSource: string;
+    asWebviewUri: jest.Mock;
   };
   dispose: jest.Mock;
 }
@@ -25,6 +34,9 @@ describe('ConnectionManager Webview Tests', () => {
   beforeEach(() => {
     // Reset singleton before every test
     (ConnectionManager as any).instance = undefined;
+
+    // Mock fs.readFileSync to return minimal HTML
+    (fs.readFileSync as jest.Mock).mockReturnValue(MOCK_WEBVIEW_HTML);
 
     globalState = {
       storage: {},
@@ -40,6 +52,7 @@ describe('ConnectionManager Webview Tests', () => {
     mockContext = {
       globalState,
       subscriptions: [],
+      extensionUri: { fsPath: '/test-extension' },
     };
 
     mockPanel = {
@@ -47,6 +60,8 @@ describe('ConnectionManager Webview Tests', () => {
         html: '',
         onDidReceiveMessage: jest.fn(),
         postMessage: jest.fn(),
+        cspSource: 'mock-csp-source',
+        asWebviewUri: jest.fn((uri) => uri),
       },
       dispose: jest.fn(),
     };
@@ -71,31 +86,41 @@ describe('ConnectionManager Webview Tests', () => {
         'weaviateConnection',
         'Add Weaviate Connection',
         vscode.ViewColumn.Active,
-        {
+        expect.objectContaining({
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [],
-        }
+        })
       );
+
+      // localResourceRoots should now point to the dist/webview folder (not empty)
+      const options = mockCreateWebviewPanel.mock.calls[0][3];
+      expect(options.localResourceRoots).toHaveLength(1);
 
       // Clean up the promise to avoid hanging test
       mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
       await dialogPromise;
     });
 
-    test('generates correct HTML content for add dialog', async () => {
+    test('sends initData when ready message is received for add dialog', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
       const dialogPromise = mgr.showAddConnectionDialog();
 
-      expect(mockPanel.webview.html).toContain('Add Weaviate Connection');
-      expect(mockPanel.webview.html).toContain('Connection Type');
-      expect(mockPanel.webview.html).toContain('Connection Name');
-      expect(mockPanel.webview.html).toContain('Save Connection');
-      expect(mockPanel.webview.html).toContain('Save and Connect');
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate ready message from the React webview
+      await messageHandler({ command: 'ready' });
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'initData',
+          isEditMode: false,
+          apiKeyPresent: false,
+        })
+      );
 
       // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
+      messageHandler({ command: 'cancel' });
       await dialogPromise;
     });
 
@@ -375,11 +400,10 @@ describe('ConnectionManager Webview Tests', () => {
         'weaviateConnection',
         'Edit Weaviate Connection',
         vscode.ViewColumn.Active,
-        {
+        expect.objectContaining({
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [],
-        }
+        })
       );
 
       // Clean up
@@ -387,7 +411,7 @@ describe('ConnectionManager Webview Tests', () => {
       await dialogPromise;
     });
 
-    test('pre-fills form with existing connection data', async () => {
+    test('sends initData with pre-filled connection data on ready', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
       const connection = await mgr.addConnection({
@@ -407,17 +431,32 @@ describe('ConnectionManager Webview Tests', () => {
 
       const dialogPromise = mgr.showEditConnectionDialog(connection.id);
 
-      expect(mockPanel.webview.html).toContain('Pre-fill Test');
-      expect(mockPanel.webview.html).toContain('existing-host');
-      expect(mockPanel.webview.html).toContain('9090');
-      expect(mockPanel.webview.html).toContain('50052');
-      expect(mockPanel.webview.html).not.toContain('existing-key');
-      expect(mockPanel.webview.html).toContain('Leave blank to keep existing key');
-      expect(mockPanel.webview.html).toContain('Update Connection');
-      expect(mockPanel.webview.html).toContain('Update and Connect');
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate ready message
+      await messageHandler({ command: 'ready' });
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'initData',
+          isEditMode: true,
+          apiKeyPresent: true, // key exists but value not sent
+          connection: expect.objectContaining({
+            name: 'Pre-fill Test',
+            httpHost: 'existing-host',
+            httpPort: 9090,
+            grpcPort: 50052,
+            httpSecure: true,
+          }),
+        })
+      );
+
+      // The actual API key value should NOT be sent to the webview
+      const postMessageCall = mockPanel.webview.postMessage.mock.calls[0][0];
+      expect(postMessageCall.connection.apiKey).toBeUndefined();
 
       // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
+      messageHandler({ command: 'cancel' });
       await dialogPromise;
     });
 
@@ -521,7 +560,7 @@ describe('ConnectionManager Webview Tests', () => {
 
       const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
 
-      // Simulate save without providing apiKey
+      // Simulate save without providing apiKey (apiKeyAction='keep' in React sends no apiKey)
       messageHandler({
         command: 'save',
         connection: {
@@ -538,105 +577,54 @@ describe('ConnectionManager Webview Tests', () => {
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
+    test('clears API key when removeApiKey flag is sent', async () => {
+      const mgr = ConnectionManager.getInstance(mockContext);
+
+      const connection = await mgr.addConnection({
+        name: 'Remove Key',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        grpcHost: 'localhost',
+        grpcPort: 50051,
+        httpSecure: false,
+        grpcSecure: false,
+        apiKey: 'key-to-remove',
+      });
+
+      const dialogPromise = mgr.showEditConnectionDialog(connection.id);
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate save with removeApiKey flag (user clicked REMOVE API KEY)
+      messageHandler({
+        command: 'save',
+        removeApiKey: true,
+        connection: {
+          name: 'Remove Key',
+          type: 'custom',
+          httpHost: 'localhost',
+          httpPort: 8080,
+          grpcHost: 'localhost',
+          grpcPort: 50051,
+          httpSecure: false,
+          grpcSecure: false,
+        },
+      });
+
+      const result = await dialogPromise;
+
+      expect(result?.connection.apiKey).toBeUndefined();
+      expect(result?.shouldConnect).toBe(false);
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+
     test('throws error for non-existent connection', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
 
       await expect(mgr.showEditConnectionDialog('non-existent-id')).rejects.toThrow(
         'Connection not found'
       );
-    });
-  });
-
-  describe('HTML Content Generation', () => {
-    test('generates valid HTML structure', async () => {
-      const mgr = ConnectionManager.getInstance(mockContext);
-
-      const dialogPromise = mgr.showAddConnectionDialog();
-
-      const html = mockPanel.webview.html;
-
-      expect(html).toContain('<!DOCTYPE html>');
-      expect(html).toContain('<html lang="en">');
-      expect(html).toContain('<head>');
-      expect(html).toContain('<body>');
-      expect(html).toContain('<script>');
-      expect(html).toContain('</html>');
-
-      // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
-      await dialogPromise;
-    });
-
-    test('includes VS Code CSS variables for theming', async () => {
-      const mgr = ConnectionManager.getInstance(mockContext);
-
-      const dialogPromise = mgr.showAddConnectionDialog();
-
-      const html = mockPanel.webview.html;
-
-      expect(html).toContain('var(--vscode-font-family)');
-      expect(html).toContain('var(--vscode-editor-background)');
-      expect(html).toContain('var(--vscode-foreground)');
-      expect(html).toContain('var(--vscode-input-border)');
-      expect(html).toContain('var(--vscode-input-background)');
-      expect(html).toContain('var(--vscode-button-background)');
-
-      // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
-      await dialogPromise;
-    });
-
-    test('includes JavaScript for form interaction', async () => {
-      const mgr = ConnectionManager.getInstance(mockContext);
-
-      const dialogPromise = mgr.showAddConnectionDialog();
-
-      const html = mockPanel.webview.html;
-
-      expect(html).toContain('acquireVsCodeApi()');
-      expect(html).toContain('addEventListener');
-      expect(html).toContain('postMessage');
-      expect(html).toContain('connectionTypeDropdown');
-
-      // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
-      await dialogPromise;
-    });
-
-    test('includes form fields for both connection types', async () => {
-      const mgr = ConnectionManager.getInstance(mockContext);
-
-      const dialogPromise = mgr.showAddConnectionDialog();
-
-      const html = mockPanel.webview.html;
-
-      // Common fields
-      expect(html).toContain('connectionName');
-      expect(html).toContain('connectionType');
-
-      // Custom fields
-      expect(html).toContain('customFields');
-      expect(html).toContain('httpHost');
-      expect(html).toContain('httpPort');
-      expect(html).toContain('grpcHost');
-      expect(html).toContain('grpcPort');
-      expect(html).toContain('httpSecure');
-      expect(html).toContain('grpcSecure');
-
-      // Cloud fields
-      expect(html).toContain('cloudFields');
-      expect(html).toContain('cloudUrl');
-      expect(html).toContain('apiKeyCloud');
-
-      // Advanced settings
-      expect(html).toContain('advancedSettings');
-      expect(html).toContain('timeoutInit');
-      expect(html).toContain('timeoutQuery');
-      expect(html).toContain('timeoutInsert');
-
-      // Clean up
-      mockPanel.webview.onDidReceiveMessage.mock.calls[0][0]({ command: 'cancel' });
-      await dialogPromise;
     });
   });
 

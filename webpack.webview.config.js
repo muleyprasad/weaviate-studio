@@ -43,6 +43,7 @@ module.exports = {
     cluster: './src/webview/ClusterPanel.tsx',
     'data-explorer': './src/data-explorer/webview/index.tsx',
     alias: './src/webview/Alias.tsx',
+    connection: './src/webview/ConnectionForm.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -148,6 +149,14 @@ module.exports = {
       template: './src/webview/alias.html',
       filename: 'alias.html',
       chunks: ['alias'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/connection.html',
+      filename: 'connection.html',
+      chunks: ['connection'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,
