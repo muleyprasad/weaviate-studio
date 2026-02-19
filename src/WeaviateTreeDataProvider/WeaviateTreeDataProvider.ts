@@ -3055,6 +3055,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     } else if (connection.type === 'custom') {
       // Build URL from custom connection parts
       const protocol = connection.httpSecure ? 'https' : 'http';
+      if (!connection.httpHost) {
+        console.warn(
+          `[connection] httpHost not set for connection "${connectionId}", falling back to "localhost"`
+        );
+      }
+      if (!connection.httpPort) {
+        console.warn(
+          `[connection] httpPort not set for connection "${connectionId}", falling back to 8080`
+        );
+      }
       const host = connection.httpHost || 'localhost';
       const port = connection.httpPort || 8080;
       return `${protocol}://${host}:${port}`;
