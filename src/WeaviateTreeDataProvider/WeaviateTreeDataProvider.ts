@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
-import { AddCollectionPanel, WebviewMessage } from '../views/AddCollectionPanel';
+import { AddCollectionPanel, WebviewToExtensionMessage } from '../views/AddCollectionPanel';
 import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
@@ -3178,7 +3178,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           await this.fetchNodes(connectionId);
           await this.updateClusterPanelIfOpen(connectionId);
         },
-        async (message: WebviewMessage, postMessage: (msg: Record<string, unknown>) => void) => {
+        async (
+          message: WebviewToExtensionMessage,
+          postMessage: (msg: Record<string, unknown>) => void
+        ) => {
           // On message callback for handling webview requests
           switch (message.command) {
             case 'ready':
@@ -3252,7 +3255,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 // Use direct REST API to get collection schema
                 const baseUrl = this.getWeaviateBaseUrl(connectionId);
                 const headers = this.getWeaviateHeaders(connectionId);
-                const collectionName = message.collectionName as string;
+                const collectionName = message.collectionName;
 
                 const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
                   method: 'GET',

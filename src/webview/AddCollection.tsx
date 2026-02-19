@@ -5,7 +5,12 @@ import Collection from 'weaviate-add-collection';
 import { SelectCreateMode, CreationMode } from './components/SelectCreateMode';
 import { FileUpload } from './components/FileUpload';
 import { CloneCollection } from './components/CloneCollection';
-import { getVscodeApi, WeaviateCollectionSchema, AvailableModules } from './vscodeApi';
+import {
+  getVscodeApi,
+  WeaviateCollectionSchema,
+  AvailableModules,
+  ExtensionToWebviewMessage,
+} from './vscodeApi';
 
 // Get VS Code API reference for messaging (shared across all components)
 const vscode = getVscodeApi();
@@ -33,7 +38,7 @@ function AddCollectionWebview() {
     }
 
     // Handle messages from the extension
-    const messageHandler = (event: MessageEvent) => {
+    const messageHandler = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       const message = event.data;
 
       switch (message.command) {

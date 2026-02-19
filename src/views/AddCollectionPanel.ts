@@ -3,11 +3,17 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SchemaClass } from '../types';
 
-/** Message received from the Add Collection webview */
-export interface WebviewMessage {
-  command: string;
-  [key: string]: unknown;
-}
+/**
+ * Discriminated union of all messages the webview can send to the extension.
+ * Used to type the message handler in AddCollectionPanel and the onMessageCallback.
+ */
+export type WebviewToExtensionMessage =
+  | { command: 'ready' }
+  | { command: 'create'; schema: SchemaClass }
+  | { command: 'cancel' }
+  | { command: 'getVectorizers' }
+  | { command: 'getCollections' }
+  | { command: 'getSchema'; collectionName: string };
 
 /**
  * Manages the Add Collection webview panel
@@ -24,7 +30,7 @@ export class AddCollectionPanel {
     extensionUri: vscode.Uri,
     private readonly onCreateCallback: (schema: SchemaClass) => Promise<void>,
     private readonly onMessageCallback?: (
-      message: WebviewMessage,
+      message: WebviewToExtensionMessage,
       postMessage: (msg: Record<string, unknown>) => void
     ) => Promise<void>,
     initialSchema?: SchemaClass
@@ -57,7 +63,7 @@ export class AddCollectionPanel {
     extensionUri: vscode.Uri,
     onCreateCallback: (schema: SchemaClass) => Promise<void>,
     onMessageCallback?: (
-      message: WebviewMessage,
+      message: WebviewToExtensionMessage,
       postMessage: (msg: Record<string, unknown>) => void
     ) => Promise<void>,
     initialSchema?: SchemaClass
@@ -132,7 +138,7 @@ export class AddCollectionPanel {
   /**
    * Handles messages from the webview
    */
-  private async _handleMessage(message: WebviewMessage): Promise<void> {
+  private async _handleMessage(message: WebviewToExtensionMessage): Promise<void> {
     switch (message.command) {
       case 'ready':
         // Webview is ready to receive data; send initial schema if provided

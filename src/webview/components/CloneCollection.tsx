@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './CloneCollection.css';
-import { getVscodeApi, WeaviateCollectionSchema } from '../vscodeApi';
+import { getVscodeApi, WeaviateCollectionSchema, ExtensionToWebviewMessage } from '../vscodeApi';
 
 export interface CloneCollectionProps {
   onSchemaLoaded: (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => void;
@@ -36,7 +36,7 @@ export function CloneCollection({
     }
 
     // Handle messages from extension
-    const messageHandler = (event: MessageEvent) => {
+    const messageHandler = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       const message = event.data;
 
       switch (message.command) {

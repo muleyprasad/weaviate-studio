@@ -16,7 +16,22 @@ export interface WeaviateCollectionSchema {
 }
 
 /** Available modules map from Weaviate server metadata */
-export type AvailableModules = Record<string, Record<string, unknown>>;
+export type AvailableModules = Record<string, unknown>;
+
+/**
+ * Discriminated union of all messages the extension can send to the webview.
+ * Used to type MessageEvent.data in webview message handlers.
+ */
+export type ExtensionToWebviewMessage =
+  | { command: 'availableModules'; modules: AvailableModules }
+  | { command: 'initialSchema'; schema: WeaviateCollectionSchema | null }
+  | { command: 'nodesNumber'; nodesNumber: number }
+  | { command: 'hasCollections'; hasCollections: boolean }
+  | { command: 'vectorizers'; vectorizers: string[]; modules: AvailableModules }
+  | { command: 'serverVersion'; version: string }
+  | { command: 'collections'; collections: string[] }
+  | { command: 'schema'; schema: WeaviateCollectionSchema }
+  | { command: 'error'; message: string };
 
 type VsCodeApi = {
   postMessage: (message: Record<string, unknown>) => void;
