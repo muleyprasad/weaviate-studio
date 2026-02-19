@@ -3453,10 +3453,6 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
   }
 
-  // LEGACY: The following methods are no longer used for the main "Add Collection" flow.
-  // They have been replaced by AddCollectionPanel (React webview) in src/views/AddCollectionPanel.ts
-  // These can be safely removed once all migration is verified complete.
-
   /**
    * Deletes a connection without showing any confirmation dialogs.
    * Callers are responsible for showing confirmation dialogs if needed.
