@@ -5,18 +5,7 @@ import Collection from 'weaviate-add-collection';
 import { SelectCreateMode, CreationMode } from './components/SelectCreateMode';
 import { FileUpload } from './components/FileUpload';
 import { CloneCollection } from './components/CloneCollection';
-import { getVscodeApi } from './vscodeApi';
-
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
+import { getVscodeApi, WeaviateCollectionSchema, AvailableModules } from './vscodeApi';
 
 // Get VS Code API reference for messaging (shared across all components)
 const vscode = getVscodeApi();
@@ -25,10 +14,10 @@ type AppMode = 'select' | CreationMode;
 
 function AddCollectionWebview() {
   const [mode, setMode] = useState<AppMode>('select');
-  const [initialSchema, setInitialSchema] = useState<any>(null);
-  const [availableModules, setAvailableModules] = useState<any>(null);
+  const [initialSchema, setInitialSchema] = useState<WeaviateCollectionSchema | null>(null);
+  const [availableModules, setAvailableModules] = useState<AvailableModules | null>(null);
   const [nodesNumber, setNodesNumber] = useState<number>(1);
-  const [currentSchema, setCurrentSchema] = useState<any>(null);
+  const [currentSchema, setCurrentSchema] = useState<WeaviateCollectionSchema | null>(null);
   const [hasCollections, setHasCollections] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -81,7 +70,7 @@ function AddCollectionWebview() {
     setMode(selectedMode);
   };
 
-  const handleFileLoaded = (schema: any, action: 'edit' | 'create') => {
+  const handleFileLoaded = (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => {
     setError('');
     if (action === 'edit') {
       setInitialSchema(schema);
@@ -112,12 +101,12 @@ function AddCollectionWebview() {
     }
   };
 
-  const handleSchemaChange = (schema: any) => {
+  const handleSchemaChange = (schema: WeaviateCollectionSchema) => {
     // Store the schema whenever it changes
     setCurrentSchema(schema);
   };
 
-  const handleSchemaSubmit = (schema: any) => {
+  const handleSchemaSubmit = (schema: WeaviateCollectionSchema) => {
     // Handle submission directly from the component
     if (vscode) {
       vscode.postMessage({

@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import './FileUpload.css';
+import { WeaviateCollectionSchema } from '../vscodeApi';
 
 export interface FileUploadProps {
-  onSchemaLoaded: (schema: any, action: 'edit' | 'create') => void;
+  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => void;
   onBack: () => void;
   onCancel: () => void;
   externalError?: string;
@@ -11,7 +12,7 @@ export interface FileUploadProps {
 export function FileUpload({ onSchemaLoaded, onBack, onCancel, externalError }: FileUploadProps) {
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [validSchema, setValidSchema] = useState<any>(null);
+  const [validSchema, setValidSchema] = useState<WeaviateCollectionSchema | null>(null);
   const [jsonText, setJsonText] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 

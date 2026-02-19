@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './CloneCollection.css';
-import { getVscodeApi } from '../vscodeApi';
+import { getVscodeApi, WeaviateCollectionSchema } from '../vscodeApi';
 
 export interface CloneCollectionProps {
-  onSchemaLoaded: (schema: any, action: 'edit' | 'create') => void;
+  onSchemaLoaded: (schema: WeaviateCollectionSchema, action: 'edit' | 'create') => void;
   onBack: () => void;
   onCancel: () => void;
   externalError?: string;
@@ -21,7 +21,7 @@ export function CloneCollection({
   const [collections, setCollections] = useState<string[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
   const [newCollectionName, setNewCollectionName] = useState<string>('');
-  const [schema, setSchema] = useState<any>(null);
+  const [schema, setSchema] = useState<WeaviateCollectionSchema | null>(null);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCollections, setIsLoadingCollections] = useState(true);

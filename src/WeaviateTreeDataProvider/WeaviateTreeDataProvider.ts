@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
-import { AddCollectionPanel } from '../views/AddCollectionPanel';
+import { AddCollectionPanel, WebviewMessage } from '../views/AddCollectionPanel';
 import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
@@ -3170,7 +3170,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Create the panel with callbacks
       const panel = AddCollectionPanel.createOrShow(
         this.context.extensionUri,
-        async (schema: any) => {
+        async (schema: SchemaClass) => {
           // On create callback
           await this.createCollection(connectionId, schema);
           await this.fetchData(connectionId);
@@ -3178,7 +3178,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           await this.fetchNodes(connectionId);
           await this.updateClusterPanelIfOpen(connectionId);
         },
-        async (message: any, postMessage: (msg: any) => void) => {
+        async (message: WebviewMessage, postMessage: (msg: Record<string, unknown>) => void) => {
           // On message callback for handling webview requests
           switch (message.command) {
             case 'ready':
@@ -3252,7 +3252,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 // Use direct REST API to get collection schema
                 const baseUrl = this.getWeaviateBaseUrl(connectionId);
                 const headers = this.getWeaviateHeaders(connectionId);
-                const collectionName = message.collectionName;
+                const collectionName = message.collectionName as string;
 
                 const response = await fetch(`${baseUrl}/v1/schema/${collectionName}`, {
                   method: 'GET',
@@ -3339,7 +3339,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * @param connectionId - The ID of the connection
    * @param schema - The collection schema to create
    */
-  private async createCollection(connectionId: string, schema: any): Promise<void> {
+  private async createCollection(connectionId: string, schema: SchemaClass): Promise<void> {
     // Basic validation
     if (!schema.class) {
       throw new Error('Collection name is required');

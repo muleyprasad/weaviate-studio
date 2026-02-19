@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { SchemaClass } from '../types';
+
+/** Message received from the Add Collection webview */
+export interface WebviewMessage {
+  command: string;
+  [key: string]: unknown;
+}
 
 /**
  * Manages the Add Collection webview panel
@@ -10,17 +17,17 @@ export class AddCollectionPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
-  private readonly _initialSchema: any | undefined;
+  private readonly _initialSchema: SchemaClass | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    private readonly onCreateCallback: (schema: any) => Promise<void>,
+    private readonly onCreateCallback: (schema: SchemaClass) => Promise<void>,
     private readonly onMessageCallback?: (
-      message: any,
-      postMessage: (msg: any) => void
+      message: WebviewMessage,
+      postMessage: (msg: Record<string, unknown>) => void
     ) => Promise<void>,
-    initialSchema?: any
+    initialSchema?: SchemaClass
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -48,9 +55,12 @@ export class AddCollectionPanel {
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
-    onCreateCallback: (schema: any) => Promise<void>,
-    onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>,
-    initialSchema?: any
+    onCreateCallback: (schema: SchemaClass) => Promise<void>,
+    onMessageCallback?: (
+      message: WebviewMessage,
+      postMessage: (msg: Record<string, unknown>) => void
+    ) => Promise<void>,
+    initialSchema?: SchemaClass
   ): AddCollectionPanel {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -98,7 +108,7 @@ export class AddCollectionPanel {
   /**
    * Posts a message to the webview
    */
-  public postMessage(message: any): void {
+  public postMessage(message: Record<string, unknown>): void {
     this._panel.webview.postMessage(message);
   }
 
@@ -122,7 +132,7 @@ export class AddCollectionPanel {
   /**
    * Handles messages from the webview
    */
-  private async _handleMessage(message: any): Promise<void> {
+  private async _handleMessage(message: WebviewMessage): Promise<void> {
     switch (message.command) {
       case 'ready':
         // Webview is ready to receive data; send initial schema if provided
@@ -137,13 +147,12 @@ export class AddCollectionPanel {
           await this.onMessageCallback(message, (msg) => this.postMessage(msg));
         }
         break;
-      case 'create':
+      case 'create': {
+        const schema = message.schema as SchemaClass;
         try {
-          await this.onCreateCallback(message.schema);
+          await this.onCreateCallback(schema);
           this.dispose();
-          vscode.window.showInformationMessage(
-            `Collection "${message.schema.class}" created successfully`
-          );
+          vscode.window.showInformationMessage(`Collection "${schema.class}" created successfully`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           // Show VS Code error notification
@@ -155,6 +164,7 @@ export class AddCollectionPanel {
           });
         }
         break;
+      }
       case 'cancel':
         this.dispose();
         break;
