@@ -3270,6 +3270,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   /**
    * Updates the cluster panel if it's currently open
    * @param connectionId - The ID of the connection
+   *
+   * @remarks
+   * Errors here are non-fatal: the collection operation has already succeeded.
+   * A warning notification is shown so the user knows the panel may be stale
+   * and can manually refresh it.
    */
   private async updateClusterPanelIfOpen(connectionId: string): Promise<void> {
     try {
@@ -3297,8 +3302,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         openClusterViewOnConnect: connection?.openClusterViewOnConnect,
       });
     } catch (error) {
-      // Silently fail - don't break collection operations if cluster panel update fails
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error updating cluster panel:', error);
+      vscode.window.showWarningMessage(
+        `Cluster panel could not be refreshed after the operation: ${errorMessage}. The panel may show stale data — please refresh manually.`
+      );
     }
   }
 
