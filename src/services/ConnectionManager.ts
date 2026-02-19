@@ -967,7 +967,7 @@ export class ConnectionManager {
   <div id="cloudFields" style="display: none;">
     <div class="form-group">
       <label for="cloudUrl">Cloud URL</label>
-      <input type="text" id="cloudUrl" placeholder="https://your-instance.weaviate.network" value="${connection?.cloudUrl || ''}">
+      <input type="text" id="cloudUrl" placeholder="https://your-instance.weaviate.cloud" value="${connection?.cloudUrl || ''}">
       <div id="cloudUrlError" class="error"></div>
     </div>
     <div class="form-group">

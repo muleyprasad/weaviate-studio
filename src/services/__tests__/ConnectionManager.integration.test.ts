@@ -264,7 +264,7 @@ describe('ConnectionManager Integration Tests', () => {
           grpcPort: i % 2 === 0 ? 50051 + i : undefined,
           httpSecure: false,
           grpcSecure: false,
-          cloudUrl: i % 2 === 1 ? `https://cloud${i}.weaviate.network` : undefined,
+          cloudUrl: i % 2 === 1 ? `https://cloud${i}.weaviate.cloud` : undefined,
           apiKey: `api-key-${i}`,
         });
         connections.push(conn);

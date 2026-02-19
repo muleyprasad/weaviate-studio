@@ -3041,7 +3041,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   /**
    * Builds the base URL for Weaviate REST API calls
    * @param connectionId - The ID of the connection
-   * @returns The base URL string (e.g., "http://localhost:8080" or "https://instance.weaviate.network")
+   * @returns The base URL string (e.g., "http://localhost:8080" or "https://instance.weaviate.cloud")
    */
   private getWeaviateBaseUrl(connectionId: string): string {
     const connection = this.connectionManager.getConnection(connectionId);

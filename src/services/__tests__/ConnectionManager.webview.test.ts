@@ -184,7 +184,7 @@ describe('ConnectionManager Webview Tests', () => {
         connection: {
           name: 'Test Cloud',
           type: 'cloud',
-          cloudUrl: 'https://test.weaviate.network',
+          cloudUrl: 'https://test.weaviate.cloud',
           apiKey: 'cloud-key',
           timeoutInit: 45,
           timeoutQuery: 90,
@@ -197,7 +197,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(result).toBeDefined();
       expect(result?.connection.name).toBe('Test Cloud');
       expect(result?.connection.type).toBe('cloud');
-      expect(result?.connection.cloudUrl).toBe('https://test.weaviate.network');
+      expect(result?.connection.cloudUrl).toBe('https://test.weaviate.cloud');
       expect(result?.shouldConnect).toBe(false);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
@@ -215,7 +215,7 @@ describe('ConnectionManager Webview Tests', () => {
         connection: {
           name: 'Test Cloud Connect',
           type: 'cloud',
-          cloudUrl: 'https://test-connect.weaviate.network',
+          cloudUrl: 'https://test-connect.weaviate.cloud',
           apiKey: 'cloud-key-connect',
           timeoutInit: 45,
           timeoutQuery: 90,
@@ -228,7 +228,7 @@ describe('ConnectionManager Webview Tests', () => {
       expect(result).toBeDefined();
       expect(result?.connection.name).toBe('Test Cloud Connect');
       expect(result?.connection.type).toBe('cloud');
-      expect(result?.connection.cloudUrl).toBe('https://test-connect.weaviate.network');
+      expect(result?.connection.cloudUrl).toBe('https://test-connect.weaviate.cloud');
       expect(result?.shouldConnect).toBe(true);
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
@@ -513,7 +513,7 @@ describe('ConnectionManager Webview Tests', () => {
       const connection = await mgr.addConnection({
         name: 'Keep Key',
         type: 'cloud',
-        cloudUrl: 'https://keep.weaviate.network',
+        cloudUrl: 'https://keep.weaviate.cloud',
         apiKey: 'secret-key',
       });
 
@@ -527,7 +527,7 @@ describe('ConnectionManager Webview Tests', () => {
         connection: {
           name: 'Keep Key',
           type: 'cloud',
-          cloudUrl: 'https://keep.weaviate.network',
+          cloudUrl: 'https://keep.weaviate.cloud',
         },
       });
 
