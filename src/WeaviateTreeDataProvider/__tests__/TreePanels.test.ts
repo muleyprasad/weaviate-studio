@@ -52,6 +52,10 @@ describe('Tree panel webview options', () => {
   };
   let provider: WeaviateTreeDataProvider;
 
+  afterAll(() => {
+    delete (global as any).fetch;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     provider = new (require('../WeaviateTreeDataProvider').WeaviateTreeDataProvider)(ctx);

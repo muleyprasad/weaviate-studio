@@ -85,6 +85,10 @@ describe('Add Collection', () => {
     subscriptions: [],
   } as unknown as vscode.ExtensionContext;
 
+  afterAll(() => {
+    delete (global as any).fetch;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
 
