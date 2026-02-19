@@ -2442,7 +2442,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
-        throw new Error('Connection not found');
+        throw new Error(`Connection not found: ${connectionId}`);
       }
 
       // Get stats from server
@@ -2586,7 +2586,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     try {
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
-        throw new Error('Connection not found');
+        throw new Error(`Connection not found: ${connectionId}`);
       }
 
       // Get the client for this connection
@@ -2923,7 +2923,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Get client for this connection
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
-        throw new Error('Connection not found');
+        throw new Error(`Connection not found: ${connectionId}`);
       }
 
       const client = this.connectionManager.getClient(connectionId);
@@ -2965,7 +2965,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Get client for this connection
       const connection = this.connectionManager.getConnection(connectionId);
       if (!connection) {
-        throw new Error('Connection not found');
+        throw new Error(`Connection not found: ${connectionId}`);
       }
 
       const client = this.connectionManager.getClient(connectionId);
@@ -3046,7 +3046,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   private getWeaviateBaseUrl(connectionId: string): string {
     const connection = this.connectionManager.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     if (connection.type === 'cloud' && connection.cloudUrl) {
@@ -3081,7 +3081,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   private getWeaviateHeaders(connectionId: string): Record<string, string> {
     const connection = this.connectionManager.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     const headers: Record<string, string> = {
@@ -3159,7 +3159,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     // Validate connection first - these errors should not be caught and re-wrapped
     const connection = this.connectionManager.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     if (connection.status !== 'connected') {
@@ -3467,7 +3467,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   async deleteConnection(connectionId: string): Promise<string> {
     const connection = this.connections.find((c: WeaviateConnection) => c.id === connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     try {

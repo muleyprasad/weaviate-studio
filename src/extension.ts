@@ -520,7 +520,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const connection = weaviateTreeDataProvider.getConnectionById(item.connectionId);
         if (!connection) {
-          vscode.window.showErrorMessage('Connection not found');
+          vscode.window.showErrorMessage(`Connection not found: ${item.connectionId}`);
           return;
         }
 

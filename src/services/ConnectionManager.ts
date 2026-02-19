@@ -511,7 +511,7 @@ export class ConnectionManager {
   public async addConnectionLink(connectionId: string, link: ConnectionLink): Promise<void> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     if (!connection.links) {
@@ -537,7 +537,7 @@ export class ConnectionManager {
   ): Promise<void> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     if (!connection.links || linkIndex < 0 || linkIndex >= connection.links.length) {
@@ -558,7 +558,7 @@ export class ConnectionManager {
   public async removeConnectionLink(connectionId: string, linkIndex: number): Promise<void> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     if (!connection.links || linkIndex < 0 || linkIndex >= connection.links.length) {
@@ -578,7 +578,7 @@ export class ConnectionManager {
   public getConnectionLinks(connectionId: string): ConnectionLink[] {
     const connection = this.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
 
     return connection.links || [];
@@ -596,7 +596,7 @@ export class ConnectionManager {
   ): Promise<{ connection: WeaviateConnection; shouldConnect: boolean } | null> {
     const connection = this.getConnection(connectionId);
     if (!connection) {
-      throw new Error('Connection not found');
+      throw new Error(`Connection not found: ${connectionId}`);
     }
     return this.showConnectionDialog(connection);
   }
