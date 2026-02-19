@@ -579,6 +579,13 @@ function ClusterPanelWebview() {
   const scrollPositionRef = useRef<number>(0);
   const prevNodeStatusDataRef = useRef<Node[]>([]);
 
+  // Signal to the extension that the webview is ready to receive data.
+  // This must run before the message listener is set up so the extension
+  // can respond with the initial 'init' payload without a race condition.
+  useEffect(() => {
+    vscode.postMessage({ command: 'ready' });
+  }, []);
+
   useEffect(() => {
     // Handle messages from the extension
     const messageHandler = (event: MessageEvent) => {

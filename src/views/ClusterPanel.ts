@@ -11,6 +11,9 @@ export class ClusterPanel {
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
   private readonly _connectionId: string;
+  /** Holds the init payload until the webview signals it is ready. */
+  private _pendingInitData: { nodeStatusData: any; openClusterViewOnConnect?: boolean } | null =
+    null;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -95,12 +98,10 @@ export class ClusterPanel {
       onMessageCallback
     );
 
-    // Send initial data
-    ClusterPanel.currentPanel.postMessage({
-      command: 'init',
-      nodeStatusData,
-      openClusterViewOnConnect,
-    });
+    // Store init data to be delivered once the webview signals it is ready.
+    // Posting immediately would race against the React bundle loading and the
+    // message would be lost before the event listener is attached.
+    ClusterPanel.currentPanel._pendingInitData = { nodeStatusData, openClusterViewOnConnect };
 
     return ClusterPanel.currentPanel;
   }
@@ -154,6 +155,18 @@ export class ClusterPanel {
     }
 
     switch (message.command) {
+      case 'ready':
+        // Webview has mounted and its message listener is now active.
+        // Flush any pending init data that was stored before the webview was ready.
+        if (this._pendingInitData) {
+          this.postMessage({
+            command: 'init',
+            nodeStatusData: this._pendingInitData.nodeStatusData,
+            openClusterViewOnConnect: this._pendingInitData.openClusterViewOnConnect,
+          });
+          this._pendingInitData = null;
+        }
+        break;
       case 'error':
         vscode.window.showErrorMessage(message.text);
         break;

@@ -194,12 +194,16 @@ describe('ClusterPanel', () => {
 
       const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
 
+      // Deliver pending init data first (simulates webview signalling ready)
+      messageHandler({ command: 'ready' });
+      mockPanel.webview.postMessage.mockClear();
+
       // Trigger refresh
       messageHandler({ command: 'refresh' });
 
-      // Should post a message back with refreshed data
-      // The refresh is handled internally in the panel
-      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+      // The refresh is forwarded to onMessageCallback; without a callback nothing
+      // extra is posted, but the handler must not throw
+      expect(mockPanel.dispose).not.toHaveBeenCalled();
     });
 
     test('handles updateShardStatus command', () => {
@@ -210,6 +214,10 @@ describe('ClusterPanel', () => {
 
       const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
 
+      // Deliver pending init data first
+      messageHandler({ command: 'ready' });
+
+      // Trigger updateShardStatus — forwarded to onMessageCallback (none here)
       messageHandler({
         command: 'updateShardStatus',
         collection: 'TestCollection',
@@ -217,8 +225,8 @@ describe('ClusterPanel', () => {
         newStatus: 'READY',
       });
 
-      // Verify command is handled (implementation may vary)
-      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+      // Panel should not have been disposed
+      expect(mockPanel.dispose).not.toHaveBeenCalled();
     });
 
     test('handles toggleOpenClusterViewOnConnect command', () => {
@@ -229,13 +237,16 @@ describe('ClusterPanel', () => {
 
       const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
 
+      // Deliver pending init data first
+      messageHandler({ command: 'ready' });
+
       messageHandler({
         command: 'toggleOpenClusterViewOnConnect',
         value: false,
       });
 
-      // Verify the setting is updated (implementation may store this)
-      expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+      // Panel should not have been disposed
+      expect(mockPanel.dispose).not.toHaveBeenCalled();
     });
   });
 
@@ -253,6 +264,11 @@ describe('ClusterPanel', () => {
       const nodeStatusData = { nodes: [] };
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+
+      // Simulate the webview signalling it is ready to receive data
+      messageHandler({ command: 'ready' });
 
       // The webview should have received the initial data
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
@@ -398,7 +414,10 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
 
-      // Initial data should be sent
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+
+      // Initial data should be sent after ready
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           command: 'init',
@@ -431,6 +450,9 @@ describe('ClusterPanel', () => {
       };
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, complexData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
 
       const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
       const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
@@ -489,6 +511,9 @@ describe('ClusterPanel', () => {
         'Test Connection'
       );
 
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+
       const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
       const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
 
@@ -526,6 +551,9 @@ describe('ClusterPanel', () => {
       };
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, mixedStatusData, 'Test Connection');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
 
       const postMessageCalls = mockPanel.webview.postMessage.mock.calls;
       const initCall = postMessageCalls.find((call: any) => call[0].command === 'init');
@@ -575,11 +603,14 @@ describe('ClusterPanel', () => {
       );
     });
 
-    test('sends initial data with init command', () => {
+    test('sends initial data with init command after ready', () => {
       const connectionId = 'test-connection-123';
       const nodeStatusData = { nodes: [{ name: 'node1' }] };
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -601,6 +632,9 @@ describe('ClusterPanel', () => {
         undefined,
         true
       );
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -855,7 +889,10 @@ describe('ClusterPanel', () => {
     });
 
     test('handles empty node status data', () => {
-      const panel = ClusterPanel.createOrShow(mockExtensionUri, 'test-id', { nodes: [] }, 'Test');
+      ClusterPanel.createOrShow(mockExtensionUri, 'test-id', { nodes: [] }, 'Test');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
 
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -888,8 +925,12 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, 'test-id', complexData, 'Test');
 
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+
       expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
+          command: 'init',
           nodeStatusData: complexData,
         })
       );
