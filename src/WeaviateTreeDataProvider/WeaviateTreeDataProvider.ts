@@ -2690,8 +2690,11 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Refresh tree to update the count
       this.refresh();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error fetching backups:', error);
-      // Don't throw - this is non-critical
+      vscode.window.showWarningMessage(
+        `Could not load backups: ${errorMessage}. The backup list may be incomplete.`
+      );
     }
   }
 
@@ -3345,7 +3348,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             errorMessage = errorJson.error[0].message;
           }
         } catch {
-          // If parsing fails, use the raw text
+          // Intentional fallback: the error body is not Weaviate error JSON
+          // (e.g. an nginx 502 HTML page). Surface the raw text so the caller
+          // still gets something meaningful. Not rethrowing is deliberate.
+          console.warn('Could not parse error response as JSON, using raw text body');
           if (errorText) {
             errorMessage += ` - ${errorText}`;
           }
@@ -3356,7 +3362,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       console.log(`Collection "${schema.class}" created successfully`);
     } catch (error) {
-      // on error, show dialog with error message
+      // fetch() throws TypeError for network-level failures (ECONNREFUSED, DNS
+      // resolution failure, TLS error, request timeout). Wrap it with an
+      // actionable message before rethrowing so callers can present a distinct
+      // "cannot reach server" prompt rather than a generic schema error.
+      if (error instanceof TypeError) {
+        console.error('Network error creating collection:', error);
+        throw new Error(
+          `Cannot reach Weaviate server. Check your connection URL and network. (${error.message})`
+        );
+      }
+      // API-level error (4xx/5xx) — message already contains the HTTP status
+      // and Weaviate validation detail; rethrow as-is.
       console.error('Error creating collection:', error);
       throw error;
     }
