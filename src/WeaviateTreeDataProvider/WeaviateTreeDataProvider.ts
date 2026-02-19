@@ -1894,7 +1894,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             const backups = await client.backup.list(backend);
             return { backend, backups };
           } catch (error) {
-            // Backend might not be configured, that's okay
+            console.warn(
+              `[backup] Failed to list backups for backend "${backend}":`,
+              error instanceof Error ? error.message : String(error)
+            );
             return { backend, backups: [] };
           }
         });
@@ -2665,7 +2668,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           const backups = await client.backup.list(backend);
           return { backend, backups };
         } catch (error) {
-          // Backend might not be configured, that's okay
+          console.warn(
+            `[backup] Failed to list backups for backend "${backend}":`,
+            error instanceof Error ? error.message : String(error)
+          );
           return { backend, backups: [] };
         }
       });
