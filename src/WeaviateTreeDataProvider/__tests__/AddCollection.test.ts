@@ -500,6 +500,81 @@ describe('Add Collection', () => {
         })
       );
     });
+
+    it('throws a descriptive error on network failure (fetch TypeError)', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValueOnce(
+        new TypeError('Failed to fetch')
+      );
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'TestCollection' })
+      ).rejects.toThrow('Cannot reach Weaviate server');
+    });
+
+    it('throws with extracted Weaviate error message on non-ok response', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        text: async () =>
+          JSON.stringify({ error: [{ message: 'class name must start with uppercase' }] }),
+        json: async () => ({}),
+      } as any);
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'testCollection' })
+      ).rejects.toThrow('class name must start with uppercase');
+    });
+
+    it('throws with raw body when non-ok response body is not JSON', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        text: async () => '<html>Bad Gateway</html>',
+        json: async () => ({}),
+      } as any);
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'TestCollection' })
+      ).rejects.toThrow('502 Bad Gateway - <html>Bad Gateway</html>');
+    });
+
+    it('throws when connection is not found', async () => {
+      mockConnectionManager.getConnection.mockReturnValue(null);
+
+      await expect(
+        (provider as any).createCollection('invalid', { class: 'TestCollection' })
+      ).rejects.toThrow('Connection not found');
+    });
+
+    it('uses https:// URL when httpSecure is true', async () => {
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Secure Connection',
+        type: 'custom',
+        httpHost: 'my-weaviate.example.com',
+        httpPort: 443,
+        httpSecure: true,
+        status: 'connected',
+      });
+
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+        text: async () => '',
+        status: 201,
+        statusText: 'Created',
+      } as any);
+
+      await (provider as any).createCollection('conn1', { class: 'TestCollection' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://my-weaviate.example.com:443/v1/schema',
+        expect.anything()
+      );
+    });
   });
 
   describe('getAvailableVectorizers', () => {
