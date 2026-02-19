@@ -3177,6 +3177,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           // Update cluster panel with latest node/collection stats
           await this.fetchNodes(connectionId);
           await this.updateClusterPanelIfOpen(connectionId);
+          // Shards start in lazy-loading state right after creation.
+          // Schedule a follow-up refresh so the panel shows the loaded shard status.
+          setTimeout(() => {
+            this.updateClusterPanelIfOpen(connectionId).catch((error) => {
+              console.error(
+                'Error in delayed cluster panel refresh after collection creation:',
+                error
+              );
+            });
+          }, 5000);
         },
         async (
           message: WebviewToExtensionMessage,
