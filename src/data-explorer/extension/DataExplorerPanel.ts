@@ -318,6 +318,7 @@ export class DataExplorerPanel {
     if (this._isMultiTenant) {
       try {
         const tenants = await this._api.getTenants(this._collectionName);
+        tenants.sort((a, b) => a.name.localeCompare(b.name));
 
         // Send schema and tenants together
         this.postMessage({
@@ -484,6 +485,7 @@ export class DataExplorerPanel {
       }
 
       const tenants = await this._api.getTenants(this._collectionName);
+      tenants.sort((a, b) => a.name.localeCompare(b.name));
       this.postMessage({
         command: 'tenantsLoaded',
         tenants,
