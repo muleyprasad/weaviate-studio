@@ -411,6 +411,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           arguments: [element.description],
         };
       }
+    } else if (element.itemType === 'objectTtlConfig') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('clock');
+      }
+      element.tooltip =
+        'Object Time to Live (TTL): automatically expires and removes objects after a set duration';
     }
 
     return element;
@@ -734,6 +740,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           element.label,
           'replication',
           new vscode.ThemeIcon('activate-breakpoints')
+        ),
+        new WeaviateTreeItem(
+          collection.objectTTL?.enabled === true ? 'Object TTL' : 'Object TTL (Disabled)',
+          collection.objectTTL?.enabled === true
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None,
+          'objectTtlConfig',
+          element.connectionId,
+          element.label,
+          'objectTtlConfig',
+          new vscode.ThemeIcon('clock')
         ),
         new WeaviateTreeItem(
           'Sharding',
@@ -1133,6 +1150,44 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
 
       return replicationItems;
+    } else if (
+      element.itemType === 'objectTtlConfig' &&
+      element.connectionId &&
+      element.collectionName
+    ) {
+      // Object TTL configuration section
+      const collection = this.collections[element.connectionId]?.find(
+        (col) => col.label === element.collectionName
+      );
+      const objectTtlConfig = collection?.schema?.objectTTL;
+
+      if (!objectTtlConfig) {
+        return [
+          new WeaviateTreeItem(
+            'No TTL configuration found',
+            vscode.TreeItemCollapsibleState.None,
+            'message'
+          ),
+        ];
+      }
+
+      const ttlItems: WeaviateTreeItem[] = [];
+      Object.entries(objectTtlConfig).forEach(([key, value]) => {
+        ttlItems.push(
+          new WeaviateTreeItem(
+            `${key}: ${value}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            element.collectionName,
+            key,
+            new vscode.ThemeIcon('clock'),
+            'objectTtlConfig'
+          )
+        );
+      });
+
+      return ttlItems;
     }
     if (
       element.itemType === 'vectorConfigDetail' &&
