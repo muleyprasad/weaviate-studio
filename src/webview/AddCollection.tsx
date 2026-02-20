@@ -26,6 +26,7 @@ function AddCollectionWebview() {
   const [currentSchema, setCurrentSchema] = useState<WeaviateCollectionSchema | null>(null);
   const [hasCollections, setHasCollections] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [weaviateVersion, setWeaviateVersion] = useState<string | null>(null);
 
   useEffect(() => {
     // Request initial data from extension
@@ -60,6 +61,9 @@ function AddCollectionWebview() {
           break;
         case 'hasCollections':
           setHasCollections(message.hasCollections || false);
+          break;
+        case 'serverVersion':
+          setWeaviateVersion(message.version || null);
           break;
         case 'error':
           setError(message.message || 'An error occurred');
@@ -252,6 +256,7 @@ function AddCollectionWebview() {
           onChange={handleSchemaChange}
           onSubmit={handleSchemaSubmit}
           hideCreateButton={true}
+          weaviateVersion={weaviateVersion}
         />
       </div>
 

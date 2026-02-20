@@ -3222,6 +3222,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
                 command: 'hasCollections',
                 hasCollections: hasCollections,
               });
+
+              // Send server version
+              const serverVersion = this.clusterMetadataCache[connectionId]?.version;
+              postMessage({
+                command: 'serverVersion',
+                version: serverVersion || 'unknown',
+              });
               break;
             case 'getVectorizers':
               try {
