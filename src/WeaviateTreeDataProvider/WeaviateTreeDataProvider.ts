@@ -292,41 +292,65 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   getTreeItem(element: WeaviateTreeItem): vscode.TreeItem {
     // Set appropriate icons and tooltips based on item type
-    if (element.itemType === 'properties' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('symbol-property');
+    if (element.itemType === 'properties') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('symbol-property');
+      }
       element.tooltip = 'View collection properties';
-    } else if (element.itemType === 'vectorConfig' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('arrow-both');
+    } else if (element.itemType === 'vectorConfig') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('arrow-both');
+      }
       element.tooltip = 'Vector configuration and modules';
-    } else if (element.itemType === 'invertedIndex' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('search');
+    } else if (element.itemType === 'invertedIndex') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('search');
+      }
       element.tooltip = 'Index configuration';
-    } else if (element.itemType === 'statistics' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('graph');
+    } else if (element.itemType === 'statistics') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('graph');
+      }
       element.tooltip = 'Collection statistics';
-    } else if (element.itemType === 'sharding' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('layout');
+    } else if (element.itemType === 'sharding') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('layout');
+      }
       element.tooltip = 'Sharding and replication configuration';
-    } else if (element.itemType === 'serverInfo' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('server');
+    } else if (element.itemType === 'serverInfo') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('server');
+      }
       element.tooltip = 'Server version and information';
-    } else if (element.itemType === 'modules' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('extensions');
+    } else if (element.itemType === 'modules') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('extensions');
+      }
       element.tooltip = 'Available Weaviate modules';
-    } else if (element.itemType === 'collectionsGroup' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('database');
+    } else if (element.itemType === 'collectionsGroup') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('database');
+      }
       element.tooltip = 'Collections in this instance';
-    } else if (element.itemType === 'backups' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('archive');
+    } else if (element.itemType === 'backups') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('archive');
+      }
       element.tooltip = 'Backups for this cluster';
-    } else if (element.itemType === 'backupItem' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('file-zip');
+    } else if (element.itemType === 'backupItem') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('file-zip');
+      }
       element.tooltip = 'Backup details';
-    } else if (element.itemType === 'aliases' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('link');
+    } else if (element.itemType === 'aliases') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('link');
+      }
       element.tooltip = 'Aliases for this cluster';
-    } else if (element.itemType === 'aliasItem' && !element.iconPath) {
-      element.iconPath = new vscode.ThemeIcon('symbol-reference');
+    } else if (element.itemType === 'aliasItem') {
+      if (!element.iconPath) {
+        element.iconPath = new vscode.ThemeIcon('symbol-reference');
+      }
       element.tooltip = 'Alias details';
     } else if (element.itemType === 'property') {
       // Ensure property items have the correct context value
