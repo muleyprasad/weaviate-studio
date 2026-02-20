@@ -688,6 +688,12 @@ describe('Add Collection', () => {
           'text2vec-cohere': {},
         },
       });
+
+      // Should also receive serverVersion message
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: '1.20.0',
+      });
     });
 
     it('sends default nodesNumber of 1 when no nodes cached', async () => {
@@ -706,6 +712,36 @@ describe('Add Collection', () => {
       expect(postMessageSpy).toHaveBeenCalledWith({
         command: 'nodesNumber',
         nodesNumber: 1,
+      });
+    });
+
+    it('sends serverVersion as unknown when no version in metadata cache', async () => {
+      (provider as any).clusterNodesCache = {
+        conn1: [{ name: 'node-1', status: 'HEALTHY' }],
+      };
+
+      // Cache exists but has no version field
+      (provider as any).clusterMetadataCache = {
+        conn1: { modules: {} },
+      };
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: 'unknown',
+      });
+    });
+
+    it('sends serverVersion as unknown when no metadata cached at all', async () => {
+      (provider as any).clusterNodesCache = {};
+      (provider as any).clusterMetadataCache = {};
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: 'unknown',
       });
     });
 
