@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import weaviate, { ConnectToCustomOptions, WeaviateClient } from 'weaviate-client';
-import { WEAVIATE_CLIENT_HEADER } from '../constants';
+import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
 
 export interface ConnectionLink {
   name: string;
@@ -332,7 +332,7 @@ export class ConnectionManager {
     try {
       let client: WeaviateClient | undefined;
       const headers = {
-        'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+        'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
       };
       if (connection.type === 'cloud' && connection.cloudUrl) {
         client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
@@ -400,7 +400,7 @@ export class ConnectionManager {
               grpcSecure: undefined, // Explicitly set to undefined
               skipInitChecks: true, // Force skip init checks to avoid gRPC compatibility issues
               headers: {
-                'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+                'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
               },
               timeout: {
                 init: connection.timeoutInit,

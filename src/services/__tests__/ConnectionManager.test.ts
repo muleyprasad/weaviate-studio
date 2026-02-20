@@ -282,9 +282,7 @@ describe('ConnectionManager', () => {
         authCredentials: { key: 'test-key' },
         skipInitChecks: undefined,
         headers: {
-          'X-Weaviate-Client': expect.stringContaining(
-            'weaviate-client-typescript/weaviate-studio@'
-          ),
+          'X-Weaviate-Client-Integration': expect.stringContaining('weaviate-studio/'),
         },
         timeout: {
           init: 30,

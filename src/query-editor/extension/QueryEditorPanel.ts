@@ -6,7 +6,7 @@ import { WeaviateClient, CollectionConfig, PropertyConfig } from 'weaviate-clien
 import type { WeaviateConnection } from '../../services/ConnectionManager';
 import * as http from 'http';
 import * as https from 'https';
-import { WEAVIATE_CLIENT_HEADER } from '../../constants';
+import { WEAVIATE_INTEGRATION_HEADER } from '../../constants';
 
 // Helper function to generate a nonce
 function getNonce() {
@@ -285,7 +285,7 @@ export class QueryEditorPanel {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+      'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
     };
     if (conn?.apiKey) {
       headers['Authorization'] = `Bearer ${conn.apiKey}`;

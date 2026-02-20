@@ -18,7 +18,7 @@ import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
 import * as http from 'http';
-import { WEAVIATE_CLIENT_HEADER } from '../constants';
+import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -3172,7 +3172,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+      'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
     };
 
     if (connection.apiKey) {
@@ -3627,7 +3627,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           url,
           {
             headers: {
-              'X-Weaviate-Client': WEAVIATE_CLIENT_HEADER,
+              'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
               ...(connection.apiKey && { Authorization: `Bearer ${connection.apiKey}` }),
             },
           },
