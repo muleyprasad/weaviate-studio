@@ -325,6 +325,7 @@ export function activate(context: vscode.ExtensionContext) {
           item.connectionId,
           'add',
           undefined,
+          [],
           async (roleData: any) => {
             const perms = buildPermissionsFromFormState(client, roleData.permissions);
             await client.roles.create(roleData.name, perms);
@@ -352,7 +353,10 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
         const roleName = item.itemId;
-        const existingRole = await client.roles.byName(roleName);
+        const [existingRole, groupAssignments] = await Promise.all([
+          client.roles.byName(roleName),
+          client.roles.getGroupAssignments(roleName).catch(() => []),
+        ]);
         if (!existingRole) {
           vscode.window.showErrorMessage(`Role "${roleName}" not found`);
           return;
@@ -362,6 +366,7 @@ export function activate(context: vscode.ExtensionContext) {
           item.connectionId,
           'edit',
           existingRole,
+          groupAssignments,
           async (roleData: any) => {
             const newPerms = buildPermissionsFromFormState(client, roleData.permissions);
             // Fetch fresh role state each save — avoids stale-closure bugs on repeated saves
@@ -744,11 +749,11 @@ export function activate(context: vscode.ExtensionContext) {
       }
       const groupId = item.itemId;
       const confirmation = await vscode.window.showWarningMessage(
-        `Are you sure you want to remove all role assignments from group "${groupId}"? The group itself is managed by your OIDC provider and will not be deleted.`,
+        `Delete group "${groupId}"?\n\nThis will revoke all role assignments for this group. The group itself is managed by your OIDC provider and will not be affected.`,
         { modal: true },
-        'Remove Roles'
+        'Delete Group'
       );
-      if (confirmation !== 'Remove Roles') {
+      if (confirmation !== 'Delete Group') {
         return;
       }
       try {

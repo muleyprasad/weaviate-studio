@@ -411,6 +411,11 @@
           "group": "rbac@1"
         },
         {
+          "command": "weaviate.rbac.editRole",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateRbacRoleRef",
+          "group": "inline@1"
+        },
+        {
           "command": "weaviate.rbac.editUser",
           "when": "view == weaviateConnectionsView && (viewItem == weaviateRbacUserActive || viewItem == weaviateRbacUserInactive || viewItem == weaviateRbacUserActive_DbEnvUser || viewItem == weaviateRbacUserInactive_DbEnvUser)",
           "group": "inline@1"

@@ -12,6 +12,7 @@ export class RbacRolePanel {
   private readonly _connectionId: string;
   private readonly _mode: 'add' | 'edit';
   private readonly _existingRole: any | undefined;
+  private readonly _groupAssignments: any[];
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -19,6 +20,7 @@ export class RbacRolePanel {
     connectionId: string,
     mode: 'add' | 'edit',
     existingRole: any | undefined,
+    groupAssignments: any[],
     private readonly onSaveCallback: (roleData: any) => Promise<void>
   ) {
     this._panel = panel;
@@ -26,6 +28,7 @@ export class RbacRolePanel {
     this._connectionId = connectionId;
     this._mode = mode;
     this._existingRole = existingRole;
+    this._groupAssignments = groupAssignments;
 
     this._update();
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -49,6 +52,7 @@ export class RbacRolePanel {
     connectionId: string,
     mode: 'add' | 'edit',
     existingRole: any | undefined,
+    groupAssignments: any[],
     onSaveCallback: (roleData: any) => Promise<void>
   ): RbacRolePanel {
     const column = vscode.window.activeTextEditor?.viewColumn;
@@ -78,6 +82,7 @@ export class RbacRolePanel {
       connectionId,
       mode,
       existingRole,
+      groupAssignments,
       onSaveCallback
     );
     RbacRolePanel.panels.set(panelKey, rbacRolePanel);
@@ -112,6 +117,7 @@ export class RbacRolePanel {
           connectionId: this._connectionId,
           mode: this._mode,
           existingRole: this._existingRole,
+          groupAssignments: this._groupAssignments,
         });
         break;
       case 'saveRole':

@@ -360,6 +360,33 @@
   animation: spin 1s linear infinite;
 }
 
+.group-assignments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-assignment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--vscode-sideBar-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.group-assignment-item .group-id {
+  flex: 1;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.group-assignment-item .group-type {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

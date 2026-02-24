@@ -26,22 +26,28 @@ import * as http from 'http';
  * of Weaviate schema information.
  */
 export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<WeaviateTreeItem> {
-  /** Busca e cacheia lista de usuários para uma conexão */
+  /** Fetches and caches users for a connection (no-op if already cached). Throws on API error. */
+  private async _ensureUsersCached(connectionId: string, client: any): Promise<void> {
+    if (this.rbacCache[connectionId]?.users) {
+      return;
+    }
+    const users = await client.users.db.listAll({ includeLastUsedTime: true });
+    this.rbacCache[connectionId] = {
+      ...(this.rbacCache[connectionId] || {}),
+      users: Array.isArray(users) ? users : Object.values(users),
+    };
+  }
+
+  /** Returns cached users for a connection, fetching them first if needed. */
   public async getUsers(connectionId: string): Promise<any[]> {
     const client = this.connectionManager.getClient(connectionId);
     if (!client) {
       return [];
     }
-    if (!this.rbacCache[connectionId]?.users) {
-      try {
-        const users = await client.users.db.listAll();
-        this.rbacCache[connectionId] = {
-          ...(this.rbacCache[connectionId] || {}),
-          users: Array.isArray(users) ? users : Object.values(users),
-        };
-      } catch (e) {
-        return [];
-      }
+    try {
+      await this._ensureUsersCached(connectionId, client);
+    } catch (e) {
+      return [];
     }
     return this.rbacCache[connectionId]?.users || [];
   }
@@ -746,6 +752,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         );
       }
 
+      // Last Used At (if available)
+      if (user.lastUsedAt) {
+        details.push(
+          new WeaviateTreeItem(
+            `Last used: ${new Date(user.lastUsedAt).toLocaleString()}`,
+            vscode.TreeItemCollapsibleState.None,
+            'rbacUserDetail',
+            element.connectionId,
+            undefined,
+            this.generateSafeId(`${user.id}-lastUsedAt`),
+            new vscode.ThemeIcon('history'),
+            'weaviateRbacUserDetail',
+            undefined
+          )
+        );
+      }
+
       // API Key First Letters (if available)
       if (user.apiKeyFirstLetters) {
         details.push(
@@ -771,10 +794,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           'rbacUserDetails',
           element.connectionId,
           undefined,
-          this.generateSafeId(`${user.id}-roles`),
+          user.id,
           new vscode.ThemeIcon('shield'),
           'weaviateRbacUserDetails',
-          user.roleNames.join(', ')
+          [...user.roleNames].sort((a: string, b: string) => a.localeCompare(b)).join(', ')
         );
         userRolesItem.id = `${element.connectionId}:userRoles:${user.id}`;
         details.push(userRolesItem);
@@ -799,12 +822,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     // RBAC: User Details - Roles list
     if (element?.itemType === 'rbacUserDetails' && element.connectionId && element.itemId) {
-      // Decode the safe ID to get user ID
-      const decodedId = Buffer.from(
-        element.itemId.replace(/-/g, '+').replace(/_/g, '/'),
-        'base64'
-      ).toString();
-      const userId = decodedId.substring(0, decodedId.lastIndexOf('-roles'));
+      const userId = element.itemId;
 
       const users = this.rbacCache[element.connectionId]?.users || [];
       const user = users.find((u: any) => u.id === userId);
@@ -813,20 +831,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return [];
       }
 
-      return user.roleNames.map((roleName: string, index: number) => {
-        const safeId = this.generateSafeId(`${userId}-role-${index}`);
-        return new WeaviateTreeItem(
-          roleName,
-          vscode.TreeItemCollapsibleState.None,
-          'rbacUserDetail',
-          element.connectionId,
-          undefined,
-          safeId,
-          new vscode.ThemeIcon('shield'),
-          'weaviateRbacUserDetail',
-          undefined
-        );
-      });
+      return [...user.roleNames]
+        .sort((a: string, b: string) => a.localeCompare(b))
+        .map((roleName: string) => {
+          return new WeaviateTreeItem(
+            roleName,
+            vscode.TreeItemCollapsibleState.None,
+            'rbacUserDetail',
+            element.connectionId,
+            undefined,
+            roleName,
+            new vscode.ThemeIcon('shield'),
+            'weaviateRbacRoleRef',
+            undefined
+          );
+        });
     }
 
     // RBAC: Users
@@ -836,23 +855,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         return [];
       }
       // Fetch and cache users
-      if (!this.rbacCache[element.connectionId]?.users) {
-        try {
-          const users = await client.users.db.listAll();
-          this.rbacCache[element.connectionId] = {
-            ...(this.rbacCache[element.connectionId] || {}),
-            users,
-          };
-        } catch (e) {
-          return [
-            new WeaviateTreeItem(
-              'Error while getting users',
-              vscode.TreeItemCollapsibleState.None,
-              'message',
-              element.connectionId
-            ),
-          ];
-        }
+      try {
+        await this._ensureUsersCached(element.connectionId, client);
+      } catch (e) {
+        return [
+          new WeaviateTreeItem(
+            'Error while getting users',
+            vscode.TreeItemCollapsibleState.None,
+            'message',
+            element.connectionId
+          ),
+        ];
       }
       const users = this.rbacCache[element.connectionId]?.users || [];
       return users
@@ -901,6 +914,59 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
 
     // RBAC: Groups
+    // RBAC: Group Item - Show roles assigned to a group
+    if (element?.itemType === 'rbacGroupItem' && element.connectionId && element.itemId) {
+      const groupId = element.itemId;
+      const client = this.connectionManager.getClient(element.connectionId);
+      if (!client) {
+        return [];
+      }
+      try {
+        const assignedRolesMap = await client.groups.oidc.getAssignedRoles(groupId);
+        const roleNames = Object.keys(assignedRolesMap || {});
+        if (roleNames.length === 0) {
+          return [
+            new WeaviateTreeItem(
+              'No roles assigned',
+              vscode.TreeItemCollapsibleState.None,
+              'rbacUserDetail',
+              element.connectionId,
+              undefined,
+              `${groupId}-noroles`,
+              new vscode.ThemeIcon('shield'),
+              undefined,
+              undefined
+            ),
+          ];
+        }
+        return roleNames
+          .sort()
+          .map(
+            (roleName) =>
+              new WeaviateTreeItem(
+                roleName,
+                vscode.TreeItemCollapsibleState.None,
+                'rbacUserDetail',
+                element.connectionId,
+                undefined,
+                roleName,
+                new vscode.ThemeIcon('shield'),
+                'weaviateRbacRoleRef',
+                undefined
+              )
+          );
+      } catch (e) {
+        return [
+          new WeaviateTreeItem(
+            'Error loading roles',
+            vscode.TreeItemCollapsibleState.None,
+            'message',
+            element.connectionId
+          ),
+        ];
+      }
+    }
+
     if (element?.itemType === 'rbacGroups' && element.connectionId) {
       const client = this.connectionManager.getClient(element.connectionId);
       if (!client) {
@@ -931,7 +997,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         .map((group: any) => {
           const item = new WeaviateTreeItem(
             group,
-            vscode.TreeItemCollapsibleState.None,
+            vscode.TreeItemCollapsibleState.Collapsed,
             'rbacGroupItem',
             element.connectionId,
             undefined,
@@ -1178,15 +1244,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           }
         };
         const fetchUsers = async () => {
-          if (!this.rbacCache[connectionId]?.users) {
-            try {
-              const users = await client.users.db.listAll();
-              this.rbacCache[connectionId] = {
-                ...(this.rbacCache[connectionId] || {}),
-                users,
-              };
-            } catch {}
-          }
+          try {
+            await this._ensureUsersCached(connectionId, client);
+          } catch {}
         };
         const fetchGroups = async () => {
           if (!this.rbacCache[connectionId]?.groups) {
@@ -1260,15 +1320,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       };
       const fetchUsers = async () => {
-        if (!this.rbacCache[connectionId]?.users) {
-          try {
-            const users = await client.users.db.listAll();
-            this.rbacCache[connectionId] = {
-              ...(this.rbacCache[connectionId] || {}),
-              users,
-            };
-          } catch {}
-        }
+        try {
+          await this._ensureUsersCached(connectionId, client);
+        } catch {}
       };
       const fetchGroups = async () => {
         if (!this.rbacCache[connectionId]?.groups) {

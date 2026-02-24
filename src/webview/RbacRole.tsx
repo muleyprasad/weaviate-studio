@@ -354,6 +354,9 @@ function RbacRoleWebview() {
   const [isBuiltinRole, setIsBuiltinRole] = useState(false);
   const [permissions, setPermissions] = useState<PermissionsState>(DEFAULT_PERMISSIONS);
   const [sectionErrors, setSectionErrors] = useState<Set<keyof PermissionsState>>(new Set());
+  const [groupAssignments, setGroupAssignments] = useState<
+    { groupID: string; groupType?: string }[]
+  >([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -395,6 +398,7 @@ function RbacRoleWebview() {
             setRoleName(name);
             setIsBuiltinRole(BUILTIN_ROLES.has(name));
             setPermissions(roleToPermissionsState(msg.existingRole));
+            setGroupAssignments(msg.groupAssignments || []);
           }
           break;
         case 'roleSaved':
@@ -517,6 +521,23 @@ function RbacRoleWebview() {
           />
         </div>
       </div>
+
+      {mode === 'edit' && groupAssignments.length > 0 && (
+        <div className="form-section">
+          <div className="form-group">
+            <label>Assigned Groups ({groupAssignments.length})</label>
+            <div className="group-assignments-list">
+              {groupAssignments.map((g, i) => (
+                <div key={i} className="group-assignment-item">
+                  <span className="codicon codicon-organization"></span>
+                  <span className="group-id">{g.groupID}</span>
+                  {g.groupType && <span className="group-type">{g.groupType}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="form-section">
         <h3 className="permissions-title">Permissions</h3>
