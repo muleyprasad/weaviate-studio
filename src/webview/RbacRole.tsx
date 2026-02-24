@@ -274,7 +274,9 @@ function PermSection({
 
   // Auto-expand when entries arrive (e.g. initData in edit mode)
   useEffect(() => {
-    if (configs.length > 0) setOpen(true);
+    if (configs.length > 0) {
+      setOpen(true);
+    }
   }, [configs.length]);
 
   // Auto-expand and scroll into view when an error is flagged

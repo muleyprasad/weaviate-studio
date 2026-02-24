@@ -62,6 +62,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     expect(panel).toBeInstanceOf(RbacRolePanel);
@@ -75,7 +76,14 @@ describe('RbacRolePanel', () => {
 
   it('should create a panel with edit title', () => {
     const existingRole = { name: 'data-reader' };
-    RbacRolePanel.createOrShow(mockExtensionUri as any, 'conn-1', 'edit', existingRole, mockOnSave);
+    RbacRolePanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'edit',
+      existingRole,
+      [],
+      mockOnSave
+    );
     expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
       'weaviateRbacRole',
       'Edit Role: data-reader',
@@ -90,6 +98,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     mockPanel.reveal.mockClear();
@@ -98,19 +107,21 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     expect(panel1).toBe(panel2);
     expect(mockPanel.reveal).toHaveBeenCalled();
   });
 
-  it('should send initData on ready command', async () => {
+  it('should send initData on ready command (no groups)', async () => {
     const existingRole = { name: 'my-role' };
     const panel = RbacRolePanel.createOrShow(
       mockExtensionUri as any,
       'conn-1',
       'edit',
       existingRole,
+      [],
       mockOnSave
     );
     mockPanel.webview.postMessage.mockClear();
@@ -120,6 +131,29 @@ describe('RbacRolePanel', () => {
       connectionId: 'conn-1',
       mode: 'edit',
       existingRole,
+      groupAssignments: [],
+    });
+  });
+
+  it('should send initData with groupAssignments when provided', async () => {
+    const existingRole = { name: 'my-role' };
+    const groups = [{ groupID: 'group-a', groupType: 'oidc' }];
+    const panel = RbacRolePanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'edit',
+      existingRole,
+      groups,
+      mockOnSave
+    );
+    mockPanel.webview.postMessage.mockClear();
+    await (panel as any)._handleMessage({ command: 'ready' });
+    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'initData',
+      connectionId: 'conn-1',
+      mode: 'edit',
+      existingRole,
+      groupAssignments: groups,
     });
   });
 
@@ -129,6 +163,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     mockPanel.webview.postMessage.mockClear();
@@ -147,6 +182,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     mockPanel.webview.postMessage.mockClear();
@@ -166,6 +202,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     const disposeSpy = jest.spyOn(panel, 'dispose');
@@ -179,6 +216,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     panel.dispose();
@@ -191,6 +229,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     panel.postMessage({ foo: 'bar' });
@@ -206,6 +245,7 @@ describe('RbacRolePanel', () => {
       'conn-1',
       'add',
       undefined,
+      [],
       mockOnSave
     );
     const html = (panel as any)._getHtmlForWebview(mockPanel.webview);
