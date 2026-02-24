@@ -1,0 +1,366 @@
+.rbac-role-container {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.rbac-role-container h1 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.form-section {
+  background: var(--vscode-editor-background);
+  padding: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-panel-border);
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+}
+
+.form-group input[type='text'] {
+  width: 100%;
+  padding: 8px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.form-group input[type='text']:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  border-color: var(--vscode-focusBorder);
+}
+
+.form-group input[type='text']:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Permissions section */
+.permissions-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--vscode-foreground);
+}
+
+.permission-section {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.permission-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--vscode-editor-inactiveSelectionBackground);
+  cursor: pointer;
+  user-select: none;
+}
+
+.permission-header:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.permission-header .toggle-arrow {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  transition: transform 0.15s;
+  width: 12px;
+  display: inline-block;
+}
+
+.permission-header .toggle-arrow.open {
+  transform: rotate(90deg);
+}
+
+.permission-header .perm-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.permission-header .perm-status {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.permission-header .perm-status.configured {
+  background: var(--vscode-statusBarItem-remoteBackground);
+  color: var(--vscode-statusBarItem-remoteForeground);
+}
+
+.permission-header .perm-status.error-badge {
+  background: var(--vscode-inputValidation-errorBackground);
+  color: var(--vscode-errorForeground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+.permission-section.has-error {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.permission-section.has-error > .permission-header {
+  background: var(--vscode-inputValidation-errorBackground);
+}
+
+.permission-entry.entry-error {
+  border-color: var(--vscode-inputValidation-errorBorder);
+  background: var(--vscode-inputValidation-errorBackground);
+}
+
+.entry-error-msg {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--vscode-errorForeground);
+}
+
+.permission-body {
+  padding: 14px;
+  background: var(--vscode-editor-background);
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.filter-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.filter-field label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-field input {
+  padding: 6px 8px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.filter-field input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  border-color: var(--vscode-focusBorder);
+}
+
+.actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+  user-select: none;
+}
+
+.action-checkbox:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.action-checkbox input[type='checkbox'] {
+  cursor: pointer;
+  margin: 0;
+}
+
+.action-checkbox.checked {
+  background: var(--vscode-editor-selectionBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.info-note {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.2s;
+}
+
+.primary-button {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.secondary-button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message {
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.error-message {
+  background: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  color: var(--vscode-errorForeground);
+}
+
+.success-message {
+  background: var(--vscode-inputValidation-infoBackground);
+  border: 1px solid var(--vscode-inputValidation-infoBorder);
+  color: var(--vscode-foreground);
+}
+
+.warning-note {
+  padding: 8px 12px;
+  background: var(--vscode-inputValidation-warningBackground);
+  border: 1px solid var(--vscode-inputValidation-warningBorder);
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  color: var(--vscode-foreground);
+}
+
+/* Multi-entry permission rules */
+.permission-entry {
+  position: relative;
+  padding: 10px 10px 10px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  background: var(--vscode-sideBar-background);
+}
+
+.permission-entry + .permission-entry {
+  margin-top: 4px;
+}
+
+.remove-entry-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-errorForeground);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  border-radius: 3px;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-entry-btn:hover {
+  opacity: 1;
+  background: var(--vscode-inputValidation-errorBackground);
+}
+
+.add-entry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  border: 1px dashed var(--vscode-textLink-foreground);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.add-entry-btn:hover {
+  opacity: 1;
+  background: var(--vscode-editor-selectionBackground);
+}
+
+.codicon-modifier-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

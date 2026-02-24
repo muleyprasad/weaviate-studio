@@ -82,6 +82,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     }
   > = {};
 
+  /** Stores the rbacGroup tree item per connectionId for targeted refresh */
+  private rbacGroupItems: Map<string, WeaviateTreeItem> = new Map();
+
   /** Cache of aliases per connection */
   private aliasesCache: Record<string, AliasItem[]> = {};
 
@@ -474,7 +477,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         { key: 'rolesPermissions', label: 'Roles Permissions', icon: 'shield' },
         { key: 'tenantsPermissions', label: 'Tenants Permissions', icon: 'group-by-ref-type' },
         { key: 'usersPermissions', label: 'Users Permissions', icon: 'account' },
-      ];
+      ].sort((a, b) => a.label.localeCompare(b.label));
 
       for (const permType of permissionTypes) {
         const permissions = role[permType.key];
@@ -482,19 +485,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
         if (count > 0) {
           const safeId = this.generateSafeId(`${element.itemId}-${permType.key}`);
-          permissionGroups.push(
-            new WeaviateTreeItem(
-              `${permType.label} (${count})`,
-              vscode.TreeItemCollapsibleState.Collapsed,
-              'rbacRolePermissionsGroup',
-              element.connectionId,
-              undefined,
-              safeId,
-              new vscode.ThemeIcon(permType.icon),
-              'weaviateRbacRolePermissionsGroup',
-              undefined
-            )
+          const permItem = new WeaviateTreeItem(
+            `${permType.label} (${count})`,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'rbacRolePermissionsGroup',
+            element.connectionId,
+            undefined,
+            safeId,
+            new vscode.ThemeIcon(permType.icon),
+            'weaviateRbacRolePermissionsGroup',
+            undefined
           );
+          permItem.id = `${element.connectionId}:rolePerm:${safeId}`;
+          permissionGroups.push(permItem);
         }
       }
 
@@ -657,22 +660,32 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         }
       }
       const roles = this.rbacCache[element.connectionId]?.roles || [];
+      const BUILTIN_ROLES = new Set(['admin', 'root', 'read-only', 'viewer']);
       return roles
-        .sort((a: any, b: any) => a.name.localeCompare(b.name))
-        .map(
-          (role: any) =>
-            new WeaviateTreeItem(
-              role.name,
-              vscode.TreeItemCollapsibleState.Collapsed,
-              'rbacRole',
-              element.connectionId,
-              undefined,
-              role.name,
-              new vscode.ThemeIcon('shield'),
-              'weaviateRbacRole',
-              undefined
-            )
-        );
+        .sort((a: any, b: any) => {
+          const aBuiltin = BUILTIN_ROLES.has(a.name) ? 1 : 0;
+          const bBuiltin = BUILTIN_ROLES.has(b.name) ? 1 : 0;
+          if (aBuiltin !== bBuiltin) {
+            return aBuiltin - bBuiltin;
+          }
+          return a.name.localeCompare(b.name);
+        })
+        .map((role: any) => {
+          const isBuiltin = BUILTIN_ROLES.has(role.name);
+          const item = new WeaviateTreeItem(
+            role.name,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'rbacRole',
+            element.connectionId,
+            undefined,
+            role.name,
+            new vscode.ThemeIcon(isBuiltin ? 'lock' : 'shield'),
+            isBuiltin ? 'weaviateRbacRoleBuiltin' : 'weaviateRbacRole',
+            undefined
+          );
+          item.id = `${element.connectionId}:role:${role.name}`;
+          return item;
+        });
     }
 
     // RBAC: User Details - Show details for a specific user
@@ -752,19 +765,19 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
       // Roles
       if (user.roleNames && user.roleNames.length > 0) {
-        details.push(
-          new WeaviateTreeItem(
-            `Roles (${user.roleNames.length})`,
-            vscode.TreeItemCollapsibleState.Collapsed,
-            'rbacUserDetails',
-            element.connectionId,
-            undefined,
-            this.generateSafeId(`${user.id}-roles`),
-            new vscode.ThemeIcon('shield'),
-            'weaviateRbacUserDetails',
-            user.roleNames.join(', ')
-          )
+        const userRolesItem = new WeaviateTreeItem(
+          `Roles (${user.roleNames.length})`,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          'rbacUserDetails',
+          element.connectionId,
+          undefined,
+          this.generateSafeId(`${user.id}-roles`),
+          new vscode.ThemeIcon('shield'),
+          'weaviateRbacUserDetails',
+          user.roleNames.join(', ')
         );
+        userRolesItem.id = `${element.connectionId}:userRoles:${user.id}`;
+        details.push(userRolesItem);
       } else {
         details.push(
           new WeaviateTreeItem(
@@ -871,7 +884,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             );
           }
 
-          return new WeaviateTreeItem(
+          const userItem = new WeaviateTreeItem(
             user.id,
             vscode.TreeItemCollapsibleState.Collapsed,
             'rbacUser',
@@ -882,6 +895,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             contextValue,
             user.active ? 'Active' : 'Inactive'
           );
+          userItem.id = `${element.connectionId}:user:${user.id}`;
+          return userItem;
         });
     }
 
@@ -913,20 +928,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const groups = this.rbacCache[element.connectionId]?.groups || [];
       return groups
         .sort((a: any, b: any) => a.localeCompare(b))
-        .map(
-          (group: any) =>
-            new WeaviateTreeItem(
-              group,
-              vscode.TreeItemCollapsibleState.None,
-              'rbacGroupItem',
-              element.connectionId,
-              undefined,
-              group,
-              new vscode.ThemeIcon('organization'),
-              'weaviateRbacGroupItem',
-              undefined
-            )
-        );
+        .map((group: any) => {
+          const item = new WeaviateTreeItem(
+            group,
+            vscode.TreeItemCollapsibleState.None,
+            'rbacGroupItem',
+            element.connectionId,
+            undefined,
+            group,
+            new vscode.ThemeIcon('organization'),
+            'weaviateRbacGroupItem',
+            undefined
+          );
+          item.id = `${element.connectionId}:group:${group}`;
+          return item;
+        });
     }
     // Helper function to map property types to icons
     const getPropertyTypeIcon = (dataType: any): vscode.ThemeIcon => {
@@ -1269,38 +1285,47 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const rolesCount = this.rbacCache[connectionId]?.roles?.length;
       const usersCount = this.rbacCache[connectionId]?.users?.length;
       const groupsCount = this.rbacCache[connectionId]?.groups?.length;
-      return [
-        new WeaviateTreeItem(
-          `Roles${typeof rolesCount === 'number' ? ` (${rolesCount})` : ''}`,
-          vscode.TreeItemCollapsibleState.Collapsed,
-          'rbacRoles',
-          connectionId,
-          undefined,
-          'rbacRoles',
-          new vscode.ThemeIcon('person'),
-          'weaviateRbacRoles'
-        ),
-        new WeaviateTreeItem(
-          `Users${typeof usersCount === 'number' ? ` (${usersCount})` : ''}`,
-          vscode.TreeItemCollapsibleState.Collapsed,
-          'rbacUsers',
-          connectionId,
-          undefined,
-          'rbacUsers',
-          new vscode.ThemeIcon('account'),
-          'weaviateRbacUsers'
-        ),
-        new WeaviateTreeItem(
-          `Groups${typeof groupsCount === 'number' ? ` (${groupsCount})` : ''}`,
-          vscode.TreeItemCollapsibleState.Collapsed,
-          'rbacGroups',
-          connectionId,
-          undefined,
-          'rbacGroups',
-          new vscode.ThemeIcon('organization'),
-          'weaviateRbacGroups'
-        ),
-      ];
+
+      // Store the rbacGroup element for targeted refresh (preserves expansion state)
+      this.rbacGroupItems.set(connectionId, element);
+
+      const rolesItem = new WeaviateTreeItem(
+        `Roles${typeof rolesCount === 'number' ? ` (${rolesCount})` : ''}`,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'rbacRoles',
+        connectionId,
+        undefined,
+        'rbacRoles',
+        new vscode.ThemeIcon('person'),
+        'weaviateRbacRoles'
+      );
+      rolesItem.id = `${connectionId}:rbacRoles`;
+
+      const usersItem = new WeaviateTreeItem(
+        `Users${typeof usersCount === 'number' ? ` (${usersCount})` : ''}`,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'rbacUsers',
+        connectionId,
+        undefined,
+        'rbacUsers',
+        new vscode.ThemeIcon('account'),
+        'weaviateRbacUsers'
+      );
+      usersItem.id = `${connectionId}:rbacUsers`;
+
+      const groupsItem = new WeaviateTreeItem(
+        `Groups${typeof groupsCount === 'number' ? ` (${groupsCount})` : ''}`,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        'rbacGroups',
+        connectionId,
+        undefined,
+        'rbacGroups',
+        new vscode.ThemeIcon('organization'),
+        'weaviateRbacGroups'
+      );
+      groupsItem.id = `${connectionId}:rbacGroups`;
+
+      return [rolesItem, usersItem, groupsItem];
     } else if (element.itemType === 'collection' && element.connectionId) {
       let collection = this.collections[element.connectionId]?.find(
         (col) => col.label === element.collectionName
@@ -3602,18 +3627,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
   }
 
   /**
-   * Refreshes RBAC data (roles, users, groups) for a connection
+   * Refreshes RBAC data (roles, users, groups) for a connection.
+   * Fires on the stored rbacGroup item so the Roles/Users/Groups containers
+   * get updated counts while preserving their expansion state (via stable IDs).
    * @param connectionId - The ID of the connection
    */
   async refreshRbac(connectionId: string): Promise<void> {
     try {
-      // Clear RBAC cache for this connection
       delete this.rbacCache[connectionId];
 
-      // Refresh the tree view
-      this.refresh();
-
-      vscode.window.showInformationMessage('RBAC data refreshed successfully');
+      const rbacGroupItem = this.rbacGroupItems.get(connectionId);
+      if (rbacGroupItem) {
+        this._onDidChangeTreeData.fire(rbacGroupItem);
+      } else {
+        this.refresh();
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       vscode.window.showWarningMessage(`RBAC refresh completed with issues: ${errorMessage}`);

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import weaviate from 'weaviate-client';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTreeDataProvider';
 import { QueryEditorPanel } from './query-editor/extension/QueryEditorPanel';
 import { WeaviateConnection } from './services/ConnectionManager';
@@ -8,6 +9,9 @@ import { BackupRestorePanel } from './views/BackupRestorePanel';
 import { ClusterPanel } from './views/ClusterPanel';
 import { DataExplorerPanel } from './data-explorer/extension/DataExplorerPanel';
 import { AliasPanel } from './views/AliasPanel';
+import { RbacRolePanel } from './views/RbacRolePanel';
+import { RbacUserPanel } from './views/RbacUserPanel';
+import { RbacGroupPanel } from './views/RbacGroupPanel';
 import type {
   BackupArgs,
   BackupConfigCreate,
@@ -122,15 +126,265 @@ async function handleWeaviateFile(
   }
 }
 
+/**
+ * Converts the permissions form state from the RbacRole webview into Permission objects
+ * using the weaviate-client permissions factory on the client.
+ */
+/** Returns true if at least one boolean action flag is set on a permission entry. */
+function hasAnyAction(entry: any): boolean {
+  return [
+    'create',
+    'read',
+    'update',
+    'delete',
+    'manage',
+    'assignAndRevoke',
+    'create_collection',
+    'read_config',
+    'update_config',
+    'delete_collection',
+  ].some((k) => !!entry[k]);
+}
+
+function buildPermissionsFromFormState(_client: any, permState: any): any[] {
+  const perms: any[] = [];
+  if (!permState) {
+    return perms;
+  }
+
+  for (const c of (permState.collections || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.collections({
+        collection: c.collection || '*',
+        create_collection: c.create_collection || false,
+        read_config: c.read_config || false,
+        update_config: c.update_config || false,
+        delete_collection: c.delete_collection || false,
+      })
+    );
+  }
+
+  for (const d of (permState.data || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.data({
+        collection: d.collection || '*',
+        tenant: d.tenant || '*',
+        create: d.create || false,
+        read: d.read || false,
+        update: d.update || false,
+        delete: d.delete || false,
+      })
+    );
+  }
+
+  for (const b of (permState.backups || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.backup({
+        collection: b.collection || '*',
+        manage: b.manage || false,
+      })
+    );
+  }
+
+  for (const t of (permState.tenants || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.tenants({
+        collection: t.collection || '*',
+        tenant: t.tenant || '*',
+        create: t.create || false,
+        read: t.read || false,
+        update: t.update || false,
+        delete: t.delete || false,
+      })
+    );
+  }
+
+  for (const r of (permState.roles || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.roles({
+        role: r.role || '*',
+        create: r.create || false,
+        read: r.read || false,
+        update: r.update || false,
+        delete: r.delete || false,
+      })
+    );
+  }
+
+  for (const u of (permState.users || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.users({
+        user: u.user || '*',
+        read: u.read || false,
+        assignAndRevoke: u.assignAndRevoke || false,
+      })
+    );
+  }
+
+  for (const a of (permState.aliases || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.aliases({
+        alias: a.alias || '*',
+        collection: a.aliasCollection || '*',
+        create: a.create || false,
+        read: a.read || false,
+        update: a.update || false,
+        delete: a.delete || false,
+      })
+    );
+  }
+
+  for (const c of (permState.cluster || []).filter(hasAnyAction)) {
+    perms.push(...weaviate.permissions.cluster({ read: c.read || false }));
+  }
+
+  for (const n of (permState.nodesMinimal || []).filter(hasAnyAction)) {
+    perms.push(...weaviate.permissions.nodes.minimal({ read: n.read || false }));
+  }
+
+  for (const nv of (permState.nodesVerbose || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.nodes.verbose({
+        collection: nv.collection || '*',
+        read: nv.read || false,
+      })
+    );
+  }
+
+  for (const rp of (permState.replicate || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.replicate({
+        collection: rp.collection || '*',
+        shard: rp.shard || '*',
+        create: rp.create || false,
+        read: rp.read || false,
+        update: rp.update || false,
+        delete: rp.delete || false,
+      })
+    );
+  }
+
+  for (const g of (permState.groupsOidc || []).filter(hasAnyAction)) {
+    perms.push(
+      ...weaviate.permissions.groups.oidc({
+        groupID: g.groupID || '*',
+        read: g.read || false,
+        assignAndRevoke: g.assignAndRevoke || false,
+      })
+    );
+  }
+
+  return perms;
+}
+
+/**
+ * Collects all permissions from all categories of an existing Role object.
+ * Used to determine which permissions to remove when editing a role.
+ */
+function collectAllPermissions(role: any): any[] {
+  const all: any[] = [];
+  const keys = [
+    'aliasPermissions',
+    'backupsPermissions',
+    'clusterPermissions',
+    'collectionsPermissions',
+    'dataPermissions',
+    'groupsPermissions',
+    'nodesPermissions',
+    'replicatePermissions',
+    'rolesPermissions',
+    'tenantsPermissions',
+    'usersPermissions',
+  ];
+  for (const key of keys) {
+    if (Array.isArray(role[key])) {
+      all.push(...role[key]);
+    }
+  }
+  return all;
+}
+
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
   // RBAC: Context commands
   context.subscriptions.push(
     vscode.commands.registerCommand('weaviate.rbac.addRole', async (item) => {
-      vscode.window.showInformationMessage('Add Role (implement UI/form)');
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        RbacRolePanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'add',
+          undefined,
+          async (roleData: any) => {
+            const perms = buildPermissionsFromFormState(client, roleData.permissions);
+            await client.roles.create(roleData.name, perms);
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            vscode.window.showInformationMessage(`Role "${roleData.name}" created successfully`);
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Add Role panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Add Role: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.editRole', async (item) => {
-      vscode.window.showInformationMessage(`Edit Role: ${item?.label} (implement UI/form)`);
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or role information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const roleName = item.itemId;
+        const existingRole = await client.roles.byName(roleName);
+        if (!existingRole) {
+          vscode.window.showErrorMessage(`Role "${roleName}" not found`);
+          return;
+        }
+        RbacRolePanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'edit',
+          existingRole,
+          async (roleData: any) => {
+            const newPerms = buildPermissionsFromFormState(client, roleData.permissions);
+            // Fetch fresh role state each save — avoids stale-closure bugs on repeated saves
+            const currentRole = await client.roles.byName(roleName);
+            const oldPerms = currentRole ? collectAllPermissions(currentRole) : [];
+            // Remove old first, then add new — prevents "subset-remove" bug:
+            // if new perms are a subset of old, add-then-remove would strip the newly added ones.
+            if (oldPerms.length > 0) {
+              await client.roles.removePermissions(roleName, oldPerms);
+            }
+            if (newPerms.length > 0) {
+              await client.roles.addPermissions(roleName, newPerms);
+            }
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            vscode.window.showInformationMessage(`Role "${roleName}" updated successfully`);
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Edit Role panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Edit Role: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.deleteRole', async (item) => {
       if (!item?.connectionId || !item?.itemId) {
@@ -167,10 +421,98 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
     vscode.commands.registerCommand('weaviate.rbac.addUser', async (item) => {
-      vscode.window.showInformationMessage('Add User (implement UI/form)');
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const allRolesMap = await client.roles.listAll();
+        const availableRoles = Object.keys(allRolesMap)
+          .filter((r) => r !== 'root' && r !== 'read-only')
+          .sort();
+        RbacUserPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'add',
+          undefined,
+          availableRoles,
+          [],
+          async (userData: any) => {
+            const newApiKey = await client.users.db.create(userData.userId);
+            if (userData.rolesToAssign && userData.rolesToAssign.length > 0) {
+              await client.users.db.assignRoles(userData.rolesToAssign, userData.userId);
+            }
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            const copyAction = await vscode.window.showWarningMessage(
+              `User "${userData.userId}" created.\n\n⚠️ This is the ONLY time the API key will be shown:\n\n${newApiKey}\n\nCopy it now.`,
+              { modal: true },
+              'Copy to Clipboard'
+            );
+            if (copyAction === 'Copy to Clipboard') {
+              await vscode.env.clipboard.writeText(newApiKey);
+              vscode.window.showInformationMessage('API key copied to clipboard');
+            }
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Add User panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Add User: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.editUser', async (item) => {
-      vscode.window.showInformationMessage(`Edit User: ${item?.label} (implement UI/form)`);
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or user information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const userId = item.itemId;
+        const [existingUser, assignedRolesMap, allRolesMap] = await Promise.all([
+          client.users.db.byName(userId),
+          client.users.db.getAssignedRoles(userId),
+          client.roles.listAll(),
+        ]);
+        const assignedRoles = Object.keys(assignedRolesMap);
+        const availableRoles = Object.keys(allRolesMap)
+          .filter((r) => r !== 'root' && r !== 'read-only')
+          .sort();
+        RbacUserPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'edit',
+          existingUser,
+          availableRoles,
+          assignedRoles,
+          async (userData: any) => {
+            if (userData.rolesToAssign && userData.rolesToAssign.length > 0) {
+              await client.users.db.assignRoles(userData.rolesToAssign, userId);
+            }
+            if (userData.rolesToRevoke && userData.rolesToRevoke.length > 0) {
+              await client.users.db.revokeRoles(userData.rolesToRevoke, userId);
+            }
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            vscode.window.showInformationMessage(`User "${userId}" updated successfully`);
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Edit User panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Edit User: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.deleteUser', async (item) => {
       if (!item?.connectionId || !item?.itemId) {
@@ -310,15 +652,127 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
     vscode.commands.registerCommand('weaviate.rbac.addGroup', async (item) => {
-      vscode.window.showInformationMessage('Add Group (implement UI/form)');
+      if (!item?.connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const allRolesMap = await client.roles.listAll();
+        const availableRoles = Object.keys(allRolesMap)
+          .filter((r) => r !== 'root')
+          .sort();
+        RbacGroupPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'add',
+          undefined,
+          availableRoles,
+          [],
+          async (groupData: any) => {
+            if (groupData.rolesToAssign && groupData.rolesToAssign.length > 0) {
+              await client.groups.oidc.assignRoles(groupData.groupId, groupData.rolesToAssign);
+            }
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            vscode.window.showInformationMessage(
+              `Roles assigned to group "${groupData.groupId}" successfully`
+            );
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Add Group panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Add Group: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.editGroup', async (item) => {
-      vscode.window.showInformationMessage(`Edit Group: ${item?.label} (implement UI/form)`);
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or group information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const groupId = item.itemId;
+        const [assignedRolesMap, allRolesMap] = await Promise.all([
+          client.groups.oidc.getAssignedRoles(groupId),
+          client.roles.listAll(),
+        ]);
+        const assignedRoles = Object.keys(assignedRolesMap);
+        const availableRoles = Object.keys(allRolesMap)
+          .filter((r) => r !== 'root')
+          .sort();
+        RbacGroupPanel.createOrShow(
+          context.extensionUri,
+          item.connectionId,
+          'edit',
+          groupId,
+          availableRoles,
+          assignedRoles,
+          async (groupData: any) => {
+            if (groupData.rolesToAssign && groupData.rolesToAssign.length > 0) {
+              await client.groups.oidc.assignRoles(groupId, groupData.rolesToAssign);
+            }
+            if (groupData.rolesToRevoke && groupData.rolesToRevoke.length > 0) {
+              await client.groups.oidc.revokeRoles(groupId, groupData.rolesToRevoke);
+            }
+            await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            vscode.window.showInformationMessage(`Group "${groupId}" updated successfully`);
+          }
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to open Edit Group panel:', error);
+        vscode.window.showErrorMessage(
+          `Failed to open Edit Group: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.rbac.deleteGroup', async (item) => {
-      vscode.window.showInformationMessage(
-        `Delete Group: ${item?.label} (implement confirmation and deletion)`
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or group information');
+        return;
+      }
+      const groupId = item.itemId;
+      const confirmation = await vscode.window.showWarningMessage(
+        `Are you sure you want to remove all role assignments from group "${groupId}"? The group itself is managed by your OIDC provider and will not be deleted.`,
+        { modal: true },
+        'Remove Roles'
       );
+      if (confirmation !== 'Remove Roles') {
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = connectionManager.getClient(item.connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Connection not found');
+          return;
+        }
+        const assignedRolesMap = await client.groups.oidc.getAssignedRoles(groupId);
+        const assignedRoles = Object.keys(assignedRolesMap);
+        if (assignedRoles.length > 0) {
+          await client.groups.oidc.revokeRoles(groupId, assignedRoles);
+        }
+        await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        vscode.window.showInformationMessage(
+          `All roles removed from group "${groupId}" successfully`
+        );
+      } catch (error) {
+        console.error('[RBAC] Failed to remove group roles:', error);
+        vscode.window.showErrorMessage(
+          `Failed to remove group roles: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }),
     vscode.commands.registerCommand('weaviate.refreshRbac', async (item) => {
       if (!item?.connectionId) {
