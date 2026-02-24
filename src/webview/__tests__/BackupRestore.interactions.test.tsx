@@ -169,19 +169,13 @@ describe('handleRestoreBackup — collection modes', () => {
       target: { value: 'include' },
     });
 
-    // Check one collection
-    const checkboxes = screen.getAllByRole('checkbox');
-    // First checkbox may be waitForCompletion, look for labeled ones
-    const col1Checkbox = screen.getByLabelText
-      ? screen.queryByRole('checkbox', { name: 'Col1' })
-      : null;
+    // Find Col1 checkbox via its label text
+    const col1Label = screen.getByText('Col1');
+    const col1Checkbox = col1Label
+      .closest('label')
+      ?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     if (col1Checkbox) {
       fireEvent.click(col1Checkbox);
-    } else {
-      // Find any col1 checkbox by nearby text
-      const col1Label = screen.getByText('Col1');
-      const checkbox = col1Label.previousSibling as HTMLInputElement;
-      if (checkbox) fireEvent.click(checkbox);
     }
 
     // Click restore — should not throw
