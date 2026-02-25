@@ -617,7 +617,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const userId = item.itemId;
-        await client.users.db.activate(userId);
+        const activateResult = await client.users.db.activate(userId);
+        if (activateResult === false) {
+          vscode.window.showErrorMessage(
+            `Failed to activate user "${userId}". The operation was not successful.`
+          );
+          return;
+        }
         await weaviateTreeDataProvider.refreshRbac(item.connectionId);
         vscode.window.showInformationMessage(`User "${userId}" activated successfully`);
       } catch (error) {
@@ -641,7 +647,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const userId = item.itemId;
-        await client.users.db.deactivate(userId);
+        const deactivateResult = await client.users.db.deactivate(userId);
+        if (deactivateResult === false) {
+          vscode.window.showErrorMessage(
+            `Failed to deactivate user "${userId}". The operation was not successful.`
+          );
+          return;
+        }
         await weaviateTreeDataProvider.refreshRbac(item.connectionId);
         vscode.window.showInformationMessage(`User "${userId}" deactivated successfully`);
       } catch (error) {
