@@ -8,11 +8,11 @@ import {
   WeaviateMetadata,
   BackupItem,
   AliasItem,
+  SchemaClass,
 } from '../types';
 import { ViewRenderer } from '../views/ViewRenderer';
-import { AddCollectionPanel } from '../views/AddCollectionPanel';
-import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { AddCollectionPanel, WebviewToExtensionMessage } from '../views/AddCollectionPanel';
+import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
 import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';

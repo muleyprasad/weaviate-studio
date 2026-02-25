@@ -227,7 +227,7 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       | 'rbacGroups'
       | 'rbacGroupItem'
       | 'rbacRoleGroups'
-      | 'rbacRoleGroupItem',
+      | 'rbacRoleGroupItem'
       | 'objectTtlConfig',
     public readonly connectionId?: string,
     public readonly collectionName?: string,
