@@ -46,7 +46,7 @@ function RbacUserWebview() {
           setAvailableRoles(roles);
           if (msg.mode === 'edit' && msg.existingUser) {
             setUserId(msg.existingUser.id || '');
-            const envUser = msg.existingUser.dbUserType === 'db_env_user';
+            const envUser = msg.existingUser.userType === 'db_env_user';
             setIsEnvUser(envUser);
             const assigned = new Set<string>(msg.assignedRoles || []);
             setSelectedRoles(assigned);

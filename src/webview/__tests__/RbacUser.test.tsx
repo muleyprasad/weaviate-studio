@@ -224,6 +224,63 @@ describe('RbacUser Webview Component', () => {
       expect(mode).toBe('edit');
       expect(roles).toEqual(['admin', 'data-reader', 'viewer']);
     });
+
+    it('should detect db_env_user via userType property', () => {
+      // The SDK returns userType (not dbUserType) on the user object.
+      // Previously the webview checked dbUserType which is always undefined.
+      let isEnvUser = false;
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'initData' && msg.mode === 'edit' && msg.existingUser) {
+          isEnvUser = msg.existingUser.userType === 'db_env_user';
+        }
+      };
+
+      handleMessage({
+        command: 'initData',
+        mode: 'edit',
+        existingUser: { id: 'svc-account', userType: 'db_env_user' },
+        availableRoles: [],
+        assignedRoles: [],
+      });
+      expect(isEnvUser).toBe(true);
+    });
+
+    it('should not flag regular db users as env users', () => {
+      let isEnvUser = false;
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'initData' && msg.mode === 'edit' && msg.existingUser) {
+          isEnvUser = msg.existingUser.userType === 'db_env_user';
+        }
+      };
+
+      handleMessage({
+        command: 'initData',
+        mode: 'edit',
+        existingUser: { id: 'regular-user', userType: 'db' },
+        availableRoles: [],
+        assignedRoles: [],
+      });
+      expect(isEnvUser).toBe(false);
+    });
+
+    it('should not flag users with missing userType as env users', () => {
+      // Guards against the old dbUserType bug where the check always evaluated to false
+      let isEnvUser = false;
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'initData' && msg.mode === 'edit' && msg.existingUser) {
+          isEnvUser = msg.existingUser.userType === 'db_env_user';
+        }
+      };
+
+      handleMessage({
+        command: 'initData',
+        mode: 'edit',
+        existingUser: { id: 'user-no-type' },
+        availableRoles: [],
+        assignedRoles: [],
+      });
+      expect(isEnvUser).toBe(false);
+    });
   });
 
   describe('role toggle', () => {
