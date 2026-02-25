@@ -433,6 +433,15 @@ function RbacRoleWebview() {
       return;
     }
 
+    // Validate: editing a role with zero rules would silently delete all permissions
+    const totalRules = Object.values(permissions).reduce((sum, arr) => sum + arr.length, 0);
+    if (mode === 'edit' && totalRules === 0) {
+      setError(
+        'Cannot save a role with no permission rules. Add at least one rule, or delete the role explicitly.'
+      );
+      return;
+    }
+
     // Validate: every rule must have at least one action selected
     const SECTION_TITLES: Array<{ key: keyof PermissionsState; title: string }> = [
       { key: 'collections', title: 'Collections' },

@@ -251,5 +251,60 @@ describe('RbacRole Webview Component', () => {
       const validateAndSave = (roleName: string) => !!roleName.trim();
       expect(validateAndSave('my-role')).toBe(true);
     });
+
+    it('should block save in edit mode when all permission rules are removed', () => {
+      const DEFAULT_PERMISSIONS: Record<string, any[]> = {
+        collections: [],
+        data: [],
+        backups: [],
+        tenants: [],
+        roles: [],
+        users: [],
+        aliases: [],
+        cluster: [],
+        nodesMinimal: [],
+        nodesVerbose: [],
+        replicate: [],
+        groupsOidc: [],
+      };
+
+      let errorSet = '';
+      const validateAndSave = (
+        roleName: string,
+        mode: 'add' | 'edit',
+        permissions: Record<string, any[]>
+      ): boolean => {
+        if (!roleName.trim()) {
+          errorSet = 'Role name is required';
+          return false;
+        }
+        const totalRules = Object.values(permissions).reduce((sum, arr) => sum + arr.length, 0);
+        if (mode === 'edit' && totalRules === 0) {
+          errorSet =
+            'Cannot save a role with no permission rules. Add at least one rule, or delete the role explicitly.';
+          return false;
+        }
+        return true;
+      };
+
+      // Blocked in edit mode with zero rules
+      errorSet = '';
+      expect(validateAndSave('my-role', 'edit', DEFAULT_PERMISSIONS)).toBe(false);
+      expect(errorSet).toContain('no permission rules');
+
+      // Allowed in add mode with zero rules (empty role creation is a server-side concern)
+      errorSet = '';
+      expect(validateAndSave('my-role', 'add', DEFAULT_PERMISSIONS)).toBe(true);
+      expect(errorSet).toBe('');
+
+      // Allowed in edit mode when at least one rule exists
+      errorSet = '';
+      const withRules = {
+        ...DEFAULT_PERMISSIONS,
+        collections: [{ collection: '*', read_config: true }],
+      };
+      expect(validateAndSave('my-role', 'edit', withRules)).toBe(true);
+      expect(errorSet).toBe('');
+    });
   });
 });

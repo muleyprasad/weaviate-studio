@@ -304,6 +304,21 @@ function collectAllPermissions(role: any): any[] {
   return all;
 }
 
+/**
+ * Produces a stable string key for a permission object so that two permission
+ * objects that are semantically identical compare equal regardless of property
+ * insertion order or action array order.
+ */
+function permKey(p: any): string {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(p)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, Array.isArray(v) ? [...v].sort() : v])
+    )
+  );
+}
+
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
   // RBAC: Context commands
@@ -372,13 +387,18 @@ export function activate(context: vscode.ExtensionContext) {
             // Fetch fresh role state each save — avoids stale-closure bugs on repeated saves
             const currentRole = await client.roles.byName(roleName);
             const oldPerms = currentRole ? collectAllPermissions(currentRole) : [];
-            // Remove old first, then add new — prevents "subset-remove" bug:
-            // if new perms are a subset of old, add-then-remove would strip the newly added ones.
-            if (oldPerms.length > 0) {
-              await client.roles.removePermissions(roleName, oldPerms);
+            // Diff-based update: only touch permissions that actually changed.
+            // This avoids the race window of "remove all then re-add" and prevents
+            // an implicit delete when newPerms is empty (blocked by the webview too).
+            const oldKeys = new Set(oldPerms.map(permKey));
+            const newKeys = new Set(newPerms.map(permKey));
+            const toRemove = oldPerms.filter((p) => !newKeys.has(permKey(p)));
+            const toAdd = newPerms.filter((p) => !oldKeys.has(permKey(p)));
+            if (toRemove.length > 0) {
+              await client.roles.removePermissions(roleName, toRemove);
             }
-            if (newPerms.length > 0) {
-              await client.roles.addPermissions(roleName, newPerms);
+            if (toAdd.length > 0) {
+              await client.roles.addPermissions(roleName, toAdd);
             }
             await weaviateTreeDataProvider.refreshRbac(item.connectionId);
             vscode.window.showInformationMessage(`Role "${roleName}" updated successfully`);
