@@ -3,17 +3,6 @@ import { createRoot } from 'react-dom/client';
 import './theme.css';
 import './Cluster.css';
 
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 // Get VS Code API reference for messaging
 let vscode: ReturnType<typeof window.acquireVsCodeApi>;
 try {
@@ -184,12 +173,15 @@ function NodeComponent({
   selectedShardName,
   onShardSelect,
 }: NodeComponentProps) {
+  // Ensure shards is always an array
+  const shards = node.shards || [];
+
   // Calculate unique collections
-  const uniqueCollections = new Set(node.shards.map((shard) => shard.class));
+  const uniqueCollections = new Set(shards.map((shard) => shard.class));
   const uniqueCollectionCount = uniqueCollections.size;
 
   // Group shards by status (excluding READY)
-  const nonReadyShards = node.shards.filter((shard) => shard.vectorIndexingStatus !== 'READY');
+  const nonReadyShards = shards.filter((shard) => shard.vectorIndexingStatus !== 'READY');
   const statusGroups = nonReadyShards.reduce(
     (acc, shard) => {
       const status = shard.vectorIndexingStatus;
@@ -202,7 +194,7 @@ function NodeComponent({
   const hasReadonly = statusGroups['READONLY'] > 0;
 
   const handleSetAllReadyToReady = () => {
-    const readonlyShards = node.shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY');
+    const readonlyShards = shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY');
 
     // Group shards by collection
     const shardsByCollection = readonlyShards.reduce(
@@ -302,9 +294,9 @@ function NodeComponent({
           </div>
 
           <div className="shards-container">
-            <h4>Shards ({node.shards.length})</h4>
+            <h4>Shards ({shards.length})</h4>
             <div className="shards-grid">
-              {[...node.shards]
+              {[...shards]
                 .sort((a, b) => {
                   // First sort by collection name
                   const collectionCompare = a.class.localeCompare(b.class);
@@ -587,6 +579,13 @@ function ClusterPanelWebview() {
   const scrollPositionRef = useRef<number>(0);
   const prevNodeStatusDataRef = useRef<Node[]>([]);
 
+  // Signal to the extension that the webview is ready to receive data.
+  // This must run before the message listener is set up so the extension
+  // can respond with the initial 'init' payload without a race condition.
+  useEffect(() => {
+    vscode.postMessage({ command: 'ready' });
+  }, []);
+
   useEffect(() => {
     // Handle messages from the extension
     const messageHandler = (event: MessageEvent) => {
@@ -610,14 +609,35 @@ function ClusterPanelWebview() {
               setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
             }
 
-            // Auto-select first node only on initial load, not on refresh
-            if (
-              message.nodeStatusData &&
-              message.nodeStatusData.length > 0 &&
-              !selectedNodeName &&
-              !hasInitialized
-            ) {
-              setSelectedNodeName(message.nodeStatusData[0].name);
+            // Auto-select defaults on initial load only, not on refresh
+            if (message.nodeStatusData && message.nodeStatusData.length > 0 && !hasInitialized) {
+              const data: Node[] = message.nodeStatusData;
+
+              // Node view: expand the first node in the list
+              setSelectedNodeName(data[0].name);
+
+              // Collection view: expand the first collection (alphabetically) and its first node
+              const allCollectionNames = new Set<string>();
+              data.forEach((node) => {
+                (node.shards || []).forEach((shard) => allCollectionNames.add(shard.class));
+              });
+              const sortedCollections = Array.from(allCollectionNames).sort((a, b) =>
+                a.localeCompare(b)
+              );
+              if (sortedCollections.length > 0) {
+                const firstCollection = sortedCollections[0];
+                setSelectedCollectionName(firstCollection);
+                // Find the first node (alphabetically) that has shards in this collection
+                const nodesInFirstCollection = data
+                  .filter((node) =>
+                    (node.shards || []).some((shard) => shard.class === firstCollection)
+                  )
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                if (nodesInFirstCollection.length > 0) {
+                  setSelectedNodeName(nodesInFirstCollection[0].name);
+                }
+              }
+
               setHasInitialized(true);
             }
 
@@ -692,7 +712,9 @@ function ClusterPanelWebview() {
   }, []);
 
   const getAutoRefreshLabel = () => {
-    if (autoRefreshInterval === 'off') return 'Off';
+    if (autoRefreshInterval === 'off') {
+      return 'Off';
+    }
     return autoRefreshInterval.toUpperCase();
   };
 

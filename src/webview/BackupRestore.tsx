@@ -4,17 +4,6 @@ import { BACKUP_CONFIG } from '../constants/backupConfig';
 import './theme.css';
 import './BackupRestore.css';
 
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 // Get VS Code API reference for messaging
 let vscode: any;
 try {
@@ -53,7 +42,7 @@ interface RestoreStatus {
   path?: string;
 }
 
-function BackupRestoreWebview() {
+export function BackupRestoreWebview() {
   const [backupId, setBackupId] = useState<string>('');
   const [backend, setBackend] = useState<string>('');
   const [collections, setCollections] = useState<string[]>([]);
@@ -465,26 +454,28 @@ function BackupRestoreWebview() {
             </select>
           </div>
 
-          {collectionMode !== 'all' && collections.length > 0 && (
-            <div className="form-section">
-              <label className="form-label">
-                Select Collections to {collectionMode === 'include' ? 'Include' : 'Exclude'}:
-              </label>
-              <div className="collections-list">
-                {collections.map((collection) => (
-                  <label key={collection} className="collection-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedCollections.includes(collection)}
-                      onChange={() => handleCollectionToggle(collection)}
-                      disabled={isRestoring}
-                    />
-                    <span>{collection}</span>
-                  </label>
-                ))}
+          {collectionMode !== 'all' &&
+            backupDetails?.classes &&
+            backupDetails.classes.length > 0 && (
+              <div className="form-section">
+                <label className="form-label">
+                  Select Collections to {collectionMode === 'include' ? 'Include' : 'Exclude'}:
+                </label>
+                <div className="collections-list">
+                  {backupDetails.classes.map((collection) => (
+                    <label key={collection} className="collection-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedCollections.includes(collection)}
+                        onChange={() => handleCollectionToggle(collection)}
+                        disabled={isRestoring}
+                      />
+                      <span>{collection}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div className="form-section">
             <label className="form-label checkbox-label">

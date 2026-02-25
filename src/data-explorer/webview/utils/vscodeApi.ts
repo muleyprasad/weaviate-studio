@@ -14,9 +14,9 @@ let vscodeApi: VSCodeAPI | null = null;
  */
 export function getVSCodeAPI(): VSCodeAPI {
   if (!vscodeApi) {
-    vscodeApi = window.acquireVsCodeApi();
+    vscodeApi = window.acquireVsCodeApi() as unknown as VSCodeAPI;
   }
-  return vscodeApi;
+  return vscodeApi!;
 }
 
 /**

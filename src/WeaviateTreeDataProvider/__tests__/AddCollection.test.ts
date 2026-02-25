@@ -1,6 +1,9 @@
 import { jest } from '@jest/globals';
 import * as vscode from 'vscode';
 
+// Mock fetch globally for tests
+global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
+
 // Mock ConnectionManager
 const mockConnectionManager = {
   getConnection: jest.fn(),
@@ -81,6 +84,10 @@ describe('Add Collection', () => {
     globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
     subscriptions: [],
   } as unknown as vscode.ExtensionContext;
+
+  afterAll(() => {
+    delete (global as any).fetch;
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -279,34 +286,53 @@ describe('Add Collection', () => {
         ] as any[],
       };
 
-      // Re-render clone view and capture clone handlers
-      // Simulate navigating to cloneExisting option by calling addCollectionWithOptions flow pieces directly
-      // Create a fresh panel and handler for clone webview
-      await (provider as any).addCollectionWithOptions('conn1');
-      // capture the last created panel from vscode mock
-      mockPanel = vsMock.window.createWebviewPanel.mock.results.slice(-1)[0].value;
-      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      // Call addCollection which now opens the React-based AddCollectionPanel
+      await (provider as any).addCollection('conn1');
 
-      // Select cloneExisting to load clone UI
-      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
-      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      // Get the message handler for the AddCollectionPanel
+      expect(capturedOnMessage).toBeDefined();
 
-      // First request schema
-      await cloneHandler({ command: 'getSchema', collectionName: 'SourceCollection' });
-
-      // Then trigger clone with new name
-      await cloneHandler({
-        command: 'clone',
-        sourceCollection: 'SourceCollection',
-        newCollectionName: 'ClonedCollection',
-        schema: (provider as any).collections['conn1'][0].schema,
+      // Simulate the CloneCollection component requesting collections
+      let capturedCollections: string[] = [];
+      const mockPostMessage = jest.fn((msg: any) => {
+        if (msg.command === 'collections') {
+          capturedCollections = msg.collections;
+        }
       });
 
-      // Options panel is disposed and AddCollectionPanel is opened with initial schema passed
-      expect(mockPanel.dispose).toHaveBeenCalled();
+      await capturedOnMessage!({ command: 'getCollections' }, mockPostMessage);
+      expect(capturedCollections).toEqual(['SourceCollection']);
+
+      // The getSchema handler fetches via REST API; return the schema we seeded above
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          class: 'SourceCollection',
+          description: 'desc',
+          properties: [{ name: 'title', dataType: ['text'] }],
+        }),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
+
+      // Simulate requesting the schema for cloning
+      let capturedSchema: any = null;
+      const mockSchemaPostMessage = jest.fn((msg: any) => {
+        if (msg.command === 'schema') {
+          capturedSchema = msg.schema;
+        }
+      });
+
+      await capturedOnMessage!(
+        { command: 'getSchema', collectionName: 'SourceCollection' },
+        mockSchemaPostMessage
+      );
+      expect(capturedSchema).toBeDefined();
+      expect(capturedSchema.class).toBe('SourceCollection');
+
+      // Verify AddCollectionPanel was created with the handler
       expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
-      expect(lastInitialSchema).toBeDefined();
-      expect(lastInitialSchema.class).toBe('ClonedCollection');
     });
 
     it('when cloning multi-tenant collection, should properly populate multi-tenancy settings', async () => {
@@ -319,7 +345,6 @@ describe('Add Collection', () => {
               class: 'MultiTenantCollection',
               description: 'Multi-tenant collection',
               multiTenancy: {
-                // Using multiTenancy (not multiTenancyConfig) as shown in user's data
                 enabled: true,
                 autoTenantCreation: true,
                 autoTenantActivation: true,
@@ -330,31 +355,53 @@ describe('Add Collection', () => {
         ] as any[],
       };
 
-      // Navigate to clone view and trigger clone
-      await (provider as any).addCollectionWithOptions('conn1');
-      mockPanel = vsMock.window.createWebviewPanel.mock.results.slice(-1)[0].value;
-      const optionsHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      // Call addCollection which now opens the React-based AddCollectionPanel
+      await (provider as any).addCollection('conn1');
 
-      await optionsHandler({ command: 'selectOption', option: 'cloneExisting' });
-      const cloneHandler = mockPanel.webview.onDidReceiveMessage.mock.calls.pop()?.[0];
+      // Get the message handler for the AddCollectionPanel
+      expect(capturedOnMessage).toBeDefined();
 
-      await cloneHandler({ command: 'getSchema', collectionName: 'MultiTenantCollection' });
+      // The getSchema handler fetches via REST API; return the schema we seeded above
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          class: 'MultiTenantCollection',
+          description: 'Multi-tenant collection',
+          multiTenancy: {
+            enabled: true,
+            autoTenantCreation: true,
+            autoTenantActivation: true,
+          },
+          properties: [{ name: 'title', dataType: ['text'] }],
+        }),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
 
-      await cloneHandler({
-        command: 'clone',
-        sourceCollection: 'MultiTenantCollection',
-        newCollectionName: 'ClonedMultiTenant',
-        schema: (provider as any).collections['conn1'][0].schema,
+      // Simulate requesting the schema for cloning
+      let capturedSchema: any = null;
+      const mockSchemaPostMessage = jest.fn((msg: any) => {
+        if (msg.command === 'schema') {
+          capturedSchema = msg.schema;
+        }
       });
 
-      // Options panel is disposed and AddCollectionPanel is opened with correct initial multi-tenant schema
-      expect(mockPanel.dispose).toHaveBeenCalled();
-      expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
-      expect(lastInitialSchema).toBeDefined();
-      expect(lastInitialSchema.class).toBe('ClonedMultiTenant');
-      const mt =
-        lastInitialSchema.multiTenancy || (lastInitialSchema as any).multiTenancyConfig || {};
+      await capturedOnMessage!(
+        { command: 'getSchema', collectionName: 'MultiTenantCollection' },
+        mockSchemaPostMessage
+      );
+      expect(capturedSchema).toBeDefined();
+      expect(capturedSchema.class).toBe('MultiTenantCollection');
+
+      // Verify multi-tenancy settings are preserved
+      const mt = capturedSchema.multiTenancy || (capturedSchema as any).multiTenancyConfig || {};
       expect(mt.enabled).toBe(true);
+      expect(mt.autoTenantCreation).toBe(true);
+      expect(mt.autoTenantActivation).toBe(true);
+
+      // Verify AddCollectionPanel was created
+      expect(mockAddCollectionPanel.createOrShow).toHaveBeenCalled();
     });
   });
 
@@ -369,14 +416,26 @@ describe('Add Collection', () => {
     });
 
     it('builds correct schema object', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
+      // Mock connection with REST API details
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        status: 'connected',
+      });
+
+      // Mock fetch to return success
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
 
       const inputSchema = {
         class: 'TestCollection',
@@ -394,38 +453,131 @@ describe('Add Collection', () => {
 
       await (provider as any).createCollection('conn1', inputSchema);
 
-      expect(mockCreateFromSchema).toHaveBeenCalledWith({
-        class: 'TestCollection',
-        description: 'Test description',
-        vectorizer: 'text2vec-openai',
-        vectorIndexType: 'hnsw',
-        properties: [
-          {
-            name: 'title',
-            dataType: ['text'],
-            description: 'Title field',
-          },
-        ],
-      });
+      // Verify fetch was called with correct parameters
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/v1/schema',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify(inputSchema),
+        })
+      );
     });
 
     it('handles vectorizer "none" correctly', async () => {
-      const mockCreateFromSchema = jest.fn() as any;
-      mockCreateFromSchema.mockImplementation(() => Promise.resolve({}));
-      const mockClient = {
-        collections: {
-          createFromSchema: mockCreateFromSchema,
-        },
-      };
-      mockConnectionManager.getClient.mockReturnValue(mockClient);
-
-      await (provider as any).createCollection('conn1', {
-        class: 'TestCollection',
-        vectorizer: 'none',
+      // Mock connection with REST API details
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Test Connection',
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+        status: 'connected',
       });
 
-      const calledSchema = mockCreateFromSchema.mock.calls[0][0] as any;
-      expect(calledSchema.vectorizer).toBeUndefined();
+      // Mock fetch to return success
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+        text: async () => '',
+        status: 200,
+        statusText: 'OK',
+      } as any);
+
+      const inputSchema = {
+        class: 'TestCollection',
+        vectorizer: 'none',
+      };
+
+      await (provider as any).createCollection('conn1', inputSchema);
+
+      // Verify fetch was called with the schema as-is (REST API handles it)
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:8080/v1/schema',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(inputSchema),
+        })
+      );
+    });
+
+    it('throws a descriptive error on network failure (fetch TypeError)', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockRejectedValueOnce(
+        new TypeError('Failed to fetch')
+      );
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'TestCollection' })
+      ).rejects.toThrow('Cannot reach Weaviate server');
+    });
+
+    it('throws with extracted Weaviate error message on non-ok response', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        text: async () =>
+          JSON.stringify({ error: [{ message: 'class name must start with uppercase' }] }),
+        json: async () => ({}),
+      } as any);
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'testCollection' })
+      ).rejects.toThrow('class name must start with uppercase');
+    });
+
+    it('throws with raw body when non-ok response body is not JSON', async () => {
+      (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        text: async () => '<html>Bad Gateway</html>',
+        json: async () => ({}),
+      } as any);
+
+      await expect(
+        (provider as any).createCollection('conn1', { class: 'TestCollection' })
+      ).rejects.toThrow('502 Bad Gateway - <html>Bad Gateway</html>');
+    });
+
+    it('throws when connection is not found', async () => {
+      mockConnectionManager.getConnection.mockReturnValue(null);
+
+      await expect(
+        (provider as any).createCollection('invalid', { class: 'TestCollection' })
+      ).rejects.toThrow('Connection not found');
+    });
+
+    it('uses https:// URL when httpSecure is true', async () => {
+      mockConnectionManager.getConnection.mockReturnValue({
+        id: 'conn1',
+        name: 'Secure Connection',
+        type: 'custom',
+        httpHost: 'my-weaviate.example.com',
+        httpPort: 443,
+        httpSecure: true,
+        status: 'connected',
+      });
+
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+        text: async () => '',
+        status: 201,
+        statusText: 'Created',
+      } as any);
+
+      await (provider as any).createCollection('conn1', { class: 'TestCollection' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://my-weaviate.example.com:443/v1/schema',
+        expect.anything()
+      );
     });
   });
 
@@ -536,6 +688,12 @@ describe('Add Collection', () => {
           'text2vec-cohere': {},
         },
       });
+
+      // Should also receive serverVersion message
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: '1.20.0',
+      });
     });
 
     it('sends default nodesNumber of 1 when no nodes cached', async () => {
@@ -554,6 +712,36 @@ describe('Add Collection', () => {
       expect(postMessageSpy).toHaveBeenCalledWith({
         command: 'nodesNumber',
         nodesNumber: 1,
+      });
+    });
+
+    it('sends serverVersion as unknown when no version in metadata cache', async () => {
+      (provider as any).clusterNodesCache = {
+        conn1: [{ name: 'node-1', status: 'HEALTHY' }],
+      };
+
+      // Cache exists but has no version field
+      (provider as any).clusterMetadataCache = {
+        conn1: { modules: {} },
+      };
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: 'unknown',
+      });
+    });
+
+    it('sends serverVersion as unknown when no metadata cached at all', async () => {
+      (provider as any).clusterNodesCache = {};
+      (provider as any).clusterMetadataCache = {};
+
+      await capturedOnMessage!({ command: 'ready' }, postMessageSpy);
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'serverVersion',
+        version: 'unknown',
       });
     });
 

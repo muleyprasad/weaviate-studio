@@ -2,37 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 // @ts-ignore - JSX component without type declarations
 import Collection from 'weaviate-add-collection';
+import { SelectCreateMode, CreationMode } from './components/SelectCreateMode';
+import { FileUpload } from './components/FileUpload';
+import { CloneCollection } from './components/CloneCollection';
+import {
+  getVscodeApi,
+  WeaviateCollectionSchema,
+  AvailableModules,
+  ExtensionToWebviewMessage,
+  SchemaLoadAction,
+} from './vscodeApi';
 
-// Setup VS Code API for message passing with the extension host
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
+// Get VS Code API reference for messaging (shared across all components)
+const vscode = getVscodeApi();
 
-// Get VS Code API reference for messaging
-let vscode: any;
-try {
-  vscode = window.acquireVsCodeApi();
-} catch (error) {
-  console.error('Failed to acquire VS Code API', error);
-}
-
-interface AddCollectionProps {
-  connectionId?: string;
-  initialSchema?: any;
-  availableModules?: any;
-}
+type AppMode = 'select' | CreationMode;
 
 function AddCollectionWebview() {
-  const [initialSchema, setInitialSchema] = useState<any>(null);
-  const [availableModules, setAvailableModules] = useState<any>(null);
+  const [mode, setMode] = useState<AppMode>('select');
+  const [initialSchema, setInitialSchema] = useState<WeaviateCollectionSchema | null>(null);
+  const [availableModules, setAvailableModules] = useState<AvailableModules | null>(null);
   const [nodesNumber, setNodesNumber] = useState<number>(1);
-  const [currentSchema, setCurrentSchema] = useState<any>(null);
+  const [currentSchema, setCurrentSchema] = useState<WeaviateCollectionSchema | null>(null);
+  const [hasCollections, setHasCollections] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [weaviateVersion, setWeaviateVersion] = useState<string | null>(null);
 
   useEffect(() => {
     // Request initial data from extension
@@ -46,7 +40,7 @@ function AddCollectionWebview() {
     }
 
     // Handle messages from the extension
-    const messageHandler = (event: MessageEvent) => {
+    const messageHandler = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       const message = event.data;
 
       switch (message.command) {
@@ -57,12 +51,22 @@ function AddCollectionWebview() {
           break;
         case 'initialSchema':
           setInitialSchema(message.schema);
+          // If we receive an initial schema, go straight to fromScratch mode
+          if (message.schema) {
+            setMode('fromScratch');
+          }
           break;
         case 'nodesNumber':
           setNodesNumber(message.nodesNumber || 1);
           break;
+        case 'hasCollections':
+          setHasCollections(message.hasCollections || false);
+          break;
+        case 'serverVersion':
+          setWeaviateVersion(message.version || null);
+          break;
         case 'error':
-          alert(`Error: ${message.message}`);
+          setError(message.message || 'An error occurred');
           break;
       }
     };
@@ -71,9 +75,31 @@ function AddCollectionWebview() {
     return () => window.removeEventListener('message', messageHandler);
   }, []);
 
+  const handleModeSelect = (selectedMode: CreationMode) => {
+    setError('');
+    setMode(selectedMode);
+  };
+
+  const handleFileLoaded = (schema: WeaviateCollectionSchema, action: SchemaLoadAction) => {
+    setError('');
+    if (action === 'edit') {
+      setInitialSchema(schema);
+      setMode('fromScratch');
+    } else if (action === 'create') {
+      // Create directly without editing
+      if (vscode) {
+        vscode.postMessage({
+          command: 'create',
+          schema: schema,
+        });
+      }
+    }
+  };
+
   const handleCreate = () => {
     // Use the schema from the onChange/onSubmit callback
     if (currentSchema) {
+      setError('');
       if (vscode) {
         vscode.postMessage({
           command: 'create',
@@ -81,16 +107,16 @@ function AddCollectionWebview() {
         });
       }
     } else {
-      alert('No schema found. Please fill in the collection details.');
+      setError('No schema found. Please fill in the collection details.');
     }
   };
 
-  const handleSchemaChange = (schema: any) => {
+  const handleSchemaChange = (schema: WeaviateCollectionSchema) => {
     // Store the schema whenever it changes
     setCurrentSchema(schema);
   };
 
-  const handleSchemaSubmit = (schema: any) => {
+  const handleSchemaSubmit = (schema: WeaviateCollectionSchema) => {
     // Handle submission directly from the component
     if (vscode) {
       vscode.postMessage({
@@ -106,11 +132,120 @@ function AddCollectionWebview() {
     }
   };
 
+  const handleBack = () => {
+    setError('');
+    setMode('select');
+    setInitialSchema(null);
+  };
+
+  // Render based on current mode
+  if (mode === 'select') {
+    return (
+      <>
+        {error && (
+          <div
+            style={{
+              padding: '12px 16px',
+              marginBottom: '20px',
+              background: 'var(--vscode-inputValidation-errorBackground)',
+              border: '1px solid var(--vscode-inputValidation-errorBorder)',
+              borderRadius: '4px',
+              color: 'var(--vscode-errorForeground)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{error}</span>
+            <button
+              onClick={() => setError('')}
+              style={{
+                marginLeft: 'auto',
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '4px 8px',
+              }}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        <SelectCreateMode
+          hasCollections={hasCollections}
+          onSelectMode={handleModeSelect}
+          onCancel={handleCancel}
+        />
+      </>
+    );
+  }
+
+  if (mode === 'importFromFile') {
+    return (
+      <FileUpload
+        onSchemaLoaded={handleFileLoaded}
+        onBack={handleBack}
+        onCancel={handleCancel}
+        externalError={error}
+      />
+    );
+  }
+
+  if (mode === 'cloneExisting') {
+    return (
+      <CloneCollection
+        onSchemaLoaded={handleFileLoaded}
+        onBack={handleBack}
+        onCancel={handleCancel}
+        externalError={error}
+      />
+    );
+  }
+
+  // Default: fromScratch mode
   return (
     <div className="add-collection-container">
       <div className="add-collection-header">
         <h1>Add Weaviate Collection</h1>
       </div>
+
+      {error && (
+        <div
+          style={{
+            padding: '12px 16px',
+            marginBottom: '20px',
+            background: 'var(--vscode-inputValidation-errorBackground)',
+            border: '1px solid var(--vscode-inputValidation-errorBorder)',
+            borderRadius: '4px',
+            color: 'var(--vscode-errorForeground)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>⚠️</span>
+          <span>{error}</span>
+          <button
+            onClick={() => setError('')}
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontSize: '16px',
+              padding: '4px 8px',
+            }}
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="add-collection-content">
         <Collection
@@ -121,12 +256,16 @@ function AddCollectionWebview() {
           onChange={handleSchemaChange}
           onSubmit={handleSchemaSubmit}
           hideCreateButton={true}
+          weaviateVersion={weaviateVersion}
         />
       </div>
 
       <div className="add-collection-actions">
         <button className="action-button action-button-primary" onClick={handleCreate}>
           Create Collection
+        </button>
+        <button className="action-button action-button-secondary" onClick={handleBack}>
+          Back
         </button>
         <button className="action-button action-button-secondary" onClick={handleCancel}>
           Cancel

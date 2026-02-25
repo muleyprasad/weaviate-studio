@@ -213,7 +213,8 @@ export class WeaviateTreeItem extends vscode.TreeItem {
       | 'generativeConfig'
       | 'rerankerConfig'
       | 'connectionLinks'
-      | 'connectionLink',
+      | 'connectionLink'
+      | 'objectTtlConfig',
     public readonly connectionId?: string,
     public readonly collectionName?: string,
     public readonly itemId?: string,
