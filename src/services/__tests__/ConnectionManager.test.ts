@@ -234,7 +234,7 @@ describe('ConnectionManager', () => {
       const cloudConn = await mgr.addConnection({
         name: 'Cloud Instance',
         type: 'cloud',
-        cloudUrl: 'https://my-cluster.weaviate.network',
+        cloudUrl: 'https://my-cluster.weaviate.cloud',
         apiKey: 'cloud-api-key',
         timeoutInit: 30,
         timeoutQuery: 60,
@@ -242,7 +242,7 @@ describe('ConnectionManager', () => {
       });
 
       expect(cloudConn.type).toBe('cloud');
-      expect(cloudConn.cloudUrl).toBe('https://my-cluster.weaviate.network');
+      expect(cloudConn.cloudUrl).toBe('https://my-cluster.weaviate.cloud');
       expect(cloudConn.apiKey).toBe('cloud-api-key');
       expect(cloudConn.timeoutInit).toBe(30);
       expect(cloudConn.timeoutQuery).toBe(60);
@@ -280,6 +280,10 @@ describe('ConnectionManager', () => {
         httpSecure: false,
         grpcSecure: false,
         authCredentials: { key: 'test-key' },
+        skipInitChecks: undefined,
+        headers: {
+          'X-Weaviate-Client-Integration': expect.stringContaining('weaviate-studio/'),
+        },
         timeout: {
           init: 30,
           query: 60,

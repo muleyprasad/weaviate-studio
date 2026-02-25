@@ -38,16 +38,6 @@ function validateAliasName(aliasName: string): { valid: boolean; error?: string 
   };
 }
 
-declare global {
-  interface Window {
-    acquireVsCodeApi: () => {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
-
 let vscode: any;
 try {
   vscode = window.acquireVsCodeApi();
@@ -138,6 +128,10 @@ function AliasWebview() {
           setIsSubmitting(false);
           setSuccess(`Alias "${message.alias}" updated successfully!`);
           setError('');
+          // Update editingAlias so "Current target" reflects the new collection
+          setEditingAlias((prev) =>
+            prev ? { ...prev, collection: message.newTargetCollection } : prev
+          );
           break;
 
         case 'error':

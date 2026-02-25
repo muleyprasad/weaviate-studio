@@ -46,6 +46,7 @@ module.exports = {
     'rbac-role': './src/webview/RbacRole.tsx',
     'rbac-user': './src/webview/RbacUser.tsx',
     'rbac-group': './src/webview/RbacGroup.tsx',
+    connection: './src/webview/ConnectionForm.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -175,6 +176,9 @@ module.exports = {
       template: './src/webview/rbac-group.html',
       filename: 'rbac-group.html',
       chunks: ['rbac-group'],
+      template: './src/webview/connection.html',
+      filename: 'connection.html',
+      chunks: ['connection'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,

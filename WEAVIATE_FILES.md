@@ -13,6 +13,7 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
 ## File Format
 
 ### Custom Connection
+
 ```json
 {
   "name": "My Local Instance",
@@ -20,7 +21,7 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
   "httpHost": "localhost",
   "httpPort": 8080,
   "httpSecure": false,
-  "grpcHost": "localhost", 
+  "grpcHost": "localhost",
   "grpcPort": 50051,
   "grpcSecure": false,
   "apiKey": "optional-for-custom",
@@ -29,11 +30,12 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
 ```
 
 ### Cloud Connection
+
 ```json
 {
   "name": "My Cloud Cluster",
   "type": "cloud",
-  "cloudUrl": "https://my-cluster.weaviate.network",
+  "cloudUrl": "https://my-cluster.weaviate.cloud",
   "apiKey": "your-api-key-here",
   "connectionVersion": "2"
 }
@@ -42,13 +44,16 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
 ## Required Fields
 
 ### For all connection types:
+
 - `name`: Connection name (string, not empty)
 - `type`: Connection type ("custom" or "cloud")
 
 ### For "custom" type:
+
 - `httpHost`: HTTP host (string, not empty)
 
 ### For "cloud" type:
+
 - `cloudUrl`: Cloud cluster URL (string, not empty)
 - `apiKey`: API key (string, not empty)
 
@@ -69,7 +74,8 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
 
 ### When opening a valid .weaviate file:
 
-1. **First time**: 
+1. **First time**:
+
    - "Add Connection": Adds the connection without connecting
    - "Add and Connect": Adds the connection and connects immediately
    - "Cancel": Does nothing
@@ -82,6 +88,7 @@ The Weaviate Studio extension now supports `.weaviate` files to facilitate impor
 ### Validation
 
 The extension automatically validates:
+
 - If the file contains valid JSON
 - If it has all required fields
 - If field types are correct

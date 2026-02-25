@@ -1024,6 +1024,175 @@ describe('WeaviateTreeDataProvider', () => {
     });
   });
 
+  describe('Object TTL', () => {
+    const connectionId = '2';
+    const collectionName = 'TestTTLCollection';
+
+    function makeMockCollection(objectTTL?: Record<string, unknown>) {
+      return {
+        label: collectionName,
+        itemType: 'collection',
+        connectionId,
+        collectionName,
+        schema: {
+          class: collectionName,
+          properties: [],
+          vectorizers: {},
+          multiTenancy: { enabled: false },
+          ...(objectTTL !== undefined ? { objectTTL } : {}),
+        },
+      };
+    }
+
+    it('shows "Object TTL" collapsed when objectTTL.enabled is true', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({
+          enabled: true,
+          defaultTTLSeconds: 3600,
+          filterExpiredObjects: true,
+          deleteOn: 'creationTime',
+        }),
+      ];
+      const collectionElement = {
+        itemType: 'collection',
+        connectionId,
+        collectionName,
+        label: collectionName,
+      };
+      const children = await provider.getChildren(collectionElement as any);
+      const ttlItem = children.find((c: any) => c.itemType === 'objectTtlConfig');
+      expect(ttlItem).toBeDefined();
+      expect(ttlItem?.label).toBe('Object TTL');
+      expect(ttlItem?.collapsibleState).toBe(vscode.TreeItemCollapsibleState.Collapsed);
+    });
+
+    it('shows "Object TTL (Disabled)" when objectTTL.enabled is false', async () => {
+      (provider as any).collections[connectionId] = [makeMockCollection({ enabled: false })];
+      const collectionElement = {
+        itemType: 'collection',
+        connectionId,
+        collectionName,
+        label: collectionName,
+      };
+      const children = await provider.getChildren(collectionElement as any);
+      const ttlItem = children.find((c: any) => c.itemType === 'objectTtlConfig');
+      expect(ttlItem).toBeDefined();
+      expect(ttlItem?.label).toBe('Object TTL (Disabled)');
+      expect(ttlItem?.collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
+    });
+
+    it('shows "Object TTL (Disabled)" when objectTTL is absent from schema', async () => {
+      (provider as any).collections[connectionId] = [makeMockCollection()];
+      const collectionElement = {
+        itemType: 'collection',
+        connectionId,
+        collectionName,
+        label: collectionName,
+      };
+      const children = await provider.getChildren(collectionElement as any);
+      const ttlItem = children.find((c: any) => c.itemType === 'objectTtlConfig');
+      expect(ttlItem).toBeDefined();
+      expect(ttlItem?.label).toBe('Object TTL (Disabled)');
+      expect(ttlItem?.collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
+    });
+
+    it('objectTtlConfig tree item has clock icon', async () => {
+      (provider as any).collections[connectionId] = [makeMockCollection({ enabled: true })];
+      const collectionElement = {
+        itemType: 'collection',
+        connectionId,
+        collectionName,
+        label: collectionName,
+      };
+      const children = await provider.getChildren(collectionElement as any);
+      const ttlItem = children.find((c: any) => c.itemType === 'objectTtlConfig');
+      expect((ttlItem as any)?.iconPath?.id).toBe('clock');
+    });
+
+    it('renders all TTL config fields as key-value children', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({
+          enabled: true,
+          defaultTTLSeconds: 3600,
+          filterExpiredObjects: true,
+          deleteOn: 'creationTime',
+        }),
+      ];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      const labels = children.map((c: any) => c.label);
+      expect(labels).toContain('enabled: true');
+      expect(labels).toContain('defaultTTLSeconds: 3600');
+      expect(labels).toContain('filterExpiredObjects: true');
+      expect(labels).toContain('deleteOn: creationTime');
+    });
+
+    it('renders deleteOn with a date property name', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({
+          enabled: true,
+          defaultTTLSeconds: 123,
+          filterExpiredObjects: true,
+          deleteOn: 'some_date_property',
+        }),
+      ];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      const labels = children.map((c: any) => c.label);
+      expect(labels).toContain('deleteOn: some_date_property');
+    });
+
+    it('renders deleteOn with updateTime', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({
+          enabled: true,
+          defaultTTLSeconds: 3600,
+          filterExpiredObjects: true,
+          deleteOn: 'updateTime',
+        }),
+      ];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      const labels = children.map((c: any) => c.label);
+      expect(labels).toContain('deleteOn: updateTime');
+    });
+
+    it('renders extra future TTL fields dynamically', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({ enabled: true, defaultTTLSeconds: 60, someNewField: 'futureValue' }),
+      ];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      const labels = children.map((c: any) => c.label);
+      expect(labels).toContain('someNewField: futureValue');
+    });
+
+    it('returns "No TTL configuration found" when schema has no objectTTL', async () => {
+      (provider as any).collections[connectionId] = [makeMockCollection()];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      expect(children).toHaveLength(1);
+      expect(children[0].label).toBe('No TTL configuration found');
+    });
+
+    it('all TTL children have object itemType', async () => {
+      (provider as any).collections[connectionId] = [
+        makeMockCollection({
+          enabled: true,
+          defaultTTLSeconds: 3600,
+          filterExpiredObjects: true,
+          deleteOn: 'creationTime',
+        }),
+      ];
+      const ttlElement = { itemType: 'objectTtlConfig', connectionId, collectionName };
+      const children = await provider.getChildren(ttlElement as any);
+      children.forEach((child: any) => {
+        expect(child.itemType).toBe('object');
+        expect(child.collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
+      });
+    });
+  });
+
   describe('sortAliases', () => {
     it('should sort aliases alphabetically by alias name', () => {
       const aliases = [

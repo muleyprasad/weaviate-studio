@@ -21,7 +21,7 @@ describe('Weaviate File Handler', () => {
   const validCloudConnection = {
     name: 'Test Cloud Connection',
     type: 'cloud' as const,
-    cloudUrl: 'https://test-cluster.weaviate.network',
+    cloudUrl: 'https://test-cluster.weaviate.cloud',
     apiKey: 'test-api-key',
     connectionVersion: '2',
   };
@@ -35,7 +35,7 @@ describe('Weaviate File Handler', () => {
   const minimalCloudConnection = {
     name: 'Minimal Cloud',
     type: 'cloud' as const,
-    cloudUrl: 'https://cluster.weaviate.network',
+    cloudUrl: 'https://cluster.weaviate.cloud',
     apiKey: 'key123',
   };
 

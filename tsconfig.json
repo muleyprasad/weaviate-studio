@@ -12,7 +12,8 @@
     "noFallthroughCasesInSwitch": true /* Report errors for fallthrough cases in switch statement. */,
     "noUnusedParameters": false /* Report errors on unused parameters. */,
     "jsx": "react-jsx",
-    "isolatedModules": true
+    "isolatedModules": true,
+    "resolveJsonModule": true /* Enable importing .json files */
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -558,6 +558,10 @@
   color: var(--vscode-foreground);
 }
 
+.shard-stat .value[class*='status-'] {
+  color: #2196f3;
+}
+
 .shard-stat .value.status-ready {
   color: #4caf50;
 }
@@ -569,6 +573,10 @@
 .shard-stat .value.status-readonly {
   color: #f44336;
   font-weight: 600;
+}
+
+.shard-stat .value.status-lazy_loading {
+  color: #ff9800;
 }
 
 .shard-full-data {

@@ -241,6 +241,80 @@ describe('AddCollection Webview - onChange and onSubmit handlers', () => {
     });
   });
 
+  describe('serverVersion message handling', () => {
+    it('should store the version when serverVersion message is received', () => {
+      let weaviateVersion: string | null = null;
+
+      const messageHandler = (message: any) => {
+        if (message.command === 'serverVersion') {
+          weaviateVersion = message.version || null;
+        }
+      };
+
+      messageHandler({ command: 'serverVersion', version: '1.25.0' });
+
+      expect(weaviateVersion).toBe('1.25.0');
+    });
+
+    it('should set version to null when serverVersion message has no version', () => {
+      let weaviateVersion: string | null = 'previous';
+
+      const messageHandler = (message: any) => {
+        if (message.command === 'serverVersion') {
+          weaviateVersion = message.version || null;
+        }
+      };
+
+      messageHandler({ command: 'serverVersion', version: '' });
+
+      expect(weaviateVersion).toBeNull();
+    });
+
+    it('should not update version for unrelated messages', () => {
+      let weaviateVersion: string | null = '1.20.0';
+
+      const messageHandler = (message: any) => {
+        if (message.command === 'serverVersion') {
+          weaviateVersion = message.version || null;
+        }
+      };
+
+      messageHandler({ command: 'nodesNumber', nodesNumber: 3 });
+      messageHandler({ command: 'availableModules', modules: {} });
+
+      expect(weaviateVersion).toBe('1.20.0');
+    });
+
+    it('should handle serverVersion alongside other ready messages', () => {
+      let weaviateVersion: string | null = null;
+      let nodesNumber = 1;
+      let modules: any = null;
+
+      const messageHandler = (message: any) => {
+        switch (message.command) {
+          case 'serverVersion':
+            weaviateVersion = message.version || null;
+            break;
+          case 'nodesNumber':
+            nodesNumber = message.nodesNumber || 1;
+            break;
+          case 'availableModules':
+            modules = message.modules;
+            break;
+        }
+      };
+
+      // Simulate the burst of messages sent on 'ready'
+      messageHandler({ command: 'nodesNumber', nodesNumber: 2 });
+      messageHandler({ command: 'availableModules', modules: { 'text2vec-openai': {} } });
+      messageHandler({ command: 'serverVersion', version: '1.25.0' });
+
+      expect(weaviateVersion).toBe('1.25.0');
+      expect(nodesNumber).toBe(2);
+      expect(modules).toEqual({ 'text2vec-openai': {} });
+    });
+  });
+
   describe('Callback signatures', () => {
     it('onChange callback should accept schema object', () => {
       const handleSchemaChange = (schema: any) => {

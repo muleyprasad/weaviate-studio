@@ -5,7 +5,9 @@ This document describes the comprehensive tests created for the Weaviate Studio 
 ## Created Test Files
 
 ### 1. `ConnectionManager.test.ts` (Expanded)
+
 Main file with fundamental tests:
+
 - ✅ Basic CRUD tests (Create, Read, Update, Delete)
 - ✅ Connection type tests (Custom vs Cloud)
 - ✅ Timeout and advanced configuration tests
@@ -15,7 +17,9 @@ Main file with fundamental tests:
 - ✅ Edge cases and validation tests
 
 ### 2. `ConnectionManager.webview.test.ts` (New)
+
 Webview interface specific tests:
+
 - ✅ Add connection dialogs
 - ✅ Edit connection dialogs
 - ✅ Form validation
@@ -24,7 +28,9 @@ Webview interface specific tests:
 - ✅ VS Code themes and styles
 
 ### 3. `ConnectionManager.integration.test.ts` (New)
+
 Integration and performance tests:
+
 - ✅ Performance tests with many connections
 - ✅ Concurrent operations
 - ✅ Data integrity after complex operations
@@ -32,7 +38,9 @@ Integration and performance tests:
 - ✅ Integration edge cases
 
 ### 4. `ConnectionManager.validation.test.ts` (New)
+
 Validation and mocking tests:
+
 - ✅ Required field validation
 - ✅ Weaviate client mocking
 - ✅ Storage mock tests
@@ -44,6 +52,7 @@ Validation and mocking tests:
 ### Tested Features
 
 #### ✅ Basic CRUD Operations
+
 - Add connections (custom and cloud)
 - List connections
 - Get connection by ID
@@ -51,6 +60,7 @@ Validation and mocking tests:
 - Delete connections
 
 #### ✅ Connection Management
+
 - Connect to Weaviate instances
 - Disconnect
 - Client caching
@@ -58,18 +68,21 @@ Validation and mocking tests:
 - Custom timeouts
 
 #### ✅ Connection Types
+
 - Custom connections (HTTP/gRPC)
 - Cloud connections (Weaviate Cloud)
 - Security settings (HTTPS/TLS)
 - API Key authentication
 
 #### ✅ Data Migration
+
 - Migration from old format (URL) to new (host/port)
 - Automatic detection of cloud vs custom URLs
 - Data preservation during migration
 - Connection versioning
 
 #### ✅ User Interface (Webview)
+
 - Add/edit connection forms
 - Client-side and server-side validation
 - Conditional fields (custom vs cloud)
@@ -77,6 +90,7 @@ Validation and mocking tests:
 - VS Code theming
 
 #### ✅ State Management
+
 - Singleton pattern
 - Connection change events
 - GlobalState persistence
@@ -84,6 +98,7 @@ Validation and mocking tests:
 - Status reset on initialization
 
 #### ✅ Error Handling
+
 - Connection failures
 - Timeouts
 - Invalid URLs
@@ -91,12 +106,14 @@ Validation and mocking tests:
 - Missing required fields
 
 #### ✅ Performance and Concurrency
+
 - Operations with many connections (100+)
 - Concurrent operations
 - Rapid status changes
 - Memory cleanup
 
 #### ✅ Validation and Edge Cases
+
 - Duplicate names
 - Special characters
 - Extreme timeout values
@@ -113,6 +130,7 @@ Validation and mocking tests:
 ## Specific Tested Scenarios
 
 ### Connection Migration
+
 ```typescript
 // Old URL -> New structure
 'https://my-cluster.weaviate.cloud' -> { type: 'cloud', cloudUrl: '...' }
@@ -120,20 +138,23 @@ Validation and mocking tests:
 ```
 
 ### Connection Types
+
 ```typescript
 // Custom connection
 { type: 'custom', httpHost: 'localhost', httpPort: 8080, grpcPort: 50051 }
 
-// Cloud connection  
-{ type: 'cloud', cloudUrl: 'https://....weaviate.network', apiKey: '...' }
+// Cloud connection
+{ type: 'cloud', cloudUrl: 'https://....weaviate.cloud', apiKey: '...' }
 ```
 
 ### Field Validation
+
 - Custom: `name` and `httpHost` are required
 - Cloud: `name`, `cloudUrl` and `apiKey` are required
 - Timeouts are optional with default values
 
 ### Concurrency Handling
+
 - Multiple simultaneous additions
 - Concurrent updates on same connection
 - Parallel connect/disconnect operations
@@ -141,27 +162,31 @@ Validation and mocking tests:
 ## Used Mocking
 
 ### Weaviate Client
+
 ```typescript
-jest.spyOn(weaviateClient, 'connectToCustom')
-jest.spyOn(weaviateClient, 'connectToWeaviateCloud')
-jest.spyOn(weaviateClient, 'ApiKey')
+jest.spyOn(weaviateClient, 'connectToCustom');
+jest.spyOn(weaviateClient, 'connectToWeaviateCloud');
+jest.spyOn(weaviateClient, 'ApiKey');
 ```
 
 ### VS Code APIs
+
 ```typescript
-jest.spyOn(vscode.window, 'createWebviewPanel')
-jest.spyOn(vscode.window, 'showErrorMessage')
+jest.spyOn(vscode.window, 'createWebviewPanel');
+jest.spyOn(vscode.window, 'showErrorMessage');
 ```
 
 ### Storage and Context
+
 ```typescript
-mockContext.globalState.get()
-mockContext.globalState.update()
+mockContext.globalState.get();
+mockContext.globalState.update();
 ```
 
 ### Date/Time
+
 ```typescript
-jest.spyOn(Date, 'now')
+jest.spyOn(Date, 'now');
 ```
 
 ## How to Run Tests
@@ -183,6 +208,7 @@ npm test -- --watch
 ## Next Steps
 
 The tests are complete and cover all main aspects of the ConnectionManager:
+
 - ✅ Basic functionality
 - ✅ Edge cases
 - ✅ Error handling

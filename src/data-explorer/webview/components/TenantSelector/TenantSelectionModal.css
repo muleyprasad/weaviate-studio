@@ -66,6 +66,62 @@
   color: var(--vscode-descriptionForeground);
 }
 
+.tenant-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tenant-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  padding: 4px 8px;
+}
+
+
+.tenant-search-icon {
+  color: var(--vscode-input-placeholderForeground);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.tenant-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--vscode-input-foreground);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.tenant-search-input:focus {
+  outline: none;
+}
+
+.tenant-search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+
+.tenant-refresh-btn {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tenant-no-results {
+  padding: 20px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}
+
 .modal-body {
   flex: 1;
   overflow-y: auto;

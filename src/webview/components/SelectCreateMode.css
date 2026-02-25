@@ -1,0 +1,84 @@
+/* Container - uses theme variables */
+.select-create-mode-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Header section */
+.select-create-mode-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.select-create-mode-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.select-create-mode-header .subtitle {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Options grid */
+.options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Individual option card */
+.option-card {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 20px;
+  background: var(--vscode-editor-background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.option-card:hover {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 2px 8px rgba(0, 122, 204, 0.1);
+}
+
+.option-card-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--vscode-input-background);
+}
+
+.option-card-disabled:hover {
+  border-color: var(--vscode-panel-border);
+  box-shadow: none;
+}
+
+.option-icon {
+  font-size: 24px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.option-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.option-description {
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Button group - reuses theme button styles */
+.select-create-mode-container .button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vscode-panel-border);
+}

@@ -92,7 +92,7 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         mgr.addConnection({
           name: 'Test Cloud',
           type: 'cloud',
-          cloudUrl: 'https://test.weaviate.network',
+          cloudUrl: 'https://test.weaviate.cloud',
           apiKey: '',
         } as any)
       ).rejects.toThrow();
@@ -136,7 +136,7 @@ describe('ConnectionManager Validation and Mock Tests', () => {
       const cloudConn = await mgr.addConnection({
         name: 'Valid Cloud',
         type: 'cloud',
-        cloudUrl: 'https://test.weaviate.network',
+        cloudUrl: 'https://test.weaviate.cloud',
         apiKey: 'test-key',
       });
 
@@ -184,6 +184,10 @@ describe('ConnectionManager Validation and Mock Tests', () => {
         httpSecure: true,
         grpcSecure: true,
         authCredentials: { key: 'mock-key' },
+        skipInitChecks: undefined,
+        headers: {
+          'X-Weaviate-Client-Integration': expect.stringContaining('weaviate-studio/'),
+        },
         timeout: {
           init: 25,
           query: 55,
@@ -215,7 +219,7 @@ describe('ConnectionManager Validation and Mock Tests', () => {
       const conn = await mgr.addConnection({
         name: 'Mock Cloud Test',
         type: 'cloud',
-        cloudUrl: 'https://mock-cloud.weaviate.network',
+        cloudUrl: 'https://mock-cloud.weaviate.cloud',
         apiKey: 'cloud-mock-key',
         timeoutInit: 35,
         timeoutQuery: 75,
@@ -225,17 +229,18 @@ describe('ConnectionManager Validation and Mock Tests', () => {
       await mgr.connect(conn.id);
 
       expect(mockApiKey).toHaveBeenCalledWith('cloud-mock-key');
-      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith(
-        'https://mock-cloud.weaviate.network',
-        {
-          authCredentials: mockApiKeyInstance,
-          timeout: {
-            init: 35,
-            query: 75,
-            insert: 155,
-          },
-        }
-      );
+      expect(mockConnectToWeaviateCloud).toHaveBeenCalledWith('https://mock-cloud.weaviate.cloud', {
+        authCredentials: mockApiKeyInstance,
+        skipInitChecks: undefined,
+        headers: {
+          'X-Weaviate-Client-Integration': expect.stringContaining('weaviate-studio/'),
+        },
+        timeout: {
+          init: 35,
+          query: 75,
+          insert: 155,
+        },
+      });
 
       expect(mockClient.isReady).toHaveBeenCalled();
       expect(mgr.getClient(conn.id)).toBe(mockClient);
