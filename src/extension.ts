@@ -319,6 +319,24 @@ function permKey(p: any): string {
   );
 }
 
+/**
+ * Fetches the current role list and pushes it to all open user and group panels
+ * for the given connection. Called after any role is created or deleted so open
+ * panels reflect the change without needing to be reopened.
+ */
+async function pushRoleListToOpenPanels(client: any, connectionId: string): Promise<void> {
+  const allRolesMap = await client.roles.listAll();
+  const allRoles = Object.keys(allRolesMap).sort();
+  RbacUserPanel.notifyRolesChanged(
+    connectionId,
+    allRoles.filter((r) => r !== 'root' && r !== 'read-only')
+  );
+  RbacGroupPanel.notifyRolesChanged(
+    connectionId,
+    allRoles.filter((r) => r !== 'root')
+  );
+}
+
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
   // RBAC: Context commands
@@ -345,6 +363,7 @@ export function activate(context: vscode.ExtensionContext) {
             const perms = buildPermissionsFromFormState(client, roleData.permissions);
             await client.roles.create(roleData.name, perms);
             await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+            await pushRoleListToOpenPanels(client, item.connectionId);
             vscode.window.showInformationMessage(`Role "${roleData.name}" created successfully`);
           }
         );
@@ -438,6 +457,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         await client.roles.delete(roleName);
         await weaviateTreeDataProvider.refreshRbac(item.connectionId);
+        await pushRoleListToOpenPanels(client, item.connectionId);
         vscode.window.showInformationMessage(`Role "${roleName}" deleted successfully`);
       } catch (error) {
         vscode.window.showErrorMessage(

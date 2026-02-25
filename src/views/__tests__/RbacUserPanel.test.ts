@@ -197,6 +197,97 @@ describe('RbacUserPanel', () => {
     expect(disposeSpy).toHaveBeenCalled();
   });
 
+  it('should post rolesUpdated to webview when updateAvailableRoles is called', () => {
+    const panel = RbacUserPanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'add',
+      undefined,
+      availableRoles,
+      [],
+      mockOnSave
+    );
+    mockPanel.webview.postMessage.mockClear();
+    panel.updateAvailableRoles(['admin', 'new-role', 'viewer']);
+    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'rolesUpdated',
+      availableRoles: ['admin', 'new-role', 'viewer'],
+    });
+  });
+
+  it('should reflect updated roles in subsequent initData after updateAvailableRoles', async () => {
+    const panel = RbacUserPanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'edit',
+      existingUser,
+      availableRoles,
+      assignedRoles,
+      mockOnSave
+    );
+    panel.updateAvailableRoles(['admin', 'new-role']);
+    mockPanel.webview.postMessage.mockClear();
+    await (panel as any)._handleMessage({ command: 'ready' });
+    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ availableRoles: ['admin', 'new-role'] })
+    );
+  });
+
+  it('should notify all panels for a connection via notifyRolesChanged', () => {
+    // Create two panels for conn-1 with distinct keys (add vs edit)
+    const panel1 = RbacUserPanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'add',
+      undefined,
+      availableRoles,
+      [],
+      mockOnSave
+    );
+    // Second panel needs a separate webview mock so postMessage calls are distinguishable
+    const mockPanel2 = { ...mockPanel, webview: { ...mockPanel.webview, postMessage: jest.fn() } };
+    jest.spyOn(vscode.window, 'createWebviewPanel').mockReturnValueOnce(mockPanel2 as any);
+    const panel2 = RbacUserPanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'edit',
+      existingUser,
+      availableRoles,
+      assignedRoles,
+      mockOnSave
+    );
+    mockPanel.webview.postMessage.mockClear();
+    mockPanel2.webview.postMessage.mockClear();
+
+    RbacUserPanel.notifyRolesChanged('conn-1', ['updated-role']);
+
+    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'rolesUpdated',
+      availableRoles: ['updated-role'],
+    });
+    expect(mockPanel2.webview.postMessage).toHaveBeenCalledWith({
+      command: 'rolesUpdated',
+      availableRoles: ['updated-role'],
+    });
+  });
+
+  it('should not notify panels for a different connection via notifyRolesChanged', () => {
+    RbacUserPanel.createOrShow(
+      mockExtensionUri as any,
+      'conn-1',
+      'add',
+      undefined,
+      availableRoles,
+      [],
+      mockOnSave
+    );
+    mockPanel.webview.postMessage.mockClear();
+
+    RbacUserPanel.notifyRolesChanged('conn-999', ['updated-role']);
+
+    expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+  });
+
   it('should return fallback HTML when readFileSync throws', () => {
     fsMock.readFileSync.mockImplementationOnce(() => {
       throw new Error('file not found');

@@ -12,7 +12,7 @@ export class RbacUserPanel {
   private readonly _connectionId: string;
   private readonly _mode: 'add' | 'edit';
   private readonly _existingUser: any | undefined;
-  private readonly _availableRoles: string[];
+  private _availableRoles: string[];
   private readonly _assignedRoles: string[];
 
   private constructor(
@@ -92,6 +92,19 @@ export class RbacUserPanel {
 
   public postMessage(message: any): void {
     this._panel.webview.postMessage(message);
+  }
+
+  public updateAvailableRoles(roles: string[]): void {
+    this._availableRoles = roles;
+    this.postMessage({ command: 'rolesUpdated', availableRoles: roles });
+  }
+
+  public static notifyRolesChanged(connectionId: string, roles: string[]): void {
+    for (const panel of RbacUserPanel.panels.values()) {
+      if (panel._connectionId === connectionId) {
+        panel.updateAvailableRoles(roles);
+      }
+    }
   }
 
   public dispose(): void {

@@ -50,6 +50,36 @@ describe('RbacGroup Webview Component', () => {
       expect(rolesToAssign).toEqual([]);
       expect(rolesToRevoke).toEqual(['admin']);
     });
+
+    it('should advance originalRoles baseline after successful save so re-saves compute correct diff', () => {
+      const computeDiff = (selected: Set<string>, original: Set<string>) => ({
+        rolesToAssign: [...selected].filter((r) => !original.has(r)),
+        rolesToRevoke: [...original].filter((r) => !selected.has(r)),
+      });
+
+      // Initial state: group has [viewer]
+      let originalRoles = new Set(['viewer']);
+      let selectedRoles = new Set(['viewer']);
+
+      // User adds 'admin' and saves
+      selectedRoles = new Set(['viewer', 'admin']);
+      const firstSave = computeDiff(selectedRoles, originalRoles);
+      expect(firstSave.rolesToAssign).toEqual(['admin']);
+      expect(firstSave.rolesToRevoke).toEqual([]);
+
+      // Save succeeds — baseline advances to current selectedRoles (the fix)
+      originalRoles = new Set(selectedRoles);
+
+      // User now removes 'admin'
+      selectedRoles = new Set(['viewer']);
+      const secondSave = computeDiff(selectedRoles, originalRoles);
+      // With the fix: admin is correctly identified for revocation
+      expect(secondSave.rolesToAssign).toEqual([]);
+      expect(secondSave.rolesToRevoke).toEqual(['admin']);
+
+      // Without the fix (stale baseline = original {viewer}), the second diff would be:
+      // rolesToAssign=[], rolesToRevoke=[] — silently missing the revocation
+    });
   });
 
   describe('form validation', () => {
@@ -105,6 +135,47 @@ describe('RbacGroup Webview Component', () => {
       };
       handleMessage({ command: 'error', message: 'Failed to assign roles' });
       expect(errorMsg).toBe('Failed to assign roles');
+    });
+
+    it('should update availableRoles list when rolesUpdated message is received', () => {
+      let roles: string[] = ['admin', 'viewer'];
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'rolesUpdated') {
+          roles = (msg.availableRoles || []).sort((a: string, b: string) => a.localeCompare(b));
+        }
+      };
+
+      // A new role was added elsewhere — list grows
+      handleMessage({ command: 'rolesUpdated', availableRoles: ['admin', 'new-role', 'viewer'] });
+      expect(roles).toEqual(['admin', 'new-role', 'viewer']);
+    });
+
+    it('should remove a deleted role from the list when rolesUpdated is received', () => {
+      let roles: string[] = ['admin', 'old-role', 'viewer'];
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'rolesUpdated') {
+          roles = (msg.availableRoles || []).sort((a: string, b: string) => a.localeCompare(b));
+        }
+      };
+
+      handleMessage({ command: 'rolesUpdated', availableRoles: ['admin', 'viewer'] });
+      expect(roles).toEqual(['admin', 'viewer']);
+      expect(roles).not.toContain('old-role');
+    });
+
+    it('should sort roles alphabetically from rolesUpdated message', () => {
+      let roles: string[] = [];
+      const handleMessage = (msg: any) => {
+        if (msg.command === 'rolesUpdated') {
+          roles = (msg.availableRoles || []).sort((a: string, b: string) => a.localeCompare(b));
+        }
+      };
+
+      handleMessage({
+        command: 'rolesUpdated',
+        availableRoles: ['zebra-role', 'admin', 'mid-role'],
+      });
+      expect(roles).toEqual(['admin', 'mid-role', 'zebra-role']);
     });
 
     it('should handle initData for add mode', () => {

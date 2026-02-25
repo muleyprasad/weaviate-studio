@@ -27,6 +27,7 @@ function RbacUserWebview() {
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [originalRoles, setOriginalRoles] = useState<Set<string>>(new Set());
+  const selectedRolesRef = React.useRef<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -62,8 +63,14 @@ function RbacUserWebview() {
             setUserId('');
             setSelectedRoles(new Set());
           } else {
-            setOriginalRoles((prev) => new Set(prev));
+            // Advance the baseline to the roles that were just successfully saved
+            setOriginalRoles(new Set(selectedRolesRef.current));
           }
+          break;
+        case 'rolesUpdated':
+          setAvailableRoles(
+            (msg.availableRoles || []).sort((a: string, b: string) => a.localeCompare(b))
+          );
           break;
         case 'error':
           setIsSubmitting(false);
@@ -76,6 +83,11 @@ function RbacUserWebview() {
     vscode.postMessage({ command: 'ready' });
     return () => window.removeEventListener('message', handler);
   }, []);
+
+  // Keep ref in sync so the stale-closed message handler can read the current value
+  useEffect(() => {
+    selectedRolesRef.current = selectedRoles;
+  }, [selectedRoles]);
 
   const toggleRole = (role: string) => {
     setSelectedRoles((prev) => {
