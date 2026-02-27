@@ -30,6 +30,10 @@ class MockConnectionManager {
   getConnection(_id: string) {
     return this.connections.find((c) => c.id === _id);
   }
+
+  getClient(_id: string) {
+    return null; // no real client in unit tests
+  }
 }
 
 // Jest module mocks
