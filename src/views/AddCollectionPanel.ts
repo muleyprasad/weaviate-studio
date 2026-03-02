@@ -23,7 +23,8 @@ export class AddCollectionPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
-  private readonly _initialSchema: SchemaClass | undefined;
+  private readonly _initialSchema: any | undefined;
+  private readonly _readOnly: boolean;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -33,11 +34,13 @@ export class AddCollectionPanel {
       message: WebviewToExtensionMessage,
       postMessage: (msg: Record<string, unknown>) => void
     ) => Promise<void>,
-    initialSchema?: SchemaClass
+    initialSchema?: any,
+    readOnly?: boolean
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._initialSchema = initialSchema;
+    this._readOnly = readOnly ?? false;
 
     // Set the webview's initial html content
     this._update();
@@ -66,7 +69,8 @@ export class AddCollectionPanel {
       message: WebviewToExtensionMessage,
       postMessage: (msg: Record<string, unknown>) => void
     ) => Promise<void>,
-    initialSchema?: SchemaClass
+    initialSchema?: any,
+    readOnly?: boolean
   ): AddCollectionPanel {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -103,7 +107,8 @@ export class AddCollectionPanel {
       extensionUri,
       onCreateCallback,
       onMessageCallback,
-      initialSchema
+      initialSchema,
+      readOnly
     );
 
     // Note: initial schema will also be sent when the webview signals it's ready
@@ -148,6 +153,11 @@ export class AddCollectionPanel {
             schema: this._initialSchema,
           });
         }
+        // Send readOnly state to webview
+        this.postMessage({
+          command: 'setReadOnly',
+          readOnly: this._readOnly,
+        });
         // Delegate to the optional message callback for additional ready handling
         if (this.onMessageCallback) {
           await this.onMessageCallback(message, (msg) => this.postMessage(msg));
