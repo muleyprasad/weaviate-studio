@@ -42,6 +42,8 @@ export interface WeaviateConnection {
 
   connectionVersion?: string; // future use
 
+  readOnly?: boolean; // When true, disables all create/update/delete operations for this connection
+
   // backwards compatibility
   url?: string; // old field, to be migrated
 }

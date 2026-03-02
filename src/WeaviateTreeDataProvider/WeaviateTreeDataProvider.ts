@@ -1122,8 +1122,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     if (!element) {
       // Root level - show connections
       const connectionItems = this.connections.map((conn) => {
+        const isReadOnly = conn.readOnly === true;
         const contextValue =
-          conn.status === 'connected' ? 'weaviateConnectionActive' : 'weaviateConnection';
+          conn.status === 'connected'
+            ? isReadOnly
+              ? 'weaviateConnectionActiveReadOnly'
+              : 'weaviateConnectionActive'
+            : isReadOnly
+              ? 'weaviateConnectionReadOnly'
+              : 'weaviateConnection';
         const item = new WeaviateTreeItem(
           `${conn.type === 'cloud' ? '☁️' : '🔗'} ${conn.name}`,
           vscode.TreeItemCollapsibleState.Collapsed,
@@ -1134,12 +1141,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           this.getStatusIcon(conn.status),
           contextValue
         );
+        if (isReadOnly) {
+          // @ts-ignore - Setting read-only property
+          item.description = 'READONLY';
+          item.resourceUri = vscode.Uri.from({ scheme: 'weaviate-readonly', path: `/${conn.id}` });
+        }
         // Tooltip should reflect the connection type
         const hostInfo =
           conn.type === 'cloud'
             ? conn.cloudUrl || 'cloud'
             : `${conn.httpHost || ''}${conn.httpPort ? `:${conn.httpPort}` : ''}`;
-        item.tooltip = `${conn.name} (${hostInfo})\nStatus: ${conn.status}`;
+        item.tooltip = `${conn.name} (${hostInfo})\nStatus: ${conn.status}${isReadOnly ? '\n⚠️ Read-only mode' : ''}`;
 
         // Only expand connected clusters
         if (conn.status === 'connected') {
@@ -3719,6 +3731,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         throw new Error(`Connection not found: ${connectionId}`);
       }
 
+      if (connection.readOnly === true) {
+        throw new Error(`Connection "${connection.name}" is in read-only mode`);
+      }
+
       const client = this.connectionManager.getClient(connectionId);
       if (!client) {
         throw new Error('Client not initialized');
@@ -3761,6 +3777,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         throw new Error(`Connection not found: ${connectionId}`);
       }
 
+      if (connection.readOnly === true) {
+        throw new Error(`Connection "${connection.name}" is in read-only mode`);
+      }
+
       const client = this.connectionManager.getClient(connectionId);
       if (!client) {
         throw new Error('Client not initialized');
@@ -3783,6 +3803,18 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       console.error('Error in deleteAllCollections:', error);
       throw new Error(`Failed to delete all collections: ${errorMessage}`);
     }
+  }
+
+  async toggleConnectionReadOnly(connectionId: string): Promise<void> {
+    const connection = this.connections.find((c) => c.id === connectionId);
+    if (!connection) {
+      throw new Error('Connection not found');
+    }
+    await this.connectionManager.updateConnection(connectionId, {
+      readOnly: !connection.readOnly,
+    });
+    connection.readOnly = !connection.readOnly;
+    this.refresh();
   }
 
   /**
