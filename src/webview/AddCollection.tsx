@@ -276,8 +276,9 @@ function AddCollectionWebview() {
           className="action-button action-button-primary"
           onClick={handleCreate}
           disabled={readOnly}
+          title={readOnly ? 'This connection is in read-only mode' : undefined}
         >
-          Create Collection
+          {readOnly ? '🔒 READONLY MODE' : 'Create Collection'}
         </button>
         <button className="action-button action-button-secondary" onClick={handleBack}>
           Back
