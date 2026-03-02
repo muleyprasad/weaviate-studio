@@ -22,6 +22,7 @@ interface RestoreData {
   rolesOptions?: string;
   usersOptions?: string;
   waitForCompletion?: boolean;
+  overwriteAlias?: boolean;
 }
 
 interface BackupDetails {
@@ -71,6 +72,7 @@ export function BackupRestoreWebview() {
   const [path, setPath] = useState<string>('');
   const [rolesOptions, setRolesOptions] = useState<string>('noRestore');
   const [usersOptions, setUsersOptions] = useState<string>('noRestore');
+  const [overwriteAlias, setOverwriteAlias] = useState<boolean>(false);
   const [waitForCompletion, setWaitForCompletion] = useState<boolean>(false);
   const [restoreStatus, setRestoreStatus] = useState<RestoreStatus | null>(null);
   const [showForm, setShowForm] = useState<boolean>(true);
@@ -172,6 +174,7 @@ export function BackupRestoreWebview() {
           setPath('');
           setRolesOptions('noRestore');
           setUsersOptions('noRestore');
+          setOverwriteAlias(false);
           setWaitForCompletion(false);
           setShowAdvancedConfig(false);
           break;
@@ -266,6 +269,9 @@ export function BackupRestoreWebview() {
     if (usersOptions && usersOptions !== 'noRestore') {
       restoreData.usersOptions = usersOptions;
     }
+    if (overwriteAlias) {
+      restoreData.overwriteAlias = true;
+    }
 
     if (vscode) {
       vscode.postMessage({
@@ -298,6 +304,7 @@ export function BackupRestoreWebview() {
     setPath('');
     setRolesOptions('noRestore');
     setUsersOptions('noRestore');
+    setOverwriteAlias(false);
     setWaitForCompletion(false);
     setShowAdvancedConfig(false);
   };
@@ -596,6 +603,21 @@ export function BackupRestoreWebview() {
                 </select>
                 <small className="form-hint">
                   Set if RBAC users will be restored. Default is "noRestore".
+                </small>
+              </div>
+
+              <div className="form-section">
+                <label className="form-label checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={overwriteAlias}
+                    onChange={(e) => setOverwriteAlias(e.target.checked)}
+                    disabled={isRestoring}
+                  />
+                  <span>Overwrite Alias on Conflict</span>
+                </label>
+                <small className="form-hint">
+                  If a collection alias already exists and conflicts with the backup, overwrite it.
                 </small>
               </div>
             </div>

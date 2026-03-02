@@ -1619,10 +1619,6 @@ export function activate(context: vscode.ExtensionContext) {
               backupConfig.config = backupConfig.config || {};
               backupConfig.config.cpuPercentage = backupData.cpuPercentage;
             }
-            if (backupData.chunkSize !== undefined) {
-              backupConfig.config = backupConfig.config || {};
-              backupConfig.config.chunkSize = backupData.chunkSize;
-            }
             if (backupData.compressionLevel) {
               backupConfig.config = backupConfig.config || {};
               backupConfig.config.compressionLevel = backupData.compressionLevel;
@@ -1795,6 +1791,10 @@ export function activate(context: vscode.ExtensionContext) {
                       if (restoreData.usersOptions) {
                         restoreConfig.usersOptions = restoreData.usersOptions;
                       }
+                      if (restoreData.overwriteAlias) {
+                        restoreConfig.config = restoreConfig.config || {};
+                        restoreConfig.config.overwriteAlias = true;
+                      }
 
                       const result = await client.backup.restore(restoreConfig);
 
@@ -1804,6 +1804,9 @@ export function activate(context: vscode.ExtensionContext) {
 
                       setTimeout(async () => {
                         await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                        if (restoreData.overwriteAlias) {
+                          await weaviateTreeDataProvider.refreshAliases(item.connectionId);
+                        }
                       }, 2000);
                     } catch (error) {
                       throw error;
@@ -2133,6 +2136,10 @@ export function activate(context: vscode.ExtensionContext) {
               if (restoreData.usersOptions) {
                 restoreConfig.usersOptions = restoreData.usersOptions;
               }
+              if (restoreData.overwriteAlias) {
+                restoreConfig.config = restoreConfig.config || {};
+                restoreConfig.config.overwriteAlias = true;
+              }
               console.log('calling backup.restore with config:', restoreConfig);
               const result = await client.backup.restore(restoreConfig);
 
@@ -2143,6 +2150,9 @@ export function activate(context: vscode.ExtensionContext) {
               // Refresh collections after restore
               setTimeout(async () => {
                 await weaviateTreeDataProvider.refreshCollections(item.connectionId, true);
+                if (restoreData.overwriteAlias) {
+                  await weaviateTreeDataProvider.refreshAliases(item.connectionId);
+                }
               }, 2000);
             } catch (error) {
               throw error; // Re-throw to be handled by the panel
