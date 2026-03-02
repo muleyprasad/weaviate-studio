@@ -338,12 +338,10 @@ export function BackupRestoreWebview() {
                 <span className="detail-value">{backupDetails.duration}</span>
               </div>
             )}
-            {backupDetails.size !== undefined && (
-              <div className="detail-item">
-                <span className="detail-label">Size:</span>
-                <span className="detail-value">{formatSize(backupDetails.size)}</span>
-              </div>
-            )}
+            <div className="detail-item">
+              <span className="detail-label">Size:</span>
+              <span className="detail-value">{formatSize(backupDetails.size)}</span>
+            </div>
             {backupDetails.path && (
               <div className="detail-item">
                 <span className="detail-label">Path:</span>
