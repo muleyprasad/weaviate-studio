@@ -1692,6 +1692,7 @@ export function activate(context: vscode.ExtensionContext) {
                           path: b.path,
                           collections: b.collections || [],
                           duration: duration,
+                          size: b.size,
                         };
                       });
                       allBackups.push(...backupsWithBackend);

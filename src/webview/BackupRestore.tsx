@@ -31,7 +31,22 @@ interface BackupDetails {
   error?: string;
   path?: string;
   duration?: string;
+  size?: number;
   classes?: string[];
+}
+
+function formatSize(gibs?: number): string {
+  if (gibs === null || gibs === undefined) {
+    return '-';
+  }
+  if (gibs === 0) {
+    return '0 B';
+  }
+  const bytes = gibs * 1024 * 1024 * 1024; // API returns size in GiB
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[i]}`;
 }
 
 interface RestoreStatus {
@@ -321,6 +336,12 @@ export function BackupRestoreWebview() {
               <div className="detail-item">
                 <span className="detail-label">Duration:</span>
                 <span className="detail-value">{backupDetails.duration}</span>
+              </div>
+            )}
+            {backupDetails.size !== undefined && (
+              <div className="detail-item">
+                <span className="detail-label">Size:</span>
+                <span className="detail-value">{formatSize(backupDetails.size)}</span>
               </div>
             )}
             {backupDetails.path && (

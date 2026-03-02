@@ -30,6 +30,21 @@ interface BackupStatus {
   error?: string;
   path?: string;
   duration?: string;
+  size?: number;
+}
+
+function formatSize(gibs?: number): string {
+  if (gibs === null || gibs === undefined) {
+    return '-';
+  }
+  if (gibs === 0) {
+    return '0 B';
+  }
+  const bytes = gibs * 1024 * 1024 * 1024; // API returns size in GiB
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[i]}`;
 }
 
 function NewBackupWebview() {
@@ -733,6 +748,7 @@ function NewBackupWebview() {
                     <th className="theme-table-cell">Backend</th>
                     <th className="theme-table-cell">Status</th>
                     <th className="theme-table-cell">Duration</th>
+                    <th className="theme-table-cell">Size</th>
                     <th className="theme-table-cell">Error</th>
                     <th className="theme-table-cell">Actions</th>
                   </tr>
@@ -748,6 +764,7 @@ function NewBackupWebview() {
                         </span>
                       </td>
                       <td className="theme-table-cell">{backup.duration || '-'}</td>
+                      <td className="theme-table-cell">{formatSize(backup.size)}</td>
                       <td className="theme-table-cell">{backup.error || '-'}</td>
                       <td className="theme-table-cell">
                         {backup.status === 'STARTED' && (
