@@ -864,182 +864,26 @@ export class ConnectionManager {
       return `${attr}="${assetUri}"`;
     });
 
-    // Add event listeners for remove buttons
-    container.querySelectorAll('.remove-link-button').forEach(button => {
-      button.addEventListener('click', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        links.splice(index, 1);
-        renderLinks();
-      });
-    });
+    // Add CSP
+    const cspSource = webview.cspSource;
+    html = html.replace(
+      '<head>',
+      `<head>
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}' ${cspSource}; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
+    );
+
+    // Replace nonce placeholder
+    const nonce = this._getNonce();
+    html = html.replace(/{{nonce}}/g, nonce);
+
+    return html;
   }
 
-  function addLink() {
-    links.push({ name: '', url: '' });
-    renderLinks();
-  }
-
-  // Initialize links display
-  renderLinks();
-
-  // Add link button listener
-  document.getElementById('addLinkButton').addEventListener('click', addLink);
-
-  // Dropdown change listener
-  connectionTypeDropdown.addEventListener('change', (e) => {
-    currentType = e.target.value;
-    updateFieldsVisibility(currentType);
-  });
-
-  // Advanced toggle
-  document.getElementById('toggleAdvanced').addEventListener('click', () => {
-    const adv = document.getElementById('advancedSettings');
-    adv.style.display = adv.style.display === 'block' ? 'none' : 'block';
-  });
-
-  // Save button
-  document.getElementById('saveButton').addEventListener('click', () => {
-    const name = document.getElementById('connectionName').value.trim();
-    const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
-    const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
-    const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
-    const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
-    const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
-    const skipInitChecks = document.getElementById('skipInitChecks').checked;
-    const autoConnect = document.getElementById('autoConnect').checked;
-    const openClusterViewOnConnect = document.getElementById('openClusterViewOnConnect').checked;
-
-    // Clear errors
-    document.querySelectorAll('.error').forEach(el => {
-      el.style.display = 'none';
-      el.textContent = '';
-    });
-
-    if (!name) {
-      showError('nameError', 'Name is required');
-      return;
-    }
-
-    // Filter out empty links
-    const validLinks = links.filter(link => link.name.trim() && link.url.trim());
-
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-
-    if (currentType === "custom") {
-      const httpHost = document.getElementById('httpHost').value.trim();
-      const httpPort = parseInt(document.getElementById('httpPort').value, 10);
-      const grpcHost = document.getElementById('grpcHost').value.trim();
-      const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
-      const httpSecure = document.getElementById('httpSecure').checked;
-      const grpcSecure = document.getElementById('grpcSecure').checked;
-
-      if (!httpHost) {
-        showError('httpHostError', 'HTTP Host is required');
-        return;
-      }
-
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-      if (apiKeyCustom) {
-        connection.apiKey = apiKeyCustom;
-      }
-    } else {
-      const cloudUrl = document.getElementById('cloudUrl').value.trim();
-      if (!cloudUrl) {
-        showError('cloudUrlError', 'Cloud URL is required');
-        return;
-      }
-      const cloudUrlChanged = isEditMode && existingCloudUrl && cloudUrl && existingCloudUrl !== cloudUrl;
-      const requiresApiKey = !isEditMode || currentType !== existingType || !existingApiKeyPresent || cloudUrlChanged;
-      if (requiresApiKey && !apiKeyCloud) {
-        showError('apiKeyError', 'API Key is required for cloud connection');
-        return;
-      }
-      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-      if (apiKeyCloud) {
-        connection.apiKey = apiKeyCloud;
-      }
-    }
-
-    vscode.postMessage({ command: 'save', connection });
-  });
-
-  // Save and Connect button
-  document.getElementById('saveAndConnectButton').addEventListener('click', () => {
-    const name = document.getElementById('connectionName').value.trim();
-    const apiKeyCustom = document.getElementById('apiKeyCustom').value.trim();
-    const apiKeyCloud = document.getElementById('apiKeyCloud').value.trim();
-    const timeoutInit = parseInt(document.getElementById('timeoutInit').value, 10);
-    const timeoutQuery = parseInt(document.getElementById('timeoutQuery').value, 10);
-    const timeoutInsert = parseInt(document.getElementById('timeoutInsert').value, 10);
-    const skipInitChecks = document.getElementById('skipInitChecks').checked;
-    const autoConnect = document.getElementById('autoConnect').checked;
-    const openClusterViewOnConnect = document.getElementById('openClusterViewOnConnect').checked;
-
-    // Clear errors
-    document.querySelectorAll('.error').forEach(el => {
-      el.style.display = 'none';
-      el.textContent = '';
-    });
-
-    if (!name) {
-      showError('nameError', 'Name is required');
-      return;
-    }
-
-    // Filter out empty links
-    const validLinks = links.filter(link => link.name.trim() && link.url.trim());
-
-    let connection = { name, type: currentType, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-
-    if (currentType === "custom") {
-      const httpHost = document.getElementById('httpHost').value.trim();
-      const httpPort = parseInt(document.getElementById('httpPort').value, 10);
-      const grpcHost = document.getElementById('grpcHost').value.trim();
-      const grpcPort = parseInt(document.getElementById('grpcPort').value, 10);
-      const httpSecure = document.getElementById('httpSecure').checked;
-      const grpcSecure = document.getElementById('grpcSecure').checked;
-
-      if (!httpHost) {
-        showError('httpHostError', 'HTTP Host is required');
-        return;
-      }
-
-      connection = { name, type: "custom", httpHost, httpPort, httpSecure, grpcHost, grpcPort, grpcSecure, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-      if (apiKeyCustom) {
-        connection.apiKey = apiKeyCustom;
-      }
-    } else {
-      const cloudUrl = document.getElementById('cloudUrl').value.trim();
-      if (!cloudUrl) {
-        showError('cloudUrlError', 'Cloud URL is required');
-        return;
-      }
-      const cloudUrlChanged = isEditMode && existingCloudUrl && cloudUrl && existingCloudUrl !== cloudUrl;
-      const requiresApiKey = !isEditMode || currentType !== existingType || !existingApiKeyPresent || cloudUrlChanged;
-      if (requiresApiKey && !apiKeyCloud) {
-        showError('apiKeyError', 'API Key is required for cloud connection');
-        return;
-      }
-      connection = { name, type: "cloud", cloudUrl, timeoutInit, timeoutQuery, timeoutInsert, skipInitChecks, autoConnect, openClusterViewOnConnect, links: validLinks };
-      if (apiKeyCloud) {
-        connection.apiKey = apiKeyCloud;
-      }
-    }
-
-    vscode.postMessage({ command: 'saveAndConnect', connection });
-  });
-
-  // Cancel button
-  document.getElementById('cancelButton').addEventListener('click', () => {
-    vscode.postMessage({ command: 'cancel' });
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      document.getElementById('saveButton').click();
-    } else if (e.key === 'Escape') {
-      document.getElementById('cancelButton').click();
+  private _getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
   }
