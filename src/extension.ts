@@ -1270,6 +1270,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
 
+    // Toggle read-only mode for a connection
+    vscode.commands.registerCommand(
+      'weaviate.toggleConnectionReadOnly',
+      async (item: { connectionId: string }) => {
+        if (!item?.connectionId) {
+          return;
+        }
+        try {
+          await weaviateTreeDataProvider.toggleConnectionReadOnly(item.connectionId);
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            error instanceof Error ? error.message : 'Failed to toggle read-only mode'
+          );
+        }
+      }
+    ),
+
     vscode.commands.registerCommand('weaviate.viewDetailedSchema', (item: any) => {
       weaviateTreeDataProvider.handleViewDetailedSchema(item);
     }),
