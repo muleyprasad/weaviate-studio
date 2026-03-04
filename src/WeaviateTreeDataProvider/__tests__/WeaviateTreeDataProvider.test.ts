@@ -1148,6 +1148,59 @@ describe('WeaviateTreeDataProvider', () => {
       });
     });
 
+    describe('createCollection readOnly guard', () => {
+      let readOnlyProvider: WeaviateTreeDataProvider;
+
+      beforeEach(() => {
+        const mockCtx = {
+          globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+          subscriptions: [],
+        } as unknown as vscode.ExtensionContext;
+        readOnlyProvider = new WeaviateTreeDataProvider(mockCtx);
+      });
+
+      it('throws error and does not call REST API when connection is readOnly', async () => {
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: true }),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+
+        const mockFetch = jest.fn();
+        (global as any).fetch = mockFetch;
+
+        await expect(
+          (readOnlyProvider as any).createCollection('1', { class: 'MyCollection' })
+        ).rejects.toThrow('Connection "Prod" is in read-only mode');
+
+        expect(mockFetch).not.toHaveBeenCalled();
+        delete (global as any).fetch;
+      });
+
+      it('proceeds normally when connection is not readOnly', async () => {
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: false }),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+        (readOnlyProvider as any).getWeaviateBaseUrl = jest
+          .fn()
+          .mockReturnValue('http://localhost:8080');
+        (readOnlyProvider as any).getWeaviateHeaders = jest.fn().mockReturnValue({});
+
+        const mockFetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: jest.fn().mockResolvedValue({}),
+        } as any);
+        (global as any).fetch = mockFetch;
+
+        await expect(
+          (readOnlyProvider as any).createCollection('1', { class: 'MyCollection' })
+        ).resolves.not.toThrow();
+
+        expect(mockFetch).toHaveBeenCalled();
+        delete (global as any).fetch;
+      });
+    });
+
     describe('toggleConnectionReadOnly', () => {
       let toggleProvider: WeaviateTreeDataProvider;
 
