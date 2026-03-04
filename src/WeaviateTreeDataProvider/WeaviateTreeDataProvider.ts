@@ -4213,6 +4213,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       throw new Error('Collection name is required');
     }
 
+    const connection = this.connectionManager.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+
+    if (connection.readOnly === true) {
+      throw new Error(`Connection "${connection.name}" is in read-only mode`);
+    }
+
     // Use direct REST API to create collection
     const baseUrl = this.getWeaviateBaseUrl(connectionId);
     const headers = this.getWeaviateHeaders(connectionId);
