@@ -18,7 +18,6 @@ interface BackupData {
   includeCollections?: string[];
   excludeCollections?: string[];
   cpuPercentage?: number;
-  chunkSize?: number;
   compressionLevel?: string;
   path?: string;
 }
@@ -30,6 +29,21 @@ interface BackupStatus {
   error?: string;
   path?: string;
   duration?: string;
+  size?: number;
+}
+
+function formatSize(gibs?: number): string {
+  if (gibs === null || gibs === undefined) {
+    return '-';
+  }
+  if (gibs === 0) {
+    return '0 B';
+  }
+  const bytes = gibs * 1024 * 1024 * 1024; // API returns size in GiB
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[i]}`;
 }
 
 function NewBackupWebview() {
@@ -53,7 +67,6 @@ function NewBackupWebview() {
   const [showAll, setShowAll] = useState<boolean>(false);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState<boolean>(false);
   const [cpuPercentage, setCpuPercentage] = useState<string>('');
-  const [chunkSize, setChunkSize] = useState<string>('');
   const [compressionLevel, setCompressionLevel] = useState<string>(
     BACKUP_CONFIG.COMPRESSION_LEVELS[0]
   );
@@ -86,31 +99,6 @@ function NewBackupWebview() {
       setCpuPercentage(MAX.toString());
     } else if (numValue < MIN && value.length > 0) {
       setCpuPercentage(MIN.toString());
-    }
-  };
-
-  // Validate and handle chunk size input (2-512)
-  const handleChunkSizeChange = (value: string): void => {
-    // Allow empty string
-    if (value === '') {
-      setChunkSize('');
-      return;
-    }
-
-    // Only allow numeric input
-    const numValue = parseInt(value);
-    if (isNaN(numValue)) {
-      return;
-    }
-
-    // Constrain to valid range
-    const { MIN, MAX } = BACKUP_CONFIG.CHUNK_SIZE;
-    if (numValue >= MIN && numValue <= MAX) {
-      setChunkSize(value);
-    } else if (numValue > MAX) {
-      setChunkSize(MAX.toString());
-    } else if (numValue < MIN && value.length > 0) {
-      setChunkSize(MIN.toString());
     }
   };
 
@@ -195,7 +183,6 @@ function NewBackupWebview() {
           setBackups([]);
           // Reset advanced config fields
           setCpuPercentage('');
-          setChunkSize('');
           setCompressionLevel(BACKUP_CONFIG.COMPRESSION_LEVELS[0]);
           setPath('');
           // Reset backend to default if available
@@ -281,9 +268,6 @@ function NewBackupWebview() {
     if (cpuPercentage) {
       backupData.cpuPercentage = parseInt(cpuPercentage);
     }
-    if (chunkSize) {
-      backupData.chunkSize = parseInt(chunkSize);
-    }
     if (compressionLevel && compressionLevel !== BACKUP_CONFIG.COMPRESSION_LEVELS[0]) {
       backupData.compressionLevel = compressionLevel;
     }
@@ -340,7 +324,6 @@ function NewBackupWebview() {
     setShowForm(true);
     setError('');
     setCpuPercentage('');
-    setChunkSize('');
     setCompressionLevel(BACKUP_CONFIG.COMPRESSION_LEVELS[0]);
     setPath('');
     setShowAdvancedConfig(false);
@@ -506,23 +489,6 @@ function NewBackupWebview() {
                         placeholder="50"
                         min="1"
                         max="80"
-                        disabled={isCreating}
-                      />
-                    </div>
-
-                    <div className="form-field">
-                      <label htmlFor="chunkSize" className="form-label-small">
-                        Chunk Size (2-512 MB):
-                      </label>
-                      <input
-                        id="chunkSize"
-                        type="number"
-                        className="form-input-small"
-                        value={chunkSize}
-                        onChange={(e) => handleChunkSizeChange(e.target.value)}
-                        placeholder="128"
-                        min="2"
-                        max="512"
                         disabled={isCreating}
                       />
                     </div>
@@ -733,6 +699,7 @@ function NewBackupWebview() {
                     <th className="theme-table-cell">Backend</th>
                     <th className="theme-table-cell">Status</th>
                     <th className="theme-table-cell">Duration</th>
+                    <th className="theme-table-cell">Size</th>
                     <th className="theme-table-cell">Error</th>
                     <th className="theme-table-cell">Actions</th>
                   </tr>
@@ -748,6 +715,7 @@ function NewBackupWebview() {
                         </span>
                       </td>
                       <td className="theme-table-cell">{backup.duration || '-'}</td>
+                      <td className="theme-table-cell">{formatSize(backup.size)}</td>
                       <td className="theme-table-cell">{backup.error || '-'}</td>
                       <td className="theme-table-cell">
                         {backup.status === 'STARTED' && (

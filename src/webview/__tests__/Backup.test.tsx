@@ -219,7 +219,6 @@ describe('Backup Webview Component', () => {
         backend: 's3',
         includeCollections: ['Collection1', 'Collection2'],
         cpuPercentage: 70,
-        chunkSize: 128,
         compressionLevel: 'BestSpeed',
       };
 

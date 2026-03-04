@@ -22,6 +22,7 @@ interface RestoreData {
   rolesOptions?: string;
   usersOptions?: string;
   waitForCompletion?: boolean;
+  overwriteAlias?: boolean;
 }
 
 interface BackupDetails {
@@ -31,7 +32,22 @@ interface BackupDetails {
   error?: string;
   path?: string;
   duration?: string;
+  size?: number;
   classes?: string[];
+}
+
+function formatSize(gibs?: number): string {
+  if (gibs === null || gibs === undefined) {
+    return '-';
+  }
+  if (gibs === 0) {
+    return '0 B';
+  }
+  const bytes = gibs * 1024 * 1024 * 1024; // API returns size in GiB
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, i);
+  return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[i]}`;
 }
 
 interface RestoreStatus {
@@ -56,6 +72,7 @@ export function BackupRestoreWebview() {
   const [path, setPath] = useState<string>('');
   const [rolesOptions, setRolesOptions] = useState<string>('noRestore');
   const [usersOptions, setUsersOptions] = useState<string>('noRestore');
+  const [overwriteAlias, setOverwriteAlias] = useState<boolean>(false);
   const [waitForCompletion, setWaitForCompletion] = useState<boolean>(false);
   const [restoreStatus, setRestoreStatus] = useState<RestoreStatus | null>(null);
   const [showForm, setShowForm] = useState<boolean>(true);
@@ -157,6 +174,7 @@ export function BackupRestoreWebview() {
           setPath('');
           setRolesOptions('noRestore');
           setUsersOptions('noRestore');
+          setOverwriteAlias(false);
           setWaitForCompletion(false);
           setShowAdvancedConfig(false);
           break;
@@ -251,6 +269,9 @@ export function BackupRestoreWebview() {
     if (usersOptions && usersOptions !== 'noRestore') {
       restoreData.usersOptions = usersOptions;
     }
+    if (overwriteAlias) {
+      restoreData.overwriteAlias = true;
+    }
 
     if (vscode) {
       vscode.postMessage({
@@ -283,6 +304,7 @@ export function BackupRestoreWebview() {
     setPath('');
     setRolesOptions('noRestore');
     setUsersOptions('noRestore');
+    setOverwriteAlias(false);
     setWaitForCompletion(false);
     setShowAdvancedConfig(false);
   };
@@ -323,6 +345,10 @@ export function BackupRestoreWebview() {
                 <span className="detail-value">{backupDetails.duration}</span>
               </div>
             )}
+            <div className="detail-item">
+              <span className="detail-label">Size:</span>
+              <span className="detail-value">{formatSize(backupDetails.size)}</span>
+            </div>
             {backupDetails.path && (
               <div className="detail-item">
                 <span className="detail-label">Path:</span>
@@ -577,6 +603,21 @@ export function BackupRestoreWebview() {
                 </select>
                 <small className="form-hint">
                   Set if RBAC users will be restored. Default is "noRestore".
+                </small>
+              </div>
+
+              <div className="form-section">
+                <label className="form-label checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={overwriteAlias}
+                    onChange={(e) => setOverwriteAlias(e.target.checked)}
+                    disabled={isRestoring}
+                  />
+                  <span>Overwrite Alias on Conflict</span>
+                </label>
+                <small className="form-hint">
+                  If a collection alias already exists and conflicts with the backup, overwrite it.
                 </small>
               </div>
             </div>

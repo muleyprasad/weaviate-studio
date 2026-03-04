@@ -2744,6 +2744,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             }
           }
 
+          // Add size if available
+          const sizeText = this.formatSize(backup.size);
+          if (sizeText) {
+            descriptionText += descriptionText ? ` · ${sizeText}` : sizeText;
+          }
+
           // Set contextValue based on backup status
           const contextValueMap: Record<string, string> = {
             SUCCESS: 'weaviateBackupSuccess',
@@ -2932,6 +2938,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
             undefined,
             'duration',
             new vscode.ThemeIcon('watch')
+          )
+        );
+      }
+
+      // Size (if available)
+      const sizeText = this.formatSize(backup.size);
+      if (sizeText) {
+        backupDetailItems.push(
+          new WeaviateTreeItem(
+            `Size: ${sizeText}`,
+            vscode.TreeItemCollapsibleState.None,
+            'object',
+            element.connectionId,
+            undefined,
+            'size',
+            new vscode.ThemeIcon('database')
           )
         );
       }
@@ -4418,6 +4440,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     } catch (error) {
       return null;
     }
+  }
+
+  private formatSize(gibs?: number): string {
+    if (gibs === null || gibs === undefined) {
+      return '';
+    }
+    if (gibs === 0) {
+      return '0 B';
+    }
+    const bytes = gibs * 1024 * 1024 * 1024; // API returns size in GiB
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, i);
+    return `${value % 1 === 0 ? value : value.toFixed(1)} ${units[i]}`;
   }
 
   async flattenObject(
