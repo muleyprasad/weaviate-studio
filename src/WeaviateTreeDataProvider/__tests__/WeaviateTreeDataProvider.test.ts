@@ -1024,6 +1024,254 @@ describe('WeaviateTreeDataProvider', () => {
     });
   });
 
+  describe('Read-Only Mode', () => {
+    describe('context values', () => {
+      it('sets weaviateConnectionReadOnly for disconnected readOnly connection', async () => {
+        (provider as any).connections = [
+          {
+            id: '3',
+            name: 'ReadOnlyConn',
+            url: 'http://c',
+            status: 'disconnected',
+            lastUsed: 3,
+            readOnly: true,
+          },
+        ];
+
+        const children = await provider.getChildren();
+        const item: any = children.find((c: any) => c.label.endsWith('ReadOnlyConn'));
+        expect(item).toBeDefined();
+        expect(item.contextValue).toBe('weaviateConnectionReadOnly');
+      });
+
+      it('sets weaviateConnectionActiveReadOnly for connected readOnly connection', async () => {
+        (provider as any).connections = [
+          {
+            id: '4',
+            name: 'ReadOnlyActive',
+            url: 'http://d',
+            status: 'connected',
+            lastUsed: 4,
+            readOnly: true,
+          },
+        ];
+
+        const children = await provider.getChildren();
+        const item: any = children.find((c: any) => c.label.endsWith('ReadOnlyActive'));
+        expect(item).toBeDefined();
+        expect(item.contextValue).toBe('weaviateConnectionActiveReadOnly');
+      });
+
+      it('sets description to READONLY when connection is readOnly', async () => {
+        (provider as any).connections = [
+          {
+            id: '3',
+            name: 'ReadOnlyConn',
+            url: 'http://c',
+            status: 'disconnected',
+            lastUsed: 3,
+            readOnly: true,
+          },
+        ];
+
+        const children = await provider.getChildren();
+        const item: any = children.find((c: any) => c.label.endsWith('ReadOnlyConn'));
+        expect(item).toBeDefined();
+        expect(item.description).toBe('READONLY');
+      });
+
+      it('does not set READONLY description for non-readOnly connections', async () => {
+        const children = await provider.getChildren();
+        const item: any = children.find((c: any) => c.label.endsWith('Local'));
+        expect(item).toBeDefined();
+        expect(item.description).toBeFalsy();
+      });
+    });
+
+    describe('deleteCollection readOnly guard', () => {
+      let readOnlyProvider: WeaviateTreeDataProvider;
+
+      beforeEach(() => {
+        const mockCtx = {
+          globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+          subscriptions: [],
+        } as unknown as vscode.ExtensionContext;
+        readOnlyProvider = new WeaviateTreeDataProvider(mockCtx);
+      });
+
+      it('throws error and does not call client when connection is readOnly', async () => {
+        const mockClient = { collections: { delete: jest.fn() } };
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: true }),
+          getClient: jest.fn().mockReturnValue(mockClient),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(readOnlyProvider.deleteCollection('1', 'MyCollection')).rejects.toThrow(
+          'Failed to delete collection: Connection "Prod" is in read-only mode'
+        );
+
+        expect(mockClient.collections.delete).not.toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('deleteAllCollections readOnly guard', () => {
+      let readOnlyProvider: WeaviateTreeDataProvider;
+
+      beforeEach(() => {
+        const mockCtx = {
+          globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+          subscriptions: [],
+        } as unknown as vscode.ExtensionContext;
+        readOnlyProvider = new WeaviateTreeDataProvider(mockCtx);
+      });
+
+      it('throws error and does not call client when connection is readOnly', async () => {
+        const mockClient = { collections: { deleteAll: jest.fn() } };
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: true }),
+          getClient: jest.fn().mockReturnValue(mockClient),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        await expect(readOnlyProvider.deleteAllCollections('1')).rejects.toThrow(
+          'Failed to delete all collections: Connection "Prod" is in read-only mode'
+        );
+
+        expect(mockClient.collections.deleteAll).not.toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('createCollection readOnly guard', () => {
+      let readOnlyProvider: WeaviateTreeDataProvider;
+
+      beforeEach(() => {
+        const mockCtx = {
+          globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+          subscriptions: [],
+        } as unknown as vscode.ExtensionContext;
+        readOnlyProvider = new WeaviateTreeDataProvider(mockCtx);
+      });
+
+      it('throws error and does not call REST API when connection is readOnly', async () => {
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: true }),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+
+        const mockFetch = jest.fn();
+        (global as any).fetch = mockFetch;
+
+        await expect(
+          (readOnlyProvider as any).createCollection('1', { class: 'MyCollection' })
+        ).rejects.toThrow('Connection "Prod" is in read-only mode');
+
+        expect(mockFetch).not.toHaveBeenCalled();
+        delete (global as any).fetch;
+      });
+
+      it('proceeds normally when connection is not readOnly', async () => {
+        const mockConnectionManager = {
+          getConnection: jest.fn().mockReturnValue({ id: '1', name: 'Prod', readOnly: false }),
+        };
+        (readOnlyProvider as any).connectionManager = mockConnectionManager;
+        (readOnlyProvider as any).getWeaviateBaseUrl = jest
+          .fn()
+          .mockReturnValue('http://localhost:8080');
+        (readOnlyProvider as any).getWeaviateHeaders = jest.fn().mockReturnValue({});
+
+        const mockFetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: jest.fn().mockResolvedValue({}),
+        } as any);
+        (global as any).fetch = mockFetch;
+
+        await expect(
+          (readOnlyProvider as any).createCollection('1', { class: 'MyCollection' })
+        ).resolves.not.toThrow();
+
+        expect(mockFetch).toHaveBeenCalled();
+        delete (global as any).fetch;
+      });
+    });
+
+    describe('toggleConnectionReadOnly', () => {
+      let toggleProvider: WeaviateTreeDataProvider;
+
+      beforeEach(() => {
+        const mockCtx = {
+          globalState: { get: jest.fn().mockReturnValue([]), update: jest.fn() },
+          subscriptions: [],
+        } as unknown as vscode.ExtensionContext;
+        toggleProvider = new WeaviateTreeDataProvider(mockCtx);
+      });
+
+      it('toggles readOnly from false to true', async () => {
+        const mockUpdateConnection = jest.fn().mockResolvedValue(undefined);
+        (toggleProvider as any).connectionManager = { updateConnection: mockUpdateConnection };
+        (toggleProvider as any).connections = [
+          { id: '1', name: 'Local', url: 'http://a', status: 'disconnected', readOnly: false },
+        ];
+
+        const refreshSpy = jest.spyOn(toggleProvider, 'refresh').mockImplementation(() => {});
+
+        await toggleProvider.toggleConnectionReadOnly('1');
+
+        expect(mockUpdateConnection).toHaveBeenCalledWith('1', { readOnly: true });
+        expect((toggleProvider as any).connections[0].readOnly).toBe(true);
+        expect(refreshSpy).toHaveBeenCalled();
+        refreshSpy.mockRestore();
+      });
+
+      it('toggles readOnly from true to false', async () => {
+        const mockUpdateConnection = jest.fn().mockResolvedValue(undefined);
+        (toggleProvider as any).connectionManager = { updateConnection: mockUpdateConnection };
+        (toggleProvider as any).connections = [
+          { id: '1', name: 'Local', url: 'http://a', status: 'disconnected', readOnly: true },
+        ];
+
+        const refreshSpy = jest.spyOn(toggleProvider, 'refresh').mockImplementation(() => {});
+
+        await toggleProvider.toggleConnectionReadOnly('1');
+
+        expect(mockUpdateConnection).toHaveBeenCalledWith('1', { readOnly: false });
+        expect((toggleProvider as any).connections[0].readOnly).toBe(false);
+        expect(refreshSpy).toHaveBeenCalled();
+        refreshSpy.mockRestore();
+      });
+
+      it('treats undefined readOnly as false when toggling (sets to true)', async () => {
+        const mockUpdateConnection = jest.fn().mockResolvedValue(undefined);
+        (toggleProvider as any).connectionManager = { updateConnection: mockUpdateConnection };
+        (toggleProvider as any).connections = [
+          { id: '1', name: 'Local', url: 'http://a', status: 'disconnected' }, // no readOnly field
+        ];
+
+        const refreshSpy = jest.spyOn(toggleProvider, 'refresh').mockImplementation(() => {});
+
+        await toggleProvider.toggleConnectionReadOnly('1');
+
+        expect(mockUpdateConnection).toHaveBeenCalledWith('1', { readOnly: true });
+        refreshSpy.mockRestore();
+      });
+
+      it('throws error when connection not found', async () => {
+        (toggleProvider as any).connectionManager = { updateConnection: jest.fn() };
+        (toggleProvider as any).connections = [];
+
+        await expect(toggleProvider.toggleConnectionReadOnly('nonexistent')).rejects.toThrow(
+          'Connection not found'
+        );
+      });
+    });
+  });
+
   describe('Object TTL', () => {
     const connectionId = '2';
     const collectionName = 'TestTTLCollection';

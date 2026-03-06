@@ -346,6 +346,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
         const client = connectionManager.getClient(item.connectionId);
@@ -378,6 +387,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing connection or role information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -435,6 +453,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection or role information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       const roleName = item.itemId;
       const confirmation = await vscode.window.showWarningMessage(
@@ -469,6 +496,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -517,6 +553,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection or user information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
         const client = connectionManager.getClient(item.connectionId);
@@ -564,6 +609,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection or user information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       const userId = item.itemId;
       const confirmation = await vscode.window.showWarningMessage(
@@ -607,6 +661,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection or user information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -637,6 +700,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection or user information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -666,6 +738,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing connection or user information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
 
       const userId = item.itemId;
@@ -713,6 +794,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
         const client = connectionManager.getClient(item.connectionId);
@@ -752,6 +842,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing connection or group information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -798,6 +897,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing connection or group information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
       const groupId = item.itemId;
       const confirmation = await vscode.window.showWarningMessage(
@@ -1270,6 +1378,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
 
+    // Toggle read-only mode for a connection
+    vscode.commands.registerCommand(
+      'weaviate.toggleConnectionReadOnly',
+      async (item: { connectionId: string }) => {
+        if (!item?.connectionId) {
+          return;
+        }
+        try {
+          await weaviateTreeDataProvider.toggleConnectionReadOnly(item.connectionId);
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            error instanceof Error ? error.message : 'Failed to toggle read-only mode'
+          );
+        }
+      }
+    ),
+
     vscode.commands.registerCommand('weaviate.viewDetailedSchema', (item: any) => {
       weaviateTreeDataProvider.handleViewDetailedSchema(item);
     }),
@@ -1358,6 +1483,15 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.window.showErrorMessage('Missing connection ID or collection name');
           return;
         }
+        {
+          const conn = weaviateTreeDataProvider
+            .getConnectionManager()
+            .getConnection(item.connectionId);
+          if (conn?.readOnly === true) {
+            vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+            return;
+          }
+        }
 
         const confirm = await vscode.window.showWarningMessage(
           `Are you sure you want to delete the collection "${item.collectionName}"? This action cannot be undone.`,
@@ -1389,6 +1523,15 @@ export function activate(context: vscode.ExtensionContext) {
         if (!item?.connectionId) {
           vscode.window.showErrorMessage('Missing connection ID');
           return;
+        }
+        {
+          const conn = weaviateTreeDataProvider
+            .getConnectionManager()
+            .getConnection(item.connectionId);
+          if (conn?.readOnly === true) {
+            vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+            return;
+          }
         }
 
         const confirm = await vscode.window.showWarningMessage(
@@ -1577,6 +1720,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
 
       try {
@@ -1925,6 +2077,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       try {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
@@ -1967,6 +2128,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing alias information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
 
       try {
@@ -2022,6 +2192,15 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('Missing alias information');
         return;
       }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
 
       try {
         const confirmation = await vscode.window.showWarningMessage(
@@ -2060,6 +2239,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId || !item?.itemId) {
         vscode.window.showErrorMessage('Missing connection or backup information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
 
       try {
@@ -2258,6 +2446,15 @@ export function activate(context: vscode.ExtensionContext) {
       if (!item?.connectionId) {
         vscode.window.showErrorMessage('Missing connection information');
         return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
       }
 
       try {

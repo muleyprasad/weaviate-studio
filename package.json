@@ -132,6 +132,10 @@
         "title": "Delete Connection"
       },
       {
+        "command": "weaviate.toggleConnectionReadOnly",
+        "title": "Toggle Read-Only Mode"
+      },
+      {
         "command": "weaviate.addCollection",
         "title": "Weaviate: Add Collection",
         "category": "Weaviate",
@@ -514,6 +518,26 @@
           "command": "weaviate.deleteConnection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
           "group": "2_management@2"
+        },
+        {
+          "command": "weaviate.toggleConnectionReadOnly",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnection",
+          "group": "2_management@3"
+        },
+        {
+          "command": "weaviate.toggleConnectionReadOnly",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
+          "group": "2_management@3"
+        },
+        {
+          "command": "weaviate.toggleConnectionReadOnly",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionReadOnly",
+          "group": "2_management@3"
+        },
+        {
+          "command": "weaviate.toggleConnectionReadOnly",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActiveReadOnly",
+          "group": "2_management@3"
         },
         {
           "command": "weaviate.viewDetailedSchema",
