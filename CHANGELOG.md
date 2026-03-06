@@ -5,6 +5,25 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added - RAG Chat
+
+- **RAG Chat Panel** — Ask natural-language questions about your Weaviate data directly in VS Code
+
+  - Chat-style UI with question/answer bubbles and collapsible "Retrieved Context" section
+  - Multi-collection support via pill-based selector — add or remove collections, query across multiple collections in parallel
+  - Only RAG-capable collections (those with a generative module such as `generative-openai`, `generative-cohere`, etc.) are listed; collections without generative config are filtered out
+  - Right-click a collection in the sidebar → **"Open RAG Chat"** to open the panel with that collection pre-selected
+  - If the RAG Chat panel is already open, right-clicking another collection adds it as a new pill without clearing the existing selection
+  - Uses Weaviate's server-side generative config — no additional LLM API keys required in the extension
+  - Retrieved context objects display first 3 text properties, UUID, and distance/certainty scores
+  - Loading spinner, error states, and empty state messaging consistent with the rest of the extension
+  - Clear chat button to reset conversation history and collection selection
+  - Enter to send, Shift+Enter for newline
+  - New command: `weaviate.openRagChat` with `$(comment-discussion)` icon on collection tree items
+  - Inline icon and context menu entry on collection items (alongside Data Explorer and Query Editor)
+
 ## [1.4.0] - 2026-02-18
 
 ### Added - Data Explorer

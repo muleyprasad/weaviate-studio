@@ -87,7 +87,12 @@ src/
 ├── types/                        # TypeScript definitions
 ├── views/                        # Custom views (including AddCollectionPanel)
 ├── query-editor/                 # GraphQL editor components
-└── webview/                      # React-based UI and components
+├── data-explorer/                # Data Explorer panel, API, and React webview
+├── rag-chat/                     # RAG Chat panel, API, and React webview
+│   ├── extension/                #   RagChatPanel.ts, RagChatAPI.ts
+│   ├── webview/                  #   RagChat.tsx, RagChat.css, index.tsx, rag-chat.html
+│   └── types/                    #   TypeScript interfaces for messages and state
+└── webview/                      # Shared React-based UI and components
 ```
 
 ## Working with Dependencies
