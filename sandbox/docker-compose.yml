@@ -19,11 +19,8 @@ services:
       AUTHORIZATION_ADMINLIST_USERS: 'test-key-123'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
       DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
-      ENABLE_MODULES: 'text2vec-transformers,backup-filesystem,generative-openai'
+      ENABLE_MODULES: 'text2vec-transformers,backup-filesystem'
       TRANSFORMERS_INFERENCE_API: 'http://text2vec-transformers:8080'
-      # OpenAI API key for generative RAG queries
-      # Set your key here or pass via environment variable
-      GENERATIVE_OPENAI_APIKEY: '${OPENAI_API_KEY:-}'
       CLUSTER_HOSTNAME: 'node1'
       # Backup filesystem configuration
       BACKUP_FILESYSTEM_PATH: '/var/lib/weaviate/backups'
