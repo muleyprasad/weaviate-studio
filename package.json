@@ -291,6 +291,12 @@
         "title": "View Cluster Information",
         "category": "Weaviate",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "weaviate.openRagChat",
+        "title": "Open RAG Chat",
+        "category": "Weaviate",
+        "icon": "$(comment-discussion)"
       }
     ],
     "languages": [
@@ -627,6 +633,17 @@
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
           "group": "inline@2",
           "icon": "$(telescope)"
+        },
+        {
+          "command": "weaviate.openRagChat",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@4"
+        },
+        {
+          "command": "weaviate.openRagChat",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "inline@3",
+          "icon": "$(comment-discussion)"
         },
         {
           "command": "weaviate.addCollection",

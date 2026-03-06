@@ -1,0 +1,380 @@
+/**
+ * RagChatPanel - Main webview panel controller for RAG Chat
+ * Manages the VS Code webview panel lifecycle and message passing
+ */
+
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import type { WeaviateClient } from 'weaviate-client';
+import { RagChatAPI } from './RagChatAPI';
+import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
+
+/**
+ * Manages the RAG Chat webview panel
+ */
+export class RagChatPanel {
+  public static currentPanel: RagChatPanel | undefined;
+  private static panels: Map<string, RagChatPanel> = new Map();
+
+  private readonly _panel: vscode.WebviewPanel;
+  private readonly _extensionUri: vscode.Uri;
+  private readonly _connectionId: string;
+  private _api: RagChatAPI | undefined;
+  private _disposables: vscode.Disposable[] = [];
+
+  private constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    connectionId: string,
+    private readonly getClient: () => WeaviateClient | undefined
+  ) {
+    this._panel = panel;
+    this._extensionUri = extensionUri;
+    this._connectionId = connectionId;
+
+    // Initialize API with client
+    const client = this.getClient();
+    if (client) {
+      this._api = new RagChatAPI(client);
+    }
+
+    // Set the webview's initial HTML content
+    this._update();
+
+    // Listen for when the panel is disposed
+    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    // Handle messages from the webview
+    this._panel.webview.onDidReceiveMessage(
+      async (message: RagChatWebviewMessage) => {
+        await this._handleMessage(message);
+      },
+      null,
+      this._disposables
+    );
+
+    // Update API when panel becomes active
+    this._panel.onDidChangeViewState(
+      () => {
+        if (this._panel.visible) {
+          const client = this.getClient();
+          if (client && !this._api) {
+            this._api = new RagChatAPI(client);
+          }
+        }
+      },
+      null,
+      this._disposables
+    );
+  }
+
+  /**
+   * Creates or shows the RAG Chat panel for a connection
+   */
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    connectionId: string,
+    getClient: () => WeaviateClient | undefined
+  ): RagChatPanel {
+    const panelKey = connectionId;
+    const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+
+    // Check if panel already exists for this connection
+    const existingPanel = RagChatPanel.panels.get(panelKey);
+    if (existingPanel) {
+      existingPanel._panel.reveal(column);
+      return existingPanel;
+    }
+
+    // Create new panel
+    const panel = vscode.window.createWebviewPanel('weaviateRagChat', 'RAG Chat', column, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(extensionUri, 'dist'),
+        vscode.Uri.joinPath(extensionUri, 'out'),
+      ],
+    });
+
+    const ragChatPanel = new RagChatPanel(panel, extensionUri, connectionId, getClient);
+
+    RagChatPanel.panels.set(panelKey, ragChatPanel);
+    RagChatPanel.currentPanel = ragChatPanel;
+
+    return ragChatPanel;
+  }
+
+  /**
+   * Sends a message to the webview
+   */
+  public postMessage(message: RagChatExtensionMessage): void {
+    this._panel.webview.postMessage(message);
+  }
+
+  /**
+   * Disposes the panel
+   */
+  public dispose(): void {
+    const panelKey = this._connectionId;
+    RagChatPanel.panels.delete(panelKey);
+
+    if (RagChatPanel.currentPanel === this) {
+      RagChatPanel.currentPanel = undefined;
+    }
+
+    this._panel.dispose();
+
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
+    }
+  }
+
+  /**
+   * Gets the connection ID for this panel
+   */
+  public getConnectionId(): string {
+    return this._connectionId;
+  }
+
+  /**
+   * Closes all panels for a specific connection
+   */
+  public static closeForConnection(connectionId: string): void {
+    const panel = RagChatPanel.panels.get(connectionId);
+    if (panel) {
+      panel.dispose();
+    }
+  }
+
+  /**
+   * Handles messages from the webview
+   */
+  private async _handleMessage(message: RagChatWebviewMessage): Promise<void> {
+    // Ensure API is available
+    if (!this._api) {
+      const client = this.getClient();
+      if (client) {
+        this._api = new RagChatAPI(client);
+      } else {
+        this.postMessage({
+          command: 'ragError',
+          error: 'Not connected to Weaviate. Please check your connection.',
+          requestId: message.requestId,
+        });
+        return;
+      }
+    }
+
+    try {
+      switch (message.command) {
+        case 'initialize':
+          await this._handleInitialize();
+          break;
+
+        case 'getCollections':
+          await this._handleGetCollections(message.requestId);
+          break;
+
+        case 'executeRagQuery':
+          await this._handleExecuteRagQuery(message);
+          break;
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('RagChatPanel error:', error);
+      this.postMessage({
+        command: 'ragError',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Handles initialization - sends collections list to webview
+   */
+  private async _handleInitialize(): Promise<void> {
+    try {
+      const collections = await this._api!.getCollections();
+      this.postMessage({
+        command: 'init',
+        collectionNames: collections,
+      });
+    } catch (error) {
+      console.error('RagChatPanel: Failed to load collections:', error);
+      this.postMessage({
+        command: 'init',
+        collectionNames: [],
+        error: error instanceof Error ? error.message : 'Failed to load collections',
+      });
+    }
+  }
+
+  /**
+   * Handles getCollections request
+   */
+  private async _handleGetCollections(requestId?: string): Promise<void> {
+    const collections = await this._api!.getCollections();
+    this.postMessage({
+      command: 'collectionsLoaded',
+      collectionNames: collections,
+      requestId,
+    });
+  }
+
+  /**
+   * Handles executeRagQuery request
+   */
+  private async _handleExecuteRagQuery(message: RagChatWebviewMessage): Promise<void> {
+    const collectionName = message.collectionNames?.[0];
+    if (!collectionName) {
+      this.postMessage({
+        command: 'ragError',
+        error: 'No collection selected',
+        requestId: message.requestId,
+      });
+      return;
+    }
+
+    if (!message.question?.trim()) {
+      this.postMessage({
+        command: 'ragError',
+        error: 'Question cannot be empty',
+        requestId: message.requestId,
+      });
+      return;
+    }
+
+    try {
+      const result = await this._api!.executeRagQuery({
+        collectionName,
+        question: message.question,
+        limit: message.limit,
+      });
+
+      this.postMessage({
+        command: 'ragResponse',
+        answer: result.answer,
+        contextObjects: result.contextObjects,
+        question: message.question,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'RAG query failed';
+      this.postMessage({
+        command: 'ragError',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Updates the webview HTML content
+   */
+  private _update(): void {
+    const webview = this._panel.webview;
+    this._panel.webview.html = this._getHtmlForWebview(webview);
+  }
+
+  /**
+   * Generates the HTML content for the webview
+   */
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const distPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview');
+    const htmlPath = path.join(distPath.fsPath, 'rag-chat.html');
+
+    let html: string;
+    try {
+      html = fs.readFileSync(htmlPath, 'utf8');
+    } catch {
+      // Fallback HTML if bundle is not built
+      return `<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>RAG Chat</title>
+          <style>
+            body {
+              font-family: var(--vscode-font-family);
+              background-color: var(--vscode-editor-background);
+              color: var(--vscode-editor-foreground);
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+            }
+            .error-container {
+              text-align: center;
+              max-width: 500px;
+            }
+            h1 { color: var(--vscode-errorForeground); }
+            p { color: var(--vscode-descriptionForeground); }
+            code {
+              background-color: var(--vscode-textCodeBlock-background);
+              padding: 2px 6px;
+              border-radius: 3px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1>RAG Chat Not Built</h1>
+            <p>The RAG Chat webview bundle has not been built yet.</p>
+            <p>Please run: <code>npm run build:webview</code></p>
+          </div>
+        </body>
+        </html>`;
+    }
+
+    // Replace asset paths with webview URIs
+    html = html.replace(/(src|href)="([^"]+)"/g, (match, attr, assetPath) => {
+      if (assetPath.startsWith('http') || assetPath.startsWith('//')) {
+        return match;
+      }
+      const assetUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, assetPath));
+      return `${attr}="${assetUri}"`;
+    });
+
+    // Add CSP
+    const cspSource = webview.cspSource;
+    html = html.replace(
+      '<head>',
+      `<head>
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}' ${cspSource}; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
+    );
+
+    // Replace nonce placeholder
+    const nonce = this._getNonce();
+    html = html.replace(/{{nonce}}/g, nonce);
+
+    // Inject initial data
+    const initScript = `
+      <script nonce="${nonce}">
+        window.initialData = ${JSON.stringify({
+          connectionId: this._connectionId,
+          collectionNames: [],
+        })};
+      </script>
+    `;
+    html = html.replace('</head>', `${initScript}</head>`);
+
+    return html;
+  }
+
+  /**
+   * Generates a cryptographically secure nonce for CSP
+   */
+  private _getNonce(): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(16).toString('base64');
+  }
+}

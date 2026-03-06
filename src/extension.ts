@@ -8,6 +8,7 @@ import { BackupPanel } from './views/BackupPanel';
 import { BackupRestorePanel } from './views/BackupRestorePanel';
 import { ClusterPanel } from './views/ClusterPanel';
 import { DataExplorerPanel } from './data-explorer/extension/DataExplorerPanel';
+import { RagChatPanel } from './rag-chat/extension/RagChatPanel';
 import { AliasPanel } from './views/AliasPanel';
 import { RbacRolePanel } from './views/RbacRolePanel';
 import { RbacUserPanel } from './views/RbacUserPanel';
@@ -1343,6 +1344,25 @@ export function activate(context: vscode.ExtensionContext) {
       const getClient = () => connectionManager.getClient(connectionId);
 
       DataExplorerPanel.createOrShow(context.extensionUri, connectionId, collectionName, getClient);
+    }),
+
+    // Open RAG Chat command
+    vscode.commands.registerCommand('weaviate.openRagChat', (arg1: any) => {
+      let connectionId: string;
+
+      if (typeof arg1 === 'string') {
+        connectionId = arg1;
+      } else if (arg1?.connectionId) {
+        connectionId = arg1.connectionId;
+      } else {
+        console.error('Invalid arguments for weaviate.openRagChat:', arg1);
+        return;
+      }
+
+      const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+      const getClient = () => connectionManager.getClient(connectionId);
+
+      RagChatPanel.createOrShow(context.extensionUri, connectionId, getClient);
     }),
 
     // Refresh the tree view
