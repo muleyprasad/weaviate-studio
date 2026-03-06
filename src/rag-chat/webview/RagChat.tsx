@@ -392,6 +392,14 @@ export function RagChat() {
     [handleSubmit]
   );
 
+  const handleClearChat = useCallback(() => {
+    setHistory([]);
+    setQuestion('');
+    setSelectedCollections(
+      initialData?.initialCollectionName ? [initialData.initialCollectionName] : []
+    );
+  }, []);
+
   const connectionId = initialData?.connectionId ?? '';
   const canSubmit = question.trim().length > 0 && selectedCollections.length > 0 && !loading;
 
@@ -399,8 +407,21 @@ export function RagChat() {
     <div className="rag-chat">
       {/* Header */}
       <header className="rag-chat-header">
-        <h1 className="rag-chat-title">RAG Chat</h1>
-        {connectionId && <span className="rag-chat-subtitle">Connected to {connectionId}</span>}
+        <div className="rag-header-left">
+          <h1 className="rag-chat-title">RAG Chat</h1>
+          {connectionId && <span className="rag-chat-subtitle">Connected to {connectionId}</span>}
+        </div>
+        {history.length > 0 && (
+          <button
+            type="button"
+            className="rag-clear-btn"
+            onClick={handleClearChat}
+            title="Clear chat"
+            aria-label="Clear chat"
+          >
+            Clear
+          </button>
+        )}
       </header>
 
       {/* Chat history area */}

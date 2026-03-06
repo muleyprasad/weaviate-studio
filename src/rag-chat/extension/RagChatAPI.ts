@@ -139,9 +139,10 @@ export class RagChatAPI {
   }
 
   /**
-   * Gets all available collection names from the Weaviate instance.
+   * Gets all collection names that support RAG (generative search) from the Weaviate instance.
+   * Only returns collections that have a generative module configured.
    *
-   * @returns Sorted array of collection name strings
+   * @returns Sorted array of collection name strings that support RAG
    */
   async getCollections(): Promise<string[]> {
     try {
@@ -150,7 +151,12 @@ export class RagChatAPI {
         this.REQUEST_TIMEOUT
       );
 
-      const names = collections.map((col: { name: string }) => col.name);
+      const names = collections
+        .filter((col) => {
+          const generative = col.generative;
+          return generative?.name && generative.name !== 'none';
+        })
+        .map((col) => col.name);
 
       return names.sort();
     } catch (error) {

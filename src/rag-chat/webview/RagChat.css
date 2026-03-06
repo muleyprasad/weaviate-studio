@@ -25,6 +25,34 @@
   flex-shrink: 0;
 }
 
+.rag-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rag-clear-btn {
+  background-color: transparent;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #ccc));
+  border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-panel-border, #444));
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rag-clear-btn:hover {
+  background-color: var(
+    --vscode-button-secondaryHoverBackground,
+    rgba(255, 255, 255, 0.1)
+  ) !important;
+  border-color: var(--vscode-focusBorder, #0e639c) !important;
+}
+
 .rag-chat-title {
   margin: 0;
   font-size: 16px;
@@ -109,13 +137,13 @@
 }
 
 .rag-bubble-user .rag-bubble-content {
-  background-color: var(--vscode-button-background, #0E639C);
+  background-color: var(--vscode-button-background, #0e639c);
   color: var(--vscode-button-foreground, white);
   border-radius: 12px 12px 2px 12px;
 }
 
 .rag-bubble-assistant .rag-bubble-content {
-  background-color: var(--vscode-input-background, #3C3C3C);
+  background-color: var(--vscode-input-background, #3c3c3c);
   color: var(--vscode-editor-foreground);
   border-radius: 2px 12px 12px 12px;
   border: 1px solid var(--vscode-panel-border, #333);
@@ -291,8 +319,8 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background-color: var(--vscode-badge-background, #4D4D4D);
-  color: var(--vscode-badge-foreground, #FFF);
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
@@ -311,7 +339,7 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--vscode-badge-foreground, #FFF);
+  color: var(--vscode-badge-foreground, #fff);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -354,9 +382,9 @@
 .rag-select {
   flex: 1;
   padding: 5px 8px;
-  background-color: var(--vscode-dropdown-background, var(--vscode-input-background, #3C3C3C));
-  color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground, #FFF));
-  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, #3C3C3C));
+  background-color: var(--vscode-dropdown-background, var(--vscode-input-background, #3c3c3c));
+  color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground, #fff));
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, #3c3c3c));
   border-radius: 4px;
   font-size: 13px;
   font-family: inherit;
@@ -365,13 +393,16 @@
 
 .rag-select:focus {
   outline: none;
-  border-color: var(--vscode-focusBorder, #0E639C);
+  border-color: var(--vscode-focusBorder, #0e639c);
 }
 
 .rag-add-btn {
-  background-color: var(--vscode-button-secondaryBackground, var(--vscode-input-background, #3C3C3C));
-  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #FFF));
-  border: 1px solid var(--vscode-button-border, var(--vscode-input-border, #3C3C3C));
+  background-color: var(
+    --vscode-button-secondaryBackground,
+    var(--vscode-input-background, #3c3c3c)
+  );
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #fff));
+  border: 1px solid var(--vscode-button-border, var(--vscode-input-border, #3c3c3c));
   border-radius: 4px;
   padding: 5px 10px;
   cursor: pointer;
@@ -382,7 +413,10 @@
 }
 
 .rag-add-btn:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground, #505050)) !important;
+  background-color: var(
+    --vscode-button-secondaryHoverBackground,
+    var(--vscode-list-hoverBackground, #505050)
+  ) !important;
 }
 
 .rag-chat-input-row {
@@ -394,9 +428,9 @@
 .rag-textarea {
   flex: 1;
   padding: 8px 12px;
-  background-color: var(--vscode-input-background, #3C3C3C);
-  color: var(--vscode-input-foreground, #FFF);
-  border: 1px solid var(--vscode-input-border, #3C3C3C);
+  background-color: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #fff);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
   border-radius: 6px;
   font-size: 13px;
   font-family: inherit;
@@ -410,7 +444,7 @@
 
 .rag-textarea:focus {
   outline: none;
-  border-color: var(--vscode-focusBorder, #0E639C);
+  border-color: var(--vscode-focusBorder, #0e639c);
 }
 
 .rag-textarea::placeholder {
@@ -423,7 +457,7 @@
 }
 
 .rag-submit-btn {
-  background-color: var(--vscode-button-background, #0E639C);
+  background-color: var(--vscode-button-background, #0e639c);
   color: var(--vscode-button-foreground, white);
   border: none;
   border-radius: 4px;
@@ -440,7 +474,7 @@
 }
 
 .rag-submit-btn:disabled {
-  background-color: var(--vscode-input-background, #2D2D2D);
+  background-color: var(--vscode-input-background, #2d2d2d);
   color: var(--vscode-disabledForeground, #888);
   cursor: not-allowed;
 }

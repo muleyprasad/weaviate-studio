@@ -1364,7 +1364,14 @@ export function activate(context: vscode.ExtensionContext) {
       const connectionManager = weaviateTreeDataProvider.getConnectionManager();
       const getClient = () => connectionManager.getClient(connectionId);
 
-      RagChatPanel.createOrShow(context.extensionUri, connectionId, getClient, collectionName);
+      // forceNew=true when opening from collection context menu to start fresh
+      RagChatPanel.createOrShow(
+        context.extensionUri,
+        connectionId,
+        getClient,
+        collectionName,
+        true
+      );
     }),
 
     // Refresh the tree view

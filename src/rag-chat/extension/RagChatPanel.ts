@@ -74,22 +74,24 @@ export class RagChatPanel {
 
   /**
    * Creates or shows the RAG Chat panel for a connection.
+   * If forceNew is true, disposes any existing panel and creates a new one.
    * If an initialCollectionName is provided it is pre-selected in the UI.
-   * When the panel already exists, the new collection is added to the
-   * selection via the 'addCollection' message so it appears as a pill.
+   * When the panel already exists (and forceNew is false), the new collection
+   * is added to the selection via the 'addCollection' message so it appears as a pill.
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
     connectionId: string,
     getClient: () => WeaviateClient | undefined,
-    initialCollectionName?: string
+    initialCollectionName?: string,
+    forceNew: boolean = false
   ): RagChatPanel {
     const panelKey = connectionId;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
 
     // Check if panel already exists for this connection
     const existingPanel = RagChatPanel.panels.get(panelKey);
-    if (existingPanel) {
+    if (existingPanel && !forceNew) {
       existingPanel._panel.reveal(column);
       // If opened from a specific collection, tell the webview to add it
       if (initialCollectionName) {
@@ -99,6 +101,11 @@ export class RagChatPanel {
         });
       }
       return existingPanel;
+    }
+
+    // Dispose existing panel if forceNew is requested
+    if (existingPanel) {
+      existingPanel.dispose();
     }
 
     // Create new panel
