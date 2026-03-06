@@ -1349,11 +1349,13 @@ export function activate(context: vscode.ExtensionContext) {
     // Open RAG Chat command
     vscode.commands.registerCommand('weaviate.openRagChat', (arg1: any) => {
       let connectionId: string;
+      let collectionName: string | undefined;
 
       if (typeof arg1 === 'string') {
         connectionId = arg1;
       } else if (arg1?.connectionId) {
         connectionId = arg1.connectionId;
+        collectionName = arg1.label || arg1.collectionName;
       } else {
         console.error('Invalid arguments for weaviate.openRagChat:', arg1);
         return;
@@ -1362,7 +1364,7 @@ export function activate(context: vscode.ExtensionContext) {
       const connectionManager = weaviateTreeDataProvider.getConnectionManager();
       const getClient = () => connectionManager.getClient(connectionId);
 
-      RagChatPanel.createOrShow(context.extensionUri, connectionId, getClient);
+      RagChatPanel.createOrShow(context.extensionUri, connectionId, getClient, collectionName);
     }),
 
     // Refresh the tree view

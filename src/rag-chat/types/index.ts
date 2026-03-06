@@ -81,7 +81,8 @@ export type RagChatExtensionMessageCommand =
   | 'init'
   | 'ragResponse'
   | 'ragError'
-  | 'collectionsLoaded';
+  | 'collectionsLoaded'
+  | 'addCollection';
 
 /**
  * Message sent from the extension to the webview

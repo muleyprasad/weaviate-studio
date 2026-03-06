@@ -20,6 +20,7 @@ export class RagChatPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private readonly _connectionId: string;
+  private _initialCollectionName: string | undefined;
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
 
@@ -27,11 +28,13 @@ export class RagChatPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     connectionId: string,
-    private readonly getClient: () => WeaviateClient | undefined
+    private readonly getClient: () => WeaviateClient | undefined,
+    initialCollectionName?: string
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._connectionId = connectionId;
+    this._initialCollectionName = initialCollectionName;
 
     // Initialize API with client
     const client = this.getClient();
@@ -70,12 +73,16 @@ export class RagChatPanel {
   }
 
   /**
-   * Creates or shows the RAG Chat panel for a connection
+   * Creates or shows the RAG Chat panel for a connection.
+   * If an initialCollectionName is provided it is pre-selected in the UI.
+   * When the panel already exists, the new collection is added to the
+   * selection via the 'addCollection' message so it appears as a pill.
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
     connectionId: string,
-    getClient: () => WeaviateClient | undefined
+    getClient: () => WeaviateClient | undefined,
+    initialCollectionName?: string
   ): RagChatPanel {
     const panelKey = connectionId;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -84,6 +91,13 @@ export class RagChatPanel {
     const existingPanel = RagChatPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
+      // If opened from a specific collection, tell the webview to add it
+      if (initialCollectionName) {
+        existingPanel.postMessage({
+          command: 'addCollection',
+          collectionNames: [initialCollectionName],
+        });
+      }
       return existingPanel;
     }
 
@@ -97,7 +111,13 @@ export class RagChatPanel {
       ],
     });
 
-    const ragChatPanel = new RagChatPanel(panel, extensionUri, connectionId, getClient);
+    const ragChatPanel = new RagChatPanel(
+      panel,
+      extensionUri,
+      connectionId,
+      getClient,
+      initialCollectionName
+    );
 
     RagChatPanel.panels.set(panelKey, ragChatPanel);
     RagChatPanel.currentPanel = ragChatPanel;
@@ -227,11 +247,12 @@ export class RagChatPanel {
   }
 
   /**
-   * Handles executeRagQuery request
+   * Handles executeRagQuery request — supports multiple collections.
+   * Runs a RAG query per collection in parallel and merges the results.
    */
   private async _handleExecuteRagQuery(message: RagChatWebviewMessage): Promise<void> {
-    const collectionName = message.collectionNames?.[0];
-    if (!collectionName) {
+    const collectionNames = message.collectionNames ?? [];
+    if (collectionNames.length === 0) {
       this.postMessage({
         command: 'ragError',
         error: 'No collection selected',
@@ -250,16 +271,28 @@ export class RagChatPanel {
     }
 
     try {
-      const result = await this._api!.executeRagQuery({
-        collectionName,
-        question: message.question,
-        limit: message.limit,
-      });
+      // Run RAG queries in parallel across all selected collections
+      const results = await Promise.all(
+        collectionNames.map((name) =>
+          this._api!.executeRagQuery({
+            collectionName: name,
+            question: message.question!,
+            limit: message.limit,
+          })
+        )
+      );
+
+      // Merge: concatenate context objects, combine answers
+      const allContextObjects = results.flatMap((r) => r.contextObjects);
+      const answer =
+        results.length === 1
+          ? results[0].answer
+          : results.map((r, i) => `**${collectionNames[i]}**:\n${r.answer}`).join('\n\n---\n\n');
 
       this.postMessage({
         command: 'ragResponse',
-        answer: result.answer,
-        contextObjects: result.contextObjects,
+        answer,
+        contextObjects: allContextObjects,
         question: message.question,
         requestId: message.requestId,
       });
@@ -356,12 +389,13 @@ export class RagChatPanel {
     const nonce = this._getNonce();
     html = html.replace(/{{nonce}}/g, nonce);
 
-    // Inject initial data
+    // Inject initial data — include initialCollectionName so the
+    // webview can pre-select the collection the user right-clicked on.
     const initScript = `
       <script nonce="${nonce}">
         window.initialData = ${JSON.stringify({
           connectionId: this._connectionId,
-          collectionNames: [],
+          initialCollectionName: this._initialCollectionName ?? null,
         })};
       </script>
     `;

@@ -1,7 +1,8 @@
 /**
  * RagChat - Root component for the RAG Chat webview
  * Provides a chat interface for asking questions about Weaviate collection data
- * using generative AI (Retrieval-Augmented Generation)
+ * using generative AI (Retrieval-Augmented Generation).
+ * Supports multi-collection selection via an add-and-pill UI.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -15,7 +16,7 @@ import type {
 // Initial data injected by the extension into window.initialData
 interface RagChatInitialData {
   connectionId: string;
-  collectionNames: string[];
+  initialCollectionName: string | null;
 }
 
 function getInitialData(): RagChatInitialData | undefined {
@@ -28,6 +29,8 @@ const vscodeApi = (window as any).acquireVsCodeApi();
 function generateRequestId(): string {
   return `rag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
+
+// ─── Sub-components ──────────────────────────────────────────────────
 
 /** Collapsible section for retrieved context objects */
 function ContextSection({ contextObjects }: { contextObjects: RagContextObject[] }) {
@@ -102,7 +105,18 @@ function ChatEntry({ entry }: { entry: RagChatHistoryEntry }) {
       {/* User question bubble */}
       <div className="rag-bubble rag-bubble-user">
         <div className="rag-bubble-label">You</div>
-        <div className="rag-bubble-content">{entry.query.question}</div>
+        <div className="rag-bubble-content">
+          {entry.query.question}
+          {entry.query.collectionNames.length > 0 && (
+            <div className="rag-bubble-collections">
+              {entry.query.collectionNames.map((name) => (
+                <span key={name} className="rag-collection-pill rag-collection-pill-small">
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Response area */}
@@ -130,12 +144,102 @@ function ChatEntry({ entry }: { entry: RagChatHistoryEntry }) {
   );
 }
 
+/** Multi-collection selector: dropdown to add + pill list of selected */
+function CollectionSelector({
+  allCollections,
+  selectedCollections,
+  onAdd,
+  onRemove,
+}: {
+  allCollections: string[];
+  selectedCollections: string[];
+  onAdd: (name: string) => void;
+  onRemove: (name: string) => void;
+}) {
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  // Collections available for adding (not yet selected)
+  const availableCollections = allCollections.filter((c) => !selectedCollections.includes(c));
+
+  const handleAdd = useCallback(() => {
+    const value = selectRef.current?.value;
+    if (value) {
+      onAdd(value);
+      // Reset dropdown to placeholder
+      if (selectRef.current) {
+        selectRef.current.value = '';
+      }
+    }
+  }, [onAdd]);
+
+  return (
+    <div className="rag-collection-selector">
+      <label className="rag-label" id="rag-collection-label">
+        Collections
+      </label>
+
+      {/* Selected collections as pills */}
+      {selectedCollections.length > 0 && (
+        <div className="rag-collection-pills" role="list" aria-label="Selected collections">
+          {selectedCollections.map((name) => (
+            <span key={name} className="rag-collection-pill" role="listitem">
+              {name}
+              <button
+                type="button"
+                className="rag-pill-remove"
+                onClick={() => onRemove(name)}
+                aria-label={`Remove ${name}`}
+                title={`Remove ${name}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Add collection dropdown */}
+      {availableCollections.length > 0 && (
+        <div className="rag-collection-add-row">
+          <select
+            ref={selectRef}
+            className="rag-select"
+            aria-labelledby="rag-collection-label"
+            defaultValue=""
+          >
+            <option value="" disabled>
+              {selectedCollections.length === 0
+                ? 'Select a collection…'
+                : 'Add another collection…'}
+            </option>
+            {availableCollections.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="rag-add-btn" onClick={handleAdd} title="Add collection">
+            Add
+          </button>
+        </div>
+      )}
+
+      {allCollections.length === 0 && (
+        <span className="rag-no-collections">No collections available</span>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────
+
 export function RagChat() {
   const initialData = getInitialData();
-  const [collections, setCollections] = useState<string[]>(initialData?.collectionNames ?? []);
-  const [selectedCollection, setSelectedCollection] = useState<string>(
-    initialData?.collectionNames?.[0] ?? ''
-  );
+  const [allCollections, setAllCollections] = useState<string[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>(() => {
+    const initial = initialData?.initialCollectionName;
+    return initial ? [initial] : [];
+  });
   const [question, setQuestion] = useState('');
   const [history, setHistory] = useState<RagChatHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -157,8 +261,36 @@ export function RagChat() {
         case 'init':
         case 'collectionsLoaded': {
           const names = msg.collectionNames ?? [];
-          setCollections(names);
-          setSelectedCollection((prev) => (names.includes(prev) ? prev : (names[0] ?? '')));
+          setAllCollections(names);
+          // If we had a pre-selected collection from initialData and it
+          // exists in the list, keep it. Otherwise keep whatever is valid.
+          setSelectedCollections((prev) => {
+            const valid = prev.filter((c) => names.includes(c));
+            if (valid.length > 0) {
+              return valid;
+            }
+            // Pre-select initialCollectionName if it's in the list
+            const initial = initialData?.initialCollectionName;
+            if (initial && names.includes(initial)) {
+              return [initial];
+            }
+            return [];
+          });
+          break;
+        }
+        case 'addCollection': {
+          // Extension is telling us to add a collection to the selection
+          // (e.g. user right-clicked a different collection while panel is open)
+          const toAdd = msg.collectionNames ?? [];
+          setSelectedCollections((prev) => {
+            const merged = [...prev];
+            for (const name of toAdd) {
+              if (!merged.includes(name)) {
+                merged.push(name);
+              }
+            }
+            return merged;
+          });
           break;
         }
         case 'ragResponse': {
@@ -209,9 +341,18 @@ export function RagChat() {
     textareaRef.current?.focus();
   }, []);
 
+  // Collection add/remove handlers
+  const handleAddCollection = useCallback((name: string) => {
+    setSelectedCollections((prev) => (prev.includes(name) ? prev : [...prev, name]));
+  }, []);
+
+  const handleRemoveCollection = useCallback((name: string) => {
+    setSelectedCollections((prev) => prev.filter((c) => c !== name));
+  }, []);
+
   const handleSubmit = useCallback(() => {
     const trimmed = question.trim();
-    if (!trimmed || !selectedCollection || loading) {
+    if (!trimmed || selectedCollections.length === 0 || loading) {
       return;
     }
 
@@ -220,7 +361,7 @@ export function RagChat() {
     const entry: RagChatHistoryEntry = {
       id: requestId,
       query: {
-        collectionNames: [selectedCollection],
+        collectionNames: [...selectedCollections],
         question: trimmed,
       },
       response: null,
@@ -235,11 +376,11 @@ export function RagChat() {
 
     vscodeApi.postMessage({
       command: 'executeRagQuery',
-      collectionNames: [selectedCollection],
+      collectionNames: [...selectedCollections],
       question: trimmed,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollection, loading]);
+  }, [question, selectedCollections, loading]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -252,7 +393,7 @@ export function RagChat() {
   );
 
   const connectionId = initialData?.connectionId ?? '';
-  const canSubmit = question.trim().length > 0 && selectedCollection && !loading;
+  const canSubmit = question.trim().length > 0 && selectedCollections.length > 0 && !loading;
 
   return (
     <div className="rag-chat">
@@ -267,7 +408,7 @@ export function RagChat() {
         {history.length === 0 && (
           <div className="rag-chat-empty">
             <p>Ask a question about your Weaviate collection data.</p>
-            <p>Select a collection below and type your question to get started.</p>
+            <p>Select one or more collections below and type your question to get started.</p>
           </div>
         )}
         {history.map((entry) => (
@@ -278,26 +419,12 @@ export function RagChat() {
 
       {/* Input area */}
       <footer className="rag-chat-input-area">
-        <div className="rag-chat-controls">
-          <label htmlFor="rag-collection-select" className="rag-label">
-            Collection
-          </label>
-          <select
-            id="rag-collection-select"
-            className="rag-select"
-            value={selectedCollection}
-            onChange={(e) => setSelectedCollection(e.target.value)}
-            aria-label="Select collection"
-            disabled={collections.length === 0}
-          >
-            {collections.length === 0 && <option value="">No collections available</option>}
-            {collections.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CollectionSelector
+          allCollections={allCollections}
+          selectedCollections={selectedCollections}
+          onAdd={handleAddCollection}
+          onRemove={handleRemoveCollection}
+        />
         <div className="rag-chat-input-row">
           <textarea
             ref={textareaRef}
