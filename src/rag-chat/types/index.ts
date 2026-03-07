@@ -35,6 +35,8 @@ export interface RagContextObject {
   distance?: number;
   /** Certainty score from vector search */
   certainty?: number;
+  /** Hybrid search score (BM25 + vector combined relevance) */
+  score?: number;
   /** Source collection name (for multi-collection RAG attribution) */
   collectionName?: string;
 }

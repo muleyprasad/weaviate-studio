@@ -9,6 +9,7 @@ import { BackupRestorePanel } from './views/BackupRestorePanel';
 import { ClusterPanel } from './views/ClusterPanel';
 import { DataExplorerPanel } from './data-explorer/extension/DataExplorerPanel';
 import { RagChatPanel } from './rag-chat/extension/RagChatPanel';
+import type { FilterCondition, FilterMatchMode } from './data-explorer/types';
 import { AliasPanel } from './views/AliasPanel';
 import { RbacRolePanel } from './views/RbacRolePanel';
 import { RbacUserPanel } from './views/RbacUserPanel';
@@ -21,6 +22,24 @@ import type {
   AliasCreateData,
   AliasUpdateData,
 } from './types';
+
+/** Typed arguments for the weaviate.openDataExplorer command */
+interface DataExplorerCommandArgs {
+  connectionId: string;
+  label?: string;
+  collectionName?: string;
+  targetUuid?: string;
+}
+
+/** Typed arguments for the weaviate.openRagChat command */
+interface RagChatCommandArgs {
+  connectionId: string;
+  label?: string;
+  collectionName?: string;
+  forceNew?: boolean;
+  inheritedFilters?: FilterCondition[];
+  inheritedFilterMatchMode?: FilterMatchMode;
+}
 
 /**
  * Handles opening of .weaviate files
@@ -1322,41 +1341,52 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     // Open Data Explorer for a collection
-    vscode.commands.registerCommand('weaviate.openDataExplorer', (arg1: any, arg2?: string) => {
-      // Handle both call signatures:
-      // 1. openDataExplorer(connectionId: string, collectionName: string)
-      // 2. openDataExplorer({ connectionId: string, label: string })
-      let connectionId: string;
-      let collectionName: string;
+    vscode.commands.registerCommand(
+      'weaviate.openDataExplorer',
+      (arg1: string | DataExplorerCommandArgs, arg2?: string) => {
+        // Handle both call signatures:
+        // 1. openDataExplorer(connectionId: string, collectionName: string)
+        // 2. openDataExplorer({ connectionId: string, label: string })
+        let connectionId: string;
+        let collectionName: string;
+        let targetUuid: string | undefined;
 
-      if (typeof arg1 === 'string' && arg2) {
-        connectionId = arg1;
-        collectionName = arg2;
-      } else if (arg1?.connectionId && (arg1.label || arg1.collectionName)) {
-        connectionId = arg1.connectionId;
-        collectionName = arg1.label || arg1.collectionName || '';
-      } else {
-        console.error('Invalid arguments for weaviate.openDataExplorer:', arg1, arg2);
-        return;
+        if (typeof arg1 === 'string' && arg2) {
+          connectionId = arg1;
+          collectionName = arg2;
+        } else if (
+          typeof arg1 === 'object' &&
+          arg1?.connectionId &&
+          (arg1.label || arg1.collectionName)
+        ) {
+          connectionId = arg1.connectionId;
+          collectionName = arg1.label || arg1.collectionName || '';
+          targetUuid = arg1.targetUuid;
+        } else {
+          console.error('Invalid arguments for weaviate.openDataExplorer:', arg1, arg2);
+          return;
+        }
+
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const getClient = () => connectionManager.getClient(connectionId);
+
+        DataExplorerPanel.createOrShow(
+          context.extensionUri,
+          connectionId,
+          collectionName,
+          getClient,
+          targetUuid
+        );
       }
-
-      const connectionManager = weaviateTreeDataProvider.getConnectionManager();
-      const getClient = () => connectionManager.getClient(connectionId);
-
-      DataExplorerPanel.createOrShow(
-        context.extensionUri,
-        connectionId,
-        collectionName,
-        getClient,
-        arg1?.targetUuid // deep-link to specific object if provided
-      );
-    }),
+    ),
 
     // Open RAG Chat command
-    vscode.commands.registerCommand('weaviate.openRagChat', (arg1: any) => {
+    vscode.commands.registerCommand('weaviate.openRagChat', (arg1: string | RagChatCommandArgs) => {
       let connectionId: string;
       let collectionName: string | undefined;
       let forceNew = true; // default true for context menu clicks
+      let inheritedFilters: FilterCondition[] | undefined;
+      let inheritedFilterMatchMode: FilterMatchMode | undefined;
 
       if (typeof arg1 === 'string') {
         connectionId = arg1;
@@ -1366,6 +1396,8 @@ export function activate(context: vscode.ExtensionContext) {
         if (arg1.forceNew !== undefined) {
           forceNew = arg1.forceNew;
         }
+        inheritedFilters = arg1.inheritedFilters;
+        inheritedFilterMatchMode = arg1.inheritedFilterMatchMode;
       } else {
         console.error('Invalid arguments for weaviate.openRagChat:', arg1);
         return;
@@ -1380,8 +1412,8 @@ export function activate(context: vscode.ExtensionContext) {
         getClient,
         collectionName,
         forceNew,
-        arg1?.inheritedFilters,
-        arg1?.inheritedFilterMatchMode
+        inheritedFilters,
+        inheritedFilterMatchMode
       );
     }),
 

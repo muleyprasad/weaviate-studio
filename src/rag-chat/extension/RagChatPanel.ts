@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
@@ -26,6 +27,7 @@ export class RagChatPanel {
   private _inheritedFilterMatchMode: FilterMatchMode | undefined;
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
+  private _currentRagRequestId: string | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -98,6 +100,9 @@ export class RagChatPanel {
     const existingPanel = RagChatPanel.panels.get(panelKey);
     if (existingPanel && !forceNew) {
       existingPanel._panel.reveal(column);
+      // Update inherited filters so queries use the latest filter context
+      existingPanel._inheritedFilters = inheritedFilters;
+      existingPanel._inheritedFilterMatchMode = inheritedFilterMatchMode;
       // If opened from a specific collection, tell the webview to add it
       if (initialCollectionName) {
         existingPanel.postMessage({
@@ -275,8 +280,9 @@ export class RagChatPanel {
 
   /**
    * Handles executeRagQuery request — supports multiple collections.
-   * Runs a RAG query per collection sequentially (collections may have
-   * different vectorizers) and merges the results with source attribution.
+   * Runs RAG queries in parallel via Promise.allSettled and merges
+   * the results with source attribution. Tracks the current requestId
+   * so stale responses from cancelled/cleared queries are ignored.
    */
   private async _handleExecuteRagQuery(message: RagChatWebviewMessage): Promise<void> {
     const collectionNames = message.collectionNames ?? [];
@@ -298,9 +304,30 @@ export class RagChatPanel {
       return;
     }
 
+    // Track current request so we can ignore stale responses
+    this._currentRagRequestId = message.requestId;
+
     try {
-      // Sequential retrieval: collections may use different vectorizers,
-      // so we query each one individually rather than via multi-target.
+      // Parallel retrieval using Promise.allSettled — each collection query
+      // is independent, so we can execute them concurrently for better latency.
+      const settled = await Promise.allSettled(
+        collectionNames.map(async (name) => {
+          const result = await this._api!.executeRagQuery({
+            collectionName: name,
+            question: message.question!,
+            limit: message.limit,
+            where: this._inheritedFilters,
+            matchMode: this._inheritedFilterMatchMode,
+          });
+          return { collectionName: name, ...result };
+        })
+      );
+
+      // If the user cleared chat or started a new query, ignore this response
+      if (this._currentRagRequestId !== message.requestId) {
+        return;
+      }
+
       const results: Array<{
         collectionName: string;
         answer: string;
@@ -309,31 +336,24 @@ export class RagChatPanel {
           properties: Record<string, unknown>;
           distance?: number;
           certainty?: number;
+          score?: number;
         }>;
-      }> = [];
-
-      for (const name of collectionNames) {
-        try {
-          const result = await this._api!.executeRagQuery({
-            collectionName: name,
-            question: message.question!,
-            limit: message.limit,
-            // Apply inherited filters from Data Explorer to narrow RAG retrieval context
-            where: this._inheritedFilters,
-            matchMode: this._inheritedFilterMatchMode,
-          });
-          results.push({ collectionName: name, ...result });
-        } catch (error) {
-          // Non-blocking: log the error and continue with other collections
-          const errMsg = error instanceof Error ? error.message : String(error);
-          console.warn(`RagChatPanel: Query failed for collection "${name}": ${errMsg}`);
-          results.push({
-            collectionName: name,
-            answer: `⚠️ Query failed for "${name}": ${errMsg}`,
-            contextObjects: [],
-          });
+      }> = settled.map((outcome, i) => {
+        if (outcome.status === 'fulfilled') {
+          return outcome.value;
         }
-      }
+        // Non-blocking: log the error and include a failure message
+        const errMsg =
+          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+        console.warn(
+          `RagChatPanel: Query failed for collection "${collectionNames[i]}": ${errMsg}`
+        );
+        return {
+          collectionName: collectionNames[i],
+          answer: `⚠️ Query failed for "${collectionNames[i]}": ${errMsg}`,
+          contextObjects: [],
+        };
+      });
 
       // Merge: stamp collectionName on each context object for source attribution
       const allContextObjects = results.flatMap((r) =>
@@ -354,12 +374,15 @@ export class RagChatPanel {
         requestId: message.requestId,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'RAG query failed';
-      this.postMessage({
-        command: 'ragError',
-        error: errorMessage,
-        requestId: message.requestId,
-      });
+      // Only send error if this is still the active request
+      if (this._currentRagRequestId === message.requestId) {
+        const errorMessage = error instanceof Error ? error.message : 'RAG query failed';
+        this.postMessage({
+          command: 'ragError',
+          error: errorMessage,
+          requestId: message.requestId,
+        });
+      }
     }
   }
 
@@ -442,9 +465,23 @@ export class RagChatPanel {
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}' ${cspSource}; script-src 'nonce-{{nonce}}' ${cspSource}; img-src ${cspSource} https: data:; font-src ${cspSource}; connect-src ${cspSource};">`
     );
 
-    // Replace nonce placeholder
+    // Replace nonce placeholder with validation
     const nonce = this._getNonce();
+    const noncePlaceholderCount = (html.match(/{{nonce}}/g) || []).length;
     html = html.replace(/{{nonce}}/g, nonce);
+
+    // Validate all placeholders were replaced
+    const remainingPlaceholders = (html.match(/{{nonce}}/g) || []).length;
+    if (remainingPlaceholders > 0) {
+      console.error(
+        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced`
+      );
+    }
+    if (noncePlaceholderCount === 0) {
+      console.warn(
+        'CSP nonce replacement: No {{nonce}} placeholders found in HTML. Expected at least 2.'
+      );
+    }
 
     // Inject initial data — include initialCollectionName so the
     // webview can pre-select the collection the user right-clicked on.
@@ -468,7 +505,6 @@ export class RagChatPanel {
    * Generates a cryptographically secure nonce for CSP
    */
   private _getNonce(): string {
-    const crypto = require('crypto');
     return crypto.randomBytes(16).toString('base64');
   }
 }

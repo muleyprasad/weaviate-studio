@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { DataExplorerAPI } from './DataExplorerAPI';
 import type {
@@ -42,12 +43,14 @@ export class DataExplorerPanel {
     extensionUri: vscode.Uri,
     connectionId: string,
     collectionName: string,
-    private readonly getClient: () => WeaviateClient | undefined
+    private readonly getClient: () => WeaviateClient | undefined,
+    targetUuid?: string
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._connectionId = connectionId;
     this._collectionName = collectionName;
+    this._initialTargetUuid = targetUuid;
 
     // Initialize API with client
     const client = this.getClient();
@@ -136,10 +139,9 @@ export class DataExplorerPanel {
       extensionUri,
       connectionId,
       collectionName,
-      getClient
+      getClient,
+      targetUuid
     );
-    // Store deep-link UUID — injected into initialData for the webview to open on mount
-    dataExplorerPanel._initialTargetUuid = targetUuid;
 
     DataExplorerPanel.panels.set(panelKey, dataExplorerPanel);
     DataExplorerPanel.currentPanel = dataExplorerPanel;
@@ -876,7 +878,6 @@ export class DataExplorerPanel {
    * Generates a cryptographically secure nonce for CSP
    */
   private _getNonce(): string {
-    const crypto = require('crypto');
     return crypto.randomBytes(16).toString('base64');
   }
 }

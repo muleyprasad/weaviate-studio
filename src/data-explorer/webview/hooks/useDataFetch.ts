@@ -290,21 +290,20 @@ export function useDataFetch() {
     }
   }, [dataState.collectionName, initialize]);
 
+  // Track whether the deep-link has already been fired (React ref avoids global mutation)
+  const deepLinkFiredRef = useRef(false);
+
   // Deep-link: if the panel was opened with a target UUID, auto-open its detail panel
   useEffect(() => {
     const targetUuid = (window as any).initialData?.targetUuid;
-    // Note: since initialFetchDoneRef doesn't trigger a re-render, we need to check this periodically
-    // or rely on a state variable. As a simple fix, we add dataState.objects to dependencies
-    // so it evaluates after data is loaded.
     if (
       targetUuid &&
-      (window as any).initialData?._deepLinkFired !== true &&
+      !deepLinkFiredRef.current &&
       dataState.objects &&
       dataState.objects.length > 0
     ) {
       getObjectDetail(targetUuid);
-      // Mark as fired so we don't spam it
-      (window as any).initialData._deepLinkFired = true;
+      deepLinkFiredRef.current = true;
     }
   }, [dataState.objects, getObjectDetail]);
 

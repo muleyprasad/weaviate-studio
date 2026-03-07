@@ -24,7 +24,9 @@ function getInitialData(): RagChatInitialData | undefined {
   return (window as any).initialData as RagChatInitialData | undefined;
 }
 
-// Acquire VS Code API once at module level
+// Acquire VS Code API once at module level.
+// NOTE: acquireVsCodeApi() can only be called once per webview session.
+// Calling it again (e.g. during HMR) will throw. This matches the Data Explorer pattern.
 const vscodeApi = (window as any).acquireVsCodeApi();
 
 function generateRequestId(): string {
@@ -122,12 +124,7 @@ function ContextItem({ obj, collectionName }: { obj: RagContextObject; collectio
             title={`Open in Data Explorer (${resolvedCollection})`}
             aria-label={`Open ${resolvedCollection} in Data Explorer`}
           >
-            {/* Inline SVG so no dependency on codicons version */}
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M14 3v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h5v1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3h1z" />
-              <path d="M14 2h-4V1h5v5h-1V2z" />
-              <path d="M8.354 8.354l-5 5-.708-.708 5-5 .708.708z" />
-            </svg>
+            <span className="codicon codicon-telescope" aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -139,8 +136,13 @@ function ContextItem({ obj, collectionName }: { obj: RagContextObject; collectio
           </span>
         </div>
       ))}
-      {(typeof obj.distance === 'number' || typeof obj.certainty === 'number') && (
+      {(typeof obj.distance === 'number' ||
+        typeof obj.certainty === 'number' ||
+        typeof obj.score === 'number') && (
         <div className="rag-context-scores">
+          {typeof obj.score === 'number' && (
+            <span className="rag-context-score">score: {obj.score.toFixed(4)}</span>
+          )}
           {typeof obj.distance === 'number' && (
             <span className="rag-context-score">distance: {obj.distance.toFixed(4)}</span>
           )}
@@ -507,13 +509,15 @@ export function RagChat() {
     [handleSubmit]
   );
 
+  // initialData is a module-level constant from getInitialData(), so it's
+  // stable across renders; listing it in deps is technically correct.
   const handleClearChat = useCallback(() => {
     setHistory([]);
     setQuestion('');
     setSelectedCollections(
       initialData?.initialCollectionName ? [initialData.initialCollectionName] : []
     );
-  }, []);
+  }, [initialData]);
 
   const connectionId = initialData?.connectionId ?? '';
   const canSubmit = question.trim().length > 0 && selectedCollections.length > 0 && !loading;
