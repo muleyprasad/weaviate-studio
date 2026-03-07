@@ -19,6 +19,8 @@ interface RagChatInitialData {
   connectionId: string;
   initialCollectionName: string | null;
   connectionName: string | null;
+  inheritedFilters?: import('../types').FilterCondition[] | null;
+  inheritedFilterMatchMode?: import('../types').FilterMatchMode | null;
 }
 
 function getInitialData(): RagChatInitialData | undefined {
@@ -605,7 +607,7 @@ export function RagChat() {
   const [history, setHistory] = useState<RagChatHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [topK, setTopK] = useState(5);
-  const [timeout, setTimeout] = useState(120000); // Default 2 minutes
+  const [queryTimeout, setQueryTimeout] = useState(120000); // Default 2 minutes
   const [showContext, setShowContext] = useState(true);
   const [collectionsLoading, setCollectionsLoading] = useState(true);
 
@@ -748,10 +750,10 @@ export function RagChat() {
       collectionNames: [...selectedCollections],
       question: trimmed,
       limit: topK,
-      timeout,
+      timeout: queryTimeout,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, topK, timeout, loading]);
+  }, [question, selectedCollections, topK, queryTimeout, loading]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
   const handleRetry = useCallback(
@@ -780,11 +782,11 @@ export function RagChat() {
         collectionNames: [...entry.query.collectionNames],
         question: entry.query.question,
         limit: entry.query.limit,
-        timeout: timeout, // Use current UI timeout, not the original failed one
+        timeout: queryTimeout, // Use current UI timeout, not the original failed one
         requestId: newRequestId,
       } satisfies RagChatWebviewMessage);
     },
-    [timeout]
+    [queryTimeout]
   );
 
   const handleKeyDown = useCallback(
@@ -867,10 +869,10 @@ export function RagChat() {
         />
         <RagOptions
           topK={topK}
-          timeout={timeout}
+          timeout={queryTimeout}
           showContext={showContext}
           onTopKChange={setTopK}
-          onTimeoutChange={setTimeout}
+          onTimeoutChange={setQueryTimeout}
           onShowContextChange={setShowContext}
         />
         <div className="rag-chat-input-row">

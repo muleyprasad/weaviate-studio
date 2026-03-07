@@ -1,7 +1,6 @@
 import { RagChatAPI } from '../rag-chat/extension/RagChatAPI';
 import type { WeaviateClient } from 'weaviate-client';
 import { Filters } from 'weaviate-client';
-import { isTimeoutError, createTimeoutError } from '../shared/timeout';
 import * as timeoutModule from '../shared/timeout';
 
 // Mock the workspace configuration to return a specific timeout
@@ -38,6 +37,12 @@ describe('RagChatAPI', () => {
       await expect(api.executeRagQuery({ collectionName: '', question: 'test' })).rejects.toThrow(
         'Collection name cannot be empty.'
       );
+    });
+
+    it('throws error for whitespace-only collection name', async () => {
+      await expect(
+        api.executeRagQuery({ collectionName: '   ', question: 'test' })
+      ).rejects.toThrow('Collection name cannot be empty.');
     });
 
     it('throws error for invalid characters in collection name', async () => {
@@ -88,6 +93,25 @@ describe('RagChatAPI', () => {
       );
     });
 
+    it('returns empty string answer when Weaviate returns null for generated', async () => {
+      const mockResult = {
+        generated: null,
+        objects: [],
+      };
+      const mockCollection = {
+        generate: { hybrid: jest.fn().mockResolvedValue(mockResult) },
+      };
+      mockClient.collections.get.mockReturnValue(mockCollection);
+
+      const result = await api.executeRagQuery({
+        collectionName: 'TestCollection',
+        question: 'What is this?',
+      });
+
+      expect(result.answer).toBe('');
+      expect(result.contextObjects).toHaveLength(0);
+    });
+
     it('throws timeout error when query takes too long', async () => {
       const mockCollection = {
         generate: {
@@ -109,6 +133,180 @@ describe('RagChatAPI', () => {
         })
       ).rejects.toThrow(/timed out after/);
     });
+
+    // ─── Filter Building ────────────────────────────────────────────────
+
+    describe('filter building (where parameter)', () => {
+      let mockCollection: any;
+      let mockFilterBuilder: any;
+
+      beforeEach(() => {
+        // Create a reusable mock filter builder
+        mockFilterBuilder = {
+          equal: jest.fn().mockReturnValue({ _built: 'equal' }),
+          notEqual: jest.fn().mockReturnValue({ _built: 'notEqual' }),
+          greaterThan: jest.fn().mockReturnValue({ _built: 'greaterThan' }),
+          greaterOrEqual: jest.fn().mockReturnValue({ _built: 'greaterOrEqual' }),
+          lessThan: jest.fn().mockReturnValue({ _built: 'lessThan' }),
+          lessOrEqual: jest.fn().mockReturnValue({ _built: 'lessOrEqual' }),
+          like: jest.fn().mockReturnValue({ _built: 'like' }),
+          isNull: jest.fn().mockReturnValue({ _built: 'isNull' }),
+        };
+
+        mockCollection = {
+          filter: {
+            byProperty: jest.fn().mockReturnValue(mockFilterBuilder),
+          },
+          generate: {
+            hybrid: jest.fn().mockResolvedValue({ generated: 'answer', objects: [] }),
+          },
+        };
+
+        mockClient.collections.get.mockReturnValue(mockCollection);
+        // Reset Filters mock call counts between tests
+        (Filters.and as jest.Mock).mockClear();
+        (Filters.or as jest.Mock).mockClear();
+      });
+
+      it('passes no filters field when where array is empty', async () => {
+        await api.executeRagQuery({
+          collectionName: 'Col',
+          question: 'q',
+          where: [],
+        });
+
+        expect(mockCollection.generate.hybrid).toHaveBeenCalledWith(
+          'q',
+          { groupedTask: 'q' },
+          { limit: 5, returnMetadata: ['distance', 'certainty', 'score'] }
+        );
+        // No `filters` key in the options
+        const callArgs = mockCollection.generate.hybrid.mock.calls[0][2];
+        expect(callArgs).not.toHaveProperty('filters');
+      });
+
+      it.each([
+        ['Equal', 'equal', 'hello'],
+        ['NotEqual', 'notEqual', 'world'],
+        ['GreaterThan', 'greaterThan', 42],
+        ['GreaterThanEqual', 'greaterOrEqual', 42],
+        ['LessThan', 'lessThan', 10],
+        ['LessThanEqual', 'lessOrEqual', 10],
+        ['Like', 'like', 'foo*'],
+      ] as const)(
+        'calls the correct filter method for operator "%s"',
+        async (operator, builderMethod, value) => {
+          await api.executeRagQuery({
+            collectionName: 'Col',
+            question: 'q',
+            where: [{ id: 'f1', path: 'myProp', operator, value }],
+          });
+
+          expect(mockCollection.filter.byProperty).toHaveBeenCalledWith('myProp');
+          expect(mockFilterBuilder[builderMethod]).toHaveBeenCalledWith(value);
+        }
+      );
+
+      it('calls isNull(true) for IsNull operator', async () => {
+        await api.executeRagQuery({
+          collectionName: 'Col',
+          question: 'q',
+          where: [{ id: 'f1', path: 'myProp', operator: 'IsNull', value: null }],
+        });
+
+        expect(mockFilterBuilder.isNull).toHaveBeenCalledWith(true);
+      });
+
+      it('calls isNull(false) for IsNotNull operator', async () => {
+        await api.executeRagQuery({
+          collectionName: 'Col',
+          question: 'q',
+          where: [{ id: 'f1', path: 'myProp', operator: 'IsNotNull', value: null }],
+        });
+
+        expect(mockFilterBuilder.isNull).toHaveBeenCalledWith(false);
+      });
+
+      it('uses Filters.and() by default (AND match mode)', async () => {
+        await api.executeRagQuery({
+          collectionName: 'Col',
+          question: 'q',
+          where: [
+            { id: 'f1', path: 'propA', operator: 'Equal', value: 'a' },
+            { id: 'f2', path: 'propB', operator: 'Equal', value: 'b' },
+          ],
+          matchMode: 'AND',
+        });
+
+        expect(Filters.and).toHaveBeenCalled();
+        expect(Filters.or).not.toHaveBeenCalled();
+      });
+
+      it('uses Filters.or() when match mode is OR', async () => {
+        await api.executeRagQuery({
+          collectionName: 'Col',
+          question: 'q',
+          where: [
+            { id: 'f1', path: 'propA', operator: 'Equal', value: 'a' },
+            { id: 'f2', path: 'propB', operator: 'Equal', value: 'b' },
+          ],
+          matchMode: 'OR',
+        });
+
+        expect(Filters.or).toHaveBeenCalled();
+        expect(Filters.and).not.toHaveBeenCalled();
+      });
+
+      it('silently drops filters with unsupported operators without throwing', async () => {
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        await expect(
+          api.executeRagQuery({
+            collectionName: 'Col',
+            question: 'q',
+            where: [{ id: 'f1', path: 'myProp', operator: 'ContainsAny' as any, value: 'x' }],
+          })
+        ).resolves.not.toThrow();
+
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Dropped filter'));
+
+        // No filters key — all were dropped
+        const callArgs = mockCollection.generate.hybrid.mock.calls[0][2];
+        expect(callArgs).not.toHaveProperty('filters');
+
+        warnSpy.mockRestore();
+      });
+
+      it('silently drops individual filters that throw during construction', async () => {
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        // Make byProperty throw for the first call, succeed for the second
+        mockCollection.filter.byProperty
+          .mockImplementationOnce(() => {
+            throw new Error('Bad property');
+          })
+          .mockReturnValue(mockFilterBuilder);
+
+        // Note: with the first filter dropped and the second valid, Filters.and should be called
+        // with only the surviving clause. Result should resolve, not throw.
+        await expect(
+          api.executeRagQuery({
+            collectionName: 'Col',
+            question: 'q',
+            where: [
+              { id: 'f1', path: 'badProp', operator: 'Equal', value: 'x' },
+              { id: 'f2', path: 'goodProp', operator: 'Equal', value: 'y' },
+            ],
+          })
+        ).resolves.not.toThrow();
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Dropped filter for path "badProp"')
+        );
+
+        warnSpy.mockRestore();
+      });
+    });
   });
 
   describe('getCollections', () => {
@@ -125,6 +323,19 @@ describe('RagChatAPI', () => {
       const result = await api.getCollections();
 
       expect(result).toEqual(['CollectionB', 'CollectionD']); // Sorted alphabetically
+    });
+
+    it('filters out collections with generative: undefined', async () => {
+      const mockCollections = [
+        { name: 'NoGenerative', generative: undefined },
+        { name: 'HasGenerative', generative: { name: 'openai' } },
+      ];
+
+      mockClient.collections.listAll.mockResolvedValue(mockCollections);
+
+      const result = await api.getCollections();
+
+      expect(result).toEqual(['HasGenerative']);
     });
 
     it('throws timeout error when listAll takes too long', async () => {

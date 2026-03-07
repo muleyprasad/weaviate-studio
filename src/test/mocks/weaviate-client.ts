@@ -111,4 +111,18 @@ const exported = {
 // so that `import weaviate from 'weaviate-client'` works inside the code under test.
 (exported as any).default = exported;
 
+/**
+ * Mock for the `Filters` static helper imported as a named export:
+ *   import { Filters } from 'weaviate-client';
+ *
+ * The real Filters.and / Filters.or combine filter clause objects.
+ * For testing purposes we just return a sentinel object that records
+ * which combiner was used, so tests can assert on the result.
+ */
+const Filters = {
+  and: jest.fn((...args: any[]) => ({ _type: 'and', _clauses: args })),
+  or: jest.fn((...args: any[]) => ({ _type: 'or', _clauses: args })),
+};
+(exported as any).Filters = Filters;
+
 module.exports = exported;
