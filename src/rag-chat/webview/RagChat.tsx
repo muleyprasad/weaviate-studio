@@ -37,6 +37,110 @@ function generateRequestId(): string {
 // Top-k limit options
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
+// ─── Shared Primitive Components ─────────────────────────────────────
+
+/**
+ * Inline SVG icons — avoids dependency on the codicon TTF font, which
+ * does not load reliably in VS Code webview contexts without Monaco.
+ * Paths are taken from the VS Code codicon SVG source.
+ */
+const ICON_SVGS: Record<string, string> = {
+  // copy icon
+  copy: 'M4 4l1-1h5.414L14 6.586V14l-1 1H5l-1-1V4zm9 3l-3-3H5v10h8V7z M7 2H2l-1 1v10l1 1h2v-1H2V3h5v1h1V2z',
+  // source-control (used for "raw markdown" toggle)
+  'source-control':
+    'M7.443 1.946l3.2 3.2-.707.707-3.2-3.2.707-.707zM8.5 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm4 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM5 2.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7.5 9.354l-3.185-3.185.707-.707 3.185 3.185-.707.707zM5 13.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM4.293 12.5l3.185-3.185-.707-.707-3.185 3.185.707.707z',
+  // preview (eye icon)
+  preview:
+    'M8 4C5.255 4 2.764 5.684 1.09 8c1.674 2.316 4.165 4 6.91 4s5.236-1.684 6.91-4C13.236 5.684 10.745 4 8 4zm0 7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  // refresh / retry
+  refresh:
+    'M5.728 11.485A4.003 4.003 0 0 0 12 8h1a5 5 0 0 1-8.535 3.536L5 12H3v-4h4l-.707.707-.565-.222zM10.272 4.515A4.003 4.003 0 0 0 4 8H3a5 5 0 0 1 8.535-3.536L11 4h2v4h-4l.707-.707.565.222z',
+  // chevron-right
+  'chevron-right': 'M5.7 13.7L4.3 12.3 8.6 8l-4.3-4.3 1.4-1.4L11.4 8z',
+  // chevron-down
+  'chevron-down': 'M7.976 10.072l4.357-4.357.62.618L8.285 11h-.618L3 6.333l.619-.618 4.357 4.357z',
+  // warning
+  warning:
+    'M7.557 3l-5.46 9h10.92L7.557 3zm.44 1.5l4.46 7.5H3.597L8 4.5h-.003zM8 11H7v-1h1v1zm0-2H7V6h1v3z',
+};
+
+/**
+ * Renders an inline-SVG icon by name.
+ * Falls back to a "?" character if the icon is not found.
+ */
+function SvgIcon({ name, size = 16 }: { name: string; size?: number }) {
+  const d = ICON_SVGS[name];
+  if (!d) return <span title={name}>?</span>;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+      style={{ display: 'block', flexShrink: 0 }}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
+/**
+ * IconButton — a small square button with an inline SVG icon.
+ * Uses SVGs instead of codicon font to avoid font-loading issues in webview.
+ */
+function IconButton({
+  icon,
+  title,
+  onClick,
+  className = '',
+  variant = 'default',
+}: {
+  icon: string;
+  title: string;
+  onClick: () => void;
+  className?: string;
+  variant?: 'default' | 'error';
+}) {
+  return (
+    <button
+      type="button"
+      className={`rag-icon-btn${variant === 'error' ? ' rag-icon-btn--error' : ''}${className ? ` ${className}` : ''}`}
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+    >
+      <SvgIcon name={icon} size={16} />
+    </button>
+  );
+}
+
+/**
+ * CollectionPills — renders a horizontal row of badge pills for collection names.
+ */
+function CollectionPills({
+  names,
+  size = 'default',
+  className = '',
+}: {
+  names: string[];
+  size?: 'small' | 'default';
+  className?: string;
+}) {
+  if (names.length === 0) return null;
+  const pillClass = size === 'small' ? 'rag-collection-pill-small' : 'rag-collection-pill';
+  return (
+    <div className={`rag-collection-pills-row${className ? ` ${className}` : ''}`}>
+      {names.map((name) => (
+        <span key={name} className={pillClass}>
+          {name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────
 
 /** Format duration in ms to human-readable string */
@@ -85,10 +189,7 @@ function ContextSection({ contextObjects }: { contextObjects: RagContextObject[]
         aria-expanded={expanded}
         aria-controls="rag-context-list"
       >
-        <span
-          className={`codicon codicon-chevron-${expanded ? 'down' : 'right'}`}
-          aria-hidden="true"
-        />
+        <SvgIcon name={expanded ? 'chevron-down' : 'chevron-right'} size={14} />
         Retrieved Context ({contextObjects.length} objects)
       </button>
       {expanded && (
@@ -208,101 +309,92 @@ function ChatEntry({
         <div className="rag-bubble-content">
           {entry.query.question}
           {entry.query.collectionNames.length > 0 && (
-            <div className="rag-bubble-collections">
-              {entry.query.collectionNames.map((name) => (
-                <span key={name} className="rag-collection-pill rag-collection-pill-small">
-                  {name}
-                </span>
-              ))}
-            </div>
+            <CollectionPills
+              names={entry.query.collectionNames}
+              size="small"
+              className="rag-bubble-pills"
+            />
           )}
         </div>
       </div>
 
       {/* Response area */}
       <div className="rag-bubble rag-bubble-assistant">
-        <div className="rag-bubble-label">Weaviate</div>
+        {/* Label row — no actions here anymore */}
+        <div className="rag-bubble-header">
+          <div className="rag-bubble-label">Weaviate</div>
+        </div>
+
         {entry.loading && (
           <div className="rag-loading" role="status" aria-live="polite">
             <div className="loading-spinner" />
             <span>Generating answer…</span>
           </div>
         )}
+
         {entry.error && (
           <div className="rag-error" role="alert">
             <div className="rag-error-content">
-              <span className="codicon codicon-warning" aria-hidden="true" />
+              <SvgIcon name="warning" size={16} />
               <span>{entry.error}</span>
             </div>
             {onRetry && (
-              <button
-                type="button"
-                className="rag-toolbar-btn"
-                onClick={() => onRetry(entry)}
+              <IconButton
+                icon="refresh"
                 title="Retry this query"
-              >
-                <span className="codicon codicon-refresh" aria-hidden="true" />
-              </button>
+                onClick={() => onRetry(entry)}
+                variant="error"
+              />
             )}
           </div>
         )}
+
         {entry.response && (
           <>
-            <div className="rag-answer-header">
-              <div className="rag-answer-title">Answer</div>
+            {/* Bubble content with actions overlaid at top-right */}
+            <div className="rag-bubble-content rag-answer">
+              {/* Action buttons pinned inside the top-right of the bubble */}
               <div className="rag-answer-actions">
                 <button
                   type="button"
-                  className="rag-action-btn"
+                  className="rag-toggle-btn"
                   onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-                  title={showRawMarkdown ? 'Show formatted view' : 'Show raw markdown'}
+                  title={showRawMarkdown ? 'Show rendered preview' : 'Show raw markdown'}
                 >
-                  <span
-                    className="codicon codicon-{showRawMarkdown ? 'preview' : 'source-control'}"
-                    aria-hidden="true"
-                  />
-                  {showRawMarkdown ? 'Formatted' : 'Markdown'}
+                  {showRawMarkdown ? 'Preview' : 'Raw'}
                 </button>
-                <button
-                  type="button"
-                  className="rag-action-btn"
-                  onClick={handleCopyAnswer}
+                <IconButton
+                  icon="copy"
                   title="Copy answer to clipboard"
-                >
-                  <span className="codicon codicon-copy" aria-hidden="true" />
-                  Copy
-                </button>
+                  onClick={handleCopyAnswer}
+                />
               </div>
-            </div>
-            <div className="rag-bubble-content rag-answer">
+
               {showRawMarkdown ? (
                 <pre className="rag-raw-markdown">{entry.response.answer}</pre>
               ) : (
                 <Markdown>{entry.response.answer}</Markdown>
               )}
-            </div>
-            <div className="rag-query-meta">
-              <span className="rag-query-collections">
-                From: {entry.response.query.collectionNames.join(', ')}
-              </span>
-              {entry.response.durationMs && (
-                <span className="rag-query-duration">
-                  Query completed in {formatDuration(entry.response.durationMs)}
-                </span>
-              )}
-            </div>
-            {entry.response.hasError && onRetry && (
-              <div className="rag-error rag-error-soft">
-                <button
-                  type="button"
-                  className="rag-retry-btn"
-                  onClick={() => onRetry(entry)}
-                  title="Retry this query"
-                >
-                  <span className="codicon codicon-refresh" aria-hidden="true" /> Retry
-                </button>
+
+              <div className="rag-query-meta">
+                <CollectionPills names={entry.response.query.collectionNames} size="small" />
+                <div className="rag-query-meta-right">
+                  {entry.response.durationMs && (
+                    <span className="rag-query-duration">
+                      {formatDuration(entry.response.durationMs)}
+                    </span>
+                  )}
+                  {entry.response.hasError && onRetry && (
+                    <IconButton
+                      icon="refresh"
+                      title="Retry this query"
+                      onClick={() => onRetry(entry)}
+                      variant="error"
+                    />
+                  )}
+                </div>
               </div>
-            )}
+            </div>
             {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
           </>
         )}
@@ -352,7 +444,7 @@ function CollectionSelector({
         )}
       </div>
 
-      {/* Selected collections as pills */}
+      {/* Selected collections as removable pills */}
       {selectedCount > 0 && (
         <div className="rag-collection-pills" role="list" aria-label="Selected collections">
           {selectedCollections.map((name) => (
@@ -632,7 +724,7 @@ export function RagChat() {
       timeout,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, topK, timeout, loading, vscodeApi]);
+  }, [question, selectedCollections, topK, timeout, loading]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
   const handleRetry = useCallback(
@@ -665,7 +757,7 @@ export function RagChat() {
         requestId: newRequestId,
       } satisfies RagChatWebviewMessage);
     },
-    [timeout, vscodeApi]
+    [timeout]
   );
 
   const handleKeyDown = useCallback(

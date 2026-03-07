@@ -3,6 +3,8 @@
  * VS Code theme-aware styling for the RAG Chat webview
  */
 
+/* All icons are rendered as inline SVGs — no codicon font loading needed. */
+
 /* ===== Root Container ===== */
 .rag-chat {
   display: flex;
@@ -157,8 +159,24 @@
   padding: 0 4px;
 }
 
+.rag-bubble-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 28px;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+.rag-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .rag-bubble-user .rag-bubble-label {
   text-align: right;
+  width: 100%;
 }
 
 .rag-bubble-content {
@@ -166,7 +184,6 @@
   font-size: 13px;
   line-height: 1.6;
   word-wrap: break-word;
-  white-space: pre-wrap;
 }
 
 .rag-bubble-user .rag-bubble-content {
@@ -174,6 +191,8 @@
   color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
   border-radius: 12px 12px 2px 12px;
   border: 1px solid var(--vscode-button-secondaryBorder, rgba(14, 99, 156, 0.3));
+  /* User messages are pre-formatted text — keep literal whitespace */
+  white-space: pre-wrap;
 }
 
 .rag-bubble-assistant .rag-bubble-content {
@@ -228,28 +247,36 @@
 /* Query metadata bar (collections + duration) */
 .rag-query-meta {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.06));
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #888);
-  margin-top: 8px;
-  margin-bottom: 12px;
+}
+
+.rag-query-meta-right {
+  display: flex;
   align-items: center;
+  gap: 6px;
 }
 
-.rag-query-collections {
-  font-weight: 500;
+/* Shared pills row used by CollectionPills component */
+.rag-collection-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.rag-query-collections::before {
-  content: '📚 ';
-  margin-right: 4px;
+/* Extra margin when pills appear inside a bubble (below user question text) */
+.rag-bubble-pills {
+  margin-top: 6px;
 }
 
-.rag-query-duration::before {
-  content: '⏱️ ';
-  margin-right: 4px;
-}
+
 
 
 
@@ -282,55 +309,55 @@
   flex-shrink: 0;
 }
 
-/* ===== Answer Header with Actions ===== */
-.rag-answer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  padding: 6px 12px;
-  background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
-  border-radius: 6px 6px 0 0;
-  border-bottom: 1px solid var(--vscode-panel-border, #333);
+/* ===== Answer Actions Overlay ===== */
+
+/* Make the answer box position:relative so actions can overlay inside it */
+.rag-answer {
+  position: relative;
+  line-height: 1.6;
 }
 
-.rag-answer-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--vscode-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
+/* Position the actions container in the top-right corner of the bubble padding */
 .rag-answer-actions {
+  position: absolute;
+  top: 8px;
+  right: 12px;
   display: flex;
   gap: 6px;
+  align-items: center;
+  /* Ensure it sits above the text */
+  z-index: 2;
+  /* Add a slight background blur/color so text underneath doesn't clash */
+  background-color: color-mix(in srgb, var(--vscode-input-background, #3c3c3c) 90%, transparent);
+  border-radius: 4px;
+  padding: 2px;
 }
 
-.rag-action-btn {
+/* Text pill toggle button */
+.rag-toggle-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  justify-content: center;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  color: var(--vscode-descriptionForeground, #888);
   background-color: transparent;
-  border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-panel-border, #444));
+  border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1;
 }
 
-.rag-action-btn:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
-  border-color: var(--vscode-focusBorder, #0e639c);
+.rag-toggle-btn:hover {
+  color: var(--vscode-foreground, #fff);
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
 }
 
-.rag-action-btn .codicon {
-  font-size: 14px;
+.rag-toggle-btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
 }
 
 /* Raw markdown display */
@@ -356,6 +383,7 @@
   border: none;
   font-style: normal;
 }
+
 /* ===== Loading ===== */
 .rag-loading {
   display: flex;
@@ -447,6 +475,44 @@
   flex: 1;
 }
 
+.rag-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  /* Use primary foreground so icons are always visible —
+     descriptionForeground is too dim against most VS Code themes */
+  color: var(--vscode-foreground, #cccccc);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  font-size: 16px;
+  line-height: 1;
+}
+
+
+.rag-icon-btn:hover {
+  color: var(--vscode-foreground, #ffffff);
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+  border-color: var(--vscode-focusBorder, #0e639c);
+}
+
+/* Error / retry variant — always renders in warning/error red */
+.rag-icon-btn--error {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.rag-icon-btn--error:hover {
+  color: var(--vscode-errorForeground, #f14c4c);
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.12));
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
 .rag-open-explorer-btn {
   display: inline-flex;
   align-items: center;
@@ -536,7 +602,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px;
+  /* 16px bottom padding so the footer content never gets clipped */
+  padding: 12px 16px 16px;
   border-top: 2px solid var(--vscode-panel-border, #333);
   background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
   flex-shrink: 0;
@@ -637,9 +704,8 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  background-color: var(--vscode-editor-background, rgba(0, 0, 0, 0.2));
-  color: var(--vscode-editor-foreground, inherit);
-  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
   border-radius: 8px;
   font-size: 11px;
   font-weight: 500;
