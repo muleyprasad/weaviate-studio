@@ -104,13 +104,11 @@ function DataExplorerContent() {
     dataState.fetchedObjectDetail,
   ]);
 
-  // Get schema properties for filter builder, with uuid/id as a pseudo-property for filtering
-  const uuidProperty: PropertyConfig = {
-    name: 'id',
-    dataType: ['uuid'],
-    description: 'Object ID (UUID)',
-  };
-  const schemaProperties = [uuidProperty, ...(dataState.schema?.properties || [])];
+  // Get schema properties for filter builder
+  // Note: 'id' (UUID) is NOT included as a filterable property because Weaviate doesn't
+  // support filtering by UUID through the standard filter API. Deep-linking to specific
+  // objects is handled specially via fetchObjectById in the backend.
+  const schemaProperties = dataState.schema?.properties || [];
 
   // Handle vector search result selection
   const handleVectorResultSelect = useCallback(
