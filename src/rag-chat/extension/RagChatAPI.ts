@@ -17,12 +17,14 @@
  */
 
 import type { WeaviateClient } from 'weaviate-client';
+import { Filters } from 'weaviate-client';
 import {
   DEFAULT_TIMEOUT_MS,
   withTimeout,
   isTimeoutError,
   createTimeoutError,
 } from '../../shared/timeout';
+import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
 
 /**
  * API class for interacting with Weaviate collections in the RAG Chat feature
@@ -45,6 +47,9 @@ export class RagChatAPI {
     collectionName: string;
     question: string;
     limit?: number;
+    /** Optional where filters inherited from Data Explorer */
+    where?: FilterCondition[];
+    matchMode?: FilterMatchMode;
   }): Promise<{
     answer: string;
     contextObjects: Array<{
@@ -57,16 +62,62 @@ export class RagChatAPI {
     try {
       const collection = this.client.collections.get(params.collectionName);
 
+      // Build where filter if provided
+      let builtFilter: ReturnType<typeof Filters.and> | undefined;
+      if (params.where && params.where.length > 0) {
+        const filterClauses = params.where
+          .map((cond) => {
+            try {
+              const fb = collection.filter.byProperty(cond.path);
+              switch (cond.operator) {
+                case 'Equal':
+                  return fb.equal(cond.value as any);
+                case 'NotEqual':
+                  return fb.notEqual(cond.value as any);
+                case 'GreaterThan':
+                  return fb.greaterThan(cond.value as any);
+                case 'GreaterThanEqual':
+                  return fb.greaterOrEqual(cond.value as any);
+                case 'LessThan':
+                  return fb.lessThan(cond.value as any);
+                case 'LessThanEqual':
+                  return fb.lessOrEqual(cond.value as any);
+                case 'Like':
+                  return fb.like(String(cond.value));
+                case 'IsNull':
+                  return fb.isNull(true);
+                case 'IsNotNull':
+                  return fb.isNull(false);
+                default:
+                  return null;
+              }
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean) as unknown as Parameters<typeof Filters.and>;
+
+        if (filterClauses.length > 0) {
+          builtFilter =
+            params.matchMode === 'OR'
+              ? Filters.or(...(filterClauses as any))
+              : Filters.and(...(filterClauses as any));
+        }
+      }
+
+      const queryOptions: Record<string, unknown> = {
+        limit: params.limit ?? 5,
+        returnMetadata: ['distance', 'certainty'],
+      };
+      if (builtFilter) {
+        queryOptions.filters = builtFilter;
+      }
+
       const result = await withTimeout(
         collection.generate.nearText(
           [params.question],
-          {
-            groupedTask: params.question,
-          },
-          {
-            limit: params.limit ?? 5,
-            returnMetadata: ['distance', 'certainty'],
-          }
+          { groupedTask: params.question },
+          queryOptions
         ),
         this.REQUEST_TIMEOUT
       );

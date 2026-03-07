@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
+import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
 
 /**
  * Manages the RAG Chat webview panel
@@ -21,6 +22,8 @@ export class RagChatPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _connectionId: string;
   private _initialCollectionName: string | undefined;
+  private _inheritedFilters: FilterCondition[] | undefined;
+  private _inheritedFilterMatchMode: FilterMatchMode | undefined;
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
 
@@ -84,7 +87,9 @@ export class RagChatPanel {
     connectionId: string,
     getClient: () => WeaviateClient | undefined,
     initialCollectionName?: string,
-    forceNew: boolean = false
+    forceNew: boolean = false,
+    inheritedFilters?: FilterCondition[],
+    inheritedFilterMatchMode?: FilterMatchMode
   ): RagChatPanel {
     const panelKey = connectionId;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -125,6 +130,9 @@ export class RagChatPanel {
       getClient,
       initialCollectionName
     );
+    // Store inherited filter context from Data Explorer
+    ragChatPanel._inheritedFilters = inheritedFilters;
+    ragChatPanel._inheritedFilterMatchMode = inheritedFilterMatchMode;
 
     RagChatPanel.panels.set(panelKey, ragChatPanel);
     RagChatPanel.currentPanel = ragChatPanel;
@@ -309,6 +317,9 @@ export class RagChatPanel {
             collectionName: name,
             question: message.question!,
             limit: message.limit,
+            // Apply inherited filters from Data Explorer to narrow RAG retrieval context
+            where: this._inheritedFilters,
+            matchMode: this._inheritedFilterMatchMode,
           });
           results.push({ collectionName: name, ...result });
         } catch (error) {
@@ -436,11 +447,14 @@ export class RagChatPanel {
 
     // Inject initial data — include initialCollectionName so the
     // webview can pre-select the collection the user right-clicked on.
+    // Also inject inherited filters from Data Explorer if present.
     const initScript = `
       <script nonce="${nonce}">
         window.initialData = ${JSON.stringify({
           connectionId: this._connectionId,
           initialCollectionName: this._initialCollectionName ?? null,
+          inheritedFilters: this._inheritedFilters ?? null,
+          inheritedFilterMatchMode: this._inheritedFilterMatchMode ?? null,
         })};
       </script>
     `;

@@ -35,6 +35,7 @@ export class DataExplorerPanel {
   private _isInitializing = false;
   private _selectedTenant: string | undefined;
   private _isMultiTenant = false;
+  private _initialTargetUuid: string | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -98,7 +99,8 @@ export class DataExplorerPanel {
     extensionUri: vscode.Uri,
     connectionId: string,
     collectionName: string,
-    getClient: () => WeaviateClient | undefined
+    getClient: () => WeaviateClient | undefined,
+    targetUuid?: string
   ): DataExplorerPanel {
     const panelKey = `${connectionId}:${collectionName}`;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -107,6 +109,10 @@ export class DataExplorerPanel {
     const existingPanel = DataExplorerPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
+      // Deep-link: navigate to specific object if provided
+      if (targetUuid) {
+        existingPanel.postMessage({ command: 'openObjectDetail', uuid: targetUuid });
+      }
       return existingPanel;
     }
 
@@ -132,6 +138,8 @@ export class DataExplorerPanel {
       collectionName,
       getClient
     );
+    // Store deep-link UUID — injected into initialData for the webview to open on mount
+    dataExplorerPanel._initialTargetUuid = targetUuid;
 
     DataExplorerPanel.panels.set(panelKey, dataExplorerPanel);
     DataExplorerPanel.currentPanel = dataExplorerPanel;
@@ -281,10 +289,12 @@ export class DataExplorerPanel {
           break;
 
         case 'openRagChat':
-          // Open RAG Chat for this collection
+          // Open RAG Chat for this collection, passing active filters if any
           await vscode.commands.executeCommand('weaviate.openRagChat', {
             connectionId: this._connectionId,
             collectionName: this._collectionName,
+            inheritedFilters: message.activeFilters,
+            inheritedFilterMatchMode: message.filterMatchMode,
           });
           break;
 
@@ -816,6 +826,7 @@ export class DataExplorerPanel {
         window.initialData = ${JSON.stringify({
           collectionName: this._collectionName,
           connectionId: this._connectionId,
+          targetUuid: this._initialTargetUuid ?? null,
         })};
       </script>
     `;

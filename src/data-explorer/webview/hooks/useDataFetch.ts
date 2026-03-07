@@ -147,7 +147,14 @@ export function useDataFetch() {
             break;
 
           case 'objectDetailLoaded':
-            // Object detail is handled separately
+            // Object detail is handled separately (ObjectDetailPanel listens for this)
+            break;
+
+          case 'openObjectDetail':
+            // Deep-link: extension asked us to open a specific object's detail panel
+            if (message.uuid && getObjectDetail) {
+              getObjectDetail(message.uuid);
+            }
             break;
 
           case 'error':
@@ -276,6 +283,15 @@ export function useDataFetch() {
       initialize();
     }
   }, [dataState.collectionName, initialize]);
+
+  // Deep-link: if the panel was opened with a target UUID, auto-open its detail panel
+  useEffect(() => {
+    const targetUuid = (window as any).initialData?.targetUuid;
+    if (targetUuid && initialFetchDoneRef.current) {
+      getObjectDetail(targetUuid);
+    }
+    // Run once after initial fetch completes; initialFetchDoneRef triggers via objectsLoaded
+  }, [initialFetchDoneRef.current]);
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {

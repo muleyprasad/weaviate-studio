@@ -185,13 +185,29 @@ function DataExplorerContent() {
           <button
             type="button"
             className="toolbar-btn ask-ai-btn"
-            onClick={() => postMessageToExtension({ command: 'openRagChat' })}
-            title="Ask AI about this collection (RAG Chat)"
+            onClick={() =>
+              postMessageToExtension({
+                command: 'openRagChat',
+                // Pass active filters so RAG Chat can narrow retrieval context
+                activeFilters:
+                  filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined,
+                filterMatchMode:
+                  filterState.activeFilters.length > 0 ? filterState.matchMode : undefined,
+              })
+            }
+            title={
+              filterState.activeFilters.length > 0
+                ? `Ask AI with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
+                : 'Ask AI about this collection (RAG Chat)'
+            }
             aria-label="Open RAG Chat for this collection"
             id="ask-ai-btn"
           >
             <span className="codicon codicon-comment-discussion" aria-hidden="true" />
             Ask AI
+            {filterState.activeFilters.length > 0 && (
+              <span className="ask-ai-filter-badge">{filterState.activeFilters.length}</span>
+            )}
           </button>
 
           {/* Vector Search button */}

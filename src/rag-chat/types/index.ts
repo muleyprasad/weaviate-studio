@@ -4,6 +4,9 @@
  * responses, history, and extension <-> webview communication
  */
 
+// Re-export filter types needed by RAG Chat for filter-sharing feature
+export type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
+
 // =====================================================
 // RAG Query & Response Types
 // =====================================================
@@ -103,6 +106,10 @@ export interface RagChatExtensionMessage {
   error?: string;
   /** Request ID to match responses with requests */
   requestId?: string;
+  /** Active filters inherited from Data Explorer (filter-sharing feature) */
+  inheritedFilters?: import('../../data-explorer/types').FilterCondition[];
+  /** Match mode for inherited filters */
+  inheritedFilterMatchMode?: import('../../data-explorer/types').FilterMatchMode;
 }
 
 /**
@@ -133,6 +140,10 @@ export interface RagChatWebviewMessage {
   collectionName?: string;
   /** Object UUID for openInDataExplorer */
   uuid?: string;
+  /** Active filters to pass to RAG query (filter-sharing from Data Explorer) */
+  activeFilters?: import('../../data-explorer/types').FilterCondition[];
+  /** Match mode for active filters */
+  matchMode?: import('../../data-explorer/types').FilterMatchMode;
 }
 
 // =====================================================

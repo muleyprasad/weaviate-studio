@@ -1343,7 +1343,13 @@ export function activate(context: vscode.ExtensionContext) {
       const connectionManager = weaviateTreeDataProvider.getConnectionManager();
       const getClient = () => connectionManager.getClient(connectionId);
 
-      DataExplorerPanel.createOrShow(context.extensionUri, connectionId, collectionName, getClient);
+      DataExplorerPanel.createOrShow(
+        context.extensionUri,
+        connectionId,
+        collectionName,
+        getClient,
+        arg1?.targetUuid // deep-link to specific object if provided
+      );
     }),
 
     // Open RAG Chat command
@@ -1370,7 +1376,9 @@ export function activate(context: vscode.ExtensionContext) {
         connectionId,
         getClient,
         collectionName,
-        true
+        true,
+        arg1?.inheritedFilters,
+        arg1?.inheritedFilterMatchMode
       );
     }),
 

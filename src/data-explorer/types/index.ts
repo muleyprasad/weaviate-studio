@@ -255,7 +255,9 @@ export type ExtensionMessageCommand =
   | 'aggregationsLoaded'
   | 'exportComplete'
   | 'exportProgress'
-  | 'exportCancelled';
+  | 'exportCancelled'
+  // Integration: deep-link to a specific object from external panels
+  | 'openObjectDetail';
 
 export type WebviewMessageCommand =
   | 'initialize'
@@ -299,6 +301,8 @@ export interface ExtensionMessage {
     total: number;
     phase: 'fetching' | 'formatting' | 'complete';
   };
+  // Integration
+  uuid?: string; // For openObjectDetail deep-link
 }
 
 export interface WebviewMessage {
@@ -318,6 +322,11 @@ export interface WebviewMessage {
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;
+  // Integration: openRagChat carries active filters to pass to RAG Chat
+  activeFilters?: FilterCondition[];
+  filterMatchMode?: FilterMatchMode;
+  // Integration: openInDataExplorer may carry a target UUID for deep-link scroll
+  targetUuid?: string;
 }
 
 // Property data types enumeration

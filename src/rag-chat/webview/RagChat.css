@@ -253,23 +253,33 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
   border-radius: 3px;
   background: transparent;
   color: var(--vscode-descriptionForeground, #888);
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.7;
   flex-shrink: 0;
   transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  font-size: 14px;
 }
 
 .rag-open-explorer-btn:hover {
   opacity: 1;
   color: var(--vscode-textLink-foreground, #3794ff);
   background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31)) !important;
+}
+
+/* Fallback text icon for when codicon font isn't available — hidden if codicon loads */
+.rag-explorer-btn-fallback {
+  display: none;
+}
+
+.rag-open-explorer-btn:not(:has(.codicon)) .rag-explorer-btn-fallback {
+  display: inline;
 }
 
 .rag-context-prop {

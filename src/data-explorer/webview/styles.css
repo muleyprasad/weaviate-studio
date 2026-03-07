@@ -2759,6 +2759,26 @@ input[type="checkbox"]:focus-visible {
     color: white;
 }
 
+.ask-ai-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin-left: 2px;
+    background-color: #10B981;
+    color: white;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ask-ai-btn:hover .ask-ai-filter-badge {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
 /* ===== Responsive adjustments for Vector Search ===== */
 @media (max-width: 600px) {
     .vector-search-content {

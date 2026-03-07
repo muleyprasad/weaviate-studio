@@ -78,12 +78,14 @@ function ContextSection({ contextObjects }: { contextObjects: RagContextObject[]
                   <div className="rag-context-collection-label">{collectionName}</div>
                   <ul className="rag-context-list" role="list">
                     {objects.map((obj) => (
-                      <ContextItem key={obj.uuid} obj={obj} />
+                      <ContextItem key={obj.uuid} obj={obj} collectionName={collectionName} />
                     ))}
                   </ul>
                 </li>
               ))
-            : contextObjects.map((obj) => <ContextItem key={obj.uuid} obj={obj} />)}
+            : contextObjects.map((obj) => (
+                <ContextItem key={obj.uuid} obj={obj} collectionName={obj.collectionName} />
+              ))}
         </ul>
       )}
     </div>
@@ -91,10 +93,13 @@ function ContextSection({ contextObjects }: { contextObjects: RagContextObject[]
 }
 
 /** A single context object item */
-function ContextItem({ obj }: { obj: RagContextObject }) {
+function ContextItem({ obj, collectionName }: { obj: RagContextObject; collectionName?: string }) {
   const textProps = Object.entries(obj.properties)
     .filter(([, v]) => typeof v === 'string')
     .slice(0, 3);
+
+  // Resolve the best collection name available
+  const resolvedCollection = collectionName || obj.collectionName;
 
   return (
     <li className="rag-context-item">
@@ -102,23 +107,28 @@ function ContextItem({ obj }: { obj: RagContextObject }) {
         <span className="rag-context-uuid" title={obj.uuid}>
           {obj.uuid}
         </span>
-        {obj.collectionName && (
+        {resolvedCollection ? (
           <button
             type="button"
             className="rag-open-explorer-btn"
             onClick={() =>
               vscodeApi.postMessage({
                 command: 'openInDataExplorer',
-                collectionName: obj.collectionName,
+                collectionName: resolvedCollection,
                 uuid: obj.uuid,
               })
             }
-            title={`Open ${obj.collectionName} in Data Explorer`}
-            aria-label={`Open ${obj.collectionName} in Data Explorer`}
+            title={`Open in Data Explorer (${resolvedCollection})`}
+            aria-label={`Open ${resolvedCollection} in Data Explorer`}
           >
-            <span className="codicon codicon-telescope" aria-hidden="true" />
+            {/* Inline SVG so no dependency on codicons version */}
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M14 3v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h5v1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3h1z" />
+              <path d="M14 2h-4V1h5v5h-1V2z" />
+              <path d="M8.354 8.354l-5 5-.708-.708 5-5 .708.708z" />
+            </svg>
           </button>
-        )}
+        ) : null}
       </div>
       {textProps.map(([key, value]) => (
         <div key={key} className="rag-context-prop">
@@ -128,12 +138,12 @@ function ContextItem({ obj }: { obj: RagContextObject }) {
           </span>
         </div>
       ))}
-      {(obj.distance != null || obj.certainty != null) && (
+      {(typeof obj.distance === 'number' || typeof obj.certainty === 'number') && (
         <div className="rag-context-scores">
-          {obj.distance != null && (
+          {typeof obj.distance === 'number' && (
             <span className="rag-context-score">distance: {obj.distance.toFixed(4)}</span>
           )}
-          {obj.certainty != null && (
+          {typeof obj.certainty === 'number' && (
             <span className="rag-context-score">certainty: {obj.certainty.toFixed(4)}</span>
           )}
         </div>
