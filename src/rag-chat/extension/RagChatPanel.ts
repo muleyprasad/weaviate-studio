@@ -33,6 +33,7 @@ export class RagChatPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     connectionId: string,
+    private readonly _connectionName: string,
     private readonly getClient: () => WeaviateClient | undefined,
     initialCollectionName?: string
   ) {
@@ -87,6 +88,7 @@ export class RagChatPanel {
   public static createOrShow(
     extensionUri: vscode.Uri,
     connectionId: string,
+    connectionName: string,
     getClient: () => WeaviateClient | undefined,
     initialCollectionName?: string,
     forceNew: boolean = false,
@@ -119,7 +121,7 @@ export class RagChatPanel {
     }
 
     // Create new panel
-    const panel = vscode.window.createWebviewPanel('weaviateRagChat', 'RAG Chat', column, {
+    const panel = vscode.window.createWebviewPanel('weaviateRagChat', 'Generative Search', column, {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [
@@ -132,6 +134,7 @@ export class RagChatPanel {
       panel,
       extensionUri,
       connectionId,
+      connectionName,
       getClient,
       initialCollectionName
     );
@@ -411,7 +414,7 @@ export class RagChatPanel {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>RAG Chat</title>
+          <title>Generative Search</title>
           <style>
             body {
               font-family: var(--vscode-font-family);
@@ -440,8 +443,8 @@ export class RagChatPanel {
         </head>
         <body>
           <div class="error-container">
-            <h1>RAG Chat Not Built</h1>
-            <p>The RAG Chat webview bundle has not been built yet.</p>
+            <h1>Generative Search Not Built</h1>
+            <p>The Generative Search webview bundle has not been built yet.</p>
             <p>Please run: <code>npm run build:webview</code></p>
           </div>
         </body>
@@ -490,6 +493,7 @@ export class RagChatPanel {
       <script nonce="${nonce}">
         window.initialData = ${JSON.stringify({
           connectionId: this._connectionId,
+          connectionName: this._connectionName,
           initialCollectionName: this._initialCollectionName ?? null,
           inheritedFilters: this._inheritedFilters ?? null,
           inheritedFilterMatchMode: this._inheritedFilterMatchMode ?? null,

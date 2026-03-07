@@ -18,6 +18,7 @@ import type {
 interface RagChatInitialData {
   connectionId: string;
   initialCollectionName: string | null;
+  connectionName: string | null;
 }
 
 function getInitialData(): RagChatInitialData | undefined {
@@ -97,9 +98,15 @@ function ContextSection({ contextObjects }: { contextObjects: RagContextObject[]
 
 /** A single context object item */
 function ContextItem({ obj, collectionName }: { obj: RagContextObject; collectionName?: string }) {
-  const textProps = Object.entries(obj.properties)
-    .filter(([, v]) => typeof v === 'string')
-    .slice(0, 3);
+  const keyFields = ['created_at', 'published_date', 'video_id', 'podcast_id'];
+  const keyProps = Object.entries(obj.properties).filter(
+    ([k, v]) => keyFields.includes(k) && typeof v === 'string'
+  );
+  const otherProps = Object.entries(obj.properties)
+    .filter(([k, v]) => !keyFields.includes(k) && typeof v === 'string')
+    .slice(0, Math.max(0, 3 - keyProps.length));
+
+  const textProps = [...keyProps, ...otherProps];
 
   // Resolve the best collection name available
   const resolvedCollection = collectionName || obj.collectionName;
@@ -159,7 +166,15 @@ function ContextItem({ obj, collectionName }: { obj: RagContextObject; collectio
 }
 
 /** A single chat history entry (question + response/error/loading) */
-function ChatEntry({ entry, showContext }: { entry: RagChatHistoryEntry; showContext: boolean }) {
+function ChatEntry({
+  entry,
+  showContext,
+  onRetry,
+}: {
+  entry: RagChatHistoryEntry;
+  showContext: boolean;
+  onRetry?: (entry: RagChatHistoryEntry) => void;
+}) {
   return (
     <div className="rag-chat-entry" role="article" aria-label={`Question: ${entry.query.question}`}>
       {/* User question bubble */}
@@ -190,7 +205,17 @@ function ChatEntry({ entry, showContext }: { entry: RagChatHistoryEntry; showCon
         )}
         {entry.error && (
           <div className="rag-error" role="alert">
-            {entry.error}
+            <span>{entry.error}</span>
+            {onRetry && (
+              <button
+                type="button"
+                className="rag-retry-btn"
+                onClick={() => onRetry(entry)}
+                title="Retry this query"
+              >
+                <span className="codicon codicon-refresh" aria-hidden="true" /> Retry
+              </button>
+            )}
           </div>
         )}
         {entry.response && (
@@ -241,6 +266,7 @@ function CollectionSelector({
         <label className="rag-label" id="rag-collection-label">
           Collections
         </label>
+        <span className="rag-collection-helper">Used as retrieval sources</span>
         {selectedCount >= 3 && (
           <span className="rag-collection-summary">{selectedCount} collections selected</span>
         )}
@@ -500,7 +526,40 @@ export function RagChat() {
       limit: topK,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, loading, topK]);
+  }, [question, selectedCollections, topK, loading, vscodeApi]);
+
+  /** Retry a failed entry: reset it to loading state and re-send the same query */
+  const handleRetry = useCallback(
+    (entry: RagChatHistoryEntry) => {
+      const newRequestId = generateRequestId();
+
+      // Replace the failed entry with a fresh loading state
+      setHistory((prev) =>
+        prev.map((h) =>
+          h.id === entry.id
+            ? {
+                ...h,
+                id: newRequestId,
+                error: null,
+                response: null,
+                loading: true,
+                timestamp: Date.now(),
+              }
+            : h
+        )
+      );
+      setLoading(true);
+
+      vscodeApi.postMessage({
+        command: 'executeRagQuery',
+        collectionNames: [...entry.query.collectionNames],
+        question: entry.query.question,
+        limit: entry.query.limit,
+        requestId: newRequestId,
+      } satisfies RagChatWebviewMessage);
+    },
+    [vscodeApi]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -530,8 +589,15 @@ export function RagChat() {
       {/* Header */}
       <header className="rag-chat-header">
         <div className="rag-header-left">
-          <h1 className="rag-chat-title">RAG Chat</h1>
-          {connectionId && <span className="rag-chat-subtitle">Connected to {connectionId}</span>}
+          <h1 className="rag-chat-title">Generative Search</h1>
+          <span className="rag-chat-tagline">
+            Retrieve, ground, and generate from selected collections
+          </span>
+          {connectionId && (
+            <span className="rag-chat-subtitle">
+              Connected to: {initialData?.connectionName || connectionId}
+            </span>
+          )}
         </div>
         {history.length > 0 && (
           <button
@@ -555,7 +621,7 @@ export function RagChat() {
           </div>
         )}
         {history.map((entry) => (
-          <ChatEntry key={entry.id} entry={entry} showContext={showContext} />
+          <ChatEntry key={entry.id} entry={entry} showContext={showContext} onRetry={handleRetry} />
         ))}
         <div ref={chatEndRef} />
       </main>
@@ -581,7 +647,7 @@ export function RagChat() {
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question…"
+            placeholder="Ask a question about the selected collections…"
             aria-label="Question input"
             rows={2}
             disabled={loading}

@@ -2739,7 +2739,7 @@ input[type="checkbox"]:focus-visible {
     color: white;
 }
 
-/* ===== RAG Chat Button in Toolbar ===== */
+/* ===== Generative Search Button in Toolbar ===== */
 .rag-chat-btn {
     display: inline-flex;
     align-items: center;

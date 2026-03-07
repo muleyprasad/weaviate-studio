@@ -190,14 +190,14 @@ function DataExplorerContent() {
           {/* Tenant selector for multi-tenant collections */}
           <TenantSelector />
 
-          {/* RAG Chat button - opens RAG Chat for this collection */}
+          {/* Generative Search button - opens Generative Search for this collection */}
           <button
             type="button"
             className="toolbar-btn rag-chat-btn"
             onClick={() =>
               postMessageToExtension({
                 command: 'openRagChat',
-                // Pass active filters so RAG Chat can narrow retrieval context
+                // Pass active filters so Generative Search can narrow retrieval context
                 activeFilters:
                   filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined,
                 filterMatchMode:
@@ -206,14 +206,14 @@ function DataExplorerContent() {
             }
             title={
               filterState.activeFilters.length > 0
-                ? `RAG Chat with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
-                : 'Open RAG Chat for this collection'
+                ? `Generative Search with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
+                : 'Open Generative Search for this collection'
             }
-            aria-label="Open RAG Chat for this collection"
+            aria-label="Open Generative Search for this collection"
             id="rag-chat-btn"
           >
             <span className="codicon codicon-comment-discussion" aria-hidden="true" />
-            RAG Chat
+            Generative Search
             {filterState.activeFilters.length > 0 && (
               <span className="rag-chat-filter-badge">{filterState.activeFilters.length}</span>
             )}

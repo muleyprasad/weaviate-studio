@@ -294,7 +294,7 @@
       },
       {
         "command": "weaviate.openRagChat",
-        "title": "Open RAG Chat",
+        "title": "Generative Search",
         "category": "Weaviate",
         "icon": "$(comment-discussion)"
       }

@@ -88,7 +88,7 @@ src/
 ├── views/                        # Custom views (including AddCollectionPanel)
 ├── query-editor/                 # GraphQL editor components
 ├── data-explorer/                # Data Explorer panel, API, and React webview
-├── rag-chat/                     # RAG Chat panel, API, and React webview
+├── rag-chat/                     # Generative Search panel, API, and React webview
 │   ├── extension/                #   RagChatPanel.ts (sequential multi-collection queries), RagChatAPI.ts
 │   ├── webview/                  #   RagChat.tsx (CollectionSelector, RagOptions, ContextSection), RagChat.css, index.tsx
 │   └── types/                    #   TypeScript interfaces for messages, state, and context objects

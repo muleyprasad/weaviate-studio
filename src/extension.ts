@@ -1405,10 +1405,12 @@ export function activate(context: vscode.ExtensionContext) {
 
       const connectionManager = weaviateTreeDataProvider.getConnectionManager();
       const getClient = () => connectionManager.getClient(connectionId);
+      const connectionName = connectionManager.getConnection(connectionId)?.name || connectionId;
 
       RagChatPanel.createOrShow(
         context.extensionUri,
         connectionId,
+        connectionName,
         getClient,
         collectionName,
         forceNew,

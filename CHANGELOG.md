@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - RAG Chat
+### Added - Generative Search
 
-- **RAG Chat Panel** — Ask natural-language questions about your Weaviate data directly in VS Code
+- **Generative Search Panel** — Ask natural-language questions about your Weaviate data directly in VS Code
 
   - Chat-style UI with question/answer bubbles and collapsible "Retrieved Context" section
   - Multi-collection support via pill-based selector — auto-add on selection from dropdown, remove with × button
@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Validation hint ("Select at least one collection to start") when no collection is selected; Ask button disabled until valid
   - **RAG options**: configurable "Top results per collection" dropdown (3, 5, 10, 20) wired to the Weaviate `limit` parameter; "Show retrieved context objects" toggle to hide/show context per chat entry
   - Only RAG-capable collections (those with a generative module such as `generative-openai`, `generative-cohere`, etc.) are listed; collections without generative config are filtered out
-  - Right-click a collection in the sidebar → **"Open RAG Chat"** to open the panel with that collection pre-selected
-  - If the RAG Chat panel is already open, right-clicking another collection adds it as a new pill without clearing the existing selection
+  - Right-click a collection in the sidebar → **"Generative Search"** to open the panel with that collection pre-selected
+  - If the Generative Search panel is already open, right-clicking another collection adds it as a new pill without clearing the existing selection
   - Sequential per-collection retrieval to safely handle different vectorizers; per-collection errors are non-blocking and surfaced inline
   - Source attribution: each retrieved context object displays its originating collection name as a badge label; context sections are grouped by collection
   - Uses Weaviate's server-side generative config — no additional LLM API keys required in the extension

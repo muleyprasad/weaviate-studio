@@ -40,7 +40,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ## Top Features
 
 - **Multiple Connections:** Manage several Weaviate instances at once
-- **RAG Chat:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
+- **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
 - **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
 - **Cluster Management:** Comprehensive cluster information panel with health monitoring
@@ -100,7 +100,7 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Virtual scrolling for large datasets (1000+ objects)
 - See [Data Explorer README](src/data-explorer/README.md) for full details
 
-### RAG Chat
+### Generative Search
 
 - Chat-style interface for Retrieval-Augmented Generation queries
 - Multi-collection support: select one or more collections as pill badges; auto-add on selection from dropdown
@@ -108,8 +108,8 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Validation hint ("Select at least one collection to start") when no collection is selected; Ask button disabled until valid
 - **RAG options**: configurable "Top results per collection" (3, 5, 10, 20) and "Show retrieved context objects" toggle
 - Only RAG-capable collections (those with a generative module configured) are shown
-- Right-click a collection → **"Open RAG Chat"** pre-selects that collection
-- Opening RAG Chat from another collection while the panel is already open adds it as a new pill
+- Right-click a collection → **"Generative Search"** pre-selects that collection
+- Opening Generative Search from another collection while the panel is already open adds it as a new pill
 - Sequential per-collection retrieval to handle different vectorizers safely; per-collection errors are non-blocking
 - Source attribution: context objects display their originating collection name as a badge label
 - Generated answer displayed with collapsible "Retrieved Context" section grouped by collection, showing properties, UUID, and distance/certainty scores
@@ -210,7 +210,7 @@ Weaviate Studio uses a modular architecture with external React components for e
 
 - **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection) ([Live Demo](https://dudanogueira.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
 - **Extension Core**: TypeScript-based VS Code extension
-- **RAG Chat**: Self-contained module (`src/rag-chat/`) for generative search with its own panel, API wrapper, and React webview
+- **Generative Search**: Self-contained module (`src/rag-chat/`) for generative search with its own panel, API wrapper, and React webview
 - **Webviews**: React-based UIs with Monaco editor integration
 
 For details on updating external dependencies, see the [Working with Dependencies](CONTRIBUTING.md#working-with-dependencies) section in CONTRIBUTING.md.
