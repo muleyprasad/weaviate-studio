@@ -89,9 +89,9 @@ src/
 ├── query-editor/                 # GraphQL editor components
 ├── data-explorer/                # Data Explorer panel, API, and React webview
 ├── rag-chat/                     # RAG Chat panel, API, and React webview
-│   ├── extension/                #   RagChatPanel.ts, RagChatAPI.ts
-│   ├── webview/                  #   RagChat.tsx, RagChat.css, index.tsx, rag-chat.html
-│   └── types/                    #   TypeScript interfaces for messages and state
+│   ├── extension/                #   RagChatPanel.ts (sequential multi-collection queries), RagChatAPI.ts
+│   ├── webview/                  #   RagChat.tsx (CollectionSelector, RagOptions, ContextSection), RagChat.css, index.tsx
+│   └── types/                    #   TypeScript interfaces for messages, state, and context objects
 └── webview/                      # Shared React-based UI and components
 ```
 
