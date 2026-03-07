@@ -6,6 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type {
   RagChatHistoryEntry,
   RagContextObject,
@@ -189,7 +191,9 @@ function ChatEntry({ entry, showContext }: { entry: RagChatHistoryEntry; showCon
         )}
         {entry.response && (
           <>
-            <div className="rag-bubble-content rag-answer">{entry.response.answer}</div>
+            <div className="rag-bubble-content rag-answer">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.response.answer}</ReactMarkdown>
+            </div>
             {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
           </>
         )}
@@ -283,7 +287,10 @@ function CollectionSelector({
       )}
 
       {allCollections.length === 0 && (
-        <span className="rag-no-collections">No collections available</span>
+        <span className="rag-no-collections">
+          No generative collections found. Please ensure your Weaviate instance is configured with a
+          generative AI module (e.g., OpenAI, Cohere, etc.).
+        </span>
       )}
     </div>
   );
