@@ -58,10 +58,37 @@
   color: var(--vscode-foreground);
 }
 
-.rag-chat-subtitle {
+/* ===== Connection Status Bar ===== */
+.rag-connection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  flex-shrink: 0;
+}
+
+.rag-connection-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3fb950;
+  box-shadow: 0 0 4px rgba(63, 185, 80, 0.4);
+  flex-shrink: 0;
+}
+
+.rag-connection-label {
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #888);
-  margin-top: 2px;
+  font-weight: 400;
+}
+
+.rag-connection-name {
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  font-weight: 600;
 }
 
 .rag-chat-tagline {
@@ -191,6 +218,39 @@
   font-weight: 600;
 }
 
+/* Query execution time display */
+.rag-query-duration {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+}
+
+/* Query metadata bar (collections + duration) */
+.rag-query-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  margin-top: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.rag-query-collections {
+  font-weight: 500;
+}
+
+.rag-query-collections::before {
+  content: '📚 ';
+  margin-right: 4px;
+}
+
+.rag-query-duration::before {
+  content: '⏱️ ';
+  margin-right: 4px;
+}
+
 
 
 /* ===== Error Display ===== */
@@ -205,6 +265,81 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ===== Answer Header with Actions ===== */
+.rag-answer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.rag-answer-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rag-answer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rag-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background-color: transparent;
+  border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-panel-border, #444));
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rag-action-btn:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
+  border-color: var(--vscode-focusBorder, #0e639c);
+}
+
+.rag-action-btn .codicon {
+  font-size: 14px;
+}
+
+/* Raw markdown display */
+.rag-raw-markdown {
+  background-color: var(--vscode-textCodeBlock-background, #1e1e1e);
+  border: 1px solid var(--vscode-widget-border, #333);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  color: var(--vscode-editor-foreground);
+  margin: 0;
+}
+
+/* For soft errors embedded inside the chat bubble text area, remove red boxes */
+.rag-error-soft {
+  padding: 8px 0 0 0;
+  background-color: transparent;
+  border: none;
+  font-style: normal;
 }
 
 .rag-retry-btn {
@@ -508,8 +643,9 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  background-color: var(--vscode-badge-background, rgba(0, 0, 0, 0.15));
-  color: var(--vscode-badge-foreground, inherit);
+  background-color: var(--vscode-editor-background, rgba(0, 0, 0, 0.2));
+  color: var(--vscode-editor-foreground, inherit);
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
   font-size: 11px;
   font-weight: 500;

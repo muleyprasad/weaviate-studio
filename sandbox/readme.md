@@ -150,6 +150,58 @@ By default all rows are imported (embeddings are free). To limit import size, se
 }
 ```
 
+## Multi-Collection RAG Test Cases
+
+Use these test cases to verify multi-collection RAG functionality in Weaviate Studio. Open the **RAG Chat** panel, select the specified collections, and run each query.
+
+### Basic Single-Collection Tests
+
+| #   | Collection        | Query                                       | Expected Result                                                      |
+| --- | ----------------- | ------------------------------------------- | -------------------------------------------------------------------- |
+| 1   | **Books**         | "What are some highly-rated mystery books?" | Retrieves mystery/crime fiction (Agatha Christie, etc.) with ratings |
+| 2   | **PodcastSearch** | "What topics do technology podcasts cover?" | Retrieves tech podcasts, summarizes themes (AI, startups, coding)    |
+| 3   | **Author**        | "Tell me about authors from England"        | Retrieves authors with nested `address.country = "England"`          |
+
+### Multi-Collection Tests
+
+| #   | Collections                   | Query                                                           | Expected Result                                                                                                  |
+| --- | ----------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 4   | **Books** + **PodcastSearch** | "Find resources about psychology and human behavior"            | Retrieves psychology books AND mental health podcasts; answer synthesizes both                                   |
+| 5   | **All collections**           | "What stories involve mystery or investigation?"                | Retrieves mystery books, GitHub bug investigations, mystery podcasts, Jeopardy questions about detective fiction |
+| 6   | **Books** + **PodcastSearch** | "Compare how books vs podcasts discuss artificial intelligence" | Answer highlights differences (books = theory, podcasts = current trends)                                        |
+| 7   | **All collections**           | "Tell me about Agatha Christie"                                 | Retrieves Christie books from Books, related reviews from Review, mystery podcasts                               |
+| 8   | **GitHubIssue** + **Books**   | "What are common problems developers face?"                     | Retrieves real GitHub issues + programming productivity books                                                    |
+
+### Advanced Tests
+
+| #   | Feature                      | Setup                                                                                     | Query                                                                                      | Expected                                                                |
+| --- | ---------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 9   | **Filter inheritance**       | In Data Explorer, filter Books by `average_rating > 4.0`, then click "Search in RAG Chat" | "What are the best science fiction books?"                                                 | Only high-rated sci-fi books retrieved (filter carries over)            |
+| 10  | **Top-K variation**          | Select Books + PodcastSearch                                                              | "Summarize fantasy literature" (try with top-k = 3, 5, 10)                                 | Lower = faster but less comprehensive; higher = more context but slower |
+| 11  | **Timeout handling**         | All collections, default timeout (2min)                                                   | "Give me a comprehensive overview of self-help literature and related podcast discussions" | Completes within timeout; try with 30s to see timeout behavior          |
+| 12  | **No results**               | Books + PodcastSearch                                                                     | "What are the best restaurants in Tokyo?"                                                  | Graceful "no relevant content" response                                 |
+| 13  | **Nested properties in RAG** | Author collection                                                                         | "Tell me about authors who live in Scotland"                                               | Retrieves authors with nested address objects, uses in RAG context      |
+
+### Timeout Configuration
+
+The RAG Chat panel includes a **Query timeout** dropdown (next to "Top results per collection"):
+
+- **30s** — Fast setups, small datasets, or OpenAI vectorization
+- **60s** — Moderate datasets with local transformers
+- **2min** (default) — Recommended for ~20k objects with local transformers
+- **5min** — Large datasets or slow transformer inference
+
+Adjust the timeout if queries fail with timeout errors. For the sandbox with ~20k objects and local text2vec-transformers, 2 minutes is recommended.
+
+### Success Criteria
+
+✅ Query completes without timeout  
+✅ Answer is relevant and grounded in retrieved data  
+✅ Context objects show correct distance/certainty scores  
+✅ Multi-collection queries retrieve from multiple sources  
+✅ Nested-property collections work alongside flat RAG collections  
+✅ Filter inheritance from Data Explorer works correctly
+
 ## Troubleshooting
 
 ### Container not starting

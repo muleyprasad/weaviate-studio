@@ -21,6 +21,8 @@ export interface RagChatQuery {
   question: string;
   /** How many objects to retrieve for context (default: 5) */
   limit?: number;
+  /** Query timeout in milliseconds (default: 120000) */
+  timeout?: number;
 }
 
 /**
@@ -53,6 +55,10 @@ export interface RagChatResponse {
   query: RagChatQuery;
   /** Unix timestamp of when the response was received */
   timestamp: number;
+  /** Query execution time in milliseconds */
+  durationMs?: number;
+  /** Whether the response contains a soft error (failed query but returning an answer string) */
+  hasError?: boolean;
 }
 
 // =====================================================
@@ -112,6 +118,10 @@ export interface RagChatExtensionMessage {
   inheritedFilters?: import('../../data-explorer/types').FilterCondition[];
   /** Match mode for inherited filters */
   inheritedFilterMatchMode?: import('../../data-explorer/types').FilterMatchMode;
+  /** Query execution time in milliseconds */
+  durationMs?: number;
+  /** Whether the response contains a soft error (failed query but returning an answer string) */
+  hasError?: boolean;
 }
 
 /**
@@ -134,6 +144,8 @@ export interface RagChatWebviewMessage {
   question?: string;
   /** How many objects to retrieve for context */
   limit?: number;
+  /** Query timeout in milliseconds */
+  timeout?: number;
   /** Request ID for tracking */
   requestId?: string;
   /** Whether to show retrieved context objects in the response */

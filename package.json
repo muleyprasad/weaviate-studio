@@ -44,6 +44,16 @@
   "main": "./dist/extension.js",
   "browser": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Weaviate Studio",
+      "properties": {
+        "weaviate.ragQueryTimeout": {
+          "type": "number",
+          "default": 120000,
+          "description": "Timeout in milliseconds for RAG (Retrieval-Augmented Generation) queries. Increase if using local vectorizers or large datasets."
+        }
+      }
+    },
     "commands": [
       {
         "command": "weaviate.rbac.addRole",

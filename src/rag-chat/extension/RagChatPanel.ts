@@ -310,6 +310,8 @@ export class RagChatPanel {
     // Track current request so we can ignore stale responses
     this._currentRagRequestId = message.requestId;
 
+    const startTime = Date.now();
+
     try {
       // Parallel retrieval using Promise.allSettled — each collection query
       // is independent, so we can execute them concurrently for better latency.
@@ -319,6 +321,7 @@ export class RagChatPanel {
             collectionName: name,
             question: message.question!,
             limit: message.limit,
+            timeout: message.timeout,
             where: this._inheritedFilters,
             matchMode: this._inheritedFilterMatchMode,
           });
@@ -330,6 +333,12 @@ export class RagChatPanel {
       if (this._currentRagRequestId !== message.requestId) {
         return;
       }
+
+      // Check if all queries failed
+      const allFailed =
+        settled.length > 0 && settled.every((outcome) => outcome.status === 'rejected');
+
+      const durationMs = Date.now() - startTime;
 
       const results: Array<{
         collectionName: string;
@@ -375,6 +384,8 @@ export class RagChatPanel {
         contextObjects: allContextObjects,
         question: message.question,
         requestId: message.requestId,
+        durationMs,
+        hasError: allFailed,
       });
     } catch (error) {
       // Only send error if this is still the active request

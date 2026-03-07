@@ -39,6 +39,23 @@ const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
+/** Format duration in ms to human-readable string */
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (remainingSeconds > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${minutes}m`;
+}
+
 /** Collapsible section for retrieved context objects, grouped by collection */
 function ContextSection({ contextObjects }: { contextObjects: RagContextObject[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -175,6 +192,14 @@ function ChatEntry({
   showContext: boolean;
   onRetry?: (entry: RagChatHistoryEntry) => void;
 }) {
+  const [showRawMarkdown, setShowRawMarkdown] = useState(false);
+
+  const handleCopyAnswer = useCallback(() => {
+    if (entry.response?.answer) {
+      navigator.clipboard.writeText(entry.response.answer);
+    }
+  }, [entry.response?.answer]);
+
   return (
     <div className="rag-chat-entry" role="article" aria-label={`Question: ${entry.query.question}`}>
       {/* User question bubble */}
@@ -220,9 +245,61 @@ function ChatEntry({
         )}
         {entry.response && (
           <>
-            <div className="rag-bubble-content rag-answer">
-              <Markdown>{entry.response.answer}</Markdown>
+            <div className="rag-answer-header">
+              <div className="rag-answer-title">Answer</div>
+              <div className="rag-answer-actions">
+                <button
+                  type="button"
+                  className="rag-action-btn"
+                  onClick={() => setShowRawMarkdown(!showRawMarkdown)}
+                  title={showRawMarkdown ? 'Show formatted view' : 'Show raw markdown'}
+                >
+                  <span
+                    className="codicon codicon-{showRawMarkdown ? 'preview' : 'source-control'}"
+                    aria-hidden="true"
+                  />
+                  {showRawMarkdown ? 'Formatted' : 'Markdown'}
+                </button>
+                <button
+                  type="button"
+                  className="rag-action-btn"
+                  onClick={handleCopyAnswer}
+                  title="Copy answer to clipboard"
+                >
+                  <span className="codicon codicon-copy" aria-hidden="true" />
+                  Copy
+                </button>
+              </div>
             </div>
+            <div className="rag-bubble-content rag-answer">
+              {showRawMarkdown ? (
+                <pre className="rag-raw-markdown">{entry.response.answer}</pre>
+              ) : (
+                <Markdown>{entry.response.answer}</Markdown>
+              )}
+            </div>
+            <div className="rag-query-meta">
+              <span className="rag-query-collections">
+                From: {entry.response.query.collectionNames.join(', ')}
+              </span>
+              {entry.response.durationMs && (
+                <span className="rag-query-duration">
+                  Query completed in {formatDuration(entry.response.durationMs)}
+                </span>
+              )}
+            </div>
+            {entry.response.hasError && onRetry && (
+              <div className="rag-error rag-error-soft">
+                <button
+                  type="button"
+                  className="rag-retry-btn"
+                  onClick={() => onRetry(entry)}
+                  title="Retry this query"
+                >
+                  <span className="codicon codicon-refresh" aria-hidden="true" /> Retry
+                </button>
+              </div>
+            )}
             {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
           </>
         )}
@@ -326,16 +403,20 @@ function CollectionSelector({
   );
 }
 
-/** RAG configuration options: top-k limit and show context toggle */
+/** RAG configuration options: top-k limit, timeout, and show context toggle */
 function RagOptions({
   topK,
+  timeout,
   showContext,
   onTopKChange,
+  onTimeoutChange,
   onShowContextChange,
 }: {
   topK: number;
+  timeout: number;
   showContext: boolean;
   onTopKChange: (value: number) => void;
+  onTimeoutChange: (value: number) => void;
   onShowContextChange: (value: boolean) => void;
 }) {
   return (
@@ -355,6 +436,24 @@ function RagOptions({
               {k}
             </option>
           ))}
+        </select>
+      </div>
+
+      <div className="rag-options-group">
+        <label className="rag-options-label" htmlFor="rag-timeout-select">
+          Query timeout (ms)
+        </label>
+        <select
+          id="rag-timeout-select"
+          className="rag-select rag-select-small"
+          value={timeout}
+          onChange={(e) => onTimeoutChange(Number(e.target.value))}
+          title="Maximum time to wait for the RAG query to complete"
+        >
+          <option value={30000}>30s</option>
+          <option value={60000}>60s</option>
+          <option value={120000}>2min</option>
+          <option value={300000}>5min</option>
         </select>
       </div>
 
@@ -386,6 +485,7 @@ export function RagChat() {
   const [history, setHistory] = useState<RagChatHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [topK, setTopK] = useState(5);
+  const [timeout, setTimeout] = useState(120000); // Default 2 minutes
   const [showContext, setShowContext] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -449,6 +549,8 @@ export function RagChat() {
                       contextObjects: msg.contextObjects ?? [],
                       query: entry.query,
                       timestamp: Date.now(),
+                      durationMs: msg.durationMs,
+                      hasError: msg.hasError,
                     },
                   }
                 : entry
@@ -524,9 +626,10 @@ export function RagChat() {
       collectionNames: [...selectedCollections],
       question: trimmed,
       limit: topK,
+      timeout,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, topK, loading, vscodeApi]);
+  }, [question, selectedCollections, topK, timeout, loading, vscodeApi]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
   const handleRetry = useCallback(
@@ -555,10 +658,11 @@ export function RagChat() {
         collectionNames: [...entry.query.collectionNames],
         question: entry.query.question,
         limit: entry.query.limit,
+        timeout: timeout, // Use current UI timeout, not the original failed one
         requestId: newRequestId,
       } satisfies RagChatWebviewMessage);
     },
-    [vscodeApi]
+    [timeout, vscodeApi]
   );
 
   const handleKeyDown = useCallback(
@@ -593,11 +697,6 @@ export function RagChat() {
           <span className="rag-chat-tagline">
             Retrieve, ground, and generate from selected collections
           </span>
-          {connectionId && (
-            <span className="rag-chat-subtitle">
-              Connected to: {initialData?.connectionName || connectionId}
-            </span>
-          )}
         </div>
         {history.length > 0 && (
           <button
@@ -611,6 +710,15 @@ export function RagChat() {
           </button>
         )}
       </header>
+
+      {/* Connection status bar */}
+      {connectionId && (
+        <div className="rag-connection-bar">
+          <span className="rag-connection-indicator" />
+          <span className="rag-connection-label">Connected to</span>
+          <span className="rag-connection-name">{initialData?.connectionName || connectionId}</span>
+        </div>
+      )}
 
       {/* Chat history area */}
       <main className="rag-chat-history" role="log" aria-label="Chat history" aria-live="polite">
@@ -636,8 +744,10 @@ export function RagChat() {
         />
         <RagOptions
           topK={topK}
+          timeout={timeout}
           showContext={showContext}
           onTopKChange={setTopK}
+          onTimeoutChange={setTimeout}
           onShowContextChange={setShowContext}
         />
         <div className="rag-chat-input-row">

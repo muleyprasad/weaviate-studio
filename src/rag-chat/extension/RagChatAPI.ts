@@ -25,14 +25,19 @@ import {
   createTimeoutError,
 } from '../../shared/timeout';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
+import { workspace } from 'vscode';
 
 /**
  * API class for interacting with Weaviate collections in the RAG Chat feature
  */
 export class RagChatAPI {
-  private readonly REQUEST_TIMEOUT = DEFAULT_TIMEOUT_MS;
+  private readonly REQUEST_TIMEOUT: number;
 
-  constructor(private client: WeaviateClient) {}
+  constructor(private client: WeaviateClient) {
+    // Read timeout from user settings, default to 120 seconds
+    const config = workspace.getConfiguration('weaviate');
+    this.REQUEST_TIMEOUT = config.get<number>('ragQueryTimeout') ?? 120000;
+  }
 
   /**
    * Executes a RAG (Retrieval-Augmented Generation) query against a collection.
@@ -41,12 +46,14 @@ export class RagChatAPI {
    * @param params.collectionName - The Weaviate collection to query
    * @param params.question - The natural language question to ask
    * @param params.limit - Maximum number of context objects to retrieve (default: 5)
+   * @param params.timeout - Query timeout in milliseconds (default: 120000)
    * @returns The generated answer and the context objects used to produce it
    */
   async executeRagQuery(params: {
     collectionName: string;
     question: string;
     limit?: number;
+    timeout?: number;
     /** Optional where filters inherited from Data Explorer */
     where?: FilterCondition[];
     matchMode?: FilterMatchMode;
@@ -60,6 +67,9 @@ export class RagChatAPI {
       score?: number;
     }>;
   }> {
+    // Use timeout from params, or fall back to instance default
+    const requestTimeout = params.timeout ?? this.REQUEST_TIMEOUT;
+
     try {
       const collection = this.client.collections.get(params.collectionName);
 
@@ -116,7 +126,7 @@ export class RagChatAPI {
 
       const result = await withTimeout(
         collection.generate.hybrid(params.question, { groupedTask: params.question }, queryOptions),
-        this.REQUEST_TIMEOUT
+        requestTimeout
       );
 
       const contextObjects = result.objects.map(
@@ -146,7 +156,7 @@ export class RagChatAPI {
         throw createTimeoutError(
           'RAG query',
           `collection "${params.collectionName}"`,
-          this.REQUEST_TIMEOUT
+          requestTimeout
         );
       }
       throw new Error(
