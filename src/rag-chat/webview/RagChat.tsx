@@ -351,10 +351,14 @@ function ChatEntry({
 
         {entry.response && (
           <>
-            {/* Bubble content with actions overlaid at top-right */}
             <div className="rag-bubble-content rag-answer">
-              {/* Action buttons pinned inside the top-right of the bubble */}
+              {/* Action buttons as a top header row for the answer */}
               <div className="rag-answer-actions">
+                <IconButton
+                  icon="copy"
+                  title="Copy answer to clipboard"
+                  onClick={handleCopyAnswer}
+                />
                 <button
                   type="button"
                   className="rag-toggle-btn"
@@ -363,11 +367,6 @@ function ChatEntry({
                 >
                   {showRawMarkdown ? 'Preview' : 'Raw'}
                 </button>
-                <IconButton
-                  icon="copy"
-                  title="Copy answer to clipboard"
-                  onClick={handleCopyAnswer}
-                />
               </div>
 
               {showRawMarkdown ? (

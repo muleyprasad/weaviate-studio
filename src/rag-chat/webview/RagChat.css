@@ -309,28 +309,20 @@
   flex-shrink: 0;
 }
 
-/* ===== Answer Actions Overlay ===== */
+/* ===== Answer Actions Header ===== */
 
-/* Make the answer box position:relative so actions can overlay inside it */
 .rag-answer {
-  position: relative;
+  /* No special positioning needed, flow naturally */
   line-height: 1.6;
 }
 
-/* Position the actions container in the top-right corner of the bubble padding */
+/* Actions sit at the top right of the answer box, pushing content below */
 .rag-answer-actions {
-  position: absolute;
-  top: 8px;
-  right: 12px;
   display: flex;
+  justify-content: flex-end;
   gap: 6px;
   align-items: center;
-  /* Ensure it sits above the text */
-  z-index: 2;
-  /* Add a slight background blur/color so text underneath doesn't clash */
-  background-color: color-mix(in srgb, var(--vscode-input-background, #3c3c3c) 90%, transparent);
-  border-radius: 4px;
-  padding: 2px;
+  margin-bottom: 8px;
 }
 
 /* Text pill toggle button */
@@ -338,12 +330,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 3px 8px;
   font-size: 11px;
   font-weight: 500;
   color: var(--vscode-descriptionForeground, #888);
   background-color: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--vscode-widget-border, #444);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -351,6 +343,7 @@
 }
 
 .rag-toggle-btn:hover {
+
   color: var(--vscode-foreground, #fff);
   background-color: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
 }
