@@ -185,6 +185,11 @@ module.exports = {
       template: './src/webview/rbac-group.html',
       filename: 'rbac-group.html',
       chunks: ['rbac-group'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
       template: './src/webview/connection.html',
       filename: 'connection.html',
       chunks: ['connection'],

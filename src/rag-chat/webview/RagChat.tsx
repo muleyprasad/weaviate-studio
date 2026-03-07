@@ -63,6 +63,9 @@ const ICON_SVGS: Record<string, string> = {
   // warning
   warning:
     'M7.557 3l-5.46 9h10.92L7.557 3zm.44 1.5l4.46 7.5H3.597L8 4.5h-.003zM8 11H7v-1h1v1zm0-2H7V6h1v3z',
+  // check (used for copy success)
+  check:
+    'M13.736 4.417a1.002 1.002 0 0 0-1.415-.068l-5.83 5.412-2.5-2.585a1 1 0 1 0-1.436 1.388L5.783 12.062 13.668 5.833a1.002 1.002 0 0 0 .068-1.416z',
 };
 
 /**
@@ -294,10 +297,13 @@ function ChatEntry({
   onRetry?: (entry: RagChatHistoryEntry) => void;
 }) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleCopyAnswer = useCallback(() => {
     if (entry.response?.answer) {
       navigator.clipboard.writeText(entry.response.answer);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
   }, [entry.response?.answer]);
 
@@ -355,8 +361,8 @@ function ChatEntry({
               {/* Action buttons as a top header row for the answer */}
               <div className="rag-answer-actions">
                 <IconButton
-                  icon="copy"
-                  title="Copy answer to clipboard"
+                  icon={copied ? 'check' : 'copy'}
+                  title={copied ? 'Copied!' : 'Copy answer to clipboard'}
                   onClick={handleCopyAnswer}
                 />
                 <button
@@ -408,11 +414,13 @@ function CollectionSelector({
   selectedCollections,
   onAdd,
   onRemove,
+  loading,
 }: {
   allCollections: string[];
   selectedCollections: string[];
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
+  loading: boolean;
 }) {
   // Collections available for adding (not yet selected)
   const availableCollections = allCollections.filter((c) => !selectedCollections.includes(c));
@@ -463,35 +471,53 @@ function CollectionSelector({
         </div>
       )}
 
-      {/* Add collection dropdown — auto-adds on selection */}
-      {availableCollections.length > 0 && (
-        <select
-          className="rag-select rag-select-auto"
-          aria-labelledby="rag-collection-label"
-          value=""
-          onChange={handleSelectChange}
-        >
-          <option value="" disabled>
-            {selectedCount === 0 ? 'Select a collection…' : 'Add another collection…'}
-          </option>
-          {availableCollections.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* Validation hint */}
-      {selectedCount === 0 && allCollections.length > 0 && (
-        <span className="rag-validation-hint">Select at least one collection to start</span>
-      )}
-
-      {allCollections.length === 0 && (
-        <span className="rag-no-collections">
-          No generative collections found. Please ensure your Weaviate instance is configured with a
-          generative AI module (e.g., OpenAI, Cohere, etc.).
+      {loading && allCollections.length === 0 ? (
+        <span className="rag-loading-collections">
+          <div
+            className="loading-spinner"
+            style={{
+              width: 12,
+              height: 12,
+              marginRight: 8,
+              display: 'inline-block',
+              verticalAlign: 'middle',
+            }}
+          />
+          Loading collections…
         </span>
+      ) : (
+        <>
+          {/* Add collection dropdown — auto-adds on selection */}
+          {availableCollections.length > 0 && (
+            <select
+              className="rag-select rag-select-auto"
+              aria-labelledby="rag-collection-label"
+              value=""
+              onChange={handleSelectChange}
+            >
+              <option value="" disabled>
+                {selectedCount === 0 ? 'Select a collection…' : 'Add another collection…'}
+              </option>
+              {availableCollections.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Validation hint */}
+          {selectedCount === 0 && allCollections.length > 0 && (
+            <span className="rag-validation-hint">Select at least one collection to start</span>
+          )}
+
+          {allCollections.length === 0 && (
+            <span className="rag-no-collections">
+              No generative collections found. Please ensure your Weaviate instance is configured
+              with a generative AI module (e.g., OpenAI, Cohere, etc.).
+            </span>
+          )}
+        </>
       )}
     </div>
   );
@@ -581,6 +607,7 @@ export function RagChat() {
   const [topK, setTopK] = useState(5);
   const [timeout, setTimeout] = useState(120000); // Default 2 minutes
   const [showContext, setShowContext] = useState(true);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -614,6 +641,7 @@ export function RagChat() {
             }
             return [];
           });
+          setCollectionsLoading(false);
           break;
         }
         case 'addCollection': {
@@ -835,6 +863,7 @@ export function RagChat() {
           selectedCollections={selectedCollections}
           onAdd={handleAddCollection}
           onRemove={handleRemoveCollection}
+          loading={collectionsLoading}
         />
         <RagOptions
           topK={topK}

@@ -40,6 +40,18 @@ export class RagChatAPI {
   }
 
   /**
+   * Validates collection name to prevent injection/XSS when used in UI or error messages
+   */
+  private _validateCollectionName(name: string): void {
+    if (!name || name.trim() === '') {
+      throw new Error('Collection name cannot be empty.');
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) {
+      throw new Error('Collection name contains invalid characters.');
+    }
+  }
+
+  /**
    * Executes a RAG (Retrieval-Augmented Generation) query against a collection.
    * Uses generative search to retrieve relevant objects and generate an answer.
    *
@@ -69,6 +81,8 @@ export class RagChatAPI {
   }> {
     // Use timeout from params, or fall back to instance default
     const requestTimeout = params.timeout ?? this.REQUEST_TIMEOUT;
+
+    this._validateCollectionName(params.collectionName);
 
     try {
       const collection = this.client.collections.get(params.collectionName);
@@ -100,9 +114,15 @@ export class RagChatAPI {
                 case 'IsNotNull':
                   return fb.isNull(false);
                 default:
+                  console.warn(
+                    `RagChatAPI: Dropped filter for path "${cond.path}" due to unsupported operator "${cond.operator}"`
+                  );
                   return null;
               }
-            } catch {
+            } catch (err) {
+              console.warn(
+                `RagChatAPI: Dropped filter for path "${cond.path}" due to error: ${err instanceof Error ? err.message : String(err)}`
+              );
               return null;
             }
           })
@@ -160,7 +180,7 @@ export class RagChatAPI {
         );
       }
       throw new Error(
-        `Failed to execute RAG query on collection "${params.collectionName}": ${error instanceof Error ? error.message : String(error)}`
+        `Failed to execute RAG query on collection "${params.collectionName}": ${error instanceof Error ? error.message : String(error)}.`
       );
     }
   }
@@ -191,7 +211,7 @@ export class RagChatAPI {
         throw createTimeoutError('List collections', 'Weaviate instance', this.REQUEST_TIMEOUT);
       }
       throw new Error(
-        `Failed to list collections: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to list collections: ${error instanceof Error ? error.message : String(error)}.`
       );
     }
   }

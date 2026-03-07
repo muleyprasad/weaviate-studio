@@ -11,6 +11,7 @@ import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
+import { clampLimit, RequestTracker } from './utils';
 
 /**
  * Manages the RAG Chat webview panel
@@ -27,7 +28,7 @@ export class RagChatPanel {
   private _inheritedFilterMatchMode: FilterMatchMode | undefined;
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
-  private _currentRagRequestId: string | undefined;
+  private _requestTracker = new RequestTracker();
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -155,13 +156,14 @@ export class RagChatPanel {
 
   /**
    * Sends a message to the webview
+   * @param message The message to send
    */
   public postMessage(message: RagChatExtensionMessage): void {
     this._panel.webview.postMessage(message);
   }
 
   /**
-   * Disposes the panel
+   * Disposes the panel, cleaning up all resources
    */
   public dispose(): void {
     const panelKey = this._connectionId;
@@ -183,6 +185,7 @@ export class RagChatPanel {
 
   /**
    * Gets the connection ID for this panel
+   * @returns The unique connection identifier
    */
   public getConnectionId(): string {
     return this._connectionId;
@@ -190,6 +193,7 @@ export class RagChatPanel {
 
   /**
    * Closes all panels for a specific connection
+   * @param connectionId The connection identifier to close panels for
    */
   public static closeForConnection(connectionId: string): void {
     const panel = RagChatPanel.panels.get(connectionId);
@@ -269,7 +273,7 @@ export class RagChatPanel {
       this.postMessage({
         command: 'init',
         collectionNames: [],
-        error: error instanceof Error ? error.message : 'Failed to load collections',
+        error: error instanceof Error ? error.message : 'Failed to load collections.',
       });
     }
   }
@@ -297,7 +301,7 @@ export class RagChatPanel {
     if (collectionNames.length === 0) {
       this.postMessage({
         command: 'ragError',
-        error: 'No collection selected',
+        error: 'No collection selected.',
         requestId: message.requestId,
       });
       return;
@@ -306,14 +310,17 @@ export class RagChatPanel {
     if (!message.question?.trim()) {
       this.postMessage({
         command: 'ragError',
-        error: 'Question cannot be empty',
+        error: 'Question cannot be empty.',
         requestId: message.requestId,
       });
       return;
     }
 
-    // Track current request so we can ignore stale responses
-    this._currentRagRequestId = message.requestId;
+    // Clamp limit to [1, 100]
+    const limit = clampLimit(message.limit);
+
+    // Track active requests to ignore stale responses
+    this._requestTracker.track(message.requestId);
 
     const startTime = Date.now();
 
@@ -325,7 +332,7 @@ export class RagChatPanel {
           const result = await this._api!.executeRagQuery({
             collectionName: name,
             question: message.question!,
-            limit: message.limit,
+            limit,
             timeout: message.timeout,
             where: this._inheritedFilters,
             matchMode: this._inheritedFilterMatchMode,
@@ -334,8 +341,8 @@ export class RagChatPanel {
         })
       );
 
-      // If the user cleared chat or started a new query, ignore this response
-      if (this._currentRagRequestId !== message.requestId) {
+      // Check if this request is still active
+      if (this._requestTracker.isStale(message.requestId)) {
         return;
       }
 
@@ -392,15 +399,18 @@ export class RagChatPanel {
         durationMs,
         hasError: allFailed,
       });
+
+      this._requestTracker.complete(message.requestId);
     } catch (error) {
-      // Only send error if this is still the active request
-      if (this._currentRagRequestId === message.requestId) {
-        const errorMessage = error instanceof Error ? error.message : 'RAG query failed';
+      // Only send error if this request is still active
+      if (!this._requestTracker.isStale(message.requestId)) {
+        const errorMessage = error instanceof Error ? error.message : 'RAG query failed.';
         this.postMessage({
           command: 'ragError',
           error: errorMessage,
           requestId: message.requestId,
         });
+        this._requestTracker.complete(message.requestId);
       }
     }
   }
@@ -492,12 +502,12 @@ export class RagChatPanel {
     // Validate all placeholders were replaced
     const remainingPlaceholders = (html.match(/{{nonce}}/g) || []).length;
     if (remainingPlaceholders > 0) {
-      console.error(
-        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced`
+      throw new Error(
+        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced.`
       );
     }
     if (noncePlaceholderCount === 0) {
-      console.warn(
+      throw new Error(
         'CSP nonce replacement: No {{nonce}} placeholders found in HTML. Expected at least 2.'
       );
     }
