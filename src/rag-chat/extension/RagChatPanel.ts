@@ -255,7 +255,8 @@ export class RagChatPanel {
 
   /**
    * Handles executeRagQuery request — supports multiple collections.
-   * Runs a RAG query per collection in parallel and merges the results.
+   * Runs a RAG query per collection sequentially (collections may have
+   * different vectorizers) and merges the results with source attribution.
    */
   private async _handleExecuteRagQuery(message: RagChatWebviewMessage): Promise<void> {
     const collectionNames = message.collectionNames ?? [];
@@ -278,23 +279,49 @@ export class RagChatPanel {
     }
 
     try {
-      // Run RAG queries in parallel across all selected collections
-      const results = await Promise.all(
-        collectionNames.map((name) =>
-          this._api!.executeRagQuery({
+      // Sequential retrieval: collections may use different vectorizers,
+      // so we query each one individually rather than via multi-target.
+      const results: Array<{
+        collectionName: string;
+        answer: string;
+        contextObjects: Array<{
+          uuid: string;
+          properties: Record<string, unknown>;
+          distance?: number;
+          certainty?: number;
+        }>;
+      }> = [];
+
+      for (const name of collectionNames) {
+        try {
+          const result = await this._api!.executeRagQuery({
             collectionName: name,
             question: message.question!,
             limit: message.limit,
-          })
-        )
+          });
+          results.push({ collectionName: name, ...result });
+        } catch (error) {
+          // Non-blocking: log the error and continue with other collections
+          const errMsg = error instanceof Error ? error.message : String(error);
+          console.warn(`RagChatPanel: Query failed for collection "${name}": ${errMsg}`);
+          results.push({
+            collectionName: name,
+            answer: `⚠️ Query failed for "${name}": ${errMsg}`,
+            contextObjects: [],
+          });
+        }
+      }
+
+      // Merge: stamp collectionName on each context object for source attribution
+      const allContextObjects = results.flatMap((r) =>
+        r.contextObjects.map((obj) => ({ ...obj, collectionName: r.collectionName }))
       );
 
-      // Merge: concatenate context objects, combine answers
-      const allContextObjects = results.flatMap((r) => r.contextObjects);
+      // Combine answers with per-collection labeling
       const answer =
         results.length === 1
           ? results[0].answer
-          : results.map((r, i) => `**${collectionNames[i]}**:\n${r.answer}`).join('\n\n---\n\n');
+          : results.map((r) => `**${r.collectionName}**:\n${r.answer}`).join('\n\n---\n\n');
 
       this.postMessage({
         command: 'ragResponse',

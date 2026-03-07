@@ -30,14 +30,29 @@ function generateRequestId(): string {
   return `rag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// Top-k limit options
+const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
+
 // ─── Sub-components ──────────────────────────────────────────────────
 
-/** Collapsible section for retrieved context objects */
+/** Collapsible section for retrieved context objects, grouped by collection */
 function ContextSection({ contextObjects }: { contextObjects: RagContextObject[] }) {
   const [expanded, setExpanded] = useState(false);
 
   if (contextObjects.length === 0) {
     return null;
+  }
+
+  // Group context objects by collectionName for multi-collection attribution
+  const hasCollectionNames = contextObjects.some((obj) => obj.collectionName);
+  const grouped: Map<string, RagContextObject[]> = new Map();
+  if (hasCollectionNames) {
+    for (const obj of contextObjects) {
+      const key = obj.collectionName || 'Unknown';
+      const list = grouped.get(key) || [];
+      list.push(obj);
+      grouped.set(key, list);
+    }
   }
 
   return (
@@ -57,49 +72,59 @@ function ContextSection({ contextObjects }: { contextObjects: RagContextObject[]
       </button>
       {expanded && (
         <ul id="rag-context-list" className="rag-context-list" role="list">
-          {contextObjects.map((obj) => {
-            const textProps = Object.entries(obj.properties)
-              .filter(([, v]) => typeof v === 'string')
-              .slice(0, 3);
-
-            return (
-              <li key={obj.uuid} className="rag-context-item">
-                <div className="rag-context-uuid" title={obj.uuid}>
-                  {obj.uuid}
-                </div>
-                {textProps.map(([key, value]) => (
-                  <div key={key} className="rag-context-prop">
-                    <span className="rag-context-prop-key">{key}:</span>{' '}
-                    <span className="rag-context-prop-value">
-                      {String(value).length > 200
-                        ? `${String(value).substring(0, 200)}…`
-                        : String(value)}
-                    </span>
-                  </div>
-                ))}
-                {(obj.distance != null || obj.certainty != null) && (
-                  <div className="rag-context-scores">
-                    {obj.distance != null && (
-                      <span className="rag-context-score">distance: {obj.distance.toFixed(4)}</span>
-                    )}
-                    {obj.certainty != null && (
-                      <span className="rag-context-score">
-                        certainty: {obj.certainty.toFixed(4)}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {hasCollectionNames
+            ? Array.from(grouped.entries()).map(([collectionName, objects]) => (
+                <li key={collectionName} className="rag-context-group">
+                  <div className="rag-context-collection-label">{collectionName}</div>
+                  <ul className="rag-context-list" role="list">
+                    {objects.map((obj) => (
+                      <ContextItem key={obj.uuid} obj={obj} />
+                    ))}
+                  </ul>
+                </li>
+              ))
+            : contextObjects.map((obj) => <ContextItem key={obj.uuid} obj={obj} />)}
         </ul>
       )}
     </div>
   );
 }
 
+/** A single context object item */
+function ContextItem({ obj }: { obj: RagContextObject }) {
+  const textProps = Object.entries(obj.properties)
+    .filter(([, v]) => typeof v === 'string')
+    .slice(0, 3);
+
+  return (
+    <li className="rag-context-item">
+      <div className="rag-context-uuid" title={obj.uuid}>
+        {obj.uuid}
+      </div>
+      {textProps.map(([key, value]) => (
+        <div key={key} className="rag-context-prop">
+          <span className="rag-context-prop-key">{key}:</span>{' '}
+          <span className="rag-context-prop-value">
+            {String(value).length > 200 ? `${String(value).substring(0, 200)}…` : String(value)}
+          </span>
+        </div>
+      ))}
+      {(obj.distance != null || obj.certainty != null) && (
+        <div className="rag-context-scores">
+          {obj.distance != null && (
+            <span className="rag-context-score">distance: {obj.distance.toFixed(4)}</span>
+          )}
+          {obj.certainty != null && (
+            <span className="rag-context-score">certainty: {obj.certainty.toFixed(4)}</span>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 /** A single chat history entry (question + response/error/loading) */
-function ChatEntry({ entry }: { entry: RagChatHistoryEntry }) {
+function ChatEntry({ entry, showContext }: { entry: RagChatHistoryEntry; showContext: boolean }) {
   return (
     <div className="rag-chat-entry" role="article" aria-label={`Question: ${entry.query.question}`}>
       {/* User question bubble */}
@@ -136,7 +161,7 @@ function ChatEntry({ entry }: { entry: RagChatHistoryEntry }) {
         {entry.response && (
           <>
             <div className="rag-bubble-content rag-answer">{entry.response.answer}</div>
-            <ContextSection contextObjects={entry.response.contextObjects} />
+            {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
           </>
         )}
       </div>
@@ -156,30 +181,36 @@ function CollectionSelector({
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
 }) {
-  const selectRef = useRef<HTMLSelectElement>(null);
-
   // Collections available for adding (not yet selected)
   const availableCollections = allCollections.filter((c) => !selectedCollections.includes(c));
 
-  const handleAdd = useCallback(() => {
-    const value = selectRef.current?.value;
-    if (value) {
-      onAdd(value);
-      // Reset dropdown to placeholder
-      if (selectRef.current) {
-        selectRef.current.value = '';
+  // Auto-add on select change (no separate "Add" button)
+  const handleSelectChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      if (value) {
+        onAdd(value);
+        e.target.value = ''; // Reset to placeholder
       }
-    }
-  }, [onAdd]);
+    },
+    [onAdd]
+  );
+
+  const selectedCount = selectedCollections.length;
 
   return (
     <div className="rag-collection-selector">
-      <label className="rag-label" id="rag-collection-label">
-        Collections
-      </label>
+      <div className="rag-collection-header">
+        <label className="rag-label" id="rag-collection-label">
+          Collections
+        </label>
+        {selectedCount >= 3 && (
+          <span className="rag-collection-summary">{selectedCount} collections selected</span>
+        )}
+      </div>
 
       {/* Selected collections as pills */}
-      {selectedCollections.length > 0 && (
+      {selectedCount > 0 && (
         <div className="rag-collection-pills" role="list" aria-label="Selected collections">
           {selectedCollections.map((name) => (
             <span key={name} className="rag-collection-pill" role="listitem">
@@ -198,35 +229,80 @@ function CollectionSelector({
         </div>
       )}
 
-      {/* Add collection dropdown */}
+      {/* Add collection dropdown — auto-adds on selection */}
       {availableCollections.length > 0 && (
-        <div className="rag-collection-add-row">
-          <select
-            ref={selectRef}
-            className="rag-select"
-            aria-labelledby="rag-collection-label"
-            defaultValue=""
-          >
-            <option value="" disabled>
-              {selectedCollections.length === 0
-                ? 'Select a collection…'
-                : 'Add another collection…'}
+        <select
+          className="rag-select rag-select-auto"
+          aria-labelledby="rag-collection-label"
+          value=""
+          onChange={handleSelectChange}
+        >
+          <option value="" disabled>
+            {selectedCount === 0 ? 'Select a collection…' : 'Add another collection…'}
+          </option>
+          {availableCollections.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
-            {availableCollections.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="rag-add-btn" onClick={handleAdd} title="Add collection">
-            Add
-          </button>
-        </div>
+          ))}
+        </select>
+      )}
+
+      {/* Validation hint */}
+      {selectedCount === 0 && allCollections.length > 0 && (
+        <span className="rag-validation-hint">Select at least one collection to start</span>
       )}
 
       {allCollections.length === 0 && (
         <span className="rag-no-collections">No collections available</span>
       )}
+    </div>
+  );
+}
+
+/** RAG configuration options: top-k limit and show context toggle */
+function RagOptions({
+  topK,
+  showContext,
+  onTopKChange,
+  onShowContextChange,
+}: {
+  topK: number;
+  showContext: boolean;
+  onTopKChange: (value: number) => void;
+  onShowContextChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="rag-options">
+      <div className="rag-options-group">
+        <label className="rag-options-label" htmlFor="rag-topk-select">
+          Top results per collection
+        </label>
+        <select
+          id="rag-topk-select"
+          className="rag-select rag-select-small"
+          value={topK}
+          onChange={(e) => onTopKChange(Number(e.target.value))}
+        >
+          {TOP_K_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="rag-options-group">
+        <label className="rag-options-label rag-options-label-inline" htmlFor="rag-show-context">
+          <input
+            id="rag-show-context"
+            type="checkbox"
+            checked={showContext}
+            onChange={(e) => onShowContextChange(e.target.checked)}
+          />
+          Show retrieved context
+        </label>
+      </div>
     </div>
   );
 }
@@ -243,6 +319,8 @@ export function RagChat() {
   const [question, setQuestion] = useState('');
   const [history, setHistory] = useState<RagChatHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [topK, setTopK] = useState(5);
+  const [showContext, setShowContext] = useState(true);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -363,6 +441,7 @@ export function RagChat() {
       query: {
         collectionNames: [...selectedCollections],
         question: trimmed,
+        limit: topK,
       },
       response: null,
       error: null,
@@ -378,9 +457,10 @@ export function RagChat() {
       command: 'executeRagQuery',
       collectionNames: [...selectedCollections],
       question: trimmed,
+      limit: topK,
       requestId,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, loading]);
+  }, [question, selectedCollections, loading, topK]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -433,7 +513,7 @@ export function RagChat() {
           </div>
         )}
         {history.map((entry) => (
-          <ChatEntry key={entry.id} entry={entry} />
+          <ChatEntry key={entry.id} entry={entry} showContext={showContext} />
         ))}
         <div ref={chatEndRef} />
       </main>
@@ -445,6 +525,12 @@ export function RagChat() {
           selectedCollections={selectedCollections}
           onAdd={handleAddCollection}
           onRemove={handleRemoveCollection}
+        />
+        <RagOptions
+          topK={topK}
+          showContext={showContext}
+          onTopKChange={setTopK}
+          onShowContextChange={setShowContext}
         />
         <div className="rag-chat-input-row">
           <textarea

@@ -46,10 +46,8 @@
 }
 
 .rag-clear-btn:hover {
-  background-color: var(
-    --vscode-button-secondaryHoverBackground,
-    rgba(255, 255, 255, 0.1)
-  ) !important;
+  background-color: var(--vscode-button-secondaryHoverBackground,
+      rgba(255, 255, 255, 0.1)) !important;
   border-color: var(--vscode-focusBorder, #0e639c) !important;
 }
 
@@ -149,9 +147,7 @@
   border: 1px solid var(--vscode-panel-border, #333);
 }
 
-.rag-answer {
-  /* Additional styling for the answer text */
-}
+
 
 /* ===== Error Display ===== */
 .rag-error {
@@ -276,6 +272,27 @@
   letter-spacing: 0.3px;
 }
 
+/* ===== Context Collection Grouping ===== */
+.rag-context-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+}
+
+.rag-context-collection-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+  letter-spacing: 0.3px;
+}
+
 /* ===== Input Area ===== */
 .rag-chat-input-area {
   display: flex;
@@ -294,6 +311,12 @@
   gap: 6px;
 }
 
+.rag-collection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .rag-label {
   font-size: 12px;
   font-weight: 600;
@@ -301,9 +324,21 @@
   flex-shrink: 0;
 }
 
+.rag-collection-summary {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+}
+
 .rag-no-collections {
   font-size: 12px;
   color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+}
+
+.rag-validation-hint {
+  font-size: 11px;
+  color: var(--vscode-editorWarning-foreground, #cca700);
   font-style: italic;
 }
 
@@ -372,13 +407,7 @@
   margin-top: 6px;
 }
 
-/* Add-collection row */
-.rag-collection-add-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
+/* Collection select (auto-add) */
 .rag-select {
   flex: 1;
   padding: 5px 8px;
@@ -396,29 +425,52 @@
   border-color: var(--vscode-focusBorder, #0e639c);
 }
 
-.rag-add-btn {
-  background-color: var(
-    --vscode-button-secondaryBackground,
-    var(--vscode-input-background, #3c3c3c)
-  );
-  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #fff));
-  border: 1px solid var(--vscode-button-border, var(--vscode-input-border, #3c3c3c));
-  border-radius: 4px;
-  padding: 5px 10px;
-  cursor: pointer;
+.rag-select-auto {
+  max-width: 100%;
+}
+
+.rag-select-small {
+  flex: none;
+  min-width: 60px;
+  padding: 3px 6px;
   font-size: 12px;
-  font-weight: 500;
-  flex-shrink: 0;
-  transition: background-color 0.2s ease;
 }
 
-.rag-add-btn:hover {
-  background-color: var(
-    --vscode-button-secondaryHoverBackground,
-    var(--vscode-list-hoverBackground, #505050)
-  ) !important;
+/* ===== RAG Options ===== */
+.rag-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+  flex-wrap: wrap;
 }
 
+.rag-options-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rag-options-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  white-space: nowrap;
+}
+
+.rag-options-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.rag-options-label-inline input[type='checkbox'] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--vscode-checkbox-background, var(--vscode-button-background, #0e639c));
+}
+
+/* ===== Input Row ===== */
 .rag-chat-input-row {
   display: flex;
   gap: 8px;
@@ -487,5 +539,11 @@
 
   .rag-chat-input-area {
     padding: 8px 12px;
+  }
+
+  .rag-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }

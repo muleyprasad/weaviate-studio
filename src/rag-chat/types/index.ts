@@ -32,6 +32,8 @@ export interface RagContextObject {
   distance?: number;
   /** Certainty score from vector search */
   certainty?: number;
+  /** Source collection name (for multi-collection RAG attribution) */
+  collectionName?: string;
 }
 
 /**
@@ -121,6 +123,8 @@ export interface RagChatWebviewMessage {
   limit?: number;
   /** Request ID for tracking */
   requestId?: string;
+  /** Whether to show retrieved context objects in the response */
+  showContext?: boolean;
 }
 
 // =====================================================
