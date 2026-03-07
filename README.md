@@ -103,16 +103,23 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 ### Generative Search
 
 - Chat-style interface for Retrieval-Augmented Generation queries
-- Multi-collection support: select one or more collections as pill badges; auto-add on selection from dropdown
+- **Multi-collection support**: Select one or more collections as pill badges; auto-add on selection from dropdown
+- **Query controls**:
+  - **Top results per collection**: Configure how many objects to retrieve from each collection (3, 5, 10, 20)
+  - **Query timeout**: Adjustable timeout (30s, 60s, 2min, 5min) for long-running queries with local vectorizers
+- **Answer tools**:
+  - **Copy button**: Copy full answer to clipboard
+  - **Markdown toggle**: Switch between formatted view and raw markdown source
+- **Query metadata**: Shows which collections were queried and execution time (e.g., "From: Books, PodcastSearch • Completed in 2m 34s")
 - Summary label ("3 collections selected") when 3+ collections are active to reduce visual clutter
 - Validation hint ("Select at least one collection to start") when no collection is selected; Ask button disabled until valid
-- **RAG options**: configurable "Top results per collection" (3, 5, 10, 20) and "Show retrieved context objects" toggle
 - Only RAG-capable collections (those with a generative module configured) are shown
 - Right-click a collection → **"Generative Search"** pre-selects that collection
 - Opening Generative Search from another collection while the panel is already open adds it as a new pill
-- Sequential per-collection retrieval to handle different vectorizers safely; per-collection errors are non-blocking
+- Per-collection retrieval with non-blocking error handling
 - Source attribution: context objects display their originating collection name as a badge label
-- Generated answer displayed with collapsible "Retrieved Context" section grouped by collection, showing properties, UUID, and distance/certainty scores
+- **Retrieved Context section**: Collapsible view grouped by collection, showing properties, UUID, and distance/certainty/score metrics
+- Click telescope icon (🔭) on any context object to open it in the Data Explorer
 - Relies on Weaviate's server-side generative config—no additional API keys needed in the extension
 - Loading, error, and empty states matching the rest of the extension UX
 - Clear chat button to reset conversation history

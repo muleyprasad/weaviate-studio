@@ -150,6 +150,45 @@ By default all rows are imported (embeddings are free). To limit import size, se
 }
 ```
 
+## RAG Chat Features
+
+The RAG Chat panel includes several features to enhance your generative search experience:
+
+### Query Controls
+
+Located above the question input box:
+
+| Control                        | Options               | Description                                                   |
+| ------------------------------ | --------------------- | ------------------------------------------------------------- |
+| **Collections**                | Multi-select dropdown | Select one or more collections to query simultaneously        |
+| **Top results per collection** | 3, 5, 10, 20          | How many objects to retrieve from each collection for context |
+| **Query timeout**              | 30s, 60s, 2min, 5min  | Maximum wait time for the query to complete                   |
+
+### Answer Tools
+
+Each generated answer includes a toolbar with:
+
+| Button                      | Action                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| 📝 **Markdown / Formatted** | Toggle between rendered markdown and raw markdown source |
+| 📋 **Copy**                 | Copy the full answer text to clipboard                   |
+
+### Query Metadata
+
+Below each answer, you'll see:
+
+- **📚 From:** List of collections that were queried (e.g., `Books, PodcastSearch`)
+- **⏱️ Query completed in:** Execution time (e.g., `2m 34s`)
+
+### Retrieved Context
+
+When "Show retrieved context" is enabled:
+
+- Collapsible section showing all objects retrieved for the answer
+- Grouped by collection for multi-collection queries
+- Shows key properties, UUID, and relevance scores (distance/certainty/score)
+- Click the telescope icon (🔭) to open any object in the Data Explorer
+
 ## Multi-Collection RAG Test Cases
 
 Use these test cases to verify multi-collection RAG functionality in Weaviate Studio. Open the **RAG Chat** panel, select the specified collections, and run each query.
@@ -186,12 +225,16 @@ Use these test cases to verify multi-collection RAG functionality in Weaviate St
 
 The RAG Chat panel includes a **Query timeout** dropdown (next to "Top results per collection"):
 
-- **30s** — Fast setups, small datasets, or OpenAI vectorization
-- **60s** — Moderate datasets with local transformers
-- **2min** (default) — Recommended for ~20k objects with local transformers
-- **5min** — Large datasets or slow transformer inference
+| Timeout            | Recommended For                                      |
+| ------------------ | ---------------------------------------------------- |
+| **30s**            | Fast setups, small datasets, or OpenAI vectorization |
+| **60s**            | Moderate datasets with local transformers            |
+| **2min** (default) | Recommended for ~20k objects with local transformers |
+| **5min**           | Large datasets or slow transformer inference         |
 
 Adjust the timeout if queries fail with timeout errors. For the sandbox with ~20k objects and local text2vec-transformers, 2 minutes is recommended.
+
+> **Note:** You can also set a default timeout in VS Code settings: `weaviate.ragQueryTimeout` (in milliseconds). The UI dropdown overrides this setting per query.
 
 ### Success Criteria
 

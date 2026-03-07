@@ -15,19 +15,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Multi-collection support via pill-based selector — auto-add on selection from dropdown, remove with × button
   - Summary label ("3 collections selected") when ≥ 3 collections are active to reduce visual clutter
   - Validation hint ("Select at least one collection to start") when no collection is selected; Ask button disabled until valid
-  - **RAG options**: configurable "Top results per collection" dropdown (3, 5, 10, 20) wired to the Weaviate `limit` parameter; "Show retrieved context objects" toggle to hide/show context per chat entry
+  - **RAG options**:
+    - **Top results per collection**: Configurable dropdown (3, 5, 10, 20) wired to Weaviate `limit` parameter
+    - **Query timeout**: Adjustable timeout (30s, 60s, 2min, 5min) for long-running queries with local vectorizers
+    - **Show retrieved context objects**: Toggle to hide/show context per chat entry
+  - **Answer tools**:
+    - **Copy button**: Copy full answer to clipboard
+    - **Markdown toggle**: Switch between formatted view and raw markdown source
+  - **Query metadata**: Displays sourced collections and execution time below each answer (e.g., "📚 From: Books, PodcastSearch ⏱️ Completed in 2m 34s")
   - Only RAG-capable collections (those with a generative module such as `generative-openai`, `generative-cohere`, etc.) are listed; collections without generative config are filtered out
   - Right-click a collection in the sidebar → **"Generative Search"** to open the panel with that collection pre-selected
   - If the Generative Search panel is already open, right-clicking another collection adds it as a new pill without clearing the existing selection
-  - Sequential per-collection retrieval to safely handle different vectorizers; per-collection errors are non-blocking and surfaced inline
+  - Per-collection retrieval with non-blocking error handling; per-collection errors are surfaced inline
   - Source attribution: each retrieved context object displays its originating collection name as a badge label; context sections are grouped by collection
   - Uses Weaviate's server-side generative config — no additional LLM API keys required in the extension
-  - Retrieved context objects display first 3 text properties, UUID, and distance/certainty scores
+  - Retrieved context objects display first 3 text properties, UUID, and distance/certainty/score metrics
+  - Click telescope icon (🔭) on any context object to open it in the Data Explorer
   - Loading spinner, error states, and empty state messaging consistent with the rest of the extension
   - Clear chat button to reset conversation history and collection selection
   - Enter to send, Shift+Enter for newline
   - New command: `weaviate.openRagChat` with `$(comment-discussion)` icon on collection tree items
   - Inline icon and context menu entry on collection items (alongside Data Explorer and Query Editor)
+  - VS Code setting: `weaviate.ragQueryTimeout` (default: 120000ms) for default timeout; UI dropdown overrides per query
 
 ## [1.4.0] - 2026-02-18
 
