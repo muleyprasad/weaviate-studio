@@ -133,7 +133,10 @@ export class DataExplorerPanel {
         ],
       }
     );
-    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'telescope.svg');
+    const iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'telescope.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'telescope-dark.svg'),
+    };
     panel.iconPath = iconPath;
 
     const dataExplorerPanel = new DataExplorerPanel(

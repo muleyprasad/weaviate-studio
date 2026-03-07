@@ -129,12 +129,10 @@ export class RagChatPanel {
         vscode.Uri.joinPath(extensionUri, 'out'),
       ],
     });
-    const iconPath = vscode.Uri.joinPath(
-      extensionUri,
-      'resources',
-      'icons',
-      'comment-discussion.svg'
-    );
+    const iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'comment-discussion.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'comment-discussion-dark.svg'),
+    };
     panel.iconPath = iconPath;
 
     const ragChatPanel = new RagChatPanel(

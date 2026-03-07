@@ -127,7 +127,10 @@ export class BackupRestorePanel {
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
       }
     );
-    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'debug-restart.svg');
+    const iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'debug-restart.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'debug-restart-dark.svg'),
+    };
     panel.iconPath = iconPath;
 
     BackupRestorePanel.currentPanel = new BackupRestorePanel(

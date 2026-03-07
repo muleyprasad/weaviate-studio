@@ -617,12 +617,10 @@ export class ConnectionManager {
           localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview')],
         }
       );
-      const iconPath = vscode.Uri.joinPath(
-        this.context.extensionUri,
-        'resources',
-        'icons',
-        'add.svg'
-      );
+      const iconPath = {
+        light: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'icons', 'add.svg'),
+        dark: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'icons', 'add-dark.svg'),
+      };
       panel.iconPath = iconPath;
 
       // Set the HTML content for the webview (loaded from dist)
