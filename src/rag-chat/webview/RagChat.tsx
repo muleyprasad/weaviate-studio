@@ -230,15 +230,18 @@ function ChatEntry({
         )}
         {entry.error && (
           <div className="rag-error" role="alert">
-            <span>{entry.error}</span>
+            <div className="rag-error-content">
+              <span className="codicon codicon-warning" aria-hidden="true" />
+              <span>{entry.error}</span>
+            </div>
             {onRetry && (
               <button
                 type="button"
-                className="rag-retry-btn"
+                className="rag-toolbar-btn"
                 onClick={() => onRetry(entry)}
                 title="Retry this query"
               >
-                <span className="codicon codicon-refresh" aria-hidden="true" /> Retry
+                <span className="codicon codicon-refresh" aria-hidden="true" />
               </button>
             )}
           </div>

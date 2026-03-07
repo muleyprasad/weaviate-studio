@@ -7,6 +7,25 @@
 export const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
+ * Format milliseconds to human-readable string (e.g., "5m", "30s", "2m 30s")
+ */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (remainingSeconds > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${minutes}m`;
+}
+
+/**
  * Wraps a promise with a timeout.
  * Rejects if the promise doesn't resolve within the specified timeout.
  */
@@ -17,7 +36,13 @@ export function withTimeout<T>(
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+      setTimeout(
+        () =>
+          reject(
+            new Error(`Request timed out after ${formatDuration(timeoutMs)} (${timeoutMs}ms)`)
+          ),
+        timeoutMs
+      )
     ),
   ]);
 }
@@ -40,7 +65,7 @@ export function createTimeoutError(
   timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Error {
   return new Error(
-    `${operation} timed out after ${timeoutMs}ms for ${context}. ` +
+    `${operation} timed out after ${formatDuration(timeoutMs)} (${timeoutMs}ms) for ${context}. ` +
       'Suggestions: Try again, reduce the limit, or check server connectivity.'
   );
 }
