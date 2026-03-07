@@ -2739,8 +2739,8 @@ input[type="checkbox"]:focus-visible {
     color: white;
 }
 
-/* ===== Ask AI Button in Toolbar ===== */
-.ask-ai-btn {
+/* ===== RAG Chat Button in Toolbar ===== */
+.rag-chat-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -2754,12 +2754,12 @@ input[type="checkbox"]:focus-visible {
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.ask-ai-btn:hover {
+.rag-chat-btn:hover {
     background: linear-gradient(135deg, #0d7f5f 0%, #10B981 100%);
     color: white;
 }
 
-.ask-ai-filter-badge {
+.rag-chat-filter-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2775,7 +2775,7 @@ input[type="checkbox"]:focus-visible {
     line-height: 1;
 }
 
-.ask-ai-btn:hover .ask-ai-filter-badge {
+.rag-chat-btn:hover .rag-chat-filter-badge {
     background-color: rgba(255, 255, 255, 0.3);
 }
 

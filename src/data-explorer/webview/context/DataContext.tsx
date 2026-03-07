@@ -30,6 +30,7 @@ export interface DataContextState {
   unfilteredTotalCount: number;
   loading: boolean;
   error: string | null;
+  fetchedObjectDetail: WeaviateObject | null;
 }
 
 // ============================================================================
@@ -44,6 +45,7 @@ type DataAction =
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'REFRESH' }
+  | { type: 'SET_FETCHED_OBJECT_DETAIL'; object: WeaviateObject | null }
   // Multi-tenancy actions
   | { type: 'SET_TENANTS'; tenants: TenantInfo[]; isMultiTenant: boolean }
   | { type: 'SET_SELECTED_TENANT'; tenant: string | null };
@@ -63,6 +65,7 @@ const initialState: DataContextState = {
   unfilteredTotalCount: 0,
   loading: true,
   error: null,
+  fetchedObjectDetail: null,
 };
 
 function dataReducer(state: DataContextState, action: DataAction): DataContextState {
@@ -76,6 +79,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         unfilteredTotalCount: 0,
         schema: null,
         error: null,
+        fetchedObjectDetail: null,
       };
 
     case 'SET_SCHEMA':
@@ -120,6 +124,12 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         error: null,
       };
 
+    case 'SET_FETCHED_OBJECT_DETAIL':
+      return {
+        ...state,
+        fetchedObjectDetail: action.object,
+      };
+
     case 'SET_TENANTS':
       return {
         ...state,
@@ -134,6 +144,7 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         objects: [], // Clear objects when changing tenant
         totalCount: 0,
         unfilteredTotalCount: 0,
+        fetchedObjectDetail: null,
       };
 
     default:
@@ -153,6 +164,7 @@ export interface DataContextActions {
   setError: (error: string | null) => void;
   clearError: () => void;
   refresh: () => void;
+  setFetchedObjectDetail: (object: WeaviateObject | null) => void;
   // Multi-tenancy actions
   setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => void;
   setSelectedTenant: (tenant: string | null) => void;
@@ -213,6 +225,10 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
 
       refresh: () => {
         dispatch({ type: 'REFRESH' });
+      },
+
+      setFetchedObjectDetail: (object: WeaviateObject | null) => {
+        dispatch({ type: 'SET_FETCHED_OBJECT_DETAIL', object });
       },
 
       setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => {

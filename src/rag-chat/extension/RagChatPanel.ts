@@ -220,12 +220,13 @@ export class RagChatPanel {
 
         case 'openInDataExplorer':
           // Open Data Explorer for the collection that produced the context object
+          // Pass targetUuid so the Data Explorer deep-links to the specific object
           if (message.collectionName) {
-            await vscode.commands.executeCommand(
-              'weaviate.openDataExplorer',
-              this._connectionId,
-              message.collectionName
-            );
+            await vscode.commands.executeCommand('weaviate.openDataExplorer', {
+              connectionId: this._connectionId,
+              collectionName: message.collectionName,
+              targetUuid: message.uuid,
+            });
           }
           break;
       }

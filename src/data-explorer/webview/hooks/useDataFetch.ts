@@ -11,6 +11,7 @@ import {
   useFilterState,
   useFilterActions,
   useVectorSearchActions,
+  useUIActions,
 } from '../context';
 import { getVSCodeAPI } from '../utils/vscodeApi';
 import type { ExtensionMessage, WebviewMessage, SortState } from '../../types';
@@ -19,6 +20,7 @@ export function useDataFetch() {
   const dataState = useDataState();
   const dataActions = useDataActions();
   const uiState = useUIState();
+  const uiActions = useUIActions();
   const filterState = useFilterState();
   const filterActions = useFilterActions();
   const vectorSearchActions = useVectorSearchActions();
@@ -147,7 +149,11 @@ export function useDataFetch() {
             break;
 
           case 'objectDetailLoaded':
-            // Object detail is handled separately (ObjectDetailPanel listens for this)
+            // Object detail was explicitly fetched (e.g. from deep link or not on current page)
+            if (message.object) {
+              dataActions.setFetchedObjectDetail(message.object);
+              uiActions.openDetailPanel(message.object.uuid);
+            }
             break;
 
           case 'openObjectDetail':
@@ -287,11 +293,20 @@ export function useDataFetch() {
   // Deep-link: if the panel was opened with a target UUID, auto-open its detail panel
   useEffect(() => {
     const targetUuid = (window as any).initialData?.targetUuid;
-    if (targetUuid && initialFetchDoneRef.current) {
+    // Note: since initialFetchDoneRef doesn't trigger a re-render, we need to check this periodically
+    // or rely on a state variable. As a simple fix, we add dataState.objects to dependencies
+    // so it evaluates after data is loaded.
+    if (
+      targetUuid &&
+      (window as any).initialData?._deepLinkFired !== true &&
+      dataState.objects &&
+      dataState.objects.length > 0
+    ) {
       getObjectDetail(targetUuid);
+      // Mark as fired so we don't spam it
+      (window as any).initialData._deepLinkFired = true;
     }
-    // Run once after initial fetch completes; initialFetchDoneRef triggers via objectsLoaded
-  }, [initialFetchDoneRef.current]);
+  }, [dataState.objects, getObjectDetail]);
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {

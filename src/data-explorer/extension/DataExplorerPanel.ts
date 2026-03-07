@@ -290,11 +290,13 @@ export class DataExplorerPanel {
 
         case 'openRagChat':
           // Open RAG Chat for this collection, passing active filters if any
+          // Pass forceNew: false so it doesn't destroy an existing panel and clear history
           await vscode.commands.executeCommand('weaviate.openRagChat', {
             connectionId: this._connectionId,
             collectionName: this._collectionName,
             inheritedFilters: message.activeFilters,
             inheritedFilterMatchMode: message.filterMatchMode,
+            forceNew: false,
           });
           break;
 

@@ -82,7 +82,11 @@ function DataExplorerContent() {
     if (!uiState.selectedObjectId) {
       return null;
     }
-    // First check table data
+    // Check explicitly fetched object first (e.g., from deep link)
+    if (dataState.fetchedObjectDetail?.uuid === uiState.selectedObjectId) {
+      return dataState.fetchedObjectDetail;
+    }
+    // Then check table data
     const fromTable = dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId);
     if (fromTable) {
       return fromTable;
@@ -92,7 +96,12 @@ function DataExplorerContent() {
       (result) => result.object.uuid === uiState.selectedObjectId
     );
     return fromSearch?.object || null;
-  }, [uiState.selectedObjectId, dataState.objects, vectorSearchState.searchResults]);
+  }, [
+    uiState.selectedObjectId,
+    dataState.objects,
+    vectorSearchState.searchResults,
+    dataState.fetchedObjectDetail,
+  ]);
 
   // Get schema properties for filter builder
   const schemaProperties = dataState.schema?.properties || [];
@@ -181,10 +190,10 @@ function DataExplorerContent() {
           {/* Tenant selector for multi-tenant collections */}
           <TenantSelector />
 
-          {/* Ask AI button - opens RAG Chat for this collection */}
+          {/* RAG Chat button - opens RAG Chat for this collection */}
           <button
             type="button"
-            className="toolbar-btn ask-ai-btn"
+            className="toolbar-btn rag-chat-btn"
             onClick={() =>
               postMessageToExtension({
                 command: 'openRagChat',
@@ -197,16 +206,16 @@ function DataExplorerContent() {
             }
             title={
               filterState.activeFilters.length > 0
-                ? `Ask AI with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
-                : 'Ask AI about this collection (RAG Chat)'
+                ? `RAG Chat with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
+                : 'Open RAG Chat for this collection'
             }
             aria-label="Open RAG Chat for this collection"
-            id="ask-ai-btn"
+            id="rag-chat-btn"
           >
             <span className="codicon codicon-comment-discussion" aria-hidden="true" />
-            Ask AI
+            RAG Chat
             {filterState.activeFilters.length > 0 && (
-              <span className="ask-ai-filter-badge">{filterState.activeFilters.length}</span>
+              <span className="rag-chat-filter-badge">{filterState.activeFilters.length}</span>
             )}
           </button>
 

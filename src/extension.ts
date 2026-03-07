@@ -1356,12 +1356,16 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('weaviate.openRagChat', (arg1: any) => {
       let connectionId: string;
       let collectionName: string | undefined;
+      let forceNew = true; // default true for context menu clicks
 
       if (typeof arg1 === 'string') {
         connectionId = arg1;
       } else if (arg1?.connectionId) {
         connectionId = arg1.connectionId;
         collectionName = arg1.label || arg1.collectionName;
+        if (arg1.forceNew !== undefined) {
+          forceNew = arg1.forceNew;
+        }
       } else {
         console.error('Invalid arguments for weaviate.openRagChat:', arg1);
         return;
@@ -1370,13 +1374,12 @@ export function activate(context: vscode.ExtensionContext) {
       const connectionManager = weaviateTreeDataProvider.getConnectionManager();
       const getClient = () => connectionManager.getClient(connectionId);
 
-      // forceNew=true when opening from collection context menu to start fresh
       RagChatPanel.createOrShow(
         context.extensionUri,
         connectionId,
         getClient,
         collectionName,
-        true,
+        forceNew,
         arg1?.inheritedFilters,
         arg1?.inheritedFilterMatchMode
       );
