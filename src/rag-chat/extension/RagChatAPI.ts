@@ -57,6 +57,7 @@ export class RagChatAPI {
       properties: Record<string, unknown>;
       distance?: number;
       certainty?: number;
+      score?: number;
     }>;
   }> {
     try {
@@ -107,18 +108,14 @@ export class RagChatAPI {
 
       const queryOptions: Record<string, unknown> = {
         limit: params.limit ?? 5,
-        returnMetadata: ['distance', 'certainty'],
+        returnMetadata: ['distance', 'certainty', 'score'],
       };
       if (builtFilter) {
         queryOptions.filters = builtFilter;
       }
 
       const result = await withTimeout(
-        collection.generate.nearText(
-          [params.question],
-          { groupedTask: params.question },
-          queryOptions
-        ),
+        collection.generate.hybrid(params.question, { groupedTask: params.question }, queryOptions),
         this.REQUEST_TIMEOUT
       );
 
@@ -129,12 +126,14 @@ export class RagChatAPI {
           metadata?: {
             distance?: number;
             certainty?: number;
+            score?: number;
           };
         }) => ({
           uuid: obj.uuid,
           properties: obj.properties,
           distance: obj.metadata?.distance,
           certainty: obj.metadata?.certainty,
+          score: obj.metadata?.score,
         })
       );
 

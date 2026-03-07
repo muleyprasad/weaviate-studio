@@ -344,7 +344,7 @@ export class RagChatPanel {
       const answer =
         results.length === 1
           ? results[0].answer
-          : results.map((r) => `**${r.collectionName}**:\n${r.answer}`).join('\n\n---\n\n');
+          : results.map((r) => `### From ${r.collectionName}\n\n${r.answer}`).join('\n\n---\n\n');
 
       this.postMessage({
         command: 'ragResponse',

@@ -6,8 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import Markdown from 'markdown-to-jsx';
 import type {
   RagChatHistoryEntry,
   RagContextObject,
@@ -192,7 +191,7 @@ function ChatEntry({ entry, showContext }: { entry: RagChatHistoryEntry; showCon
         {entry.response && (
           <>
             <div className="rag-bubble-content rag-answer">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.response.answer}</ReactMarkdown>
+              <Markdown>{entry.response.answer}</Markdown>
             </div>
             {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
           </>
