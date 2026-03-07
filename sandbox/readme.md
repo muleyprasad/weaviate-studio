@@ -1,99 +1,111 @@
 # Weaviate Studio Sandbox
 
-A comprehensive local Weaviate environment for testing **nested properties** and **cross-references** in Weaviate Studio. This sandbox provides a complete setup with realistic test data to validate the enhanced query editor features.
+A local sandbox for testing **nested properties**, **cross-references**, and **multi-collection RAG** in [Weaviate Studio](https://marketplace.visualstudio.com/items?itemName=weaviate.weaviate-studio).
 
-## 🚀 Quick Start
+## What This Sandbox Supports
 
-1. **Start Weaviate:**
+- **Nested object properties** – `Author.address`, `Book.metadata`, `GitHubUser.stats`
+- **Cross-references** – `Book → Author`, `GitHubRepo → GitHubUser`, `Review → Book`
+- **Multi-collection RAG** – query across Books and Podcasts with generative search
+- **Generative queries** – natural-language answers grounded in retrieved data
+- **Retrieved context inspection** – see which objects were retrieved before generation
+- **Collection selection** – pick one or more collections in RAG Chat / Generative Search
 
-# Weaviate Local Sandbox
+## How It Works
 
-This sandbox provides a lightweight **two-container Weaviate environment** for local testing and development:
+All collections use the **local text2vec-transformers** sidecar for free embeddings — no API key needed for data import or vector search. The **generative-openai** module is also enabled, so you can run RAG / generative queries when you provide an `OPENAI_API_KEY` (only charged at query time, not on import).
 
-- One container runs **Weaviate**, the open-source vector database with **file-based backup support**
-- The second container runs a **local text2vec-transformers inference service** for text embeddings
+## Collections
 
-Everything runs locally — **no paid API keys or external services** are required, since embeddings are generated within the local transformer container.
+### Legacy (nested properties & cross-references)
 
-This setup is ideal for experimenting with schema design, testing queries, integrating with the Weaviate client libraries, or building local prototypes before deploying to the cloud.
+| Collection           | Objects | Source                                                                      |
+| -------------------- | ------- | --------------------------------------------------------------------------- |
+| **JeopardyQuestion** | 100     | [Weaviate edu-datasets](https://github.com/weaviate-tutorials/edu-datasets) |
+| **Author**           | 3       | Hardcoded sample data                                                       |
+| **Publisher**        | 3       | Hardcoded sample data                                                       |
+| **Book**             | 3       | Hardcoded sample data (refs → Author, Publisher)                            |
+| **Review**           | 3       | Hardcoded sample data (refs → Book)                                         |
+| **GitHubUser**       | ~5      | Live GitHub API                                                             |
+| **GitHubRepo**       | ~10     | Live GitHub API (refs → GitHubUser)                                         |
+| **GitHubIssue**      | ~5      | Live GitHub API (refs → GitHubRepo, GitHubUser)                             |
 
-For more details, see the official Weaviate documentation:
+### RAG (text-rich, generative-ready)
 
-- [Weaviate Quickstart (Local)](https://docs.weaviate.io/weaviate/quickstart/local)
-- [Docker Installation Guide](https://docs.weaviate.io/deploy/installation-guides/docker-installation)
-- [Local Transformers Module](https://docs.weaviate.io/weaviate/model-providers/transformers)
+| Collection        | Objects | Source                                                                                                                                              |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Books**         | ~10,000 | [Goodbooks-10k](https://github.com/zygmuntz/goodbooks-10k) — [books.csv](https://raw.githubusercontent.com/zygmuntz/goodbooks-10k/master/books.csv) |
+| **PodcastSearch** | ~10,000 | [Podcasts-Data](https://github.com/odenizgiz/Podcasts-Data) — `df_popular_podcasts.csv`                                                             |
 
----
+Each RAG collection includes a synthesised `content` field that combines key metadata into a single text block for better retrieval and generation.
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
-- Python 3.8+ (for running the sample data script)
-- At least 4GB of available RAM (8GB recommended)
-- Optional: NVIDIA GPU for accelerated embeddings
+- Docker and Docker Compose
+- Python 3.8+ with `pip`
+- At least 4 GB RAM (8 GB recommended — the transformers sidecar needs memory)
+- **Optional:** An OpenAI API key (only needed for generative / RAG queries)
 
----
+## Setup
 
-## What’s Included
-
-- **docker-compose.yml**  
-  Launches a local Weaviate instance with the `text2vec-transformers` module configured for CPU or GPU embeddings.
-- **populate.py**  
-  A sample script that:
-  - Uses Weaviate’s latest v4 client API
-  - Creates a `JeopardyQuestion` collection with text vectorization
-  - Imports 100 sample Jeopardy questions
-  - Demonstrates schema creation, batch importing, and error handling
-- **API Key configuration**
-  - API Key: `test-key-123`
-  - User: `studio-user@example.com` (any username works)
-- **Preconfigured for fast local testing** with VS Code extensions, Weaviate Studio, or CLI-based scripts.
-
----
-
-## Getting Started
-
-### 1. Start the Environment
+### 1. Create your `.env` file (optional — only for RAG queries)
 
 ```bash
-docker-compose up -d
+cp .env.example .env
 ```
 
-2. **Populate with test data:**
+Open `.env` and replace the placeholder with your real OpenAI API key:
 
-   ```bash
-   python3 populate.py
-   ```
+```
+OPENAI_API_KEY=sk-…
+```
 
-3. **Connect to Weaviate:**
-   - **Endpoint:** `http://localhost:8080`
-   - **API Key:** `test-key-123`
+> **Without an OpenAI key:** data import and vector search work fine. Only generative queries require the key.
 
-## 📊 What You Get
+### 2. Start Weaviate
 
-### Collections Created
+```bash
+docker compose up -d
+```
 
-1. **JeopardyQuestion** - 100 trivia questions (original test data)
-2. **Author** - Authors with nested address objects and geo coordinates
-3. **Publisher** - Publishers with nested contact information
-4. **Book** - Books with references to authors/publishers and nested metadata
-5. **Review** - Reviews with nested reviewer info and references to books
-6. **GitHubUser** - Real GitHub users with nested stats and URLs
-7. **GitHubRepo** - Real repositories with nested metrics and license info
-8. **GitHubIssue** - Real issues with nested reactions and labels
+### 3. Install Python dependencies
 
-### Key Features to Test
+```bash
+pip install weaviate-client requests
+```
 
-- **Nested Object Properties**: `Author.address`, `Book.metadata`, `GitHubUser.stats`
-- **Cross-References**: `Book → Author`, `GitHubRepo → GitHubUser`, `Review → Book`
-- **Various Data Types**: Text, Numbers, Booleans, Dates, GeoCoordinates
-- **Real-World Data**: Actual GitHub data via API
+### 4. Populate seed data
 
-## 🧪 Testing Nested Properties
+```bash
+# All collections (legacy + RAG)
+python3 populate.py
 
-### Sample Queries
+# Or selectively:
+python3 populate.py --rag-only        # Only Books + PodcastSearch
+python3 populate.py --legacy-only     # Only Jeopardy, Author, Book, GitHub, etc.
+python3 populate.py --skip-github     # Skip GitHub API calls
+python3 populate.py --verify-only     # Just check what's already loaded
+```
 
-**Nested Address Information:**
+By default all rows are imported (embeddings are free). To limit import size, set `BOOKS_LIMIT` and `PODCASTS_LIMIT` in `populate.py` to a non-zero value. Note: importing ~20k objects through the local transformer can take a while on CPU.
+
+### 5. Connect from Weaviate Studio
+
+| Setting  | Value                   |
+| -------- | ----------------------- |
+| Endpoint | `http://localhost:8080` |
+| API Key  | `test-key-123`          |
+
+## Example Prompts to Test
+
+### RAG / Generative Search (requires OpenAI key)
+
+- _"Find highly rated fantasy books"_
+- _"What topics do these podcasts cover?"_
+- _"Which books and podcasts are related to psychology?"_
+- _"Compare rationality-related podcast topics with highly rated nonfiction books"_
+
+### Nested Properties & Cross-References
 
 ```graphql
 {
@@ -101,10 +113,8 @@ docker-compose up -d
     Author {
       name
       address {
-        street
         city
         country
-        zipCode
       }
       coordinates {
         latitude
@@ -115,8 +125,6 @@ docker-compose up -d
 }
 ```
 
-**Book Metadata with References:**
-
 ```graphql
 {
   Get {
@@ -126,18 +134,15 @@ docker-compose up -d
         language
         edition
         format
-        weight
       }
       writtenBy {
         ... on Author {
           name
-          birthYear
         }
       }
       publishedBy {
         ... on Publisher {
           name
-          foundedYear
         }
       }
     }
@@ -145,142 +150,56 @@ docker-compose up -d
 }
 ```
 
-**GitHub Data with Nested Stats:**
+## Troubleshooting
 
-```graphql
-{
-  Get {
-    GitHubUser {
-      name
-      login
-      stats {
-        publicRepos
-        followers
-        following
-      }
-      urls {
-        htmlUrl
-        blog
-      }
-    }
-  }
-}
-```
-
-**Complex Cross-Reference Query:**
-
-```graphql
-{
-  Get {
-    GitHubIssue {
-      title
-      state
-      reactions {
-        totalCount
-        plusOne
-        heart
-      }
-      belongsToRepo {
-        ... on GitHubRepo {
-          name
-          metrics {
-            stargazersCount
-          }
-          ownedBy {
-            ... on GitHubUser {
-              name
-              login
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-## 🔧 Manual Testing Checklist
-
-Use Weaviate Studio to verify:
-
-- [ ] **Schema Introspection** - Nested properties appear in schema view
-- [ ] **Query Templates** - Templates work with nested properties
-- [ ] **Autocomplete** - Nested fields show in autocomplete
-- [ ] **Cross-Reference Navigation** - Reference traversal works
-- [ ] **Sample Query Generation** - Auto-generated queries include nested fields
-- [ ] **Error Handling** - Invalid nested property paths handled gracefully
-- [ ] **Performance** - Multi-level nested queries perform well
-
-## 🛠️ Configuration
-
-### Docker Compose Features
-
-- **HTTP-Only Mode**: GRPC disabled for compatibility (`DISABLE_GRPC: 'true'`)
-- **API Key Authentication**: Uses `test-key-123` for secure access
-- **Local Embeddings**: `text2vec-transformers` with `sentence-transformers-multi-qa-MiniLM-L6-cos-v1`
-- **Persistent Storage**: Data survives container restarts
-- **Backup Support**: Filesystem backup module enabled
-
-### GPU Support (Optional)
-
-Enable GPU acceleration by changing in `docker-compose.yml`:
-
-```yaml
-ENABLE_CUDA: '1' # Set to '1' if you have GPU
-```
-
-## 🐛 Troubleshooting
-
-**Connection Issues:**
+### Container not starting
 
 ```bash
-# Check if containers are running
-docker-compose ps
-
-# View logs
-docker-compose logs weaviate
-docker-compose logs text2vec-transformers
+docker compose ps
+docker compose logs weaviate
+docker compose logs text2vec-transformers
 ```
 
-**Data Issues:**
+### Missing OpenAI key (generative queries fail)
+
+If you see `unauthorized` or `API key` errors on generative queries, make sure `.env` contains a valid `OPENAI_API_KEY` and restart:
 
 ```bash
-# Reset everything
-docker-compose down -v && docker-compose up -d
+docker compose down
+docker compose up -d
+```
 
-# Re-populate data
+> Vector search and data import work without an OpenAI key — only generative queries need it.
+
+### GitHub API rate limits
+
+The script includes rate-limiting delays. If you hit limits, wait an hour and re-run, or use `--skip-github`.
+
+### Dataset download fails
+
+The populate script downloads CSVs from GitHub. If URLs are unreachable, retry after a few minutes. The script logs the exact error and continues gracefully.
+
+### Reset everything
+
+```bash
+docker compose down -v
+docker compose up -d
 python3 populate.py
 ```
 
-**GitHub API Rate Limits:**
+## Files
 
-- The script includes rate limiting delays
-- If you hit limits, wait 1 hour and re-run
+| File                 | Purpose                                                             |
+| -------------------- | ------------------------------------------------------------------- |
+| `docker-compose.yml` | Weaviate + text2vec-transformers sidecar + generative-openai module |
+| `.env.example`       | Template for the optional `OPENAI_API_KEY`                          |
+| `populate.py`        | Creates all collections (legacy + RAG) and imports seed data        |
+| `README.md`          | This documentation                                                  |
 
-## 📁 Files
-
-- `docker-compose.yml` - Weaviate + transformers setup with HTTP-only mode
-- `populate.py` - Comprehensive data population script
-- `README.md` - This documentation
-
-## 🎯 Expected Outcomes
-
-After setup, you should be able to:
-
-1. **See nested properties** in Weaviate Studio's schema view
-2. **Generate sample queries** that include nested field selections
-3. **Navigate cross-references** in query results
-4. **Use autocomplete** for nested property paths
-5. **Test complex queries** with multiple levels of nesting
-6. **Verify error handling** for invalid nested paths
-
-## 🔗 References
+## References
 
 - [Weaviate Documentation](https://docs.weaviate.io/)
-- [Weaviate Studio](https://weaviate.io/developers/weaviate/tools/weaviate-studio)
-- [GraphQL Query Guide](https://docs.weaviate.io/developers/weaviate/api/graphql)
-- [Nested Properties Documentation](https://docs.weaviate.io/developers/weaviate/config-refs/schema/multi-tenancy)
-
----
-
-**This sandbox validates the nested property support in QueryEditorPanel.ts and graphqlTemplates.ts across various real-world scenarios.**
+- [OpenAI Generative Module](https://docs.weaviate.io/weaviate/model-providers/openai/generative)
+- [Local Transformers Module](https://docs.weaviate.io/weaviate/model-providers/transformers)
+- [Goodbooks-10k Dataset](https://github.com/zygmuntz/goodbooks-10k)
+- [Podcasts-Data Dataset](https://github.com/odenizgiz/Podcasts-Data)

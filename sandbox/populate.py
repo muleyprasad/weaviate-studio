@@ -1,32 +1,44 @@
 #!/usr/bin/env python3
 """
-Weaviate Studio Sandbox - Comprehensive Test Data Population
+Weaviate Studio Sandbox – Comprehensive Test Data Population
 
-This script creates multiple collections with nested properties and cross-references
-to test the enhanced query editor features in Weaviate Studio.
+This script creates collections for both nested-property / cross-reference testing
+AND multi-collection RAG / generative search testing.
 
-Collections created:
-1. JeopardyQuestion - Original trivia questions
-2. Author - Authors with nested address objects
-3. Publisher - Publishers with nested contact info
-4. Book - Books with references and nested metadata
-5. Review - Reviews with nested reviewer info
-6. GitHubUser - Real GitHub users with nested stats
-7. GitHubRepo - Real repositories with nested metrics
-8. GitHubIssue - Real issues with nested reactions
+All collections use local text2vec-transformers for free embeddings.
+RAG collections also have generative-openai configured for generative queries.
+
+Legacy collections (nested properties & cross-references):
+  1. JeopardyQuestion – Trivia questions
+  2. Author           – Authors with nested address objects
+  3. Publisher         – Publishers with nested contact info
+  4. Book             – Books with references and nested metadata
+  5. Review           – Reviews with nested reviewer info
+  6. GitHubUser       – Real GitHub users with nested stats
+  7. GitHubRepo       – Real repositories with nested metrics
+  8. GitHubIssue      – Real issues with nested reactions
+
+RAG collections (text-rich, generative-ready):
+  9. Books            – Goodbooks-10k metadata
+ 10. PodcastSearch    – iTunes popular-podcasts dataset
 
 Usage:
-    python3 populate.py [--skip-github] [--verify-only]
-    
+    python3 populate.py [--skip-github] [--verify-only] [--rag-only] [--legacy-only]
+
 Options:
     --skip-github   Skip GitHub data fetching (faster, no API calls)
     --verify-only   Only verify existing collections, don't populate
+    --rag-only      Only create the RAG collections (Books, PodcastSearch)
+    --legacy-only   Only create the legacy collections (Jeopardy, Author, etc.)
 """
 
 import weaviate
 import weaviate.classes as wvc
+from weaviate.classes.config import Configure, Property, DataType
 import requests
 import json
+import csv
+import io
 import time
 import os
 import sys
@@ -34,51 +46,111 @@ import argparse
 from datetime import datetime
 import random
 
+# ──────────────────────────────────────────────────────────────
+# Constants – tweak these to change how much data is imported.
+# ──────────────────────────────────────────────────────────────
+# Set to 0 to import all rows. Local transformer embeddings are free.
+BOOKS_LIMIT = 0
+PODCASTS_LIMIT = 0
+
+BOOKS_CSV_URL = (
+    "https://raw.githubusercontent.com/zygmuntz/goodbooks-10k/master/books.csv"
+)
+PODCASTS_CSV_URL = (
+    "https://raw.githubusercontent.com/odenizgiz/Podcasts-Data/master/df_popular_podcasts.csv"
+)
+
+WEAVIATE_HOST = "localhost"
+WEAVIATE_PORT = 8080
+WEAVIATE_API_KEY = "test-key-123"
+
 # Force HTTP-only mode
-os.environ['WEAVIATE_GRPC_ENABLED'] = 'false'
+os.environ["WEAVIATE_GRPC_ENABLED"] = "false"
+
+
+# ──────────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────────
+def download_csv(url: str, label: str) -> list[dict]:
+    """Download a CSV from *url* and return a list of row-dicts."""
+    print(f"⬇  Downloading {label} from {url} …")
+    try:
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+    except Exception as exc:
+        print(f"✗  Failed to download {label}: {exc}")
+        return []
+
+    try:
+        text = resp.content.decode("utf-8")
+    except UnicodeDecodeError:
+        text = resp.content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    rows = [row for row in reader]
+    print(f"✓  Downloaded {len(rows)} rows for {label}")
+    return rows
+
+
+def safe_int(value, default=0):
+    if not value:
+        return default
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_float(value, default=0.0):
+    if not value:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
 
 def connect_to_weaviate():
     """Connect to Weaviate with error handling"""
     try:
         client = weaviate.connect_to_local(
-            host="localhost",
-            port=8080,
-            auth_credentials=weaviate.auth.AuthApiKey("test-key-123"),
-            skip_init_checks=True,  # Skip GRPC health checks since we disabled GRPC
+            host=WEAVIATE_HOST,
+            port=WEAVIATE_PORT,
+            auth_credentials=weaviate.auth.AuthApiKey(WEAVIATE_API_KEY),
+            skip_init_checks=True,
             additional_config=weaviate.config.AdditionalConfig(
                 timeout=weaviate.config.Timeout(init=30, query=60, insert=120)
             )
         )
         print("✓ Connected to Weaviate successfully")
-        
-        # Wait for Weaviate to be ready
+
         print("Checking if Weaviate is ready...")
-        ready = False
         for attempt in range(10):
             try:
                 client.collections.list_all()
-                ready = True
-                break
-            except Exception as e:
+                print("✓ Weaviate is ready")
+                return client
+            except Exception:
                 print(f"Waiting for Weaviate to be ready... (attempt {attempt + 1}/10)")
                 time.sleep(2)
-        
-        if not ready:
-            print("✗ Weaviate is not ready after 20 seconds")
-            return None
-        
-        print("✓ Weaviate is ready")
-        return client
-        
+
+        print("✗ Weaviate is not ready after 20 seconds")
+        return None
+
     except Exception as e:
         print(f"✗ Failed to connect to Weaviate: {e}")
-        print("Make sure Weaviate is running with: docker-compose up -d")
+        print("Make sure Weaviate is running with: docker compose up -d")
         return None
+
+
+# ══════════════════════════════════════════════════════════════
+# LEGACY COLLECTIONS (nested properties & cross-references)
+# ══════════════════════════════════════════════════════════════
 
 def create_jeopardy_collection(client):
     """Create and populate JeopardyQuestion collection"""
     print("\n=== Creating JeopardyQuestion collection ===")
-    
+
     try:
         if client.collections.exists("JeopardyQuestion"):
             client.collections.delete("JeopardyQuestion")
@@ -89,28 +161,27 @@ def create_jeopardy_collection(client):
     try:
         collection = client.collections.create(
             name="JeopardyQuestion",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="question", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="answer", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="round", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="value", data_type=wvc.config.DataType.INT),
+                Property(name="question", data_type=DataType.TEXT),
+                Property(name="answer", data_type=DataType.TEXT),
+                Property(name="round", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="value", data_type=DataType.INT),
             ]
         )
         print("✓ JeopardyQuestion collection created successfully!")
-        
-        # Load sample data
+
         print("Downloading Jeopardy sample data...")
         url = 'https://raw.githubusercontent.com/weaviate-tutorials/edu-datasets/main/jeopardy_100.json'
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = json.loads(resp.text)
         print(f"✓ Downloaded {len(data)} sample questions")
-        
-        # Import data using individual insertions (HTTP-only)
+
         print("Starting Jeopardy data import...")
         success_count = 0
-        
+
         for i, row in enumerate(data):
             try:
                 question_object = {
@@ -119,27 +190,25 @@ def create_jeopardy_collection(client):
                     "value": row.get("Value", 0) if row.get("Value") else 0,
                     "round": row["Round"],
                 }
-                
                 collection.data.insert(question_object)
                 success_count += 1
-                
                 if (i + 1) % 10 == 0:
                     print(f"Imported {i + 1} Jeopardy questions...")
-                    
             except Exception as e:
                 print(f"Failed to insert Jeopardy question {i + 1}: {e}")
-        
+
         print(f"✓ Successfully imported {success_count} out of {len(data)} Jeopardy questions")
         return True
-        
+
     except Exception as e:
         print(f"✗ Failed to create JeopardyQuestion collection: {e}")
         return False
 
+
 def create_book_collections(client):
     """Create and populate Author, Publisher, Book, and Review collections"""
     print("\n=== Creating Book Domain Collections ===")
-    
+
     # Collection 1: Author
     print("Creating Author collection...")
     try:
@@ -152,23 +221,24 @@ def create_book_collections(client):
     try:
         author_collection = client.collections.create(
             name="Author",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="bio", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="birthYear", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(name="isActive", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(
+                Property(name="name", data_type=DataType.TEXT),
+                Property(name="bio", data_type=DataType.TEXT),
+                Property(name="birthYear", data_type=DataType.INT),
+                Property(name="isActive", data_type=DataType.BOOL),
+                Property(
                     name="address",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="street", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="city", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="country", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="zipCode", data_type=wvc.config.DataType.TEXT),
+                        Property(name="street", data_type=DataType.TEXT),
+                        Property(name="city", data_type=DataType.TEXT),
+                        Property(name="country", data_type=DataType.TEXT),
+                        Property(name="zipCode", data_type=DataType.TEXT),
                     ]
                 ),
-                wvc.config.Property(name="coordinates", data_type=wvc.config.DataType.GEO_COORDINATES),
+                Property(name="coordinates", data_type=DataType.GEO_COORDINATES),
             ]
         )
         print("✓ Author collection created successfully!")
@@ -188,21 +258,22 @@ def create_book_collections(client):
     try:
         publisher_collection = client.collections.create(
             name="Publisher",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="foundedYear", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(name="website", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(
+                Property(name="name", data_type=DataType.TEXT),
+                Property(name="foundedYear", data_type=DataType.INT),
+                Property(name="website", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(
                     name="contactInfo",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="email", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="phone", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="address", data_type=wvc.config.DataType.TEXT),
+                        Property(name="email", data_type=DataType.TEXT),
+                        Property(name="phone", data_type=DataType.TEXT),
+                        Property(name="address", data_type=DataType.TEXT),
                     ]
                 ),
-                wvc.config.Property(name="headquarters", data_type=wvc.config.DataType.GEO_COORDINATES),
+                Property(name="headquarters", data_type=DataType.GEO_COORDINATES),
             ]
         )
         print("✓ Publisher collection created successfully!")
@@ -222,24 +293,25 @@ def create_book_collections(client):
     try:
         book_collection = client.collections.create(
             name="Book",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="title", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="description", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="isbn", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="publishedDate", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="pageCount", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(name="price", data_type=wvc.config.DataType.NUMBER),
-                wvc.config.Property(name="inStock", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="genre", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(
+                Property(name="title", data_type=DataType.TEXT),
+                Property(name="description", data_type=DataType.TEXT),
+                Property(name="isbn", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="publishedDate", data_type=DataType.DATE),
+                Property(name="pageCount", data_type=DataType.INT),
+                Property(name="price", data_type=DataType.NUMBER),
+                Property(name="inStock", data_type=DataType.BOOL),
+                Property(name="genre", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(
                     name="metadata",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="language", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="edition", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="format", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="weight", data_type=wvc.config.DataType.NUMBER),
+                        Property(name="language", data_type=DataType.TEXT),
+                        Property(name="edition", data_type=DataType.TEXT),
+                        Property(name="format", data_type=DataType.TEXT),
+                        Property(name="weight", data_type=DataType.NUMBER),
                     ]
                 ),
             ],
@@ -265,21 +337,22 @@ def create_book_collections(client):
     try:
         review_collection = client.collections.create(
             name="Review",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="title", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="content", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="rating", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(name="reviewDate", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="verified", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(
+                Property(name="title", data_type=DataType.TEXT),
+                Property(name="content", data_type=DataType.TEXT),
+                Property(name="rating", data_type=DataType.INT),
+                Property(name="reviewDate", data_type=DataType.DATE),
+                Property(name="verified", data_type=DataType.BOOL),
+                Property(
                     name="reviewer",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="email", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="memberSince", data_type=wvc.config.DataType.DATE),
-                        wvc.config.Property(name="totalReviews", data_type=wvc.config.DataType.INT),
+                        Property(name="name", data_type=DataType.TEXT),
+                        Property(name="email", data_type=DataType.TEXT),
+                        Property(name="memberSince", data_type=DataType.DATE),
+                        Property(name="totalReviews", data_type=DataType.INT),
                     ]
                 ),
             ],
@@ -294,8 +367,7 @@ def create_book_collections(client):
 
     # Populate with sample data
     print("\nPopulating book domain collections...")
-    
-    # Sample Authors
+
     authors_data = [
         {
             "name": "J.K. Rowling",
@@ -332,7 +404,6 @@ def create_book_collections(client):
         except Exception as e:
             print(f"✗ Failed to insert author {author_data['name']}: {e}")
 
-    # Sample Publishers
     publishers_data = [
         {
             "name": "Bloomsbury Publishing",
@@ -366,7 +437,6 @@ def create_book_collections(client):
         except Exception as e:
             print(f"✗ Failed to insert publisher {publisher_data['name']}: {e}")
 
-    # Sample Books with references
     books_data = [
         {
             "title": "Harry Potter and the Philosopher's Stone",
@@ -418,7 +488,6 @@ def create_book_collections(client):
         except Exception as e:
             print(f"✗ Failed to insert book {book_data['title']}: {e}")
 
-    # Sample Reviews with references
     reviews_data = [
         {
             "title": "Magical and Captivating",
@@ -456,13 +525,14 @@ def create_book_collections(client):
         except Exception as e:
             print(f"✗ Failed to insert review {review_data['title']}: {e}")
 
-    print(f"✓ Book domain collections populated successfully!")
+    print("✓ Book domain collections populated successfully!")
     return True
+
 
 def create_github_collections(client, skip_github=False):
     """Create and populate GitHub collections"""
     print("\n=== Creating GitHub Collections ===")
-    
+
     # Collection 1: GitHubUser
     print("Creating GitHubUser collection...")
     try:
@@ -475,33 +545,34 @@ def create_github_collections(client, skip_github=False):
     try:
         github_user_collection = client.collections.create(
             name="GitHubUser",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="login", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="bio", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="company", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="location", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="email", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="hireable", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="createdAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(
+                Property(name="login", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="name", data_type=DataType.TEXT),
+                Property(name="bio", data_type=DataType.TEXT),
+                Property(name="company", data_type=DataType.TEXT),
+                Property(name="location", data_type=DataType.TEXT),
+                Property(name="email", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="hireable", data_type=DataType.BOOL),
+                Property(name="createdAt", data_type=DataType.DATE),
+                Property(
                     name="stats",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="publicRepos", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="publicGists", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="followers", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="following", data_type=wvc.config.DataType.INT),
+                        Property(name="publicRepos", data_type=DataType.INT),
+                        Property(name="publicGists", data_type=DataType.INT),
+                        Property(name="followers", data_type=DataType.INT),
+                        Property(name="following", data_type=DataType.INT),
                     ]
                 ),
-                wvc.config.Property(
+                Property(
                     name="urls",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="htmlUrl", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="blog", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="twitterUsername", data_type=wvc.config.DataType.TEXT),
+                        Property(name="htmlUrl", data_type=DataType.TEXT),
+                        Property(name="blog", data_type=DataType.TEXT),
+                        Property(name="twitterUsername", data_type=DataType.TEXT),
                     ]
                 ),
             ]
@@ -523,37 +594,38 @@ def create_github_collections(client, skip_github=False):
     try:
         github_repo_collection = client.collections.create(
             name="GitHubRepo",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="fullName", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="description", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="language", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="private", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="fork", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="archived", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="createdAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="updatedAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="pushedAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="size", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(
+                Property(name="name", data_type=DataType.TEXT),
+                Property(name="fullName", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="description", data_type=DataType.TEXT),
+                Property(name="language", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="private", data_type=DataType.BOOL),
+                Property(name="fork", data_type=DataType.BOOL),
+                Property(name="archived", data_type=DataType.BOOL),
+                Property(name="createdAt", data_type=DataType.DATE),
+                Property(name="updatedAt", data_type=DataType.DATE),
+                Property(name="pushedAt", data_type=DataType.DATE),
+                Property(name="size", data_type=DataType.INT),
+                Property(
                     name="metrics",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="stargazersCount", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="watchersCount", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="forksCount", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="openIssuesCount", data_type=wvc.config.DataType.INT),
+                        Property(name="stargazersCount", data_type=DataType.INT),
+                        Property(name="watchersCount", data_type=DataType.INT),
+                        Property(name="forksCount", data_type=DataType.INT),
+                        Property(name="openIssuesCount", data_type=DataType.INT),
                     ]
                 ),
-                wvc.config.Property(name="topics", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(
+                Property(name="topics", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(
                     name="license",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="key", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="name", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="spdxId", data_type=wvc.config.DataType.TEXT),
+                        Property(name="key", data_type=DataType.TEXT),
+                        Property(name="name", data_type=DataType.TEXT),
+                        Property(name="spdxId", data_type=DataType.TEXT),
                     ]
                 ),
             ],
@@ -578,38 +650,39 @@ def create_github_collections(client, skip_github=False):
     try:
         github_issue_collection = client.collections.create(
             name="GitHubIssue",
-            vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+            generative_config=Configure.Generative.openai(),
             properties=[
-                wvc.config.Property(name="title", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="body", data_type=wvc.config.DataType.TEXT),
-                wvc.config.Property(name="number", data_type=wvc.config.DataType.INT),
-                wvc.config.Property(name="state", data_type=wvc.config.DataType.TEXT, skip_vectorization=True),
-                wvc.config.Property(name="locked", data_type=wvc.config.DataType.BOOL),
-                wvc.config.Property(name="createdAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="updatedAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(name="closedAt", data_type=wvc.config.DataType.DATE),
-                wvc.config.Property(
+                Property(name="title", data_type=DataType.TEXT),
+                Property(name="body", data_type=DataType.TEXT),
+                Property(name="number", data_type=DataType.INT),
+                Property(name="state", data_type=DataType.TEXT, skip_vectorization=True),
+                Property(name="locked", data_type=DataType.BOOL),
+                Property(name="createdAt", data_type=DataType.DATE),
+                Property(name="updatedAt", data_type=DataType.DATE),
+                Property(name="closedAt", data_type=DataType.DATE),
+                Property(
                     name="labels",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="names", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="colors", data_type=wvc.config.DataType.TEXT),
-                        wvc.config.Property(name="count", data_type=wvc.config.DataType.INT),
+                        Property(name="names", data_type=DataType.TEXT),
+                        Property(name="colors", data_type=DataType.TEXT),
+                        Property(name="count", data_type=DataType.INT),
                     ]
                 ),
-                wvc.config.Property(
+                Property(
                     name="reactions",
-                    data_type=wvc.config.DataType.OBJECT,
+                    data_type=DataType.OBJECT,
                     nested_properties=[
-                        wvc.config.Property(name="totalCount", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="plusOne", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="minusOne", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="laugh", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="hooray", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="confused", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="heart", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="rocket", data_type=wvc.config.DataType.INT),
-                        wvc.config.Property(name="eyes", data_type=wvc.config.DataType.INT),
+                        Property(name="totalCount", data_type=DataType.INT),
+                        Property(name="plusOne", data_type=DataType.INT),
+                        Property(name="minusOne", data_type=DataType.INT),
+                        Property(name="laugh", data_type=DataType.INT),
+                        Property(name="hooray", data_type=DataType.INT),
+                        Property(name="confused", data_type=DataType.INT),
+                        Property(name="heart", data_type=DataType.INT),
+                        Property(name="rocket", data_type=DataType.INT),
+                        Property(name="eyes", data_type=DataType.INT),
                     ]
                 ),
             ],
@@ -637,10 +710,10 @@ def create_github_collections(client, skip_github=False):
         try:
             print(f"Fetching user: {username}")
             response = requests.get(f"https://api.github.com/users/{username}", timeout=10)
-            
+
             if response.status_code == 200:
                 user_data = response.json()
-                
+
                 user_obj = {
                     "login": user_data.get("login", ""),
                     "name": user_data.get("name", ""),
@@ -662,18 +735,20 @@ def create_github_collections(client, skip_github=False):
                         "twitterUsername": user_data.get("twitter_username", ""),
                     }
                 }
-                
+
                 result = github_user_collection.data.insert(user_obj)
                 user_ids.append(result)
                 print(f"✓ Inserted user: {user_data.get('name', username)}")
-                
-                # Fetch some repos for this user
-                repos_response = requests.get(f"https://api.github.com/users/{username}/repos?sort=stars&per_page=3", timeout=10)
-                
+
+                repos_response = requests.get(
+                    f"https://api.github.com/users/{username}/repos?sort=stars&per_page=3",
+                    timeout=10
+                )
+
                 if repos_response.status_code == 200:
                     repos_data = repos_response.json()
-                    
-                    for repo_data in repos_data[:2]:  # Limit to 2 repos per user
+
+                    for repo_data in repos_data[:2]:
                         try:
                             repo_obj = {
                                 "name": repo_data.get("name", ""),
@@ -700,28 +775,30 @@ def create_github_collections(client, skip_github=False):
                                     "spdxId": repo_data.get("license", {}).get("spdx_id", "") if repo_data.get("license") else "",
                                 } if repo_data.get("license") else {"key": "", "name": "", "spdxId": ""}
                             }
-                            
+
                             repo_result = github_repo_collection.data.insert(
                                 properties=repo_obj,
                                 references={"ownedBy": result}
                             )
                             repo_ids.append(repo_result)
                             print(f"  ✓ Inserted repo: {repo_data.get('name', 'Unknown')}")
-                            
-                            # Fetch some issues for this repo
-                            issues_response = requests.get(f"https://api.github.com/repos/{repo_data.get('full_name')}/issues?state=all&per_page=2", timeout=10)
-                            
+
+                            issues_response = requests.get(
+                                f"https://api.github.com/repos/{repo_data.get('full_name')}/issues?state=all&per_page=2",
+                                timeout=10
+                            )
+
                             if issues_response.status_code == 200:
                                 issues_data = issues_response.json()
-                                
-                                for issue_data in issues_data[:1]:  # Limit to 1 issue per repo
+
+                                for issue_data in issues_data[:1]:
                                     try:
                                         if 'pull_request' in issue_data:
                                             continue
-                                            
+
                                         labels_names = [label.get("name", "") for label in issue_data.get("labels", [])]
                                         labels_colors = [label.get("color", "") for label in issue_data.get("labels", [])]
-                                        
+
                                         issue_obj = {
                                             "title": issue_data.get("title", ""),
                                             "body": (issue_data.get("body", "") or "")[:1000],
@@ -748,7 +825,7 @@ def create_github_collections(client, skip_github=False):
                                                 "eyes": issue_data.get("reactions", {}).get("eyes", 0),
                                             }
                                         }
-                                        
+
                                         github_issue_collection.data.insert(
                                             properties=issue_obj,
                                             references={
@@ -757,46 +834,230 @@ def create_github_collections(client, skip_github=False):
                                             }
                                         )
                                         print(f"    ✓ Inserted issue: {issue_data.get('title', 'Unknown')[:50]}...")
-                                        
+
                                     except Exception as e:
                                         print(f"    ✗ Failed to insert issue: {e}")
-                                        
-                            time.sleep(0.5)  # Rate limiting
-                            
+
+                            time.sleep(0.5)
+
                         except Exception as e:
                             print(f"  ✗ Failed to insert repo {repo_data.get('name', 'Unknown')}: {e}")
-                            
-                time.sleep(1)  # Rate limiting between users
-                
+
+                time.sleep(1)
+
             else:
                 print(f"✗ Failed to fetch user {username}: HTTP {response.status_code}")
-                
+
         except Exception as e:
             print(f"✗ Failed to process user {username}: {e}")
 
-    print(f"✓ GitHub collections populated successfully!")
+    print("✓ GitHub collections populated successfully!")
     print(f"  - Created {len(user_ids)} GitHub users")
     print(f"  - Created {len(repo_ids)} GitHub repositories")
     return True
 
+
+# ══════════════════════════════════════════════════════════════
+# RAG COLLECTIONS (text-rich, generative-ready)
+# ══════════════════════════════════════════════════════════════
+
+def create_rag_books_collection(client):
+    """Create and populate the Books collection (Goodbooks-10k)."""
+    collection_name = "Books"
+    print(f"\n{'=' * 60}")
+    print(f"  Creating {collection_name} collection (RAG)")
+    print(f"{'=' * 60}")
+
+    if client.collections.exists(collection_name):
+        client.collections.delete(collection_name)
+        print(f"✓  Deleted existing {collection_name}")
+
+    collection = client.collections.create(
+        name=collection_name,
+        vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+        generative_config=Configure.Generative.openai(),
+        properties=[
+            Property(name="book_id", data_type=DataType.INT, skip_vectorization=True),
+            Property(name="goodreads_book_id", data_type=DataType.INT, skip_vectorization=True),
+            Property(name="title", data_type=DataType.TEXT),
+            Property(name="authors", data_type=DataType.TEXT),
+            Property(name="original_publication_year", data_type=DataType.INT, skip_vectorization=True),
+            Property(name="average_rating", data_type=DataType.NUMBER, skip_vectorization=True),
+            Property(name="ratings_count", data_type=DataType.INT, skip_vectorization=True),
+            Property(name="language_code", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="image_url", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="small_image_url", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="content", data_type=DataType.TEXT),
+        ],
+    )
+    print(f"✓  {collection_name} collection created")
+
+    rows = download_csv(BOOKS_CSV_URL, "Books")
+    if not rows:
+        return 0
+
+    subset = rows if BOOKS_LIMIT == 0 else rows[:BOOKS_LIMIT]
+    inserted = 0
+    for i, row in enumerate(subset):
+        title = (row.get("title") or row.get("original_title") or "").strip()
+        if not title:
+            continue
+
+        authors = (row.get("authors") or "").strip()
+        year = safe_int(row.get("original_publication_year"))
+        rating = safe_float(row.get("average_rating"))
+        lang = (row.get("language_code") or "").strip()
+
+        content_parts = [f'"{title}" by {authors}.'] if authors else [f'"{title}".']
+        if year:
+            content_parts.append(f"Published in {year}.")
+        if rating:
+            content_parts.append(f"Average rating {rating}/5.")
+        if lang:
+            content_parts.append(f"Language: {lang}.")
+        content = " ".join(content_parts)
+
+        try:
+            collection.data.insert(
+                {
+                    "book_id": safe_int(row.get("book_id")),
+                    "goodreads_book_id": safe_int(row.get("goodreads_book_id")),
+                    "title": title,
+                    "authors": authors,
+                    "original_publication_year": year,
+                    "average_rating": rating,
+                    "ratings_count": safe_int(row.get("ratings_count")),
+                    "language_code": lang,
+                    "image_url": (row.get("image_url") or "").strip(),
+                    "small_image_url": (row.get("small_image_url") or "").strip(),
+                    "content": content,
+                }
+            )
+            inserted += 1
+            if inserted % 50 == 0:
+                print(f"   Inserted {inserted} books …")
+        except Exception as exc:
+            print(f"   ⚠  Failed to insert book #{i + 1} ({title}): {exc}")
+
+    total = len(subset)
+    print(f"✓  Inserted {inserted}/{total} books")
+    return inserted
+
+
+def create_rag_podcast_collection(client):
+    """Create and populate the PodcastSearch collection."""
+    collection_name = "PodcastSearch"
+    print(f"\n{'=' * 60}")
+    print(f"  Creating {collection_name} collection (RAG)")
+    print(f"{'=' * 60}")
+
+    if client.collections.exists(collection_name):
+        client.collections.delete(collection_name)
+        print(f"✓  Deleted existing {collection_name}")
+
+    collection = client.collections.create(
+        name=collection_name,
+        vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
+        generative_config=Configure.Generative.openai(),
+        properties=[
+            Property(name="name", data_type=DataType.TEXT),
+            Property(name="description", data_type=DataType.TEXT),
+            Property(name="genre_ids", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="episode_count", data_type=DataType.INT, skip_vectorization=True),
+            Property(name="itunes_url", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="podcast_url", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="feed_url", data_type=DataType.TEXT, skip_vectorization=True),
+            Property(name="content", data_type=DataType.TEXT),
+        ],
+    )
+    print(f"✓  {collection_name} collection created")
+
+    rows = download_csv(PODCASTS_CSV_URL, "PodcastSearch")
+    if not rows:
+        return 0
+
+    sample = rows[0] if rows else {}
+    col_map = {}
+    for key in sample:
+        lower = key.strip().lower()
+        if "name" in lower and "name" not in col_map:
+            col_map["name"] = key
+        elif "description" in lower:
+            col_map["description"] = key
+        elif "genre" in lower and "id" in lower:
+            col_map["genre_ids"] = key
+        elif "episode" in lower and "count" in lower:
+            col_map["episode_count"] = key
+        elif "itunes" in lower and "url" in lower:
+            col_map["itunes_url"] = key
+        elif "podcast" in lower and "url" in lower:
+            col_map["podcast_url"] = key
+        elif "feed" in lower and "url" in lower:
+            col_map["feed_url"] = key
+
+    subset = rows if PODCASTS_LIMIT == 0 else rows[:PODCASTS_LIMIT]
+    inserted = 0
+    for i, row in enumerate(subset):
+        name = (row.get(col_map.get("name", "Name")) or "").strip()
+        if not name:
+            continue
+
+        description = (row.get(col_map.get("description", "Description")) or "").strip()
+        genre_ids = (row.get(col_map.get("genre_ids", "Genre IDs")) or "").strip()
+        episode_count = safe_int(row.get(col_map.get("episode_count", "Episode Count")))
+
+        content_parts = [name]
+        if description:
+            content_parts.append(description)
+        if genre_ids:
+            content_parts.append(f"Genres: {genre_ids}.")
+        content = ". ".join(content_parts)
+
+        try:
+            collection.data.insert(
+                {
+                    "name": name,
+                    "description": description,
+                    "genre_ids": genre_ids,
+                    "episode_count": episode_count,
+                    "itunes_url": (row.get(col_map.get("itunes_url", "iTunes URL")) or "").strip(),
+                    "podcast_url": (row.get(col_map.get("podcast_url", "Podcast URL")) or "").strip(),
+                    "feed_url": (row.get(col_map.get("feed_url", "Feed URL")) or "").strip(),
+                    "content": content,
+                }
+            )
+            inserted += 1
+            if inserted % 50 == 0:
+                print(f"   Inserted {inserted} podcasts …")
+        except Exception as exc:
+            print(f"   ⚠  Failed to insert podcast #{i + 1} ({name}): {exc}")
+
+    total = len(subset)
+    print(f"✓  Inserted {inserted}/{total} podcasts")
+    return inserted
+
+
+# ══════════════════════════════════════════════════════════════
+# Verification
+# ══════════════════════════════════════════════════════════════
+
 def verify_collections(client):
-    """Verify all collections and test sample queries"""
+    """Verify all collections and show object counts"""
     print("\n=== Verifying Collections ===")
-    
+
     try:
         collections = client.collections.list_all()
         print(f"✓ Found {len(collections)} collections:")
-        
+
         for collection_name in collections:
             print(f"  • {collection_name}")
-            
-            # Get count via HTTP API
+
             try:
                 headers = {
                     'Authorization': 'Bearer test-key-123',
                     'Content-Type': 'application/json'
                 }
-                
+
                 query = {
                     "query": f"""
                     {{
@@ -810,14 +1071,14 @@ def verify_collections(client):
                     }}
                     """
                 }
-                
+
                 response = requests.post(
                     'http://localhost:8080/v1/graphql',
                     headers=headers,
                     json=query,
                     timeout=5
                 )
-                
+
                 if response.status_code == 200:
                     result = response.json()
                     if 'data' in result and 'Aggregate' in result['data']:
@@ -831,209 +1092,97 @@ def verify_collections(client):
                         print(f"    Objects: unknown")
                 else:
                     print(f"    Objects: unknown (HTTP {response.status_code})")
-                    
+
             except Exception as e:
                 print(f"    Objects: unknown ({e})")
 
-        # Test nested properties query if Author collection exists
-        if "Author" in collections:
-            print("\n=== Testing Nested Properties ===")
-            try:
-                headers = {
-                    'Authorization': 'Bearer test-key-123',
-                    'Content-Type': 'application/json'
-                }
-                
-                query = {
-                    "query": """
-                    {
-                        Get {
-                            Author(limit: 1) {
-                                name
-                                address {
-                                    city
-                                    country
-                                }
-                                coordinates {
-                                    latitude
-                                    longitude
-                                }
-                            }
-                        }
-                    }
-                    """
-                }
-                
-                response = requests.post(
-                    'http://localhost:8080/v1/graphql',
-                    headers=headers,
-                    json=query,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if 'data' in result and 'Get' in result['data'] and 'Author' in result['data']['Get']:
-                        authors = result['data']['Get']['Author']
-                        if authors and len(authors) > 0:
-                            author = authors[0]
-                            print(f"✓ Nested properties test passed - Author: {author.get('name', 'Unknown')}")
-                            if 'address' in author:
-                                print(f"  - City: {author['address'].get('city', 'Unknown')}")
-                            if 'coordinates' in author:
-                                print(f"  - Coordinates: {author['coordinates']}")
-                        else:
-                            print("⚠ Warning: No authors returned in nested properties test")
-                    else:
-                        print("⚠ Warning: Unexpected response structure in nested properties test")
-                else:
-                    print(f"⚠ Warning: Nested properties test failed with status: {response.status_code}")
-                    
-            except Exception as e:
-                print(f"⚠ Warning: Nested properties test failed: {e}")
-
-        # Test cross-reference query if Book collection exists
-        if "Book" in collections:
-            print("\n=== Testing Cross-References ===")
-            try:
-                query = {
-                    "query": """
-                    {
-                        Get {
-                            Book(limit: 1) {
-                                title
-                                writtenBy {
-                                    ... on Author {
-                                        name
-                                        birthYear
-                                    }
-                                }
-                                publishedBy {
-                                    ... on Publisher {
-                                        name
-                                        foundedYear
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    """
-                }
-                
-                response = requests.post(
-                    'http://localhost:8080/v1/graphql',
-                    headers=headers,
-                    json=query,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if 'data' in result and 'Get' in result['data'] and 'Book' in result['data']['Get']:
-                        books = result['data']['Get']['Book']
-                        if books and len(books) > 0:
-                            book = books[0]
-                            print(f"✓ Cross-reference test passed - Book: {book.get('title', 'Unknown')}")
-                            if 'writtenBy' in book and book['writtenBy']:
-                                print(f"  - Author: {book['writtenBy'].get('name', 'Unknown')}")
-                            if 'publishedBy' in book and book['publishedBy']:
-                                print(f"  - Publisher: {book['publishedBy'].get('name', 'Unknown')}")
-                        else:
-                            print("⚠ Warning: No books returned in cross-reference test")
-                    else:
-                        print("⚠ Warning: Unexpected response structure in cross-reference test")
-                else:
-                    print(f"⚠ Warning: Cross-reference test failed with status: {response.status_code}")
-                    
-            except Exception as e:
-                print(f"⚠ Warning: Cross-reference test failed: {e}")
-
         return True
-        
+
     except Exception as e:
         print(f"✗ Verification failed: {e}")
         return False
+
+
+# ══════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════
 
 def main():
     parser = argparse.ArgumentParser(description='Populate Weaviate with comprehensive test data')
     parser.add_argument('--skip-github', action='store_true', help='Skip GitHub data fetching')
     parser.add_argument('--verify-only', action='store_true', help='Only verify existing collections')
+    parser.add_argument('--rag-only', action='store_true', help='Only create RAG collections (Books, PodcastSearch)')
+    parser.add_argument('--legacy-only', action='store_true', help='Only create legacy collections')
     args = parser.parse_args()
 
-    print("🚀 Weaviate Studio Sandbox - Test Data Population")
+    print("🚀 Weaviate Studio Sandbox – Test Data Population")
     print("=" * 60)
-    
+
     if args.verify_only:
         print("Running in verification-only mode...")
     else:
-        print("Creating comprehensive test data with:")
-        print("  • Nested object properties")
-        print("  • Cross-references between collections")
-        print("  • Various data types (text, numbers, booleans, dates, geo coordinates)")
-        if not args.skip_github:
-            print("  • Real-world GitHub data")
+        print("Embeddings : local text2vec-transformers (free)")
+        print("Generative : OpenAI (requires OPENAI_API_KEY at query time)")
+        print()
+        if args.rag_only:
+            print("Mode: RAG collections only (Books, PodcastSearch)")
+        elif args.legacy_only:
+            print("Mode: Legacy collections only (Jeopardy, Author, Book, etc.)")
         else:
-            print("  • Skipping GitHub data (--skip-github)")
+            print("Mode: All collections (legacy + RAG)")
 
-    # Connect to Weaviate
     client = connect_to_weaviate()
     if not client:
         return 1
 
     try:
         if args.verify_only:
-            # Only verify existing collections
             if not verify_collections(client):
                 return 1
         else:
-            # Create and populate all collections
             success = True
-            
-            # Create Jeopardy collection
-            if not create_jeopardy_collection(client):
-                success = False
-            
-            # Create book domain collections
-            if not create_book_collections(client):
-                success = False
-            
-            # Create GitHub collections
-            if not create_github_collections(client, args.skip_github):
-                success = False
-            
+
+            # Legacy collections
+            if not args.rag_only:
+                if not create_jeopardy_collection(client):
+                    success = False
+                if not create_book_collections(client):
+                    success = False
+                if not create_github_collections(client, args.skip_github):
+                    success = False
+
+            # RAG collections
+            if not args.legacy_only:
+                books_count = create_rag_books_collection(client)
+                podcasts_count = create_rag_podcast_collection(client)
+
             if not success:
                 print("\n❌ Some collections failed to create. Check errors above.")
                 return 1
-            
-            # Verify everything worked
-            if not verify_collections(client):
-                print("\n⚠️  Verification failed, but collections were created.")
-            
+
+            # Verify everything
+            verify_collections(client)
+
         print("\n🎉 SUCCESS!")
         print("=" * 60)
         print("Your Weaviate instance now contains comprehensive test data.")
-        print("\n🧪 Test these features in Weaviate Studio:")
-        print("  1. Nested Properties:")
-        print("     - Author.address (street, city, country, zipCode)")
-        print("     - Book.metadata (language, edition, format, weight)")
-        print("     - GitHubUser.stats (publicRepos, followers, etc.)")
-        print("     - GitHubRepo.metrics (stars, forks, watchers)")
-        print("  2. Cross-References:")
-        print("     - Book → Author, Book → Publisher")
-        print("     - Review → Book")
-        print("     - GitHubRepo → GitHubUser")
-        print("     - GitHubIssue → GitHubRepo, GitHubIssue → GitHubUser")
-        print("  3. Various Data Types:")
-        print("     - Text, Numbers, Booleans, Dates, GeoCoordinates")
-        print("  4. Complex Queries:")
-        print("     - Multi-level nested selections")
-        print("     - Cross-reference traversal")
-        print("     - Mixed data type filtering")
-        
+        print("\n🔗 Connect from Weaviate Studio:")
+        print("   Endpoint : http://localhost:8080")
+        print("   API Key  : test-key-123")
+        print("\n🧪 Test features:")
+        print("  Legacy – Nested Properties & Cross-References:")
+        print("     Author.address, Book.metadata, GitHubUser.stats")
+        print("     Book → Author, GitHubRepo → GitHubUser, Review → Book")
+        print("  RAG – Generative Search (requires OPENAI_API_KEY in .env):")
+        print('     "Find highly rated fantasy books"')
+        print('     "What topics do these podcasts cover?"')
+        print('     "Which books and podcasts are related to psychology?"')
+
         return 0
-        
+
     finally:
         client.close()
 
+
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
