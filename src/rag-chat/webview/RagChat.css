@@ -330,12 +330,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 500;
   color: var(--vscode-descriptionForeground, #888);
-  background-color: transparent;
-  border: 1px solid var(--vscode-widget-border, #444);
+  background-color: var(--vscode-dropdown-background, rgba(0, 0, 0, 0.1));
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border, #555));
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
