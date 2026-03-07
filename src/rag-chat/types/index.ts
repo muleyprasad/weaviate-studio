@@ -108,7 +108,11 @@ export interface RagChatExtensionMessage {
 /**
  * Commands sent from the webview to the extension
  */
-export type RagChatWebviewMessageCommand = 'initialize' | 'executeRagQuery' | 'getCollections';
+export type RagChatWebviewMessageCommand =
+  | 'initialize'
+  | 'executeRagQuery'
+  | 'getCollections'
+  | 'openInDataExplorer';
 
 /**
  * Message sent from the webview to the extension
@@ -125,6 +129,10 @@ export interface RagChatWebviewMessage {
   requestId?: string;
   /** Whether to show retrieved context objects in the response */
   showContext?: boolean;
+  /** Collection name for openInDataExplorer */
+  collectionName?: string;
+  /** Object UUID for openInDataExplorer */
+  uuid?: string;
 }
 
 // =====================================================

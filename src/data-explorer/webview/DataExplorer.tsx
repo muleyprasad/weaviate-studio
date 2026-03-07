@@ -29,6 +29,7 @@ import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
 import { useDataExplorerShortcuts } from './hooks/useKeyboardShortcuts';
 import type { WeaviateObject } from '../types';
+import { postMessageToExtension } from './utils/vscodeApi';
 
 // Get initial data from the window object (injected by the extension)
 declare global {
@@ -179,6 +180,19 @@ function DataExplorerContent() {
         <div className="header-right">
           {/* Tenant selector for multi-tenant collections */}
           <TenantSelector />
+
+          {/* Ask AI button - opens RAG Chat for this collection */}
+          <button
+            type="button"
+            className="toolbar-btn ask-ai-btn"
+            onClick={() => postMessageToExtension({ command: 'openRagChat' })}
+            title="Ask AI about this collection (RAG Chat)"
+            aria-label="Open RAG Chat for this collection"
+            id="ask-ai-btn"
+          >
+            <span className="codicon codicon-comment-discussion" aria-hidden="true" />
+            Ask AI
+          </button>
 
           {/* Vector Search button */}
           <button

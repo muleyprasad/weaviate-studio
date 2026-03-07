@@ -98,8 +98,27 @@ function ContextItem({ obj }: { obj: RagContextObject }) {
 
   return (
     <li className="rag-context-item">
-      <div className="rag-context-uuid" title={obj.uuid}>
-        {obj.uuid}
+      <div className="rag-context-uuid-row">
+        <span className="rag-context-uuid" title={obj.uuid}>
+          {obj.uuid}
+        </span>
+        {obj.collectionName && (
+          <button
+            type="button"
+            className="rag-open-explorer-btn"
+            onClick={() =>
+              vscodeApi.postMessage({
+                command: 'openInDataExplorer',
+                collectionName: obj.collectionName,
+                uuid: obj.uuid,
+              })
+            }
+            title={`Open ${obj.collectionName} in Data Explorer`}
+            aria-label={`Open ${obj.collectionName} in Data Explorer`}
+          >
+            <span className="codicon codicon-telescope" aria-hidden="true" />
+          </button>
+        )}
       </div>
       {textProps.map(([key, value]) => (
         <div key={key} className="rag-context-prop">

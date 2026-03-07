@@ -233,6 +233,12 @@
   gap: 6px;
 }
 
+.rag-context-uuid-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .rag-context-uuid {
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #888);
@@ -240,6 +246,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+
+.rag-open-explorer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  cursor: pointer;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.rag-open-explorer-btn:hover {
+  opacity: 1;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31)) !important;
 }
 
 .rag-context-prop {

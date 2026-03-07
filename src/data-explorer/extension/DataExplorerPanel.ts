@@ -280,6 +280,14 @@ export class DataExplorerPanel {
           this._handleCancelExport(message);
           break;
 
+        case 'openRagChat':
+          // Open RAG Chat for this collection
+          await vscode.commands.executeCommand('weaviate.openRagChat', {
+            connectionId: this._connectionId,
+            collectionName: this._collectionName,
+          });
+          break;
+
         default:
           console.warn(`Unknown command received: ${message.command}`);
           this.postMessage({

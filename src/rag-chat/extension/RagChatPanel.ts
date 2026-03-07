@@ -209,6 +209,17 @@ export class RagChatPanel {
         case 'executeRagQuery':
           await this._handleExecuteRagQuery(message);
           break;
+
+        case 'openInDataExplorer':
+          // Open Data Explorer for the collection that produced the context object
+          if (message.collectionName) {
+            await vscode.commands.executeCommand(
+              'weaviate.openDataExplorer',
+              this._connectionId,
+              message.collectionName
+            );
+          }
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

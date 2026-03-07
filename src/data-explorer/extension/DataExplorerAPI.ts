@@ -71,44 +71,12 @@ import { isNumericMetrics, isDateMetrics } from '../types/weaviate';
 // Debug flag - set to false for production
 const DEBUG = false;
 
-// Default timeout for API requests (30 seconds)
-const DEFAULT_TIMEOUT_MS = 30000;
-
-/**
- * Wraps a promise with a timeout
- * Rejects if the promise doesn't resolve within the specified timeout
- */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
-    ),
-  ]);
-}
-
-/**
- * Checks if an error is a timeout error
- */
-function isTimeoutError(error: unknown): boolean {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return message.includes('timeout') || message.includes('timed out');
-}
-
-/**
- * Creates a user-friendly timeout error message with actionable suggestions
- */
-function createTimeoutError(
-  operation: string,
-  context: string,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
-): Error {
-  return new Error(
-    `${operation} timed out after ${timeoutMs}ms for ${context}. ` +
-      'Suggestions: Try again, reduce page size, add filters to narrow results, or check server connectivity.'
-  );
-}
+import {
+  DEFAULT_TIMEOUT_MS,
+  withTimeout,
+  isTimeoutError,
+  createTimeoutError,
+} from '../../shared/timeout';
 
 /**
  * API class for interacting with Weaviate collections in the Data Explorer

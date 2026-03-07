@@ -269,7 +269,9 @@ export type WebviewMessageCommand =
   // Phase 5: Aggregations and Export
   | 'getAggregations'
   | 'exportObjects'
-  | 'cancelExport';
+  | 'cancelExport'
+  // Integration
+  | 'openRagChat';
 
 export interface ExtensionMessage {
   command: ExtensionMessageCommand;
