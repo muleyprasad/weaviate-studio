@@ -787,6 +787,7 @@
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/codicons": "^0.0.44",
     "babel-loader": "^9.2.1",
     "baseline-browser-mapping": "^2.10.0",
     "concurrently": "^9.1.2",

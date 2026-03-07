@@ -90,6 +90,8 @@ export class ClusterPanel {
         retainContextWhenHidden: true,
       }
     );
+    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'dashboard.svg');
+    panel.iconPath = iconPath;
 
     ClusterPanel.currentPanel = new ClusterPanel(
       panel,

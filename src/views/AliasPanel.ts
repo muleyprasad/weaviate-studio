@@ -144,6 +144,8 @@ export class AliasPanel {
         ],
       }
     );
+    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'add.svg');
+    panel.iconPath = iconPath;
 
     const aliasPanel = new AliasPanel(
       panel,

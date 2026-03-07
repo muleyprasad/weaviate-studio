@@ -75,6 +75,8 @@ export class RbacRolePanel {
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
       }
     );
+    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'add.svg');
+    panel.iconPath = iconPath;
 
     const rbacRolePanel = new RbacRolePanel(
       panel,

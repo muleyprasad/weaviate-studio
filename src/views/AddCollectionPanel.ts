@@ -97,6 +97,8 @@ export class AddCollectionPanel {
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview-add-collection')],
       }
     );
+    const iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'add.svg');
+    panel.iconPath = iconPath;
 
     AddCollectionPanel.currentPanel = new AddCollectionPanel(
       panel,
