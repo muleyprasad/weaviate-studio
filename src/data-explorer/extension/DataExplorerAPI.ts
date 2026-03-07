@@ -473,6 +473,7 @@ export class DataExplorerAPI {
       const { path, operator, value, valueType } = condition;
 
       // Get the filter builder for this property
+      // Note: 'id' is a special path for filtering by object UUID
       const filterBuilder = collection.filter.byProperty(path);
 
       // Apply the appropriate operator

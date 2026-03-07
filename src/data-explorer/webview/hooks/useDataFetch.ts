@@ -293,7 +293,7 @@ export function useDataFetch() {
   // Track whether the deep-link has already been fired (React ref avoids global mutation)
   const deepLinkFiredRef = useRef(false);
 
-  // Deep-link: if the panel was opened with a target UUID, auto-open its detail panel
+  // Deep-link: if the panel was opened with a target UUID, apply filter and open detail panel
   useEffect(() => {
     const targetUuid = (window as any).initialData?.targetUuid;
     if (
@@ -302,10 +302,21 @@ export function useDataFetch() {
       dataState.objects &&
       dataState.objects.length > 0
     ) {
+      // Apply filter by ID to show only the target object
+      filterActions.setFilters([
+        {
+          id: 'deep-link-filter',
+          path: 'id',
+          operator: 'Equal',
+          value: targetUuid,
+          valueType: 'text',
+        },
+      ]);
+      // Open the detail panel for the target object
       getObjectDetail(targetUuid);
       deepLinkFiredRef.current = true;
     }
-  }, [dataState.objects, getObjectDetail]);
+  }, [dataState.objects, getObjectDetail, filterActions]);
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {

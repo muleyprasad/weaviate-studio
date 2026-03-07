@@ -28,7 +28,7 @@ import { TenantSelector, TenantSelectionModal } from './components/TenantSelecto
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
 import { useDataExplorerShortcuts } from './hooks/useKeyboardShortcuts';
-import type { WeaviateObject } from '../types';
+import type { WeaviateObject, PropertyConfig } from '../types';
 import { postMessageToExtension } from './utils/vscodeApi';
 
 // Get initial data from the window object (injected by the extension)
@@ -37,6 +37,7 @@ declare global {
     initialData?: {
       collectionName: string;
       connectionId: string;
+      targetUuid?: string;
     };
   }
 }
@@ -103,8 +104,13 @@ function DataExplorerContent() {
     dataState.fetchedObjectDetail,
   ]);
 
-  // Get schema properties for filter builder
-  const schemaProperties = dataState.schema?.properties || [];
+  // Get schema properties for filter builder, with uuid/id as a pseudo-property for filtering
+  const uuidProperty: PropertyConfig = {
+    name: 'id',
+    dataType: ['uuid'],
+    description: 'Object ID (UUID)',
+  };
+  const schemaProperties = [uuidProperty, ...(dataState.schema?.properties || [])];
 
   // Handle vector search result selection
   const handleVectorResultSelect = useCallback(
