@@ -20,6 +20,7 @@ export interface WeaviateConnection {
   links?: ConnectionLink[];
   autoConnect?: boolean; // Auto connect on expand, default: false
   openClusterViewOnConnect?: boolean; // Auto open cluster view on connect, default: true
+  readOnly?: boolean; // When true, prevents modifications to the connection
 
   // Either cloud or custom (discriminated union with "type")
   type: 'custom' | 'cloud';
