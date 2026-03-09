@@ -260,6 +260,8 @@ export class ConnectionManager {
           conn.password = await this.getSecret(conn.id, 'password');
         }
       }
+      // Notify listeners (e.g. tree view) that connections are ready
+      this._onConnectionsChanged.fire();
       return this.connections;
     } catch (error) {
       console.error('Error loading connections, starting with empty list:', error);
@@ -294,7 +296,10 @@ export class ConnectionManager {
           if (!connection.cloudUrl || connection.cloudUrl.trim() === '') {
             throw new Error('Cloud URL is required for cloud connections');
           }
-          if (!connection.apiKey || connection.apiKey.trim() === '') {
+          if (
+            connection.authType !== 'clientPassword' &&
+            (!connection.apiKey || connection.apiKey.trim() === '')
+          ) {
             throw new Error('API key is required for cloud connections');
           }
         }
@@ -322,8 +327,8 @@ export class ConnectionManager {
         // Generate unique ID with more entropy to avoid collisions during concurrent operations
         const uniqueId =
           process.env.NODE_ENV === 'test'
-            ? timestamp.toString() + Math.random().toString(36).substr(2, 9)
-            : timestamp.toString() + Math.random().toString(36).substr(2, 9);
+            ? timestamp.toString() + Math.random().toString(36).slice(2, 11)
+            : timestamp.toString() + Math.random().toString(36).slice(2, 11);
 
         const newConnection: WeaviateConnection = {
           ...connection,
@@ -452,8 +457,15 @@ export class ConnectionManager {
         'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
       };
       if (connection.type === 'cloud' && connection.cloudUrl) {
+        const cloudAuthCredentials =
+          connection.authType === 'clientPassword' && connection.username
+            ? new AuthUserPasswordCredentials({
+                username: connection.username,
+                password: connection.password,
+              })
+            : new weaviate.ApiKey(connection.apiKey || '');
         client = await weaviate.connectToWeaviateCloud(connection.cloudUrl, {
-          authCredentials: new weaviate.ApiKey(connection.apiKey || ''),
+          authCredentials: cloudAuthCredentials,
           skipInitChecks: connection.skipInitChecks,
           headers: headers,
           timeout: {
@@ -808,12 +820,14 @@ export class ConnectionManager {
                     message.connection.cloudUrl &&
                     connection.cloudUrl !== message.connection.cloudUrl
                   );
+                  const authType = message.connection.authType || 'apiKey';
                   const needsApiKey =
-                    !isEditMode ||
-                    !connection ||
-                    connection.type !== 'cloud' ||
-                    !(connection.apiKeyPresent ?? !!connection.apiKey) ||
-                    cloudUrlChanged;
+                    authType !== 'clientPassword' &&
+                    (!isEditMode ||
+                      !connection ||
+                      connection.type !== 'cloud' ||
+                      !(connection.apiKeyPresent ?? !!connection.apiKey) ||
+                      cloudUrlChanged);
                   if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
                     panel.webview.postMessage({
                       command: 'error',
@@ -901,12 +915,14 @@ export class ConnectionManager {
                     message.connection.cloudUrl &&
                     connection.cloudUrl !== message.connection.cloudUrl
                   );
+                  const authType = message.connection.authType || 'apiKey';
                   const needsApiKey =
-                    !isEditMode ||
-                    !connection ||
-                    connection.type !== 'cloud' ||
-                    !(connection.apiKeyPresent ?? !!connection.apiKey) ||
-                    cloudUrlChanged;
+                    authType !== 'clientPassword' &&
+                    (!isEditMode ||
+                      !connection ||
+                      connection.type !== 'cloud' ||
+                      !(connection.apiKeyPresent ?? !!connection.apiKey) ||
+                      cloudUrlChanged);
                   if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
                     panel.webview.postMessage({
                       command: 'error',

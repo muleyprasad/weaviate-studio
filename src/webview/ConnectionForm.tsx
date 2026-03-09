@@ -158,22 +158,24 @@ function ConnectionFormWebview() {
       if (!httpHost.trim()) {
         newErrors.httpHost = 'HTTP Host is required';
       }
-      if (authType === 'clientPassword' && !username.trim()) {
-        newErrors.username = 'Username is required for client password authentication';
-      }
     } else {
       if (!cloudUrl.trim()) {
         newErrors.cloudUrl = 'Cloud URL is required';
       }
-      // For new cloud connections, or when changing from custom to cloud,
-      // or when no existing API key, require an API key
-      const needsApiKey =
-        !isEditMode || (isEditMode && !apiKeyPresent) || (isEditMode && apiKeyAction === 'remove');
-
-      // If this is a new cloud connection and no key is provided
-      if (!isEditMode && apiKeyAction === 'update' && !apiKeyInput.trim()) {
+      // For new cloud apiKey connections with no existing key, require one
+      if (
+        authType === 'apiKey' &&
+        !isEditMode &&
+        apiKeyAction === 'update' &&
+        !apiKeyInput.trim()
+      ) {
         newErrors.apiKey = 'API Key is required for cloud connections';
       }
+    }
+
+    // Validate credentials for both connection types
+    if (authType === 'clientPassword' && !username.trim()) {
+      newErrors.username = 'Username is required for client password authentication';
     }
 
     setErrors(newErrors);
@@ -424,124 +426,6 @@ function ConnectionFormWebview() {
             />
             <label htmlFor="grpcSecure">Use Secure gRPC (TLS)</label>
           </div>
-
-          {/* Authentication section */}
-          <div className="form-section">
-            <h3 className="form-section-title">Authentication</h3>
-
-            <div className="form-group">
-              <label htmlFor="authType">Authentication Type</label>
-              <select
-                id="authType"
-                value={authType}
-                onChange={(e) => {
-                  setAuthType(e.target.value as 'apiKey' | 'clientPassword');
-                  clearErrors();
-                }}
-              >
-                <option value="apiKey">API Key</option>
-                <option value="clientPassword">Client Password (OIDC)</option>
-              </select>
-            </div>
-
-            {authType === 'apiKey' && (
-              <div className="form-group">
-                <label>API Key (optional)</label>
-                {apiKeyPresent && apiKeyAction === 'keep' ? (
-                  <div className="api-key-configured">
-                    <span>API key is configured.</span>
-                    <button
-                      type="button"
-                      className="remove-api-key-button"
-                      onClick={handleRemoveApiKey}
-                    >
-                      REMOVE API KEY
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <input
-                      type="password"
-                      id="apiKeyCustom"
-                      placeholder={getApiKeyPlaceholder()}
-                      value={apiKeyInput}
-                      onChange={(e) => {
-                        setApiKeyInput(e.target.value);
-                        setApiKeyAction('update');
-                      }}
-                    />
-                    {apiKeyAction === 'remove' && (
-                      <small>
-                        API key will be removed. Leave blank to connect anonymously, or enter a new
-                        key.
-                      </small>
-                    )}
-                    {isEditMode && apiKeyAction !== 'remove' && (
-                      <small>Leave blank to keep the existing API key unchanged.</small>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {authType === 'clientPassword' && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="username">Username</label>
-                  <input
-                    type="text"
-                    id="username"
-                    placeholder="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className={errors.username ? 'input-error' : ''}
-                  />
-                  {errors.username && <div className="field-error">{errors.username}</div>}
-                </div>
-                <div className="form-group">
-                  <label>Password</label>
-                  {passwordPresent && passwordAction === 'keep' ? (
-                    <div className="api-key-configured">
-                      <span>Password is configured.</span>
-                      <button
-                        type="button"
-                        className="remove-api-key-button"
-                        onClick={handleRemovePassword}
-                      >
-                        REMOVE PASSWORD
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        type="password"
-                        id="passwordCustom"
-                        placeholder={
-                          passwordAction === 'remove'
-                            ? 'Enter new password or leave blank'
-                            : 'Leave empty if not required'
-                        }
-                        value={passwordInput}
-                        onChange={(e) => {
-                          setPasswordInput(e.target.value);
-                          setPasswordAction('update');
-                        }}
-                      />
-                      {passwordAction === 'remove' && (
-                        <small>
-                          Password will be removed. Leave blank to connect without password, or
-                          enter a new one.
-                        </small>
-                      )}
-                      {isEditMode && passwordAction !== 'remove' && (
-                        <small>Leave blank to keep the existing password unchanged.</small>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
         </>
       )}
 
@@ -560,48 +444,133 @@ function ConnectionFormWebview() {
             />
             {errors.cloudUrl && <div className="field-error">{errors.cloudUrl}</div>}
           </div>
+        </>
+      )}
 
-          {/* API Key for cloud connections */}
-          <div className="form-group">
-            <label>API Key</label>
-            {apiKeyPresent && apiKeyAction === 'keep' ? (
-              <div className="api-key-configured">
-                <span>API key is configured.</span>
-                <button
-                  type="button"
-                  className="remove-api-key-button"
-                  onClick={handleRemoveApiKey}
-                >
-                  REMOVE API KEY
-                </button>
+      {/* Auth section (shared for both connection types) */}
+      <div className="form-section">
+        <div className="form-group">
+          <label htmlFor="authType">Authentication</label>
+          <select
+            id="authType"
+            value={authType}
+            onChange={(e) => {
+              setAuthType(e.target.value as 'apiKey' | 'clientPassword');
+              clearErrors();
+            }}
+          >
+            <option value="apiKey">API Key</option>
+            <option value="clientPassword">Client Password (OIDC)</option>
+          </select>
+        </div>
+
+        {authType === 'apiKey' && (
+          <>
+            {isEditMode && apiKeyPresent && apiKeyAction === 'keep' ? (
+              <div className="form-group">
+                <label>API Key</label>
+                <div className="secret-stored">
+                  <span>API Key stored securely</span>
+                  <button type="button" className="btn-link" onClick={handleRemoveApiKey}>
+                    Remove
+                  </button>
+                </div>
               </div>
             ) : (
-              <>
+              <div className="form-group">
+                <label htmlFor="apiKey">
+                  API Key
+                  {apiKeyAction === 'remove' && (
+                    <span className="label-hint"> (will be removed on save)</span>
+                  )}
+                </label>
                 <input
                   type="password"
-                  id="apiKeyCloud"
+                  id="apiKey"
                   placeholder={getApiKeyPlaceholder()}
                   value={apiKeyInput}
                   onChange={(e) => {
                     setApiKeyInput(e.target.value);
-                    setApiKeyAction('update');
+                    if (apiKeyAction === 'remove') {
+                      setApiKeyAction('update');
+                    }
                   }}
                   className={errors.apiKey ? 'input-error' : ''}
                 />
                 {errors.apiKey && <div className="field-error">{errors.apiKey}</div>}
-                {apiKeyAction === 'remove' && (
-                  <small>
-                    API key will be removed. Leave blank to connect anonymously, or enter a new key.
-                  </small>
+                {isEditMode && apiKeyAction !== 'keep' && (
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => setApiKeyAction('keep')}
+                  >
+                    Keep existing key
+                  </button>
                 )}
-                {isEditMode && apiKeyPresent && apiKeyAction !== 'remove' && (
-                  <small>Leave blank to keep the existing API key unchanged.</small>
-                )}
-              </>
+              </div>
             )}
-          </div>
-        </>
-      )}
+          </>
+        )}
+
+        {authType === 'clientPassword' && (
+          <>
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                type="text"
+                id="username"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={errors.username ? 'input-error' : ''}
+              />
+              {errors.username && <div className="field-error">{errors.username}</div>}
+            </div>
+
+            {isEditMode && passwordPresent && passwordAction === 'keep' ? (
+              <div className="form-group">
+                <label>Password</label>
+                <div className="secret-stored">
+                  <span>Password stored securely</span>
+                  <button type="button" className="btn-link" onClick={handleRemovePassword}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label htmlFor="password">
+                  Password
+                  {passwordAction === 'remove' && (
+                    <span className="label-hint"> (will be removed on save)</span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  placeholder="Enter password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (passwordAction === 'remove') {
+                      setPasswordAction('update');
+                    }
+                  }}
+                />
+                {isEditMode && passwordAction !== 'keep' && (
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => setPasswordAction('keep')}
+                  >
+                    Keep existing password
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Advanced settings */}
       <div>
