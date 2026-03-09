@@ -26,9 +26,20 @@ describe('ConnectionManager Integration Tests', () => {
       }),
     } as unknown as MockGlobalState;
 
+    const secretsStorage: Record<string, string> = {};
     mockContext = {
       globalState,
       subscriptions: [],
+      secrets: {
+        get: jest.fn(async (key: string) => secretsStorage[key]),
+        store: jest.fn(async (key: string, value: string) => {
+          secretsStorage[key] = value;
+        }),
+        delete: jest.fn(async (key: string) => {
+          delete secretsStorage[key];
+        }),
+        onDidChange: jest.fn(),
+      },
     };
   });
 
@@ -384,6 +395,7 @@ describe('ConnectionManager Integration Tests', () => {
       // Reset singleton and create new instance (simulating restart)
       (ConnectionManager as any).instance = undefined;
       mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
 
       const loadedConnections = mgr.getConnections();
       expect(loadedConnections).toHaveLength(1);

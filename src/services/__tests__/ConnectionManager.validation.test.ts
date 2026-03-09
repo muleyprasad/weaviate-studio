@@ -31,9 +31,20 @@ describe('ConnectionManager Validation and Mock Tests', () => {
       }),
     } as unknown as MockGlobalState;
 
+    const secretsStorage: Record<string, string> = {};
     mockContext = {
       globalState,
       subscriptions: [],
+      secrets: {
+        get: jest.fn(async (key: string) => secretsStorage[key]),
+        store: jest.fn(async (key: string, value: string) => {
+          secretsStorage[key] = value;
+        }),
+        delete: jest.fn(async (key: string) => {
+          delete secretsStorage[key];
+        }),
+        onDidChange: jest.fn(),
+      },
     };
   });
 
@@ -367,6 +378,8 @@ describe('ConnectionManager Validation and Mock Tests', () => {
   describe('Event Mock Tests', () => {
     test('event emitter fires correctly on operations', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
+      // Wait for loadConnections to finish so its event fires before we register the listener
+      await (mgr as any).addConnectionMutex;
       const eventListener = jest.fn();
 
       mgr.onConnectionsChanged(eventListener);

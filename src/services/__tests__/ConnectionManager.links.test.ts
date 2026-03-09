@@ -12,6 +12,7 @@ describe('ConnectionManager - Links functionality', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    const secretsStorage: Record<string, string> = {};
     mockContext = {
       globalState: {
         get: jest.fn().mockReturnValue([]),
@@ -20,6 +21,16 @@ describe('ConnectionManager - Links functionality', () => {
       workspaceState: {
         get: jest.fn(),
         update: jest.fn(),
+      },
+      secrets: {
+        get: jest.fn(async (key: string) => secretsStorage[key]),
+        store: jest.fn(async (key: string, value: string) => {
+          secretsStorage[key] = value;
+        }),
+        delete: jest.fn(async (key: string) => {
+          delete secretsStorage[key];
+        }),
+        onDidChange: jest.fn(),
       },
     } as any;
 
