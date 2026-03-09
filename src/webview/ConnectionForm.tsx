@@ -32,9 +32,12 @@ interface InitConnectionData {
   timeoutInsert: number;
   skipInitChecks: boolean;
   links: ConnectionLink[];
+  authType: 'apiKey' | 'clientPassword';
+  username: string;
 }
 
 type ApiKeyAction = 'keep' | 'remove' | 'update';
+type CredentialAction = 'keep' | 'remove' | 'update';
 
 function ConnectionFormWebview() {
   const [isReady, setIsReady] = useState(false);
@@ -59,10 +62,19 @@ function ConnectionFormWebview() {
   const [skipInitChecks, setSkipInitChecks] = useState(false);
   const [links, setLinks] = useState<ConnectionLink[]>([]);
 
+  // Auth type state
+  const [authType, setAuthType] = useState<'apiKey' | 'clientPassword'>('apiKey');
+
   // API key state
   const [apiKeyPresent, setApiKeyPresent] = useState(false);
   const [apiKeyAction, setApiKeyAction] = useState<ApiKeyAction>('keep');
   const [apiKeyInput, setApiKeyInput] = useState('');
+
+  // Client password state
+  const [username, setUsername] = useState('');
+  const [passwordPresent, setPasswordPresent] = useState(false);
+  const [passwordAction, setPasswordAction] = useState<CredentialAction>('keep');
+  const [passwordInput, setPasswordInput] = useState('');
 
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -91,8 +103,12 @@ function ConnectionFormWebview() {
           setTimeoutInsert(conn.timeoutInsert || 120);
           setSkipInitChecks(conn.skipInitChecks || false);
           setLinks(conn.links || []);
+          setAuthType(conn.authType || 'apiKey');
+          setUsername(conn.username || '');
           setApiKeyPresent(!!message.apiKeyPresent);
           setApiKeyAction(message.apiKeyPresent ? 'keep' : 'update');
+          setPasswordPresent(!!message.passwordPresent);
+          setPasswordAction(message.passwordPresent ? 'keep' : 'update');
           setIsEditMode(!!message.isEditMode);
           setConnectionVersion(message.connectionVersion || '');
           setIsReady(true);
@@ -142,6 +158,9 @@ function ConnectionFormWebview() {
       if (!httpHost.trim()) {
         newErrors.httpHost = 'HTTP Host is required';
       }
+      if (authType === 'clientPassword' && !username.trim()) {
+        newErrors.username = 'Username is required for client password authentication';
+      }
     } else {
       if (!cloudUrl.trim()) {
         newErrors.cloudUrl = 'Cloud URL is required';
@@ -165,6 +184,7 @@ function ConnectionFormWebview() {
     const base = {
       name: name.trim(),
       type: connectionType,
+      authType,
       autoConnect,
       openClusterViewOnConnect,
       timeoutInit,
@@ -193,9 +213,19 @@ function ConnectionFormWebview() {
       };
     }
 
-    // Handle API key
-    if (apiKeyAction === 'update' && apiKeyInput.trim()) {
-      payload.apiKey = apiKeyInput.trim();
+    // Handle API key auth
+    if (authType === 'apiKey') {
+      if (apiKeyAction === 'update' && apiKeyInput.trim()) {
+        payload.apiKey = apiKeyInput.trim();
+      }
+    }
+
+    // Handle client password auth
+    if (authType === 'clientPassword') {
+      payload.username = username.trim();
+      if (passwordAction === 'update' && passwordInput.trim()) {
+        payload.password = passwordInput.trim();
+      }
     }
 
     return payload;
@@ -211,6 +241,9 @@ function ConnectionFormWebview() {
     const message: Record<string, unknown> = { command: 'save', connection };
     if (apiKeyAction === 'remove') {
       message.removeApiKey = true;
+    }
+    if (passwordAction === 'remove') {
+      message.removePassword = true;
     }
 
     if (vscode) {
@@ -229,6 +262,9 @@ function ConnectionFormWebview() {
     if (apiKeyAction === 'remove') {
       message.removeApiKey = true;
     }
+    if (passwordAction === 'remove') {
+      message.removePassword = true;
+    }
 
     if (vscode) {
       vscode.postMessage(message);
@@ -244,6 +280,11 @@ function ConnectionFormWebview() {
   const handleRemoveApiKey = () => {
     setApiKeyAction('remove');
     setApiKeyInput('');
+  };
+
+  const handleRemovePassword = () => {
+    setPasswordAction('remove');
+    setPasswordInput('');
   };
 
   const addLink = () => {
@@ -384,40 +425,120 @@ function ConnectionFormWebview() {
             <label htmlFor="grpcSecure">Use Secure gRPC (TLS)</label>
           </div>
 
-          {/* API Key for custom connections */}
-          <div className="form-group">
-            <label>API Key (optional)</label>
-            {apiKeyPresent && apiKeyAction === 'keep' ? (
-              <div className="api-key-configured">
-                <span>API key is configured.</span>
-                <button
-                  type="button"
-                  className="remove-api-key-button"
-                  onClick={handleRemoveApiKey}
-                >
-                  REMOVE API KEY
-                </button>
+          {/* Authentication section */}
+          <div className="form-section">
+            <h3 className="form-section-title">Authentication</h3>
+
+            <div className="form-group">
+              <label htmlFor="authType">Authentication Type</label>
+              <select
+                id="authType"
+                value={authType}
+                onChange={(e) => {
+                  setAuthType(e.target.value as 'apiKey' | 'clientPassword');
+                  clearErrors();
+                }}
+              >
+                <option value="apiKey">API Key</option>
+                <option value="clientPassword">Client Password (OIDC)</option>
+              </select>
+            </div>
+
+            {authType === 'apiKey' && (
+              <div className="form-group">
+                <label>API Key (optional)</label>
+                {apiKeyPresent && apiKeyAction === 'keep' ? (
+                  <div className="api-key-configured">
+                    <span>API key is configured.</span>
+                    <button
+                      type="button"
+                      className="remove-api-key-button"
+                      onClick={handleRemoveApiKey}
+                    >
+                      REMOVE API KEY
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="password"
+                      id="apiKeyCustom"
+                      placeholder={getApiKeyPlaceholder()}
+                      value={apiKeyInput}
+                      onChange={(e) => {
+                        setApiKeyInput(e.target.value);
+                        setApiKeyAction('update');
+                      }}
+                    />
+                    {apiKeyAction === 'remove' && (
+                      <small>
+                        API key will be removed. Leave blank to connect anonymously, or enter a new
+                        key.
+                      </small>
+                    )}
+                    {isEditMode && apiKeyAction !== 'remove' && (
+                      <small>Leave blank to keep the existing API key unchanged.</small>
+                    )}
+                  </>
+                )}
               </div>
-            ) : (
+            )}
+
+            {authType === 'clientPassword' && (
               <>
-                <input
-                  type="password"
-                  id="apiKeyCustom"
-                  placeholder={getApiKeyPlaceholder()}
-                  value={apiKeyInput}
-                  onChange={(e) => {
-                    setApiKeyInput(e.target.value);
-                    setApiKeyAction('update');
-                  }}
-                />
-                {apiKeyAction === 'remove' && (
-                  <small>
-                    API key will be removed. Leave blank to connect anonymously, or enter a new key.
-                  </small>
-                )}
-                {isEditMode && apiKeyAction !== 'remove' && (
-                  <small>Leave blank to keep the existing API key unchanged.</small>
-                )}
+                <div className="form-group">
+                  <label htmlFor="username">Username</label>
+                  <input
+                    type="text"
+                    id="username"
+                    placeholder="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={errors.username ? 'input-error' : ''}
+                  />
+                  {errors.username && <div className="field-error">{errors.username}</div>}
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  {passwordPresent && passwordAction === 'keep' ? (
+                    <div className="api-key-configured">
+                      <span>Password is configured.</span>
+                      <button
+                        type="button"
+                        className="remove-api-key-button"
+                        onClick={handleRemovePassword}
+                      >
+                        REMOVE PASSWORD
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="password"
+                        id="passwordCustom"
+                        placeholder={
+                          passwordAction === 'remove'
+                            ? 'Enter new password or leave blank'
+                            : 'Leave empty if not required'
+                        }
+                        value={passwordInput}
+                        onChange={(e) => {
+                          setPasswordInput(e.target.value);
+                          setPasswordAction('update');
+                        }}
+                      />
+                      {passwordAction === 'remove' && (
+                        <small>
+                          Password will be removed. Leave blank to connect without password, or
+                          enter a new one.
+                        </small>
+                      )}
+                      {isEditMode && passwordAction !== 'remove' && (
+                        <small>Leave blank to keep the existing password unchanged.</small>
+                      )}
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>

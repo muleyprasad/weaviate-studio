@@ -39,6 +39,9 @@ const exported = {
   ApiKey: function (key: any) {
     return { key };
   },
+  AuthUserPasswordCredentials: function (creds: { username: string; password?: string }) {
+    return { username: creds.username, password: creds.password };
+  },
   connectToCustom: jest.fn().mockResolvedValue({
     misc: {
       metaGetter: () => ({ do: jest.fn().mockResolvedValue({ version: 'mock' }) }),

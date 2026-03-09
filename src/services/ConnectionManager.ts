@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import weaviate, { ConnectToCustomOptions, WeaviateClient } from 'weaviate-client';
+import weaviate, {
+  AuthUserPasswordCredentials,
+  ConnectToCustomOptions,
+  WeaviateClient,
+} from 'weaviate-client';
 import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
 
 export interface ConnectionLink {
@@ -21,7 +25,12 @@ export interface WeaviateConnection {
   type: 'custom' | 'cloud';
 
   // Common (for both types)
+  authType?: 'apiKey' | 'clientPassword'; // default: 'apiKey' if apiKey present, else none
   apiKey?: string;
+
+  // Client password auth fields
+  username?: string;
+  password?: string;
 
   // Custom connection fields
   httpHost?: string;
@@ -368,7 +377,12 @@ export class ConnectionManager {
           customOptions.grpcSecure = connection.grpcSecure;
         }
 
-        if (connection.apiKey) {
+        if (connection.authType === 'clientPassword' && connection.username) {
+          customOptions.authCredentials = new AuthUserPasswordCredentials({
+            username: connection.username,
+            password: connection.password,
+          });
+        } else if (connection.apiKey) {
           customOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
         }
 
@@ -409,7 +423,12 @@ export class ConnectionManager {
               },
             };
 
-            if (connection.apiKey) {
+            if (connection.authType === 'clientPassword' && connection.username) {
+              httpOnlyOptions.authCredentials = new AuthUserPasswordCredentials({
+                username: connection.username,
+                password: connection.password,
+              });
+            } else if (connection.apiKey) {
               httpOnlyOptions.authCredentials = new weaviate.ApiKey(connection.apiKey);
             }
 
@@ -646,8 +665,11 @@ export class ConnectionManager {
                   timeoutInsert: connection?.timeoutInsert || 120,
                   skipInitChecks: connection?.skipInitChecks || false,
                   links: connection?.links || [],
+                  authType: connection?.authType || 'apiKey',
+                  username: connection?.username || '',
                 },
                 apiKeyPresent: !!connection?.apiKey,
+                passwordPresent: !!connection?.password,
                 isEditMode,
                 connectionVersion:
                   connection?.connectionVersion || ConnectionManager.currentVersion,
@@ -695,8 +717,12 @@ export class ConnectionManager {
                   // Build update payload, handling API key removal
                   const updatePayload = { ...message.connection };
                   delete updatePayload.removeApiKey;
+                  delete updatePayload.removePassword;
                   if (message.removeApiKey === true) {
                     updatePayload.apiKey = undefined;
+                  }
+                  if (message.removePassword === true) {
+                    updatePayload.password = undefined;
                   }
                   updatedConnection = await this.updateConnection(connection.id, updatePayload);
                 } else {
@@ -709,7 +735,10 @@ export class ConnectionManager {
                     grpcPort: message.connection.grpcPort,
                     grpcSecure: message.connection.grpcSecure,
                     httpSecure: message.connection.httpSecure,
+                    authType: message.connection.authType || 'apiKey',
                     apiKey: apiKey?.trim() || undefined,
+                    username: message.connection.username?.trim() || undefined,
+                    password: message.connection.password?.trim() || undefined,
                     type: message.connection.cloudUrl === undefined ? 'custom' : 'cloud',
                     cloudUrl: message.connection.cloudUrl?.trim() || undefined,
                     timeoutInit: message.connection.timeoutInit || undefined,
@@ -781,8 +810,12 @@ export class ConnectionManager {
                   // Build update payload, handling API key removal
                   const updatePayload = { ...message.connection };
                   delete updatePayload.removeApiKey;
+                  delete updatePayload.removePassword;
                   if (message.removeApiKey === true) {
                     updatePayload.apiKey = undefined;
+                  }
+                  if (message.removePassword === true) {
+                    updatePayload.password = undefined;
                   }
                   updatedConnection = await this.updateConnection(connection.id, updatePayload);
                 } else {
@@ -795,7 +828,10 @@ export class ConnectionManager {
                     grpcPort: message.connection.grpcPort,
                     grpcSecure: message.connection.grpcSecure,
                     httpSecure: message.connection.httpSecure,
+                    authType: message.connection.authType || 'apiKey',
                     apiKey: apiKey?.trim() || undefined,
+                    username: message.connection.username?.trim() || undefined,
+                    password: message.connection.password?.trim() || undefined,
                     type: message.connection.cloudUrl === undefined ? 'custom' : 'cloud',
                     cloudUrl: message.connection.cloudUrl?.trim() || undefined,
                     timeoutInit: message.connection.timeoutInit || undefined,
