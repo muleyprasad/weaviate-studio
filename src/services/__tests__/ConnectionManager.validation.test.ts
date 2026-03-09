@@ -31,9 +31,20 @@ describe('ConnectionManager Validation and Mock Tests', () => {
       }),
     } as unknown as MockGlobalState;
 
+    const secretsStorage: Record<string, string> = {};
     mockContext = {
       globalState,
       subscriptions: [],
+      secrets: {
+        get: jest.fn(async (key: string) => secretsStorage[key]),
+        store: jest.fn(async (key: string, value: string) => {
+          secretsStorage[key] = value;
+        }),
+        delete: jest.fn(async (key: string) => {
+          delete secretsStorage[key];
+        }),
+        onDidChange: jest.fn(),
+      },
     };
   });
 

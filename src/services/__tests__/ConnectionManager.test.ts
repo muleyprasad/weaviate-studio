@@ -27,9 +27,20 @@ describe('ConnectionManager', () => {
       }),
     } as unknown as MockGlobalState;
 
+    const secretsStorage: Record<string, string> = {};
     mockContext = {
       globalState,
       subscriptions: [],
+      secrets: {
+        get: jest.fn(async (key: string) => secretsStorage[key]),
+        store: jest.fn(async (key: string, value: string) => {
+          secretsStorage[key] = value;
+        }),
+        delete: jest.fn(async (key: string) => {
+          delete secretsStorage[key];
+        }),
+        onDidChange: jest.fn(),
+      },
     };
   });
 
@@ -385,13 +396,14 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = [oldCloudConnection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const migratedConnection = connections.find((c) => c.id === 'old-cloud');
       expect(migratedConnection).toBeDefined();
       expect(migratedConnection?.type).toBe('cloud');
       expect(migratedConnection?.cloudUrl).toBe('https://my-cluster.weaviate.cloud');
-      expect(migratedConnection?.connectionVersion).toBe('2');
+      expect(migratedConnection?.connectionVersion).toBe('3');
       expect(migratedConnection?.url).toBeUndefined();
       expect(migratedConnection?.apiKey).toBe('old-api-key');
     });
@@ -408,6 +420,7 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = [oldCustomConnection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const migratedConnection = connections.find((c) => c.id === 'old-custom');
@@ -419,7 +432,7 @@ describe('ConnectionManager', () => {
       expect(migratedConnection?.grpcHost).toBe('localhost');
       expect(migratedConnection?.grpcPort).toBe(50051);
       expect(migratedConnection?.grpcSecure).toBe(false);
-      expect(migratedConnection?.connectionVersion).toBe('2');
+      expect(migratedConnection?.connectionVersion).toBe('3');
       expect(migratedConnection?.url).toBeUndefined();
       expect(migratedConnection?.apiKey).toBe('custom-key');
     });
@@ -436,6 +449,7 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = [oldCustomConnection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const migratedConnection = connections.find((c) => c.id === 'old-custom-https');
@@ -447,7 +461,7 @@ describe('ConnectionManager', () => {
       expect(migratedConnection?.grpcHost).toBe('secure-server.com');
       expect(migratedConnection?.grpcPort).toBe(50051);
       expect(migratedConnection?.grpcSecure).toBe(true);
-      expect(migratedConnection?.connectionVersion).toBe('2');
+      expect(migratedConnection?.connectionVersion).toBe('3');
     });
 
     test('detects weaviate.io cloud URLs correctly', async () => {
@@ -462,6 +476,7 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = [oldCloudConnection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const migratedConnection = connections.find((c) => c.id === 'old-weaviate-io');
@@ -480,6 +495,7 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = [invalidConnection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const connection = connections.find((c) => c.id === 'invalid');
@@ -488,8 +504,8 @@ describe('ConnectionManager', () => {
       expect(connection?.type).toBeUndefined();
     });
 
-    test('does not migrate connections that are already version 2', async () => {
-      const newConnection: WeaviateConnection = {
+    test('migrates connections from version 2 to version 3', async () => {
+      const v2Connection: WeaviateConnection = {
         id: 'new-format',
         name: 'New Format Connection',
         status: 'disconnected',
@@ -504,14 +520,17 @@ describe('ConnectionManager', () => {
         autoConnect: false,
       };
 
-      globalState.storage['weaviate-connections'] = [newConnection];
+      globalState.storage['weaviate-connections'] = [v2Connection];
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const connection = connections.find((c) => c.id === 'new-format');
-      expect(connection).toEqual(newConnection);
-      expect(globalState.update).not.toHaveBeenCalled(); // Should not save again
+      expect(connection).toBeDefined();
+      expect(connection?.connectionVersion).toBe('3'); // Migrated from v2 → v3
+      expect(connection?.type).toBe('custom');
+      expect(connection?.httpHost).toBe('localhost');
     });
 
     test('saves migrated connections to storage', async () => {
@@ -525,18 +544,24 @@ describe('ConnectionManager', () => {
 
       globalState.storage['weaviate-connections'] = [oldConnection];
 
-      ConnectionManager.getInstance(mockContext);
+      const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
 
       expect(globalState.update).toHaveBeenCalledWith(
         'weaviate-connections',
         expect.arrayContaining([
           expect.objectContaining({
             id: 'to-migrate',
-            connectionVersion: '2',
+            connectionVersion: '3',
             type: 'custom',
+            apiKeyPresent: true, // presence flag is persisted; raw key is NOT in globalState
           }),
         ])
       );
+      // Verify raw apiKey was NOT persisted
+      const savedConnections = globalState.update.mock.calls[0][1] as any[];
+      const saved = savedConnections.find((c: any) => c.id === 'to-migrate');
+      expect(saved).not.toHaveProperty('apiKey');
     });
 
     test('handles mixed old and new connection formats', async () => {
@@ -565,14 +590,16 @@ describe('ConnectionManager', () => {
       globalState.storage['weaviate-connections'] = mixedConnections;
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       const oldConnection = connections.find((c) => c.id === 'old');
       const newConnection = connections.find((c) => c.id === 'new');
 
-      expect(oldConnection?.connectionVersion).toBe('2');
+      // Both migrated to current version (v3)
+      expect(oldConnection?.connectionVersion).toBe('3');
       expect(oldConnection?.type).toBe('custom');
-      expect(newConnection?.connectionVersion).toBe('2');
+      expect(newConnection?.connectionVersion).toBe('3');
       expect(newConnection?.type).toBe('custom');
     });
   });
@@ -783,7 +810,7 @@ describe('ConnectionManager', () => {
       );
     });
 
-    test('loads connections from globalState on initialization', () => {
+    test('loads connections from globalState on initialization', async () => {
       const existingConnections: WeaviateConnection[] = [
         {
           id: 'existing',
@@ -796,13 +823,14 @@ describe('ConnectionManager', () => {
           grpcPort: 50051,
           httpSecure: false,
           grpcSecure: false,
-          connectionVersion: '2',
+          connectionVersion: '3', // Already at current version
         },
       ];
 
       globalState.storage['weaviate-connections'] = existingConnections;
 
       const mgr = ConnectionManager.getInstance(mockContext);
+      await (mgr as any).addConnectionMutex;
       const connections = mgr.getConnections();
 
       expect(connections).toHaveLength(1);

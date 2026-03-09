@@ -51,14 +51,40 @@ export interface WeaviateConnection {
 
   connectionVersion?: string; // future use
 
+  // Secret presence flags (actual values stored in context.secrets, not globalState)
+  apiKeyPresent?: boolean;
+  passwordPresent?: boolean;
+
   // backwards compatibility
   url?: string; // old field, to be migrated
 }
 
 export class ConnectionManager {
   private static instance: ConnectionManager;
-  private static readonly currentVersion = '2'; // Current connection configuration version
+  private static readonly currentVersion = '3'; // Current connection configuration version
   private readonly storageKey = 'weaviate-connections';
+
+  // --- Secret storage helpers ---
+  private secretKey(id: string, field: 'apiKey' | 'password'): string {
+    return `weaviate-connection-${id}-${field}`;
+  }
+
+  private async storeSecret(
+    id: string,
+    field: 'apiKey' | 'password',
+    value: string
+  ): Promise<void> {
+    await this.context.secrets.store(this.secretKey(id, field), value);
+  }
+
+  private async getSecret(id: string, field: 'apiKey' | 'password'): Promise<string | undefined> {
+    return this.context.secrets.get(this.secretKey(id, field));
+  }
+
+  private async deleteSecret(id: string, field: 'apiKey' | 'password'): Promise<void> {
+    await this.context.secrets.delete(this.secretKey(id, field));
+  }
+
   private _onConnectionsChanged = new vscode.EventEmitter<void>();
   public readonly onConnectionsChanged = this._onConnectionsChanged.event;
   private connections: WeaviateConnection[] = [];
@@ -66,12 +92,15 @@ export class ConnectionManager {
   private addConnectionMutex: Promise<any> = Promise.resolve(); // Mutex to prevent race conditions
 
   private constructor(private readonly context: vscode.ExtensionContext) {
-    this.loadConnections().catch((error) => {
+    // Chain the mutex onto the initial load so all operations wait for initialization
+    this.addConnectionMutex = this.loadConnections().catch((error) => {
       console.error('Failed to load connections during initialization:', error);
     });
   }
 
-  private checkConnectionsMigration(connections: WeaviateConnection[]): WeaviateConnection[] {
+  private async checkConnectionsMigration(
+    connections: WeaviateConnection[]
+  ): Promise<WeaviateConnection[]> {
     // Ensure connections is a valid array
     if (!Array.isArray(connections)) {
       console.warn('Invalid connections data, expected array, got:', typeof connections);
@@ -85,74 +114,101 @@ export class ConnectionManager {
 
     // if migration detected, save the migrated connections
     let need_to_save = false;
-    // if it doesn't have connectionVersion, need to migrate
-    const migratedConnections = validConnections.map((conn) => {
-      try {
-        // Ensure autoConnect has a default value
-        if (conn.autoConnect === undefined) {
-          conn.autoConnect = false;
-          need_to_save = true;
-        }
 
-        if (conn.connectionVersion === ConnectionManager.currentVersion) {
-          // future migrations here
+    const migratedConnections = await Promise.all(
+      validConnections.map(async (conn) => {
+        try {
+          // Ensure autoConnect has a default value
+          if (conn.autoConnect === undefined) {
+            conn.autoConnect = false;
+            need_to_save = true;
+          }
+
+          if (conn.connectionVersion === ConnectionManager.currentVersion) {
+            return conn;
+          } else if (conn.connectionVersion === '2') {
+            // v2 → v3: move plaintext apiKey/password out of globalState and into context.secrets
+            if (conn.apiKey && typeof conn.apiKey === 'string') {
+              await this.storeSecret(conn.id, 'apiKey', conn.apiKey);
+              conn.apiKeyPresent = true;
+            }
+            if (conn.password && typeof conn.password === 'string') {
+              await this.storeSecret(conn.id, 'password', conn.password);
+              conn.passwordPresent = true;
+            }
+            conn.connectionVersion = ConnectionManager.currentVersion;
+            need_to_save = true;
+          } else if (!conn.connectionVersion) {
+            // may be new connection without version — bump straight to current
+            if (conn.httpHost || conn.cloudUrl) {
+              // Already in the new shape; just migrate secrets if present
+              if (conn.apiKey && typeof conn.apiKey === 'string') {
+                await this.storeSecret(conn.id, 'apiKey', conn.apiKey);
+                conn.apiKeyPresent = true;
+              }
+              if (conn.password && typeof conn.password === 'string') {
+                await this.storeSecret(conn.id, 'password', conn.password);
+                conn.passwordPresent = true;
+              }
+              need_to_save = true;
+              return { ...conn, connectionVersion: ConnectionManager.currentVersion };
+            }
+            // old connection with legacy url field — migrate structure
+            if (
+              conn.url &&
+              (conn.url.includes('weaviate.cloud') ||
+                conn.url.includes('weaviate.io') ||
+                conn.url.includes('weaviate.network'))
+            ) {
+              conn.type = 'cloud';
+              conn.cloudUrl = conn.url;
+              delete conn.url;
+              conn.connectionVersion = ConnectionManager.currentVersion;
+              need_to_save = true;
+            } else {
+              // custom connection
+              if (!conn.url) {
+                // invalid connection, skip migration
+                return conn;
+              }
+              conn.type = 'custom';
+              let rawUrl = conn.url;
+              if (!/^https?:\/\//i.test(rawUrl)) {
+                rawUrl = `http://${rawUrl}`;
+              }
+              const url = new URL(rawUrl);
+              delete conn.url;
+              conn.httpHost = url.hostname;
+              const hasExplicitPort = url.port && url.port.trim().length > 0;
+              conn.httpPort = hasExplicitPort
+                ? parseInt(url.port, 10)
+                : url.protocol === 'https:'
+                  ? 443
+                  : 8080;
+              conn.httpSecure = url.protocol === 'https:';
+              conn.grpcHost = url.hostname;
+              conn.grpcPort = 50051;
+              conn.grpcSecure = url.protocol === 'https:';
+              conn.connectionVersion = ConnectionManager.currentVersion;
+              need_to_save = true;
+            }
+            // Migrate any plaintext secrets present in the old connection
+            if (conn.apiKey && typeof conn.apiKey === 'string') {
+              await this.storeSecret(conn.id, 'apiKey', conn.apiKey);
+              conn.apiKeyPresent = true;
+            }
+            if (conn.password && typeof conn.password === 'string') {
+              await this.storeSecret(conn.id, 'password', conn.password);
+              conn.passwordPresent = true;
+            }
+          }
           return conn;
-        } else if (!conn.connectionVersion) {
-          // may be new connection without version
-          if (conn.httpHost || conn.cloudUrl) {
-            need_to_save = true;
-            return { ...conn, connectionVersion: ConnectionManager.currentVersion };
-          }
-          // old connection, need to migrate
-          if (
-            conn.url &&
-            (conn.url.includes('weaviate.cloud') ||
-              conn.url.includes('weaviate.io') ||
-              conn.url.includes('weaviate.network'))
-          ) {
-            conn.type = 'cloud';
-            conn.cloudUrl = conn.url;
-            delete conn.url;
-            conn.connectionVersion = ConnectionManager.currentVersion;
-
-            need_to_save = true;
-          } else {
-            // custom connection
-            if (!conn.url) {
-              // invalid connection, skip migration
-              return conn;
-            }
-            conn.type = 'custom';
-            // url should be in format http(s)://host:port; add default scheme if missing
-            let rawUrl = conn.url;
-            if (!/^https?:\/\//i.test(rawUrl)) {
-              rawUrl = `http://${rawUrl}`;
-            }
-            const url = new URL(rawUrl);
-            delete conn.url;
-            conn.httpHost = url.hostname;
-            // If no port is specified, choose sensible defaults: 443 for https, 8080 for http
-            const hasExplicitPort = url.port && url.port.trim().length > 0;
-            conn.httpPort = hasExplicitPort
-              ? parseInt(url.port, 10)
-              : url.protocol === 'https:'
-                ? 443
-                : 8080;
-            conn.httpSecure = url.protocol === 'https:';
-            conn.grpcHost = url.hostname;
-            conn.grpcPort = 50051; // default grpc port
-            conn.grpcSecure = url.protocol === 'https:'; // default to false
-            conn.connectionVersion = ConnectionManager.currentVersion;
-
-            need_to_save = true;
-          }
+        } catch (error) {
+          console.warn('Error migrating connection, skipping:', conn, error);
+          return null;
         }
-        return conn;
-      } catch (error) {
-        console.warn('Error migrating connection, skipping:', conn, error);
-        return null;
-      }
-    });
+      })
+    );
 
     // Filter out any null values from failed migrations
     const finalConnections = migratedConnections.filter(
@@ -161,7 +217,9 @@ export class ConnectionManager {
 
     if (need_to_save) {
       try {
-        this.context.globalState.update(this.storageKey, finalConnections).then(
+        // Strip raw secret values before persisting
+        const toSave = finalConnections.map(({ apiKey, password, ...conn }) => conn);
+        this.context.globalState.update(this.storageKey, toSave).then(
           () => {
             // Migration complete - silent in production/tests
           },
@@ -187,12 +245,21 @@ export class ConnectionManager {
     try {
       var connections = this.context.globalState.get<WeaviateConnection[]>(this.storageKey) || [];
       // Check and save migrations
-      const migratedConnections = this.checkConnectionsMigration(connections);
+      const migratedConnections = await this.checkConnectionsMigration(connections);
       // Ensure all loaded connections start as disconnected
       this.connections = migratedConnections.map((conn: WeaviateConnection) => ({
         ...conn,
         status: 'disconnected' as const,
       }));
+      // Rehydrate secrets into in-memory connections
+      for (const conn of this.connections) {
+        if (conn.apiKeyPresent) {
+          conn.apiKey = await this.getSecret(conn.id, 'apiKey');
+        }
+        if (conn.passwordPresent) {
+          conn.password = await this.getSecret(conn.id, 'password');
+        }
+      }
       return this.connections;
     } catch (error) {
       console.error('Error loading connections, starting with empty list:', error);
@@ -202,7 +269,9 @@ export class ConnectionManager {
   }
 
   private async saveConnections() {
-    await this.context.globalState.update(this.storageKey, this.connections);
+    // Strip raw secret values — only boolean presence flags are persisted to globalState
+    const toSave = this.connections.map(({ apiKey, password, ...conn }) => conn);
+    await this.context.globalState.update(this.storageKey, toSave);
     this._onConnectionsChanged.fire();
   }
 
@@ -264,6 +333,16 @@ export class ConnectionManager {
           connectionVersion: ConnectionManager.currentVersion,
         };
 
+        // Store secrets securely; set presence flags
+        if (connection.apiKey) {
+          await this.storeSecret(newConnection.id, 'apiKey', connection.apiKey);
+          newConnection.apiKeyPresent = true;
+        }
+        if (connection.password) {
+          await this.storeSecret(newConnection.id, 'password', connection.password);
+          newConnection.passwordPresent = true;
+        }
+
         this.connections.push(newConnection);
 
         try {
@@ -305,8 +384,33 @@ export class ConnectionManager {
       }
     }
 
-    // clear the connection index, keep only the id and last used
-    this.connections[index] = { ...this.connections[index], ...updates, lastUsed: Date.now() };
+    // Handle secret fields: update secrets and set presence flags accordingly
+    const secretUpdates: Partial<WeaviateConnection> = {};
+    if ('apiKey' in updates) {
+      if (updates.apiKey) {
+        await this.storeSecret(id, 'apiKey', updates.apiKey);
+        secretUpdates.apiKeyPresent = true;
+      } else {
+        await this.deleteSecret(id, 'apiKey');
+        secretUpdates.apiKeyPresent = false;
+      }
+    }
+    if ('password' in updates) {
+      if (updates.password) {
+        await this.storeSecret(id, 'password', updates.password);
+        secretUpdates.passwordPresent = true;
+      } else {
+        await this.deleteSecret(id, 'password');
+        secretUpdates.passwordPresent = false;
+      }
+    }
+
+    this.connections[index] = {
+      ...this.connections[index],
+      ...updates,
+      ...secretUpdates,
+      lastUsed: Date.now(),
+    };
     await this.saveConnections();
     return this.connections[index];
   }
@@ -316,6 +420,10 @@ export class ConnectionManager {
     if (index === -1) {
       return false;
     }
+
+    // Clean up secrets
+    await this.deleteSecret(id, 'apiKey');
+    await this.deleteSecret(id, 'password');
 
     // Remove client without updating connection status (since we're deleting it)
     this.clients.delete(id);
@@ -510,6 +618,12 @@ export class ConnectionManager {
    * @returns Promise that resolves when all connections are cleared
    */
   public async clearAllConnections(): Promise<void> {
+    // Delete all secrets before clearing the array
+    for (const conn of this.connections) {
+      await this.deleteSecret(conn.id, 'apiKey');
+      await this.deleteSecret(conn.id, 'password');
+    }
+
     // Disconnect all active clients
     this.clients.clear();
 
@@ -668,8 +782,8 @@ export class ConnectionManager {
                   authType: connection?.authType || 'apiKey',
                   username: connection?.username || '',
                 },
-                apiKeyPresent: !!connection?.apiKey,
-                passwordPresent: !!connection?.password,
+                apiKeyPresent: !!(connection?.apiKeyPresent ?? !!connection?.apiKey),
+                passwordPresent: !!(connection?.passwordPresent ?? !!connection?.password),
                 isEditMode,
                 connectionVersion:
                   connection?.connectionVersion || ConnectionManager.currentVersion,
@@ -698,7 +812,7 @@ export class ConnectionManager {
                     !isEditMode ||
                     !connection ||
                     connection.type !== 'cloud' ||
-                    !connection.apiKey ||
+                    !(connection.apiKeyPresent ?? !!connection.apiKey) ||
                     cloudUrlChanged;
                   if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
                     panel.webview.postMessage({
@@ -791,7 +905,7 @@ export class ConnectionManager {
                     !isEditMode ||
                     !connection ||
                     connection.type !== 'cloud' ||
-                    !connection.apiKey ||
+                    !(connection.apiKeyPresent ?? !!connection.apiKey) ||
                     cloudUrlChanged;
                   if (!name || !message.connection.cloudUrl || (needsApiKey && !apiKey)) {
                     panel.webview.postMessage({

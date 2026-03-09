@@ -26,10 +26,21 @@ interface MockWebviewPanel {
 }
 
 function makeMockContext(globalState: MockGlobalState) {
+  const secretsStorage: Record<string, string> = {};
   return {
     globalState,
     subscriptions: [],
     extensionUri: { fsPath: '/test-extension' },
+    secrets: {
+      get: jest.fn(async (key: string) => secretsStorage[key]),
+      store: jest.fn(async (key: string, value: string) => {
+        secretsStorage[key] = value;
+      }),
+      delete: jest.fn(async (key: string) => {
+        delete secretsStorage[key];
+      }),
+      onDidChange: jest.fn(),
+    },
   };
 }
 
