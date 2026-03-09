@@ -34,6 +34,7 @@ export interface BackupItem {
   collections: string[];
   // Additional fields used internally
   duration?: string;
+  size?: number;
   startedAt?: string;
   completedAt?: string;
   classes?: string[]; // Legacy field, use 'collections' instead

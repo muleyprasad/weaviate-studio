@@ -35,6 +35,7 @@ export type ExtensionToWebviewMessage =
   | { command: 'serverVersion'; version: string }
   | { command: 'collections'; collections: string[] }
   | { command: 'schema'; schema: WeaviateCollectionSchema }
+  | { command: 'setReadOnly'; readOnly: boolean }
   | { command: 'error'; message: string };
 
 type VsCodeApi = {

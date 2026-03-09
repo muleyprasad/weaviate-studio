@@ -68,6 +68,11 @@ const vscode = {
       return { fsPath: fullPath, toString: () => `file://${fullPath}` };
     }),
     file: (path: string) => ({ fsPath: path, toString: () => `file://${path}` }),
+    from: (components: { scheme: string; path?: string }) => ({
+      scheme: components.scheme,
+      path: components.path || '',
+      toString: () => `${components.scheme}:${components.path || ''}`,
+    }),
   },
 };
 

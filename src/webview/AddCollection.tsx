@@ -27,6 +27,7 @@ function AddCollectionWebview() {
   const [hasCollections, setHasCollections] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [weaviateVersion, setWeaviateVersion] = useState<string | null>(null);
+  const [readOnly, setReadOnly] = useState<boolean>(false);
 
   useEffect(() => {
     // Request initial data from extension
@@ -55,6 +56,9 @@ function AddCollectionWebview() {
           if (message.schema) {
             setMode('fromScratch');
           }
+          break;
+        case 'setReadOnly':
+          setReadOnly(message.readOnly === true);
           break;
         case 'nodesNumber':
           setNodesNumber(message.nodesNumber || 1);
@@ -260,9 +264,21 @@ function AddCollectionWebview() {
         />
       </div>
 
+      {readOnly && (
+        <div className="readonly-banner">
+          <span>⚠️</span>
+          This connection is in read-only mode. Collection creation is disabled.
+        </div>
+      )}
+
       <div className="add-collection-actions">
-        <button className="action-button action-button-primary" onClick={handleCreate}>
-          Create Collection
+        <button
+          className="action-button action-button-primary"
+          onClick={handleCreate}
+          disabled={readOnly}
+          title={readOnly ? 'This connection is in read-only mode' : undefined}
+        >
+          {readOnly ? '🔒 READONLY MODE' : 'Create Collection'}
         </button>
         <button className="action-button action-button-secondary" onClick={handleBack}>
           Back

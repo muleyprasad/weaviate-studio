@@ -4,11 +4,6 @@ export const BACKUP_CONFIG = {
     MAX: 80,
     DEFAULT: 80,
   },
-  CHUNK_SIZE: {
-    MIN: 2,
-    MAX: 512,
-    DEFAULT: 128,
-  },
   REFRESH_INTERVAL: {
     MIN: 1,
     MAX: 60,
