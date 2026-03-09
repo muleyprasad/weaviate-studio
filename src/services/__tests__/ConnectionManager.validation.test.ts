@@ -378,6 +378,8 @@ describe('ConnectionManager Validation and Mock Tests', () => {
   describe('Event Mock Tests', () => {
     test('event emitter fires correctly on operations', async () => {
       const mgr = ConnectionManager.getInstance(mockContext);
+      // Wait for loadConnections to finish so its event fires before we register the listener
+      await (mgr as any).addConnectionMutex;
       const eventListener = jest.fn();
 
       mgr.onConnectionsChanged(eventListener);

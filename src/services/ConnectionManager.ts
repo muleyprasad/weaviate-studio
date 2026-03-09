@@ -304,6 +304,13 @@ export class ConnectionManager {
           }
         }
 
+        if (
+          connection.authType === 'clientPassword' &&
+          (!connection.username || connection.username.trim() === '')
+        ) {
+          throw new Error('Username is required for client password authentication');
+        }
+
         // Check for duplicate connection names
         const existingConnection = this.connections.find(
           (c) => c.name.toLowerCase() === connection.name.toLowerCase()
@@ -839,6 +846,17 @@ export class ConnectionManager {
                   }
                 }
 
+                if (
+                  message.connection.authType === 'clientPassword' &&
+                  !message.connection.username?.trim()
+                ) {
+                  panel.webview.postMessage({
+                    command: 'error',
+                    message: 'Username is required for client password authentication',
+                  });
+                  return;
+                }
+
                 let updatedConnection: WeaviateConnection | null = null;
 
                 if (isEditMode && connection) {
@@ -932,6 +950,17 @@ export class ConnectionManager {
                     });
                     return;
                   }
+                }
+
+                if (
+                  message.connection.authType === 'clientPassword' &&
+                  !message.connection.username?.trim()
+                ) {
+                  panel.webview.postMessage({
+                    command: 'error',
+                    message: 'Username is required for client password authentication',
+                  });
+                  return;
                 }
 
                 let updatedConnection: WeaviateConnection | null = null;
