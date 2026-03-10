@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { DataExplorerAPI } from './DataExplorerAPI';
+import { safeJsonStringify } from '../../rag-chat/extension/utils';
 import type {
   ExtensionMessage,
   WebviewMessage,
@@ -819,20 +820,21 @@ export class DataExplorerPanel {
     // Validate all placeholders were replaced
     const remainingPlaceholders = (html.match(/{{nonce}}/g) || []).length;
     if (remainingPlaceholders > 0) {
-      console.error(
-        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced`
+      throw new Error(
+        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced.`
       );
     }
     if (noncePlaceholderCount === 0) {
-      console.warn(
+      throw new Error(
         'CSP nonce replacement: No {{nonce}} placeholders found in HTML. Expected at least 2.'
       );
     }
 
     // Inject initial data
+    // Bug 2 fix: escape <, >, & so a malicious connection name can't break out of the <script> tag.
     const initScript = `
       <script nonce="${nonce}">
-        window.initialData = ${JSON.stringify({
+        window.initialData = ${safeJsonStringify({
           collectionName: this._collectionName,
           connectionId: this._connectionId,
           targetUuid: this._initialTargetUuid ?? null,

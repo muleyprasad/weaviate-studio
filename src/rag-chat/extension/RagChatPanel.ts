@@ -11,13 +11,18 @@ import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
-import { clampLimit, RequestTracker } from './utils';
+import {
+  clampLimit,
+  RequestTracker,
+  mergeSettledResults,
+  validateRagQueryInput,
+  safeJsonStringify,
+} from './utils';
 
 /**
  * Manages the RAG Chat webview panel
  */
 export class RagChatPanel {
-  public static currentPanel: RagChatPanel | undefined;
   private static panels: Map<string, RagChatPanel> = new Map();
 
   private readonly _panel: vscode.WebviewPanel;
@@ -36,12 +41,17 @@ export class RagChatPanel {
     connectionId: string,
     private readonly _connectionName: string,
     private readonly getClient: () => WeaviateClient | undefined,
-    initialCollectionName?: string
+    initialCollectionName?: string,
+    inheritedFilters?: FilterCondition[],
+    inheritedFilterMatchMode?: FilterMatchMode
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._connectionId = connectionId;
     this._initialCollectionName = initialCollectionName;
+    // Bug 1 fix: assign before _update() so window.initialData is correct on first render
+    this._inheritedFilters = inheritedFilters;
+    this._inheritedFilterMatchMode = inheritedFilterMatchMode;
 
     // Initialize API with client
     const client = this.getClient();
@@ -142,14 +152,12 @@ export class RagChatPanel {
       connectionId,
       connectionName,
       getClient,
-      initialCollectionName
+      initialCollectionName,
+      inheritedFilters,
+      inheritedFilterMatchMode
     );
-    // Store inherited filter context from Data Explorer
-    ragChatPanel._inheritedFilters = inheritedFilters;
-    ragChatPanel._inheritedFilterMatchMode = inheritedFilterMatchMode;
 
     RagChatPanel.panels.set(panelKey, ragChatPanel);
-    RagChatPanel.currentPanel = ragChatPanel;
 
     return ragChatPanel;
   }
@@ -168,10 +176,6 @@ export class RagChatPanel {
   public dispose(): void {
     const panelKey = this._connectionId;
     RagChatPanel.panels.delete(panelKey);
-
-    if (RagChatPanel.currentPanel === this) {
-      RagChatPanel.currentPanel = undefined;
-    }
 
     this._panel.dispose();
 
@@ -298,7 +302,8 @@ export class RagChatPanel {
    */
   private async _handleExecuteRagQuery(message: RagChatWebviewMessage): Promise<void> {
     const collectionNames = message.collectionNames ?? [];
-    if (collectionNames.length === 0) {
+    const validationError = validateRagQueryInput(collectionNames, message.question);
+    if (validationError === 'no_collections') {
       this.postMessage({
         command: 'ragError',
         error: 'No collection selected.',
@@ -306,8 +311,7 @@ export class RagChatPanel {
       });
       return;
     }
-
-    if (!message.question?.trim()) {
+    if (validationError === 'empty_question') {
       this.postMessage({
         command: 'ragError',
         error: 'Question cannot be empty.',
@@ -346,54 +350,15 @@ export class RagChatPanel {
         return;
       }
 
-      // Check if all queries failed
-      const allFailed =
-        settled.length > 0 && settled.every((outcome) => outcome.status === 'rejected');
-
       const durationMs = Date.now() - startTime;
 
-      const results: Array<{
-        collectionName: string;
-        answer: string;
-        contextObjects: Array<{
-          uuid: string;
-          properties: Record<string, unknown>;
-          distance?: number;
-          certainty?: number;
-          score?: number;
-        }>;
-      }> = settled.map((outcome, i) => {
-        if (outcome.status === 'fulfilled') {
-          return outcome.value;
-        }
-        // Non-blocking: log the error and include a failure message
-        const errMsg =
-          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-        console.warn(
-          `RagChatPanel: Query failed for collection "${collectionNames[i]}": ${errMsg}`
-        );
-        return {
-          collectionName: collectionNames[i],
-          answer: `⚠️ Query failed for "${collectionNames[i]}": ${errMsg}`,
-          contextObjects: [],
-        };
-      });
-
-      // Merge: stamp collectionName on each context object for source attribution
-      const allContextObjects = results.flatMap((r) =>
-        r.contextObjects.map((obj) => ({ ...obj, collectionName: r.collectionName }))
-      );
-
-      // Combine answers with per-collection labeling
-      const answer =
-        results.length === 1
-          ? results[0].answer
-          : results.map((r) => `### From ${r.collectionName}\n\n${r.answer}`).join('\n\n---\n\n');
+      // Merge results — extracts answers, stamps collectionName on context objects
+      const { answer, contextObjects, allFailed } = mergeSettledResults(settled, collectionNames);
 
       this.postMessage({
         command: 'ragResponse',
         answer,
-        contextObjects: allContextObjects,
+        contextObjects,
         question: message.question,
         requestId: message.requestId,
         durationMs,
@@ -515,9 +480,10 @@ export class RagChatPanel {
     // Inject initial data — include initialCollectionName so the
     // webview can pre-select the collection the user right-clicked on.
     // Also inject inherited filters from Data Explorer if present.
+    // Bug 2 fix: escape <, >, & so a malicious connection name can't break out of the <script> tag.
     const initScript = `
       <script nonce="${nonce}">
-        window.initialData = ${JSON.stringify({
+        window.initialData = ${safeJsonStringify({
           connectionId: this._connectionId,
           connectionName: this._connectionName,
           initialCollectionName: this._initialCollectionName ?? null,

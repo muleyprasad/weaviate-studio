@@ -1,15 +1,9 @@
 /**
  * Tests for RagChatPanel message handling logic.
  *
- * The multi-collection merge and input-validation logic inside
- * _handleExecuteRagQuery is tested here by:
- *   1. Directly testing the "extraction" of results from Promise.allSettled
- *      output (mirrors the exact logic from RagChatPanel.ts lines 350-400).
- *   2. Integration-style tests via a minimal RagChatPanel stand-in that
- *      stubs vscode and captures postMessage calls.
- *
- * We import from utils.ts (already tested separately) and mirror the
- * merge algorithm so a refactor will break these tests immediately.
+ * The multi-collection merge and input-validation logic is tested here
+ * by importing the pure functions extracted into utils.ts. If the production
+ * algorithm changes, these tests will break immediately.
  */
 
 // ─── Vscode mock ──────────────────────────────────────────────────────
@@ -27,58 +21,11 @@ jest.mock('vscode', () => ({
   EventEmitter: jest.fn(),
 }));
 
-// ─── Helpers that mirror the merge algorithm in RagChatPanel ─────────
-
-type SettledQueryResult = {
-  collectionName: string;
-  answer: string;
-  contextObjects: Array<{
-    uuid: string;
-    properties: Record<string, unknown>;
-    distance?: number;
-    certainty?: number;
-    score?: number;
-  }>;
-};
-
-/**
- * Mirrors RagChatPanel._handleExecuteRagQuery's merge logic (lines 350-400).
- * Pure function — easy to test without VS Code.
- */
-function mergeSettledResults(
-  settled: PromiseSettledResult<SettledQueryResult>[],
-  collectionNames: string[]
-): {
-  answer: string;
-  contextObjects: Array<SettledQueryResult['contextObjects'][number] & { collectionName: string }>;
-  allFailed: boolean;
-} {
-  const allFailed = settled.length > 0 && settled.every((o) => o.status === 'rejected');
-
-  const results: SettledQueryResult[] = settled.map((outcome, i) => {
-    if (outcome.status === 'fulfilled') {
-      return outcome.value;
-    }
-    const errMsg =
-      outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-    return {
-      collectionName: collectionNames[i],
-      answer: `⚠️ Query failed for "${collectionNames[i]}": ${errMsg}`,
-      contextObjects: [],
-    };
-  });
-
-  const allContextObjects = results.flatMap((r) =>
-    r.contextObjects.map((obj) => ({ ...obj, collectionName: r.collectionName }))
-  );
-
-  const answer =
-    results.length === 1
-      ? results[0].answer
-      : results.map((r) => `### From ${r.collectionName}\n\n${r.answer}`).join('\n\n---\n\n');
-
-  return { answer, contextObjects: allContextObjects, allFailed };
-}
+import {
+  mergeSettledResults,
+  validateRagQueryInput,
+  SettledQueryResult,
+} from '../rag-chat/extension/utils';
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
@@ -220,22 +167,30 @@ describe('RagChatPanel — multi-collection merge logic', () => {
     });
   });
 
-  describe('input validation (matches RagChatPanel._handleExecuteRagQuery guards)', () => {
-    // These test the guard conditions at the top of _handleExecuteRagQuery.
-    // Since we can't instantiate RagChatPanel here without a full VS Code
-    // environment, we validate the guard logic as extracted pure conditions.
-
-    it('no collections: should produce an error (empty collectionNames)', () => {
-      // This mirrors: if (collectionNames.length === 0) { postMessage ragError }
-      const collectionNames: string[] = [];
-      expect(collectionNames.length === 0).toBe(true);
+  describe('input validation — validateRagQueryInput', () => {
+    it('returns "no_collections" when collectionNames is empty', () => {
+      expect(validateRagQueryInput([], 'any question')).toBe('no_collections');
     });
 
-    it('empty question: should produce an error', () => {
-      // This mirrors: if (!message.question?.trim()) { postMessage ragError }
-      expect(!''.trim()).toBe(true);
-      expect(!'  '.trim()).toBe(true);
-      expect(!'hello'.trim()).toBe(false);
+    it('returns "empty_question" when question is an empty string', () => {
+      expect(validateRagQueryInput(['ColA'], '')).toBe('empty_question');
+    });
+
+    it('returns "empty_question" when question is whitespace only', () => {
+      expect(validateRagQueryInput(['ColA'], '   ')).toBe('empty_question');
+    });
+
+    it('returns "empty_question" when question is undefined', () => {
+      expect(validateRagQueryInput(['ColA'], undefined)).toBe('empty_question');
+    });
+
+    it('returns null for valid inputs (no error)', () => {
+      expect(validateRagQueryInput(['ColA'], 'What is this?')).toBeNull();
+    });
+
+    it('prioritises no_collections over empty_question', () => {
+      // Both are invalid; the function checks collections first
+      expect(validateRagQueryInput([], '')).toBe('no_collections');
     });
   });
 });

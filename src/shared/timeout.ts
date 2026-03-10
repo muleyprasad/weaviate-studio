@@ -3,7 +3,13 @@
  * Used by both RagChatAPI and DataExplorerAPI to avoid code duplication.
  */
 
-// Default timeout for API requests (30 seconds)
+/**
+ * Fallback default timeout (30 s) used only when no explicit `timeoutMs` argument
+ * is passed to `withTimeout` or `createTimeoutError`.
+ *
+ * Note: the actual RAG query timeout is 120 000 ms, sourced from the VS Code
+ * configuration (`weaviate.ragQueryTimeoutMs`). This constant is NOT used there.
+ */
 export const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
