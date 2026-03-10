@@ -44,6 +44,16 @@
   "main": "./dist/extension.js",
   "browser": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Weaviate Studio",
+      "properties": {
+        "weaviate.ragQueryTimeout": {
+          "type": "number",
+          "default": 120000,
+          "description": "Timeout in milliseconds for RAG (Retrieval-Augmented Generation) queries. Increase if using local vectorizers or large datasets."
+        }
+      }
+    },
     "commands": [
       {
         "command": "weaviate.rbac.addRole",
@@ -295,6 +305,12 @@
         "title": "View Cluster Information",
         "category": "Weaviate",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "weaviate.openRagChat",
+        "title": "Generative Search",
+        "category": "Weaviate",
+        "icon": "$(comment-discussion)"
       }
     ],
     "languages": [
@@ -653,6 +669,17 @@
           "icon": "$(telescope)"
         },
         {
+          "command": "weaviate.openRagChat",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "1_actions@4"
+        },
+        {
+          "command": "weaviate.openRagChat",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollection",
+          "group": "inline@3",
+          "icon": "$(comment-discussion)"
+        },
+        {
           "command": "weaviate.addCollection",
           "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
           "group": "inline@1",
@@ -777,12 +804,14 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@types/jest": "^30.0.0",
+    "@types/markdown-to-jsx": "^7.0.0",
     "@types/node": "20.x",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/codicons": "^0.0.44",
     "babel-loader": "^9.2.1",
     "baseline-browser-mapping": "^2.10.0",
     "concurrently": "^9.1.2",
@@ -811,6 +840,7 @@
     "@tanstack/react-virtual": "^3.13.18",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
+    "markdown-to-jsx": "^9.7.8",
     "monaco-editor": "^0.52.2",
     "monaco-graphql": "^1.7.0",
     "react": "^18.2.0",

@@ -71,44 +71,12 @@ import { isNumericMetrics, isDateMetrics } from '../types/weaviate';
 // Debug flag - set to false for production
 const DEBUG = false;
 
-// Default timeout for API requests (30 seconds)
-const DEFAULT_TIMEOUT_MS = 30000;
-
-/**
- * Wraps a promise with a timeout
- * Rejects if the promise doesn't resolve within the specified timeout
- */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
-    ),
-  ]);
-}
-
-/**
- * Checks if an error is a timeout error
- */
-function isTimeoutError(error: unknown): boolean {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return message.includes('timeout') || message.includes('timed out');
-}
-
-/**
- * Creates a user-friendly timeout error message with actionable suggestions
- */
-function createTimeoutError(
-  operation: string,
-  context: string,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
-): Error {
-  return new Error(
-    `${operation} timed out after ${timeoutMs}ms for ${context}. ` +
-      'Suggestions: Try again, reduce page size, add filters to narrow results, or check server connectivity.'
-  );
-}
+import {
+  DEFAULT_TIMEOUT_MS,
+  withTimeout,
+  isTimeoutError,
+  createTimeoutError,
+} from '../../shared/timeout';
 
 /**
  * API class for interacting with Weaviate collections in the Data Explorer
@@ -171,6 +139,73 @@ export class DataExplorerAPI {
 
       // Add filters if specified (works with all query types)
       if (params.where && params.where.length > 0) {
+        // Special case: if filtering only by UUID (id), use fetchObjectById instead
+        const isSingleIdFilter =
+          params.where.length === 1 &&
+          params.where[0].path === 'id' &&
+          params.where[0].operator === 'Equal';
+
+        if (isSingleIdFilter) {
+          // Fetch single object by UUID directly
+          const uuid = params.where[0].value as string;
+          const obj = await collection.query.fetchObjectById(uuid, {
+            includeVector: baseOptions.includeVector,
+            returnProperties: baseOptions.returnProperties,
+          });
+
+          if (!obj) {
+            // Object not found - return empty result
+            return { objects: [], total: 0, unfilteredTotal: 0 };
+          }
+
+          // Extract default vector from vectors if available
+          let defaultVector: number[] | undefined;
+          if (obj.vectors?.default) {
+            const vecData = obj.vectors.default;
+            if (Array.isArray(vecData) && vecData.length > 0 && typeof vecData[0] === 'number') {
+              defaultVector = vecData as number[];
+            }
+          }
+
+          // Transform to our format
+          const objects: WeaviateObject[] = [
+            {
+              uuid: obj.uuid,
+              properties: this._validateProperties(obj.properties),
+              metadata: {
+                uuid: obj.uuid,
+                creationTime: obj.metadata?.creationTime?.toISOString(),
+                lastUpdateTime: obj.metadata?.updateTime?.toISOString(),
+                distance: obj.metadata?.distance,
+                certainty: obj.metadata?.certainty,
+              },
+              vector: defaultVector,
+              vectors: obj.vectors,
+            },
+          ];
+
+          // Get unfiltered total count for pagination context
+          const unfilteredCacheKey = params.collectionName;
+          const unfilteredCached = this.countCache.get(unfilteredCacheKey);
+          const now = Date.now();
+          let unfilteredTotal = 0;
+
+          if (unfilteredCached && now - unfilteredCached.timestamp < this.CACHE_TTL) {
+            unfilteredTotal = unfilteredCached.count;
+          } else {
+            try {
+              const aggregateResult = await collection.aggregate.overAll();
+              unfilteredTotal = aggregateResult.totalCount ?? 1;
+              this.countCache.set(unfilteredCacheKey, { count: unfilteredTotal, timestamp: now });
+            } catch {
+              unfilteredTotal = 1; // Fallback
+            }
+          }
+
+          return { objects, total: 1, unfilteredTotal };
+        }
+
+        // Standard filter handling for non-UUID filters
         const filter = this.buildWhereFilter(collection, params.where, params.matchMode || 'AND');
         if (filter) {
           baseOptions.filters = filter;
@@ -503,6 +538,16 @@ export class DataExplorerAPI {
   ): WeaviateFilter | null {
     try {
       const { path, operator, value, valueType } = condition;
+
+      // Note: 'id' is a special path for filtering by object UUID
+      // It cannot be filtered using byProperty() - handled specially in fetchObjects
+      if (path === 'id') {
+        console.warn(
+          `Filtering by 'id' (UUID) is not supported via standard filter API. ` +
+            `Use fetchObjectById for single-object lookups.`
+        );
+        return null;
+      }
 
       // Get the filter builder for this property
       const filterBuilder = collection.filter.byProperty(path);

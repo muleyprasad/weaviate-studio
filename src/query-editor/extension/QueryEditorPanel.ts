@@ -443,6 +443,11 @@ export class QueryEditorPanel {
       column,
       getWebviewOptions(context.extensionUri)
     );
+    const iconPath = {
+      light: vscode.Uri.joinPath(context.extensionUri, 'resources', 'icons', 'edit.svg'),
+      dark: vscode.Uri.joinPath(context.extensionUri, 'resources', 'icons', 'edit-dark.svg'),
+    };
+    panel.iconPath = iconPath;
 
     // Create new editor instance and store in our map
     const newEditor = new QueryEditorPanel(panel, context, { ...options, tabId });

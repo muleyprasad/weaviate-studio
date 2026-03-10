@@ -80,6 +80,11 @@ export class RbacGroupPanel {
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
       }
     );
+    const iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'add.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'add-dark.svg'),
+    };
+    panel.iconPath = iconPath;
 
     const rbacGroupPanel = new RbacGroupPanel(
       panel,

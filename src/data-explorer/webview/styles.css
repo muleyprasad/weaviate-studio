@@ -1009,7 +1009,8 @@
 
 /* When vector search panel is open, position detail panel to the left of it */
 body:has(.vector-search-panel.open) .detail-panel-overlay {
-    right: min(42%, 520px); /* matches vector-search-content width */
+    right: min(42%, 520px);
+    /* matches vector-search-content width */
 }
 
 /* Ensure detail panel doesn't extend past available space */
@@ -2738,6 +2739,46 @@ input[type="checkbox"]:focus-visible {
     color: white;
 }
 
+/* ===== Generative Search Button in Toolbar ===== */
+.rag-chat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, #FFF);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.rag-chat-btn:hover {
+    background: linear-gradient(135deg, #0d7f5f 0%, #10B981 100%);
+    color: white;
+}
+
+.rag-chat-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin-left: 2px;
+    background-color: #10B981;
+    color: white;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.rag-chat-btn:hover .rag-chat-filter-badge {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
 /* ===== Responsive adjustments for Vector Search ===== */
 @media (max-width: 600px) {
     .vector-search-content {
@@ -3224,8 +3265,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 /* Override the normal card layout for hybrid results */
-.result-card.has-breakdown > .result-rank,
-.result-card.has-breakdown > .result-match {
+.result-card.has-breakdown>.result-rank,
+.result-card.has-breakdown>.result-match {
     display: none;
 }
 
@@ -3590,20 +3631,23 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Skeleton Loading Animations ===== */
 .skeleton-shimmer {
-    background: linear-gradient(
-        90deg,
-        var(--vscode-input-background, #2D2D2D) 0%,
-        var(--vscode-list-hoverBackground, #2A2D2E) 50%,
-        var(--vscode-input-background, #2D2D2D) 100%
-    );
+    background: linear-gradient(90deg,
+            var(--vscode-input-background, #2D2D2D) 0%,
+            var(--vscode-list-hoverBackground, #2A2D2E) 50%,
+            var(--vscode-input-background, #2D2D2D) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite ease-in-out;
     border-radius: 4px;
 }
 
 @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 .skeleton-table {
@@ -3895,6 +3939,7 @@ input[type="checkbox"]:focus-visible {
         opacity: 0;
         transform: translateY(4px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -4207,6 +4252,7 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Responsive Adjustments for Phase 6 ===== */
 @media (max-width: 1200px) {
+
     .filter-panel.open .filter-panel-content,
     .vector-search-panel.open .vector-search-content {
         width: 50vw;
@@ -4214,6 +4260,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 768px) {
+
     .filter-panel.open .filter-panel-content,
     .vector-search-panel.open .vector-search-content {
         width: 90vw;
@@ -4277,7 +4324,9 @@ input[type="checkbox"]:focus-visible {
     }
 
     @keyframes tooltipFadeIn {
-        from, to {
+
+        from,
+        to {
             opacity: 1;
             transform: none;
         }

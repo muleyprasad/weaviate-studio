@@ -28,7 +28,8 @@ import { TenantSelector, TenantSelectionModal } from './components/TenantSelecto
 import { useDataFetch } from './hooks/useDataFetch';
 import { useVectorSearch } from './hooks/useVectorSearch';
 import { useDataExplorerShortcuts } from './hooks/useKeyboardShortcuts';
-import type { WeaviateObject } from '../types';
+import type { WeaviateObject, PropertyConfig } from '../types';
+import { postMessageToExtension } from './utils/vscodeApi';
 
 // Get initial data from the window object (injected by the extension)
 declare global {
@@ -36,6 +37,7 @@ declare global {
     initialData?: {
       collectionName: string;
       connectionId: string;
+      targetUuid?: string;
     };
   }
 }
@@ -81,7 +83,11 @@ function DataExplorerContent() {
     if (!uiState.selectedObjectId) {
       return null;
     }
-    // First check table data
+    // Check explicitly fetched object first (e.g., from deep link)
+    if (dataState.fetchedObjectDetail?.uuid === uiState.selectedObjectId) {
+      return dataState.fetchedObjectDetail;
+    }
+    // Then check table data
     const fromTable = dataState.objects.find((obj) => obj.uuid === uiState.selectedObjectId);
     if (fromTable) {
       return fromTable;
@@ -91,9 +97,17 @@ function DataExplorerContent() {
       (result) => result.object.uuid === uiState.selectedObjectId
     );
     return fromSearch?.object || null;
-  }, [uiState.selectedObjectId, dataState.objects, vectorSearchState.searchResults]);
+  }, [
+    uiState.selectedObjectId,
+    dataState.objects,
+    vectorSearchState.searchResults,
+    dataState.fetchedObjectDetail,
+  ]);
 
   // Get schema properties for filter builder
+  // Note: 'id' (UUID) is NOT included as a filterable property because Weaviate doesn't
+  // support filtering by UUID through the standard filter API. Deep-linking to specific
+  // objects is handled specially via fetchObjectById in the backend.
   const schemaProperties = dataState.schema?.properties || [];
 
   // Handle vector search result selection
@@ -179,6 +193,35 @@ function DataExplorerContent() {
         <div className="header-right">
           {/* Tenant selector for multi-tenant collections */}
           <TenantSelector />
+
+          {/* Generative Search button - opens Generative Search for this collection */}
+          <button
+            type="button"
+            className="toolbar-btn rag-chat-btn"
+            onClick={() =>
+              postMessageToExtension({
+                command: 'openRagChat',
+                // Pass active filters so Generative Search can narrow retrieval context
+                activeFilters:
+                  filterState.activeFilters.length > 0 ? filterState.activeFilters : undefined,
+                filterMatchMode:
+                  filterState.activeFilters.length > 0 ? filterState.matchMode : undefined,
+              })
+            }
+            title={
+              filterState.activeFilters.length > 0
+                ? `Generative Search with ${filterState.activeFilters.length} active filter${filterState.activeFilters.length > 1 ? 's' : ''}`
+                : 'Open Generative Search for this collection'
+            }
+            aria-label="Open Generative Search for this collection"
+            id="rag-chat-btn"
+          >
+            <span className="codicon codicon-comment-discussion" aria-hidden="true" />
+            Generative Search
+            {filterState.activeFilters.length > 0 && (
+              <span className="rag-chat-filter-badge">{filterState.activeFilters.length}</span>
+            )}
+          </button>
 
           {/* Vector Search button */}
           <button

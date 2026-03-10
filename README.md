@@ -40,6 +40,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ## Top Features
 
 - **Multiple Connections:** Manage several Weaviate instances at once
+- **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
 - **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
 - **Cluster Management:** Comprehensive cluster information panel with health monitoring
@@ -98,6 +99,31 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - User preferences persistence per collection
 - Virtual scrolling for large datasets (1000+ objects)
 - See [Data Explorer README](src/data-explorer/README.md) for full details
+
+### Generative Search
+
+- Chat-style interface for Retrieval-Augmented Generation queries
+- **Multi-collection support**: Select one or more collections as pill badges; auto-add on selection from dropdown
+- **Query controls**:
+  - **Top results per collection**: Configure how many objects to retrieve from each collection (3, 5, 10, 20)
+  - **Query timeout**: Adjustable timeout (30s, 60s, 2min, 5min) for long-running queries with local vectorizers
+- **Answer tools**:
+  - **Copy button**: Copy full answer to clipboard
+  - **Markdown toggle**: Switch between formatted view and raw markdown source
+- **Query metadata**: Shows which collections were queried and execution time (e.g., "From: Books, PodcastSearch • Completed in 2m 34s")
+- Summary label ("3 collections selected") when 3+ collections are active to reduce visual clutter
+- Validation hint ("Select at least one collection to start") when no collection is selected; Ask button disabled until valid
+- Only RAG-capable collections (those with a generative module configured) are shown
+- Right-click a collection → **"Generative Search"** pre-selects that collection
+- Opening Generative Search from another collection while the panel is already open adds it as a new pill
+- Per-collection retrieval with non-blocking error handling
+- Source attribution: context objects display their originating collection name as a badge label
+- **Retrieved Context section**: Collapsible view grouped by collection, showing properties, UUID, and distance/certainty/score metrics
+- Click telescope icon (🔭) on any context object to open it in the Data Explorer
+- Relies on Weaviate's server-side generative config—no additional API keys needed in the extension
+- Loading, error, and empty states matching the rest of the extension UX
+- Clear chat button to reset conversation history
+- Enter to send, Shift+Enter for newline
 
 ### Data Visualization
 
@@ -191,6 +217,7 @@ Weaviate Studio uses a modular architecture with external React components for e
 
 - **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection) ([Live Demo](https://dudanogueira.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
 - **Extension Core**: TypeScript-based VS Code extension
+- **Generative Search**: Self-contained module (`src/rag-chat/`) for generative search with its own panel, API wrapper, and React webview
 - **Webviews**: React-based UIs with Monaco editor integration
 
 For details on updating external dependencies, see the [Working with Dependencies](CONTRIBUTING.md#working-with-dependencies) section in CONTRIBUTING.md.

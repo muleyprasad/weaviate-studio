@@ -11,6 +11,7 @@ import {
   useFilterState,
   useFilterActions,
   useVectorSearchActions,
+  useUIActions,
 } from '../context';
 import { getVSCodeAPI } from '../utils/vscodeApi';
 import type { ExtensionMessage, WebviewMessage, SortState } from '../../types';
@@ -19,6 +20,7 @@ export function useDataFetch() {
   const dataState = useDataState();
   const dataActions = useDataActions();
   const uiState = useUIState();
+  const uiActions = useUIActions();
   const filterState = useFilterState();
   const filterActions = useFilterActions();
   const vectorSearchActions = useVectorSearchActions();
@@ -147,7 +149,18 @@ export function useDataFetch() {
             break;
 
           case 'objectDetailLoaded':
-            // Object detail is handled separately
+            // Object detail was explicitly fetched (e.g. from deep link or not on current page)
+            if (message.object) {
+              dataActions.setFetchedObjectDetail(message.object);
+              uiActions.openDetailPanel(message.object.uuid);
+            }
+            break;
+
+          case 'openObjectDetail':
+            // Deep-link: extension asked us to open a specific object's detail panel
+            if (message.uuid && getObjectDetail) {
+              getObjectDetail(message.uuid);
+            }
             break;
 
           case 'error':
@@ -276,6 +289,34 @@ export function useDataFetch() {
       initialize();
     }
   }, [dataState.collectionName, initialize]);
+
+  // Track whether the deep-link has already been fired (React ref avoids global mutation)
+  const deepLinkFiredRef = useRef(false);
+
+  // Deep-link: if the panel was opened with a target UUID, apply filter and open detail panel
+  useEffect(() => {
+    const targetUuid = (window as any).initialData?.targetUuid;
+    if (
+      targetUuid &&
+      !deepLinkFiredRef.current &&
+      dataState.objects &&
+      dataState.objects.length > 0
+    ) {
+      // Apply filter by ID to show only the target object
+      filterActions.setFilters([
+        {
+          id: 'deep-link-filter',
+          path: 'id',
+          operator: 'Equal',
+          value: targetUuid,
+          valueType: 'text',
+        },
+      ]);
+      // Open the detail panel for the target object
+      getObjectDetail(targetUuid);
+      deepLinkFiredRef.current = true;
+    }
+  }, [dataState.objects, getObjectDetail, filterActions]);
 
   // Fetch when page, pageSize, sortBy, or filters change
   useEffect(() => {

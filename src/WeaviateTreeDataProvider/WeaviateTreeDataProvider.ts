@@ -294,6 +294,21 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           retainContextWhenHidden: true,
         }
       );
+      const iconPath = {
+        light: vscode.Uri.joinPath(
+          this.context.extensionUri,
+          'resources',
+          'icons',
+          'symbol-property.svg'
+        ),
+        dark: vscode.Uri.joinPath(
+          this.context.extensionUri,
+          'resources',
+          'icons',
+          'symbol-property-dark.svg'
+        ),
+      };
+      panel.iconPath = iconPath;
 
       // Format the schema as HTML, passing both SDK format and REST API JSON
       panel.webview.html = this.getDetailedSchemaHtml(collection.schema, restApiJson);

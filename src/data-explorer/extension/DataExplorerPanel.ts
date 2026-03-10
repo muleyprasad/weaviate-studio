@@ -6,8 +6,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { DataExplorerAPI } from './DataExplorerAPI';
+import { safeJsonStringify } from '../../rag-chat/extension/utils';
 import type {
   ExtensionMessage,
   WebviewMessage,
@@ -35,18 +37,21 @@ export class DataExplorerPanel {
   private _isInitializing = false;
   private _selectedTenant: string | undefined;
   private _isMultiTenant = false;
+  private _initialTargetUuid: string | undefined;
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     connectionId: string,
     collectionName: string,
-    private readonly getClient: () => WeaviateClient | undefined
+    private readonly getClient: () => WeaviateClient | undefined,
+    targetUuid?: string
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._connectionId = connectionId;
     this._collectionName = collectionName;
+    this._initialTargetUuid = targetUuid;
 
     // Initialize API with client
     const client = this.getClient();
@@ -98,7 +103,8 @@ export class DataExplorerPanel {
     extensionUri: vscode.Uri,
     connectionId: string,
     collectionName: string,
-    getClient: () => WeaviateClient | undefined
+    getClient: () => WeaviateClient | undefined,
+    targetUuid?: string
   ): DataExplorerPanel {
     const panelKey = `${connectionId}:${collectionName}`;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -107,6 +113,10 @@ export class DataExplorerPanel {
     const existingPanel = DataExplorerPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
+      // Deep-link: navigate to specific object if provided
+      if (targetUuid) {
+        existingPanel.postMessage({ command: 'openObjectDetail', uuid: targetUuid });
+      }
       return existingPanel;
     }
 
@@ -124,13 +134,19 @@ export class DataExplorerPanel {
         ],
       }
     );
+    const iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'telescope.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'telescope-dark.svg'),
+    };
+    panel.iconPath = iconPath;
 
     const dataExplorerPanel = new DataExplorerPanel(
       panel,
       extensionUri,
       connectionId,
       collectionName,
-      getClient
+      getClient,
+      targetUuid
     );
 
     DataExplorerPanel.panels.set(panelKey, dataExplorerPanel);
@@ -278,6 +294,18 @@ export class DataExplorerPanel {
 
         case 'cancelExport':
           this._handleCancelExport(message);
+          break;
+
+        case 'openRagChat':
+          // Open RAG Chat for this collection, passing active filters if any
+          // Pass forceNew: false so it doesn't destroy an existing panel and clear history
+          await vscode.commands.executeCommand('weaviate.openRagChat', {
+            connectionId: this._connectionId,
+            collectionName: this._collectionName,
+            inheritedFilters: message.activeFilters,
+            inheritedFilterMatchMode: message.filterMatchMode,
+            forceNew: false,
+          });
           break;
 
         default:
@@ -792,22 +820,24 @@ export class DataExplorerPanel {
     // Validate all placeholders were replaced
     const remainingPlaceholders = (html.match(/{{nonce}}/g) || []).length;
     if (remainingPlaceholders > 0) {
-      console.error(
-        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced`
+      throw new Error(
+        `CSP nonce replacement incomplete: ${remainingPlaceholders} placeholders remain unreplaced.`
       );
     }
     if (noncePlaceholderCount === 0) {
-      console.warn(
+      throw new Error(
         'CSP nonce replacement: No {{nonce}} placeholders found in HTML. Expected at least 2.'
       );
     }
 
     // Inject initial data
+    // Bug 2 fix: escape <, >, & so a malicious connection name can't break out of the <script> tag.
     const initScript = `
       <script nonce="${nonce}">
-        window.initialData = ${JSON.stringify({
+        window.initialData = ${safeJsonStringify({
           collectionName: this._collectionName,
           connectionId: this._connectionId,
+          targetUuid: this._initialTargetUuid ?? null,
         })};
       </script>
     `;
@@ -855,7 +885,6 @@ export class DataExplorerPanel {
    * Generates a cryptographically secure nonce for CSP
    */
   private _getNonce(): string {
-    const crypto = require('crypto');
     return crypto.randomBytes(16).toString('base64');
   }
 }
