@@ -17,7 +17,7 @@
  */
 
 import type { WeaviateClient } from 'weaviate-client';
-import { Filters } from 'weaviate-client';
+import { Filters, configure } from 'weaviate-client';
 import {
   DEFAULT_TIMEOUT_MS,
   withTimeout,
@@ -69,6 +69,12 @@ export class RagChatAPI {
     /** Optional where filters inherited from Data Explorer */
     where?: FilterCondition[];
     matchMode?: FilterMatchMode;
+    /** Whether the collection has a vectorizer configured */
+    hasVectorizer?: boolean;
+    /** The selected generative provider configuration */
+    provider?: import('../types').GenerativeProviderSelection;
+    /** Advanced settings for custom providers */
+    advancedSettings?: import('../types').AdvancedRagSettings;
   }): Promise<{
     answer: string;
     contextObjects: Array<{
@@ -144,10 +150,48 @@ export class RagChatAPI {
         queryOptions.filters = builtFilter;
       }
 
-      const result = await withTimeout(
-        collection.generate.hybrid(params.question, { groupedTask: params.question }, queryOptions),
-        requestTimeout
-      );
+      // Build generative config if provider is specified
+      let genConfig: any = undefined;
+      const provider = params.provider ?? { kind: 'default' };
+
+      if (provider.kind === 'module') {
+        const createMethod =
+          (configure.generative as any)[provider.moduleName.replace('generative-', '')] ??
+          (configure.generative as any)[
+            provider.moduleName.replace('generative-', '').replace('-', '')
+          ];
+
+        if (createMethod && typeof createMethod === 'function') {
+          genConfig = createMethod();
+        } else if (provider.moduleName === 'generative-openai') {
+          genConfig = configure.generative.openAI();
+        }
+      } else if (provider.kind === 'custom' && params.advancedSettings?.baseUrl) {
+        genConfig = configure.generative.openAI({
+          baseURL: params.advancedSettings.baseUrl,
+          model: params.advancedSettings.model || undefined,
+        });
+      }
+
+      // Execute query based on vectorizer presence
+      let result;
+      const useBm25 = params.hasVectorizer === false;
+
+      const queryPayload = genConfig
+        ? { groupedTask: params.question, config: genConfig }
+        : { groupedTask: params.question };
+
+      if (useBm25) {
+        result = await withTimeout(
+          collection.generate.bm25(params.question, queryPayload, queryOptions),
+          requestTimeout
+        );
+      } else {
+        result = await withTimeout(
+          collection.generate.hybrid(params.question, queryPayload, queryOptions),
+          requestTimeout
+        );
+      }
 
       const contextObjects = result.objects.map(
         (obj: {
@@ -186,26 +230,30 @@ export class RagChatAPI {
   }
 
   /**
-   * Gets all collection names that support RAG (generative search) from the Weaviate instance.
-   * Only returns collections that have a generative module configured.
+   * Gets all collection infos from the Weaviate instance.
+   * Returns metadata about vectorizer and generative configuration.
    *
-   * @returns Sorted array of collection name strings that support RAG
+   * @returns Array of CollectionInfo objects
    */
-  async getCollections(): Promise<string[]> {
+  async getCollectionInfos(): Promise<import('../types').CollectionInfo[]> {
     try {
       const collections = await withTimeout(
         this.client.collections.listAll(),
         this.REQUEST_TIMEOUT
       );
 
-      const names = collections
-        .filter((col) => {
-          const generative = col.generative;
-          return generative?.name && generative.name !== 'none';
-        })
-        .map((col) => col.name);
+      const infos: import('../types').CollectionInfo[] = collections.map((col) => {
+        // v3 client uses vectorizers, if not present or explicitly 'none', it has no vectorizer
+        const hasVec = col.vectorizers !== undefined && Object.keys(col.vectorizers).length > 0;
+        return {
+          name: col.name,
+          hasVectorizer: hasVec,
+          generativeModule:
+            col.generative?.name && col.generative.name !== 'none' ? col.generative.name : null,
+        };
+      });
 
-      return names.sort();
+      return infos.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
       if (isTimeoutError(error)) {
         throw createTimeoutError('List collections', 'Weaviate instance', this.REQUEST_TIMEOUT);
@@ -213,6 +261,25 @@ export class RagChatAPI {
       throw new Error(
         `Failed to list collections: ${error instanceof Error ? error.message : String(error)}.`
       );
+    }
+  }
+
+  /**
+   * Scans collections to find all configured generative modules
+   */
+  async getAvailableGenerativeModules(): Promise<string[]> {
+    try {
+      const infos = await this.getCollectionInfos();
+      const modules = new Set<string>();
+      for (const info of infos) {
+        if (info.generativeModule) {
+          modules.add(info.generativeModule);
+        }
+      }
+      return Array.from(modules).sort();
+    } catch (e) {
+      console.warn('Failed to get available generative modules', e);
+      return [];
     }
   }
 }

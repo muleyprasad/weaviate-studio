@@ -25,6 +25,26 @@ export interface RagChatQuery {
   timeout?: number;
 }
 
+/** Generative provider selection — discriminated union */
+export type GenerativeProviderSelection =
+  | { kind: 'default' } // Use server-side config
+  | { kind: 'module'; moduleName: string } // Use a specific detected module
+  | { kind: 'custom' }; // Use advanced RAG settings
+
+/** Collection info returned to the webview — includes vectorizer/generative metadata */
+export interface CollectionInfo {
+  name: string;
+  hasVectorizer: boolean;
+  generativeModule: string | null; // e.g. "generative-openai" or null
+}
+
+/** Advanced RAG settings for custom LLM endpoint */
+export interface AdvancedRagSettings {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
 /**
  * A single retrieved context object from the vector search
  */
@@ -95,7 +115,8 @@ export type RagChatExtensionMessageCommand =
   | 'ragResponse'
   | 'ragError'
   | 'collectionsLoaded'
-  | 'addCollection';
+  | 'addCollection'
+  | 'advancedSettingsLoaded';
 
 /**
  * Message sent from the extension to the webview
@@ -122,6 +143,12 @@ export interface RagChatExtensionMessage {
   durationMs?: number;
   /** Whether the response contains a soft error (failed query but returning an answer string) */
   hasError?: boolean;
+  /** Collection info objects to populate the UI selector */
+  collectionInfos?: CollectionInfo[];
+  /** List of detected generative modules on the server */
+  availableModules?: string[];
+  /** Advanced settings from VS Code globalState */
+  advancedSettings?: AdvancedRagSettings;
 }
 
 /**
@@ -131,7 +158,9 @@ export type RagChatWebviewMessageCommand =
   | 'initialize'
   | 'executeRagQuery'
   | 'getCollections'
-  | 'openInDataExplorer';
+  | 'openInDataExplorer'
+  | 'getAdvancedSettings'
+  | 'saveAdvancedSettings';
 
 /**
  * Message sent from the webview to the extension
@@ -158,6 +187,10 @@ export interface RagChatWebviewMessage {
   activeFilters?: import('../../data-explorer/types').FilterCondition[];
   /** Match mode for active filters */
   matchMode?: import('../../data-explorer/types').FilterMatchMode;
+  /** The selected generative provider */
+  provider?: GenerativeProviderSelection;
+  /** Advanced settings payload to save */
+  advancedSettings?: AdvancedRagSettings;
 }
 
 // =====================================================

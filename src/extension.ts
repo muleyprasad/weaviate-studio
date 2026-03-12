@@ -1534,6 +1534,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       RagChatPanel.createOrShow(
         context.extensionUri,
+        context,
         connectionId,
         connectionName,
         getClient,

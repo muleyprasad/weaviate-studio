@@ -112,6 +112,36 @@ describe('RagChatAPI', () => {
       expect(result.contextObjects).toHaveLength(0);
     });
 
+    it('falls back to bm25 when hasVectorizer is false', async () => {
+      const mockResult = {
+        generated: 'BM25 answer',
+        objects: [],
+      };
+
+      const mockCollection = {
+        generate: {
+          hybrid: jest.fn(),
+          bm25: jest.fn().mockResolvedValue(mockResult),
+        },
+      };
+
+      mockClient.collections.get.mockReturnValue(mockCollection);
+
+      const result = await api.executeRagQuery({
+        collectionName: 'TestCollection',
+        question: 'What is this?',
+        hasVectorizer: false,
+      });
+
+      expect(result.answer).toBe('BM25 answer');
+      expect(mockCollection.generate.hybrid).not.toHaveBeenCalled();
+      expect(mockCollection.generate.bm25).toHaveBeenCalledWith(
+        'What is this?',
+        { groupedTask: 'What is this?' },
+        { limit: 5, returnMetadata: ['distance', 'certainty', 'score'] }
+      );
+    });
+
     it('throws timeout error when query takes too long', async () => {
       const mockCollection = {
         generate: {
@@ -309,33 +339,33 @@ describe('RagChatAPI', () => {
     });
   });
 
-  describe('getCollections', () => {
-    it('returns sorted list of collections with generative module configured', async () => {
+  describe('getCollectionInfos', () => {
+    it('returns sorted list of all collections with their metadata', async () => {
       const mockCollections = [
-        { name: 'CollectionC', generative: { name: 'none' } }, // filtered out
-        { name: 'CollectionB', generative: { name: 'openai' } }, // included
-        { name: 'CollectionA', generative: null }, // filtered out
-        { name: 'CollectionD', generative: { name: 'cohere' } }, // included
+        { name: 'CollectionC', generative: { name: 'none' }, vectorizers: {} },
+        {
+          name: 'CollectionB',
+          generative: { name: 'openai' },
+          vectorizers: { 'text2vec-openai': {} },
+        },
+        { name: 'CollectionA', generative: null, vectorizers: undefined },
+        {
+          name: 'CollectionD',
+          generative: { name: 'cohere' },
+          vectorizers: { 'text2vec-cohere': {} },
+        },
       ];
 
       mockClient.collections.listAll.mockResolvedValue(mockCollections);
 
-      const result = await api.getCollections();
+      const result = await api.getCollectionInfos();
 
-      expect(result).toEqual(['CollectionB', 'CollectionD']); // Sorted alphabetically
-    });
-
-    it('filters out collections with generative: undefined', async () => {
-      const mockCollections = [
-        { name: 'NoGenerative', generative: undefined },
-        { name: 'HasGenerative', generative: { name: 'openai' } },
-      ];
-
-      mockClient.collections.listAll.mockResolvedValue(mockCollections);
-
-      const result = await api.getCollections();
-
-      expect(result).toEqual(['HasGenerative']);
+      expect(result).toEqual([
+        { name: 'CollectionA', hasVectorizer: false, generativeModule: null },
+        { name: 'CollectionB', hasVectorizer: true, generativeModule: 'openai' },
+        { name: 'CollectionC', hasVectorizer: false, generativeModule: null },
+        { name: 'CollectionD', hasVectorizer: true, generativeModule: 'cohere' },
+      ]);
     });
 
     it('throws timeout error when listAll takes too long', async () => {
@@ -345,7 +375,7 @@ describe('RagChatAPI', () => {
         .spyOn(timeoutModule, 'withTimeout')
         .mockRejectedValueOnce(new Error('Request timed out'));
 
-      await expect(api.getCollections()).rejects.toThrow(/List collections timed out after/);
+      await expect(api.getCollectionInfos()).rejects.toThrow(/List collections timed out after/);
     });
   });
 });

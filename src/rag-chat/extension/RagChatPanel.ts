@@ -34,10 +34,12 @@ export class RagChatPanel {
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
   private _requestTracker = new RequestTracker();
+  private _collectionInfosCache: import('../types').CollectionInfo[] = [];
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext,
     connectionId: string,
     private readonly _connectionName: string,
     private readonly getClient: () => WeaviateClient | undefined,
@@ -98,6 +100,7 @@ export class RagChatPanel {
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
+    context: vscode.ExtensionContext,
     connectionId: string,
     connectionName: string,
     getClient: () => WeaviateClient | undefined,
@@ -149,6 +152,7 @@ export class RagChatPanel {
     const ragChatPanel = new RagChatPanel(
       panel,
       extensionUri,
+      context,
       connectionId,
       connectionName,
       getClient,
@@ -250,6 +254,16 @@ export class RagChatPanel {
             });
           }
           break;
+
+        case 'getAdvancedSettings':
+          this._handleGetAdvancedSettings();
+          break;
+
+        case 'saveAdvancedSettings':
+          if (message.advancedSettings) {
+            await this._handleSaveAdvancedSettings(message.advancedSettings);
+          }
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -267,16 +281,20 @@ export class RagChatPanel {
    */
   private async _handleInitialize(): Promise<void> {
     try {
-      const collections = await this._api!.getCollections();
+      this._collectionInfosCache = await this._api!.getCollectionInfos();
+      const modules = await this._api!.getAvailableGenerativeModules();
+
       this.postMessage({
         command: 'init',
-        collectionNames: collections,
+        collectionInfos: this._collectionInfosCache,
+        availableModules: modules,
       });
     } catch (error) {
       console.error('RagChatPanel: Failed to load collections:', error);
       this.postMessage({
         command: 'init',
-        collectionNames: [],
+        collectionInfos: [],
+        availableModules: [],
         error: error instanceof Error ? error.message : 'Failed to load collections.',
       });
     }
@@ -286,10 +304,10 @@ export class RagChatPanel {
    * Handles getCollections request
    */
   private async _handleGetCollections(requestId?: string): Promise<void> {
-    const collections = await this._api!.getCollections();
+    this._collectionInfosCache = await this._api!.getCollectionInfos();
     this.postMessage({
       command: 'collectionsLoaded',
-      collectionNames: collections,
+      collectionInfos: this._collectionInfosCache,
       requestId,
     });
   }
@@ -333,6 +351,9 @@ export class RagChatPanel {
       // is independent, so we can execute them concurrently for better latency.
       const settled = await Promise.allSettled(
         collectionNames.map(async (name) => {
+          const info = this._collectionInfosCache.find((c) => c.name === name);
+          const hasVectorizer = info ? info.hasVectorizer : true;
+
           const result = await this._api!.executeRagQuery({
             collectionName: name,
             question: message.question!,
@@ -340,6 +361,9 @@ export class RagChatPanel {
             timeout: message.timeout,
             where: this._inheritedFilters,
             matchMode: this._inheritedFilterMatchMode,
+            provider: message.provider,
+            advancedSettings: message.advancedSettings,
+            hasVectorizer,
           });
           return { collectionName: name, ...result };
         })
@@ -378,6 +402,22 @@ export class RagChatPanel {
         this._requestTracker.complete(message.requestId);
       }
     }
+  }
+
+  private _handleGetAdvancedSettings(): void {
+    const settings = this._context.globalState.get<import('../types').AdvancedRagSettings>(
+      'weaviate.ragChat.advancedSettings'
+    );
+    this.postMessage({
+      command: 'advancedSettingsLoaded',
+      advancedSettings: settings,
+    });
+  }
+
+  private async _handleSaveAdvancedSettings(
+    settings: import('../types').AdvancedRagSettings
+  ): Promise<void> {
+    await this._context.globalState.update('weaviate.ragChat.advancedSettings', settings);
   }
 
   /**

@@ -12,6 +12,9 @@ import type {
   RagContextObject,
   RagChatExtensionMessage,
   RagChatWebviewMessage,
+  CollectionInfo,
+  GenerativeProviderSelection,
+  AdvancedRagSettings,
 } from '../types';
 
 // Initial data injected by the extension into window.initialData
@@ -413,12 +416,14 @@ function ChatEntry({
 /** Multi-collection selector: dropdown to add + pill list of selected */
 function CollectionSelector({
   allCollections,
+  collectionInfos,
   selectedCollections,
   onAdd,
   onRemove,
   loading,
 }: {
   allCollections: string[];
+  collectionInfos: CollectionInfo[];
   selectedCollections: string[];
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
@@ -440,6 +445,7 @@ function CollectionSelector({
   );
 
   const selectedCount = selectedCollections.length;
+  const infoMap = new Map(collectionInfos.map((c) => [c.name, c]));
 
   return (
     <div className="rag-collection-selector">
@@ -456,20 +462,32 @@ function CollectionSelector({
       {/* Selected collections as removable pills */}
       {selectedCount > 0 && (
         <div className="rag-collection-pills" role="list" aria-label="Selected collections">
-          {selectedCollections.map((name) => (
-            <span key={name} className="rag-collection-pill" role="listitem">
-              {name}
-              <button
-                type="button"
-                className="rag-pill-remove"
-                onClick={() => onRemove(name)}
-                aria-label={`Remove ${name}`}
-                title={`Remove ${name}`}
-              >
-                ×
-              </button>
-            </span>
-          ))}
+          {selectedCollections.map((name) => {
+            const info = infoMap.get(name);
+            const showBm25Hint = info && !info.hasVectorizer;
+            return (
+              <span key={name} className="rag-collection-pill" role="listitem">
+                {name}
+                {showBm25Hint && (
+                  <span
+                    className="rag-bm25-hint"
+                    title="No vectorizer — using BM25 full-text search"
+                  >
+                    ⚡ BM25
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="rag-pill-remove"
+                  onClick={() => onRemove(name)}
+                  aria-label={`Remove ${name}`}
+                  title={`Remove ${name}`}
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -515,8 +533,7 @@ function CollectionSelector({
 
           {allCollections.length === 0 && (
             <span className="rag-no-collections">
-              No generative collections found. Please ensure your Weaviate instance is configured
-              with a generative AI module (e.g., OpenAI, Cohere, etc.).
+              No collections found. Connect to a Weaviate instance to see your collections.
             </span>
           )}
         </>
@@ -594,10 +611,119 @@ function RagOptions({
   );
 }
 
+/** Generative provider selector dropdown */
+function ProviderSelector({
+  availableModules,
+  selectedProvider,
+  onChange,
+}: {
+  availableModules: string[];
+  selectedProvider: GenerativeProviderSelection;
+  onChange: (p: GenerativeProviderSelection) => void;
+}) {
+  // Build a combined value string from the discriminated union
+  const toValue = (p: GenerativeProviderSelection): string => {
+    if (p.kind === 'default') return 'default';
+    if (p.kind === 'module') return `module:${p.moduleName}`;
+    return 'custom';
+  };
+
+  const fromValue = (v: string): GenerativeProviderSelection => {
+    if (v === 'default') return { kind: 'default' };
+    if (v === 'custom') return { kind: 'custom' };
+    return { kind: 'module', moduleName: v.replace('module:', '') };
+  };
+
+  return (
+    <div className="rag-provider-selector">
+      <label className="rag-options-label" htmlFor="rag-provider-select">
+        Generative provider
+      </label>
+      <select
+        id="rag-provider-select"
+        className="rag-select rag-select-small"
+        value={toValue(selectedProvider)}
+        onChange={(e) => onChange(fromValue(e.target.value))}
+        title="Which generative AI provider to use for answer generation"
+      >
+        <option value="default">Default (server-configured)</option>
+        {availableModules.map((mod) => (
+          <option key={mod} value={`module:${mod}`}>
+            {mod.replace('generative-', '')}
+          </option>
+        ))}
+        <option value="custom">Custom (Advanced Settings)</option>
+      </select>
+    </div>
+  );
+}
+
+/** Collapsible Advanced RAG Settings panel */
+function AdvancedRagPanel({
+  settings,
+  onChange,
+  onSave,
+}: {
+  settings: AdvancedRagSettings;
+  onChange: (s: AdvancedRagSettings) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="rag-advanced-panel">
+      <div className="rag-advanced-title">Custom LLM Endpoint (OpenAI-compatible)</div>
+      <div className="rag-advanced-fields">
+        <div className="rag-advanced-field">
+          <label className="rag-options-label" htmlFor="rag-adv-baseurl">
+            Base URL
+          </label>
+          <input
+            id="rag-adv-baseurl"
+            type="url"
+            className="rag-input"
+            placeholder="https://api.openai.com/v1"
+            value={settings.baseUrl}
+            onChange={(e) => onChange({ ...settings, baseUrl: e.target.value })}
+          />
+        </div>
+        <div className="rag-advanced-field">
+          <label className="rag-options-label" htmlFor="rag-adv-apikey">
+            API Key
+          </label>
+          <input
+            id="rag-adv-apikey"
+            type="password"
+            className="rag-input"
+            placeholder="sk-…"
+            value={settings.apiKey}
+            onChange={(e) => onChange({ ...settings, apiKey: e.target.value })}
+          />
+        </div>
+        <div className="rag-advanced-field">
+          <label className="rag-options-label" htmlFor="rag-adv-model">
+            Model
+          </label>
+          <input
+            id="rag-adv-model"
+            type="text"
+            className="rag-input"
+            placeholder="gpt-4o-mini"
+            value={settings.model}
+            onChange={(e) => onChange({ ...settings, model: e.target.value })}
+          />
+        </div>
+      </div>
+      <button type="button" className="rag-save-btn" onClick={onSave}>
+        Save Settings
+      </button>
+    </div>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────
 
 export function RagChat() {
   const initialData = getInitialData();
+  const [collectionInfos, setCollectionInfos] = useState<CollectionInfo[]>([]);
   const [allCollections, setAllCollections] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>(() => {
     const initial = initialData?.initialCollectionName;
@@ -610,14 +736,32 @@ export function RagChat() {
   const [queryTimeout, setQueryTimeout] = useState(120000); // Default 2 minutes
   const [showContext, setShowContext] = useState(true);
   const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const [availableModules, setAvailableModules] = useState<string[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<GenerativeProviderSelection>({
+    kind: 'default',
+  });
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedRagSettings>({
+    baseUrl: '',
+    apiKey: '',
+    model: '',
+  });
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Send initialize message on mount
+  // Send initialize message on mount, then load advanced settings
   useEffect(() => {
     vscodeApi.postMessage({ command: 'initialize' } satisfies RagChatWebviewMessage);
+    vscodeApi.postMessage({ command: 'getAdvancedSettings' } satisfies RagChatWebviewMessage);
   }, []);
+
+  // Auto-show advanced panel when Custom provider is selected
+  useEffect(() => {
+    if (selectedProvider.kind === 'custom') {
+      setShowAdvancedSettings(true);
+    }
+  }, [selectedProvider]);
 
   // Listen for messages from extension
   useEffect(() => {
@@ -627,8 +771,13 @@ export function RagChat() {
       switch (msg.command) {
         case 'init':
         case 'collectionsLoaded': {
-          const names = msg.collectionNames ?? [];
+          const infos = msg.collectionInfos ?? [];
+          const names = infos.map((c) => c.name);
+          setCollectionInfos(infos);
           setAllCollections(names);
+          if (msg.command === 'init' && msg.availableModules) {
+            setAvailableModules(msg.availableModules);
+          }
           // If we had a pre-selected collection from initialData and it
           // exists in the list, keep it. Otherwise keep whatever is valid.
           setSelectedCollections((prev) => {
@@ -659,6 +808,12 @@ export function RagChat() {
             }
             return merged;
           });
+          break;
+        }
+        case 'advancedSettingsLoaded': {
+          if (msg.advancedSettings) {
+            setAdvancedSettings(msg.advancedSettings);
+          }
           break;
         }
         case 'ragResponse': {
@@ -720,6 +875,13 @@ export function RagChat() {
     setSelectedCollections((prev) => prev.filter((c) => c !== name));
   }, []);
 
+  const handleSaveAdvancedSettings = useCallback(() => {
+    vscodeApi.postMessage({
+      command: 'saveAdvancedSettings',
+      advancedSettings,
+    } satisfies RagChatWebviewMessage);
+  }, [advancedSettings]);
+
   const handleSubmit = useCallback(() => {
     const trimmed = question.trim();
     if (!trimmed || selectedCollections.length === 0 || loading) {
@@ -752,8 +914,18 @@ export function RagChat() {
       limit: topK,
       timeout: queryTimeout,
       requestId,
+      provider: selectedProvider,
+      advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
     } satisfies RagChatWebviewMessage);
-  }, [question, selectedCollections, topK, queryTimeout, loading]);
+  }, [
+    question,
+    selectedCollections,
+    topK,
+    queryTimeout,
+    loading,
+    selectedProvider,
+    advancedSettings,
+  ]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
   const handleRetry = useCallback(
@@ -784,9 +956,11 @@ export function RagChat() {
         limit: entry.query.limit,
         timeout: queryTimeout, // Use current UI timeout, not the original failed one
         requestId: newRequestId,
+        provider: selectedProvider,
+        advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
       } satisfies RagChatWebviewMessage);
     },
-    [queryTimeout]
+    [queryTimeout, selectedProvider, advancedSettings]
   );
 
   const handleKeyDown = useCallback(
@@ -862,11 +1036,34 @@ export function RagChat() {
       <footer className="rag-chat-input-area">
         <CollectionSelector
           allCollections={allCollections}
+          collectionInfos={collectionInfos}
           selectedCollections={selectedCollections}
           onAdd={handleAddCollection}
           onRemove={handleRemoveCollection}
           loading={collectionsLoading}
         />
+        <ProviderSelector
+          availableModules={availableModules}
+          selectedProvider={selectedProvider}
+          onChange={setSelectedProvider}
+        />
+        {selectedProvider.kind === 'custom' && (
+          <button
+            type="button"
+            className="rag-advanced-toggle"
+            onClick={() => setShowAdvancedSettings((v) => !v)}
+            aria-expanded={showAdvancedSettings}
+          >
+            {showAdvancedSettings ? '▲ Hide Advanced Settings' : '▼ Advanced Settings'}
+          </button>
+        )}
+        {showAdvancedSettings && selectedProvider.kind === 'custom' && (
+          <AdvancedRagPanel
+            settings={advancedSettings}
+            onChange={setAdvancedSettings}
+            onSave={handleSaveAdvancedSettings}
+          />
+        )}
         <RagOptions
           topK={topK}
           timeout={queryTimeout}

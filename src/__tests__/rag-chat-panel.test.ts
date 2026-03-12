@@ -114,6 +114,7 @@ describe('RagChatPanel', () => {
       const args = baseArgs();
       RagChatPanel.createOrShow(
         args.extensionUri,
+        {} as any,
         args.connectionId,
         args.connectionName,
         args.getClient,
@@ -138,6 +139,7 @@ describe('RagChatPanel', () => {
       const args = baseArgs();
       RagChatPanel.createOrShow(
         { ...args.extensionUri, fsPath: '/ext2' } as any,
+        {} as any,
         'conn-2',
         args.connectionName,
         args.getClient,
@@ -161,6 +163,7 @@ describe('RagChatPanel', () => {
     it('escapes < and > characters in connectionName so </script> cannot break out', () => {
       RagChatPanel.createOrShow(
         { fsPath: '/ext3' } as any,
+        {} as any,
         'conn-xss',
         'x</script><img src=x onerror=alert(1)>', // malicious connection name
         () => undefined,
@@ -183,6 +186,7 @@ describe('RagChatPanel', () => {
     it('escapes & characters in connectionName', () => {
       RagChatPanel.createOrShow(
         { fsPath: '/ext4' } as any,
+        {} as any,
         'conn-amp',
         'Foo & Bar',
         () => undefined,
@@ -206,6 +210,7 @@ describe('RagChatPanel', () => {
     it('replaces all {{nonce}} placeholders in the HTML', () => {
       RagChatPanel.createOrShow(
         { fsPath: '/ext5' } as any,
+        {} as any,
         'conn-nonce',
         'My Connection',
         () => undefined,
@@ -229,6 +234,7 @@ describe('RagChatPanel', () => {
     it('includes nonce attribute on the injected initialData <script> tag', () => {
       RagChatPanel.createOrShow(
         { fsPath: '/ext6' } as any,
+        {} as any,
         'conn-nonce2',
         'My Connection',
         () => undefined,
@@ -267,6 +273,7 @@ describe('RagChatPanel', () => {
       const stubClient = {} as any;
       RagChatPanel.createOrShow(
         { fsPath: '/ext7' } as any,
+        {} as any,
         'conn-3',
         'Test Connection',
         () => stubClient,
@@ -302,6 +309,7 @@ describe('RagChatPanel', () => {
       const stubClient = {} as any;
       RagChatPanel.createOrShow(
         { fsPath: '/ext8' } as any,
+        {} as any,
         'conn-4',
         'Test Connection',
         () => stubClient,
