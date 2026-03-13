@@ -5,7 +5,7 @@
  * Supports multi-collection selection via an add-and-pill UI.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Markdown from 'markdown-to-jsx';
 import type {
   RagChatHistoryEntry,
@@ -445,7 +445,10 @@ function CollectionSelector({
   );
 
   const selectedCount = selectedCollections.length;
-  const infoMap = new Map(collectionInfos.map((c) => [c.name, c]));
+  const infoMap = useMemo(
+    () => new Map(collectionInfos.map((c) => [c.name, c])),
+    [collectionInfos]
+  );
 
   return (
     <div className="rag-collection-selector">
@@ -533,7 +536,8 @@ function CollectionSelector({
 
           {allCollections.length === 0 && (
             <span className="rag-no-collections">
-              No collections found. Connect to a Weaviate instance to see your collections.
+              No collections found. Create a collection in your Weaviate instance or ensure your
+              connection has data.
             </span>
           )}
         </>
@@ -616,10 +620,12 @@ function ProviderSelector({
   availableModules,
   selectedProvider,
   onChange,
+  loading,
 }: {
   availableModules: string[];
   selectedProvider: GenerativeProviderSelection;
   onChange: (p: GenerativeProviderSelection) => void;
+  loading?: boolean;
 }) {
   // Build a combined value string from the discriminated union
   const toValue = (p: GenerativeProviderSelection): string => {
@@ -639,21 +645,37 @@ function ProviderSelector({
       <label className="rag-options-label" htmlFor="rag-provider-select">
         Generative provider
       </label>
-      <select
-        id="rag-provider-select"
-        className="rag-select rag-select-small"
-        value={toValue(selectedProvider)}
-        onChange={(e) => onChange(fromValue(e.target.value))}
-        title="Which generative AI provider to use for answer generation"
-      >
-        <option value="default">Default (server-configured)</option>
-        {availableModules.map((mod) => (
-          <option key={mod} value={`module:${mod}`}>
-            {mod.replace('generative-', '')}
-          </option>
-        ))}
-        <option value="custom">Custom (Advanced Settings)</option>
-      </select>
+      {loading ? (
+        <span className="rag-loading-collections">
+          <div
+            className="loading-spinner"
+            style={{
+              width: 12,
+              height: 12,
+              marginRight: 8,
+              display: 'inline-block',
+              verticalAlign: 'middle',
+            }}
+          />
+          Loading…
+        </span>
+      ) : (
+        <select
+          id="rag-provider-select"
+          className="rag-select rag-select-small"
+          value={toValue(selectedProvider)}
+          onChange={(e) => onChange(fromValue(e.target.value))}
+          title="Which generative AI provider to use for answer generation"
+        >
+          <option value="default">Default (server-configured)</option>
+          {availableModules.map((mod) => (
+            <option key={mod} value={`module:${mod}`}>
+              {mod.replace('generative-', '')}
+            </option>
+          ))}
+          <option value="custom">Custom (Advanced Settings)</option>
+        </select>
+      )}
     </div>
   );
 }
@@ -663,13 +685,17 @@ function AdvancedRagPanel({
   settings,
   onChange,
   onSave,
+  savedFlash,
+  id,
 }: {
   settings: AdvancedRagSettings;
   onChange: (s: AdvancedRagSettings) => void;
   onSave: () => void;
+  savedFlash: boolean;
+  id?: string;
 }) {
   return (
-    <div className="rag-advanced-panel">
+    <div id={id} className="rag-advanced-panel">
       <div className="rag-advanced-title">Custom LLM Endpoint (OpenAI-compatible)</div>
       <div className="rag-advanced-fields">
         <div className="rag-advanced-field">
@@ -697,6 +723,9 @@ function AdvancedRagPanel({
             value={settings.apiKey}
             onChange={(e) => onChange({ ...settings, apiKey: e.target.value })}
           />
+          <span className="rag-field-hint">
+            Stored locally in VS Code global state (encrypted by VS Code)
+          </span>
         </div>
         <div className="rag-advanced-field">
           <label className="rag-options-label" htmlFor="rag-adv-model">
@@ -712,9 +741,17 @@ function AdvancedRagPanel({
           />
         </div>
       </div>
-      <button type="button" className="rag-save-btn" onClick={onSave}>
-        Save Settings
-      </button>
+      <div className="rag-advanced-actions">
+        <button type="button" className="rag-save-btn" onClick={onSave}>
+          Save Settings
+        </button>
+        {savedFlash && <span className="rag-saved-flash">✓ Saved</span>}
+      </div>
+      <div className="rag-advanced-note">
+        <strong>Note:</strong> The API key is passed as an HTTP header via Weaviate's
+        generative-openai module. If your Weaviate server already has an API key configured for the
+        generative module, you can leave the API Key field empty.
+      </div>
     </div>
   );
 }
@@ -756,11 +793,13 @@ export function RagChat() {
     vscodeApi.postMessage({ command: 'getAdvancedSettings' } satisfies RagChatWebviewMessage);
   }, []);
 
-  // Auto-show advanced panel when Custom provider is selected
+  // Auto-show advanced panel only when user first switches to Custom
+  const prevProviderKindRef = useRef(selectedProvider.kind);
   useEffect(() => {
-    if (selectedProvider.kind === 'custom') {
+    if (selectedProvider.kind === 'custom' && prevProviderKindRef.current !== 'custom') {
       setShowAdvancedSettings(true);
     }
+    prevProviderKindRef.current = selectedProvider.kind;
   }, [selectedProvider]);
 
   // Listen for messages from extension
@@ -875,11 +914,18 @@ export function RagChat() {
     setSelectedCollections((prev) => prev.filter((c) => c !== name));
   }, []);
 
+  const [settingsSavedFlash, setSettingsSavedFlash] = useState(false);
   const handleSaveAdvancedSettings = useCallback(() => {
     vscodeApi.postMessage({
       command: 'saveAdvancedSettings',
       advancedSettings,
     } satisfies RagChatWebviewMessage);
+    // Show saved confirmation, then auto-close after a brief delay
+    setSettingsSavedFlash(true);
+    setTimeout(() => {
+      setSettingsSavedFlash(false);
+      setShowAdvancedSettings(false);
+    }, 1200);
   }, [advancedSettings]);
 
   const handleSubmit = useCallback(() => {
@@ -1046,6 +1092,7 @@ export function RagChat() {
           availableModules={availableModules}
           selectedProvider={selectedProvider}
           onChange={setSelectedProvider}
+          loading={collectionsLoading}
         />
         {selectedProvider.kind === 'custom' && (
           <button
@@ -1053,15 +1100,18 @@ export function RagChat() {
             className="rag-advanced-toggle"
             onClick={() => setShowAdvancedSettings((v) => !v)}
             aria-expanded={showAdvancedSettings}
+            aria-controls="advanced-settings-panel"
           >
             {showAdvancedSettings ? '▲ Hide Advanced Settings' : '▼ Advanced Settings'}
           </button>
         )}
         {showAdvancedSettings && selectedProvider.kind === 'custom' && (
           <AdvancedRagPanel
+            id="advanced-settings-panel"
             settings={advancedSettings}
             onChange={setAdvancedSettings}
             onSave={handleSaveAdvancedSettings}
+            savedFlash={settingsSavedFlash}
           />
         )}
         <RagOptions

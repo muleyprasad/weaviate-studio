@@ -9,7 +9,12 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
-import type { RagChatExtensionMessage, RagChatWebviewMessage } from '../types';
+import type {
+  RagChatExtensionMessage,
+  RagChatWebviewMessage,
+  CollectionInfo,
+  AdvancedRagSettings,
+} from '../types';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
 import {
   clampLimit,
@@ -34,7 +39,7 @@ export class RagChatPanel {
   private _api: RagChatAPI | undefined;
   private _disposables: vscode.Disposable[] = [];
   private _requestTracker = new RequestTracker();
-  private _collectionInfosCache: import('../types').CollectionInfo[] = [];
+  private _collectionInfosCache: CollectionInfo[] = [];
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -405,7 +410,7 @@ export class RagChatPanel {
   }
 
   private _handleGetAdvancedSettings(): void {
-    const settings = this._context.globalState.get<import('../types').AdvancedRagSettings>(
+    const settings = this._context.globalState.get<AdvancedRagSettings>(
       'weaviate.ragChat.advancedSettings'
     );
     this.postMessage({
@@ -414,9 +419,7 @@ export class RagChatPanel {
     });
   }
 
-  private async _handleSaveAdvancedSettings(
-    settings: import('../types').AdvancedRagSettings
-  ): Promise<void> {
+  private async _handleSaveAdvancedSettings(settings: AdvancedRagSettings): Promise<void> {
     await this._context.globalState.update('weaviate.ragChat.advancedSettings', settings);
   }
 

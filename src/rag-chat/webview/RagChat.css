@@ -311,11 +311,6 @@
 
 /* ===== Answer Actions Header ===== */
 
-.rag-answer {
-  /* No special positioning needed, flow naturally */
-  line-height: 1.6;
-}
-
 /* Actions sit at the top right of the answer box, pushing content below */
 .rag-answer-actions {
   display: flex;
@@ -929,6 +924,13 @@
   gap: 3px;
 }
 
+.rag-advanced-note {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+  margin-top: 2px;
+}
+
 /* Reusable text input — also used in advanced settings */
 .rag-input {
   width: 100%;
@@ -964,4 +966,43 @@
 
 .rag-save-btn:hover {
   background-color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Save actions row */
+.rag-advanced-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Saved flash indicator */
+.rag-saved-flash {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3fb950;
+  animation: rag-flash-in 0.3s ease;
+}
+
+@keyframes rag-flash-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Field hints below inputs */
+.rag-field-hint {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* Note text at bottom of advanced panel */
+.rag-advanced-note {
+  margin-top: 10px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  line-height: 1.4;
 }

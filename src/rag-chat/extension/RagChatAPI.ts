@@ -25,6 +25,7 @@ import {
   createTimeoutError,
 } from '../../shared/timeout';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
+import type { CollectionInfo, GenerativeProviderSelection, AdvancedRagSettings } from '../types';
 import { workspace } from 'vscode';
 
 /**
@@ -72,9 +73,9 @@ export class RagChatAPI {
     /** Whether the collection has a vectorizer configured */
     hasVectorizer?: boolean;
     /** The selected generative provider configuration */
-    provider?: import('../types').GenerativeProviderSelection;
+    provider?: GenerativeProviderSelection;
     /** Advanced settings for custom providers */
-    advancedSettings?: import('../types').AdvancedRagSettings;
+    advancedSettings?: AdvancedRagSettings;
   }): Promise<{
     answer: string;
     contextObjects: Array<{
@@ -155,18 +156,20 @@ export class RagChatAPI {
       const provider = params.provider ?? { kind: 'default' };
 
       if (provider.kind === 'module') {
-        const createMethod =
-          (configure.generative as any)[provider.moduleName.replace('generative-', '')] ??
-          (configure.generative as any)[
-            provider.moduleName.replace('generative-', '').replace('-', '')
-          ];
-
+        // Normalize module name: remove 'generative-' prefix for Weaviate module names
+        const normalizedName = provider.moduleName.replace(/^generative-/, '');
+        const createMethod = (configure.generative as any)[normalizedName];
         if (createMethod && typeof createMethod === 'function') {
           genConfig = createMethod();
-        } else if (provider.moduleName === 'generative-openai') {
-          genConfig = configure.generative.openAI();
+        } else {
+          console.warn(
+            `RagChatAPI: Unknown generative module "${provider.moduleName}" (normalized: "${normalizedName}")`
+          );
         }
       } else if (provider.kind === 'custom' && params.advancedSettings?.baseUrl) {
+        // Custom OpenAI-compatible endpoint: pass baseURL and model.
+        // Note: API key should be configured in the Weaviate collection's generative module,
+        // not passed per-query for security reasons.
         genConfig = configure.generative.openAI({
           baseURL: params.advancedSettings.baseUrl,
           model: params.advancedSettings.model || undefined,
@@ -235,14 +238,14 @@ export class RagChatAPI {
    *
    * @returns Array of CollectionInfo objects
    */
-  async getCollectionInfos(): Promise<import('../types').CollectionInfo[]> {
+  async getCollectionInfos(): Promise<CollectionInfo[]> {
     try {
       const collections = await withTimeout(
         this.client.collections.listAll(),
         this.REQUEST_TIMEOUT
       );
 
-      const infos: import('../types').CollectionInfo[] = collections.map((col) => {
+      const infos: CollectionInfo[] = collections.map((col) => {
         // v3 client uses vectorizers, if not present or explicitly 'none', it has no vectorizer
         const hasVec = col.vectorizers !== undefined && Object.keys(col.vectorizers).length > 0;
         return {
