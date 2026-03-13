@@ -496,16 +496,7 @@ function CollectionSelector({
 
       {loading && allCollections.length === 0 ? (
         <span className="rag-loading-collections">
-          <div
-            className="loading-spinner"
-            style={{
-              width: 12,
-              height: 12,
-              marginRight: 8,
-              display: 'inline-block',
-              verticalAlign: 'middle',
-            }}
-          />
+          <div className="loading-spinner rag-loading-collections-spinner" />
           Loading collections…
         </span>
       ) : (
@@ -645,37 +636,31 @@ function ProviderSelector({
       <label className="rag-options-label" htmlFor="rag-provider-select">
         Generative provider
       </label>
-      {loading ? (
-        <span className="rag-loading-collections">
-          <div
-            className="loading-spinner"
-            style={{
-              width: 12,
-              height: 12,
-              marginRight: 8,
-              display: 'inline-block',
-              verticalAlign: 'middle',
-            }}
-          />
-          Loading…
-        </span>
-      ) : (
+      <div className="rag-select-container">
         <select
           id="rag-provider-select"
           className="rag-select rag-select-small"
           value={toValue(selectedProvider)}
           onChange={(e) => onChange(fromValue(e.target.value))}
+          disabled={loading}
           title="Which generative AI provider to use for answer generation"
         >
-          <option value="default">Default (server-configured)</option>
-          {availableModules.map((mod) => (
-            <option key={mod} value={`module:${mod}`}>
-              {mod.replace('generative-', '')}
-            </option>
-          ))}
-          <option value="custom">Custom (Advanced Settings)</option>
+          {loading && availableModules.length === 0 ? (
+            <option value="default">Loading…</option>
+          ) : (
+            <>
+              <option value="default">Default (server-configured)</option>
+              {availableModules.map((mod) => (
+                <option key={mod} value={`module:${mod}`}>
+                  {mod.replace('generative-', '')}
+                </option>
+              ))}
+              <option value="custom">Custom (Advanced Settings)</option>
+            </>
+          )}
         </select>
-      )}
+        {loading && <div className="loading-spinner rag-select-spinner" />}
+      </div>
     </div>
   );
 }
@@ -920,12 +905,12 @@ export function RagChat() {
       command: 'saveAdvancedSettings',
       advancedSettings,
     } satisfies RagChatWebviewMessage);
-    // Show saved confirmation, then auto-close after a brief delay
+    // Show saved confirmation, then auto-close after flash is visible
     setSettingsSavedFlash(true);
     setTimeout(() => {
       setSettingsSavedFlash(false);
       setShowAdvancedSettings(false);
-    }, 1200);
+    }, 1500);
   }, [advancedSettings]);
 
   const handleSubmit = useCallback(() => {
@@ -1080,20 +1065,23 @@ export function RagChat() {
 
       {/* Input area */}
       <footer className="rag-chat-input-area">
-        <CollectionSelector
-          allCollections={allCollections}
-          collectionInfos={collectionInfos}
-          selectedCollections={selectedCollections}
-          onAdd={handleAddCollection}
-          onRemove={handleRemoveCollection}
-          loading={collectionsLoading}
-        />
-        <ProviderSelector
-          availableModules={availableModules}
-          selectedProvider={selectedProvider}
-          onChange={setSelectedProvider}
-          loading={collectionsLoading}
-        />
+        {/* Visual group: data source selectors */}
+        <div className="rag-input-group">
+          <CollectionSelector
+            allCollections={allCollections}
+            collectionInfos={collectionInfos}
+            selectedCollections={selectedCollections}
+            onAdd={handleAddCollection}
+            onRemove={handleRemoveCollection}
+            loading={collectionsLoading}
+          />
+          <ProviderSelector
+            availableModules={availableModules}
+            selectedProvider={selectedProvider}
+            onChange={setSelectedProvider}
+            loading={collectionsLoading}
+          />
+        </div>
         {selectedProvider.kind === 'custom' && (
           <button
             type="button"
