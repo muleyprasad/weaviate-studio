@@ -190,8 +190,21 @@ function NodeComponent({
     },
     {} as Record<string, number>
   );
+  const queueGroups = nonReadyShards.reduce(
+    (acc, shard) => {
+      const status = shard.vectorIndexingStatus;
+      acc[status] = (acc[status] || 0) + (shard.vectorQueueLength || 0);
+      return acc;
+    },
+    {} as Record<string, number>
+  );
   const nonReadyCount = nonReadyShards.length;
   const hasReadonly = statusGroups['READONLY'] > 0;
+
+  const formatStatusBadge = (status: string, count: number) => {
+    const queueLen = queueGroups[status] || 0;
+    return queueLen > 0 ? `${count} ${status} (${queueLen} in queue)` : `${count} ${status}`;
+  };
 
   const handleSetAllReadyToReady = () => {
     const readonlyShards = shards.filter((shard) => shard.vectorIndexingStatus === 'READONLY');
@@ -229,12 +242,12 @@ function NodeComponent({
             <span
               className={hasReadonly ? 'readonly-badge' : 'non-ready-badge'}
               title={Object.entries(statusGroups)
-                .map(([status, count]) => `${count} ${status}`)
+                .map(([status, count]) => formatStatusBadge(status, count))
                 .join(', ')}
             >
               ⚠️{' '}
               {Object.entries(statusGroups)
-                .map(([status, count]) => `${count} ${status}`)
+                .map(([status, count]) => formatStatusBadge(status, count))
                 .join(', ')}
             </span>
           )}
@@ -422,6 +435,18 @@ function CollectionView({
           },
           {} as Record<string, number>
         );
+        const queueGroups = nonReadyShards.reduce(
+          (acc, shard) => {
+            const status = shard.vectorIndexingStatus;
+            acc[status] = (acc[status] || 0) + (shard.vectorQueueLength || 0);
+            return acc;
+          },
+          {} as Record<string, number>
+        );
+        const formatStatusBadge = (status: string, count: number) => {
+          const queueLen = queueGroups[status] || 0;
+          return queueLen > 0 ? `${count} ${status} (${queueLen} in queue)` : `${count} ${status}`;
+        };
         const nonReadyCount = nonReadyShards.length;
 
         const handleSetAllReadyToReady = () => {
@@ -451,12 +476,12 @@ function CollectionView({
                   <span
                     className={hasReadonly ? 'readonly-badge' : 'non-ready-badge'}
                     title={Object.entries(statusGroups)
-                      .map(([status, count]) => `${count} ${status}`)
+                      .map(([status, count]) => formatStatusBadge(status, count))
                       .join(', ')}
                   >
                     ⚠️{' '}
                     {Object.entries(statusGroups)
-                      .map(([status, count]) => `${count} ${status}`)
+                      .map(([status, count]) => formatStatusBadge(status, count))
                       .join(', ')}
                   </span>
                 ) : null}
@@ -567,6 +592,7 @@ function ClusterPanelWebview() {
   const [selectedNodeName, setSelectedNodeName] = useState<string | null>(null);
   const [selectedShardName, setSelectedShardName] = useState<string | null>(null);
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [openClusterViewOnConnect, setOpenClusterViewOnConnect] = useState<boolean>(true);
   const [viewType, setViewType] = useState<'node' | 'collection'>('node');
   const [hasInitialized, setHasInitialized] = useState<boolean>(false);
@@ -663,6 +689,22 @@ function ClusterPanelWebview() {
       window.removeEventListener('message', messageHandler);
     };
   }, [selectedNodeName, hasInitialized]);
+
+  const filteredNodeStatusData = useMemo(() => {
+    if (!searchQuery.trim()) return nodeStatusData;
+    const q = searchQuery.toLowerCase();
+    return nodeStatusData
+      .map((node) => ({
+        ...node,
+        shards: (node.shards || []).filter(
+          (shard) =>
+            shard.class.toLowerCase().includes(q) ||
+            shard.name.toLowerCase().includes(q) ||
+            shard.vectorIndexingStatus.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((node) => node.shards.length > 0);
+  }, [nodeStatusData, searchQuery]);
 
   const handleRefresh = useCallback(() => {
     // Save current scroll position
@@ -764,6 +806,29 @@ function ClusterPanelWebview() {
       <div className="cluster-header">
         <h1>Cluster Information</h1>
         <div className="header-controls">
+          <div className="search-input-wrapper">
+            <span className="search-icon">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" />
+              </svg>
+            </span>
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Filter by collection, shard, status…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                className="search-clear-button"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
           <span className="view-toggle-label">View:</span>
           <div className="view-toggle">
             <button
@@ -839,20 +904,26 @@ function ClusterPanelWebview() {
             nodeStatusData && nodeStatusData.length > 0 ? (
               viewType === 'node' ? (
                 <div className="nodes-list">
-                  {nodeStatusData.map((node) => (
-                    <NodeComponent
-                      key={node.name}
-                      node={node}
-                      isSelected={selectedNodeName === node.name}
-                      onSelect={() => handleNodeSelect(node.name)}
-                      selectedShardName={selectedShardName}
-                      onShardSelect={handleShardSelect}
-                    />
-                  ))}
+                  {filteredNodeStatusData.length > 0 ? (
+                    filteredNodeStatusData.map((node) => (
+                      <NodeComponent
+                        key={node.name}
+                        node={node}
+                        isSelected={selectedNodeName === node.name}
+                        onSelect={() => handleNodeSelect(node.name)}
+                        selectedShardName={selectedShardName}
+                        onShardSelect={handleShardSelect}
+                      />
+                    ))
+                  ) : (
+                    <div className="no-data">
+                      <p>No results match your search</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <CollectionView
-                  nodeStatusData={nodeStatusData}
+                  nodeStatusData={filteredNodeStatusData}
                   selectedNodeName={selectedNodeName}
                   selectedShardName={selectedShardName}
                   selectedCollectionName={selectedCollectionName}
@@ -866,7 +937,14 @@ function ClusterPanelWebview() {
                 <p>No cluster data available</p>
               </div>
             ),
-          [nodeStatusData, viewType, selectedNodeName, selectedShardName, selectedCollectionName]
+          [
+            nodeStatusData,
+            filteredNodeStatusData,
+            viewType,
+            selectedNodeName,
+            selectedShardName,
+            selectedCollectionName,
+          ]
         )}
       </div>
 
