@@ -156,14 +156,45 @@ export class RagChatAPI {
       const provider = params.provider ?? { kind: 'default' };
 
       if (provider.kind === 'module') {
-        // Normalize module name: remove 'generative-' prefix for Weaviate module names
+        // Explicit map from Weaviate module names (after stripping 'generative-' prefix) to the
+        // camelCase key used by configure.generative.  This is required because the client API
+        // uses camelCase (e.g. openAI, azureOpenAI) while the module name is all-lowercase with
+        // hyphens (e.g. openai, azure-openai).
+        const MODULE_NAME_MAP: Record<string, string> = {
+          openai: 'openAI',
+          'azure-openai': 'azureOpenAI',
+          cohere: 'cohere',
+          anthropic: 'anthropic',
+          google: 'google',
+          palm: 'palm',
+          aws: 'aws',
+          mistral: 'mistral',
+          ollama: 'ollama',
+          anyscale: 'anyscale',
+          databricks: 'databricks',
+          friendliai: 'friendliai',
+          nvidia: 'nvidia',
+          contextualai: 'contextualai',
+          xai: 'xai',
+        };
+
         const normalizedName = provider.moduleName.replace(/^generative-/, '');
-        const createMethod = (configure.generative as any)[normalizedName];
+        // Use the explicit map first; fall back to a case-insensitive key search so
+        // newly-added modules are still resolved without requiring a code change here.
+        const generativeObj = configure.generative as any;
+        const mappedKey = MODULE_NAME_MAP[normalizedName];
+        const resolvedKey =
+          mappedKey ??
+          Object.keys(generativeObj).find(
+            (k) => k.toLowerCase() === normalizedName.replace(/-/g, '')
+          );
+
+        const createMethod = resolvedKey ? generativeObj[resolvedKey] : undefined;
         if (createMethod && typeof createMethod === 'function') {
           genConfig = createMethod();
         } else {
           console.warn(
-            `RagChatAPI: Unknown generative module "${provider.moduleName}" (normalized: "${normalizedName}")`
+            `RagChatAPI: Unknown generative module "${provider.moduleName}" (normalized: "${normalizedName}") – no matching configure.generative builder found`
           );
         }
       } else if (provider.kind === 'custom' && params.advancedSettings?.baseUrl) {
