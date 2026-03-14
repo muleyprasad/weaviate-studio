@@ -28,6 +28,61 @@
   align-items: center;
 }
 
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--vscode-descriptionForeground);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 6px 24px 6px 28px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  font-size: 13px;
+  width: 220px;
+  outline: none;
+  font-family: var(--vscode-font-family);
+}
+
+.search-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.search-clear-button {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-clear-button:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
 .view-toggle-label {
   font-size: 13px;
   color: var(--vscode-descriptionForeground);
