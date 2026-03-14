@@ -25,6 +25,7 @@ import {
   createTimeoutError,
 } from '../../shared/timeout';
 import type { FilterCondition, FilterMatchMode } from '../../data-explorer/types';
+import type { CollectionInfo, GenerativeProviderSelection, AdvancedRagSettings } from '../types';
 import { workspace } from 'vscode';
 
 /**
@@ -72,9 +73,9 @@ export class RagChatAPI {
     /** Whether the collection has a vectorizer configured */
     hasVectorizer?: boolean;
     /** The selected generative provider configuration */
-    provider?: import('../types').GenerativeProviderSelection;
+    provider?: GenerativeProviderSelection;
     /** Advanced settings for custom providers */
-    advancedSettings?: import('../types').AdvancedRagSettings;
+    advancedSettings?: AdvancedRagSettings;
   }): Promise<{
     answer: string;
     contextObjects: Array<{
@@ -155,18 +156,51 @@ export class RagChatAPI {
       const provider = params.provider ?? { kind: 'default' };
 
       if (provider.kind === 'module') {
-        const createMethod =
-          (configure.generative as any)[provider.moduleName.replace('generative-', '')] ??
-          (configure.generative as any)[
-            provider.moduleName.replace('generative-', '').replace('-', '')
-          ];
+        // Explicit map from Weaviate module names (after stripping 'generative-' prefix) to the
+        // camelCase key used by configure.generative.  This is required because the client API
+        // uses camelCase (e.g. openAI, azureOpenAI) while the module name is all-lowercase with
+        // hyphens (e.g. openai, azure-openai).
+        const MODULE_NAME_MAP: Record<string, string> = {
+          openai: 'openAI',
+          'azure-openai': 'azureOpenAI',
+          cohere: 'cohere',
+          anthropic: 'anthropic',
+          google: 'google',
+          palm: 'palm',
+          aws: 'aws',
+          mistral: 'mistral',
+          ollama: 'ollama',
+          anyscale: 'anyscale',
+          databricks: 'databricks',
+          friendliai: 'friendliai',
+          nvidia: 'nvidia',
+          contextualai: 'contextualai',
+          xai: 'xai',
+        };
 
+        const normalizedName = provider.moduleName.replace(/^generative-/, '');
+        // Use the explicit map first; fall back to a case-insensitive key search so
+        // newly-added modules are still resolved without requiring a code change here.
+        const generativeObj = configure.generative as any;
+        const mappedKey = MODULE_NAME_MAP[normalizedName];
+        const resolvedKey =
+          mappedKey ??
+          Object.keys(generativeObj).find(
+            (k) => k.toLowerCase() === normalizedName.replace(/-/g, '')
+          );
+
+        const createMethod = resolvedKey ? generativeObj[resolvedKey] : undefined;
         if (createMethod && typeof createMethod === 'function') {
           genConfig = createMethod();
-        } else if (provider.moduleName === 'generative-openai') {
-          genConfig = configure.generative.openAI();
+        } else {
+          console.warn(
+            `RagChatAPI: Unknown generative module "${provider.moduleName}" (normalized: "${normalizedName}") – no matching configure.generative builder found`
+          );
         }
       } else if (provider.kind === 'custom' && params.advancedSettings?.baseUrl) {
+        // Custom OpenAI-compatible endpoint: pass baseURL and model.
+        // Note: API key should be configured in the Weaviate collection's generative module,
+        // not passed per-query for security reasons.
         genConfig = configure.generative.openAI({
           baseURL: params.advancedSettings.baseUrl,
           model: params.advancedSettings.model || undefined,
@@ -235,14 +269,14 @@ export class RagChatAPI {
    *
    * @returns Array of CollectionInfo objects
    */
-  async getCollectionInfos(): Promise<import('../types').CollectionInfo[]> {
+  async getCollectionInfos(): Promise<CollectionInfo[]> {
     try {
       const collections = await withTimeout(
         this.client.collections.listAll(),
         this.REQUEST_TIMEOUT
       );
 
-      const infos: import('../types').CollectionInfo[] = collections.map((col) => {
+      const infos: CollectionInfo[] = collections.map((col) => {
         // v3 client uses vectorizers, if not present or explicitly 'none', it has no vectorizer
         const hasVec = col.vectorizers !== undefined && Object.keys(col.vectorizers).length > 0;
         return {

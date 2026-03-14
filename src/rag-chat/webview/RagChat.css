@@ -311,11 +311,6 @@
 
 /* ===== Answer Actions Header ===== */
 
-.rag-answer {
-  /* No special positioning needed, flow naturally */
-  line-height: 1.6;
-}
-
 /* Actions sit at the top right of the answer box, pushing content below */
 .rag-answer-actions {
   display: flex;
@@ -837,6 +832,32 @@
   cursor: not-allowed;
 }
 
+/* ===== Input Group (visual grouping for selectors) ===== */
+.rag-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+/* Flex-aligned loading spinner for collection selector */
+.rag-loading-collections {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+.rag-loading-collections-spinner {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 400px) {
   .rag-bubble {
@@ -852,6 +873,10 @@
     align-items: flex-start;
     gap: 6px;
   }
+
+  .rag-input-group {
+    padding: 8px;
+  }
 }
 
 /* ===== Provider Selector ===== */
@@ -862,18 +887,39 @@
   padding: 6px 0 2px;
 }
 
+/* Wrapper for select + spinner overlay */
+.rag-select-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rag-select-container select:disabled {
+  opacity: 0.6;
+}
+
+.rag-select-spinner {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
 /* ===== BM25 Hint Badge ===== */
 .rag-bm25-hint {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   margin: 0 4px;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 3px;
   font-size: 10px;
-  font-weight: 600;
-  background-color: var(--vscode-statusBarItem-warningBackground, #d4a017);
-  color: var(--vscode-statusBarItem-warningForeground, #000);
+  font-weight: 500;
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
   opacity: 0.85;
   cursor: help;
 }
@@ -929,6 +975,8 @@
   gap: 3px;
 }
 
+/* (consolidated below — single definition for .rag-advanced-note) */
+
 /* Reusable text input — also used in advanced settings */
 .rag-input {
   width: 100%;
@@ -964,4 +1012,43 @@
 
 .rag-save-btn:hover {
   background-color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Save actions row */
+.rag-advanced-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Saved flash indicator */
+.rag-saved-flash {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3fb950;
+  animation: rag-flash-in 0.3s ease;
+}
+
+@keyframes rag-flash-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Field hints below inputs */
+.rag-field-hint {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* Note text at bottom of advanced panel */
+.rag-advanced-note {
+  margin-top: 10px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  line-height: 1.4;
 }
