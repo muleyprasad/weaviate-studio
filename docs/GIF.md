@@ -29,14 +29,14 @@ From Terminal (in the same folder as your `.mov` file):
 
 ```bash
 cd ~/Desktop
-ffmpeg -i your-video.mov -vf "fps=15,scale=800:-1:flags=lanczos,palettegen" palette.png
+ffmpeg -i your-video.mov -vf "fps=15,scale=800:-1:flags=lanczos,palettegen" -update 1 palette.png
 ```
 
-This creates `palette.png` — a custom color table that improves GIF quality and reduces size.
+This creates `palette.png` — a custom color table that improves GIF quality and reduces size. The `-update 1` flag ensures it writes a single image instead of a sequence.
 
 ### 3. Create the GIF
 
-Use this command to create a high-quality GIF with faster playback:
+Use this command to create a high-quality GIF with faster playback (doubling speed is highly recommended for keeping documentation GIFs concise):
 
 ```bash
 ffmpeg -i your-video.mov -i palette.png -filter_complex "setpts=0.5*PTS,fps=15,scale=800:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a" extension-demo.gif

@@ -5,12 +5,11 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.0] - 2026-03-14
 
 ### Added - Generative Search
 
 - **Generative Search Panel** — Ask natural-language questions about your Weaviate data directly in VS Code
-
   - Chat-style UI with question/answer bubbles and collapsible "Retrieved Context" section
   - Multi-collection support via pill-based selector — auto-add on selection from dropdown, remove with × button
   - Summary label ("3 collections selected") when ≥ 3 collections are active to reduce visual clutter
@@ -37,6 +36,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New command: `weaviate.openRagChat` with `$(comment-discussion)` icon on collection tree items
   - Inline icon and context menu entry on collection items (alongside Data Explorer and Query Editor)
   - VS Code setting: `weaviate.ragQueryTimeout` (default: 120000ms) for default timeout; UI dropdown overrides per query
+
+### Added - RBAC & Security
+
+- **Role-Based Access Control (RBAC)** — Comprehensive management of users, roles, and groups
+  - Integrated UI for creating, editing, and deleting RBAC Roles and Groups
+  - User management with support for password-based OIDC and API key rotation
+  - Status tracking (Active/Inactive) and role assignments for users
+  - Native integration with Weaviate's RBAC system for secure instance management
+
+### Added - Read-Only Mode
+
+- **Read-Only Guards** — Prevent accidental modifications to critical Weaviate instances
+  - Connection-level "Read-Only" toggle to disable all destructive and creative operations
+  - Visual indicators in the tree explorer for read-only connections
+  - Automatic blocking of commands like delete collection, add object, or schema updates when enabled
+
+### Changed - Cluster & Performance
+
+- **Enhanced Cluster Information Panel**
+  - Search and filter functionality for nodes and shards to manage large-scale clusters
+  - Detailed reindexing progress and vector indexing status tracking (READY, READONLY, INDEXING)
+  - Improved shard health visualization and status badges
+- **Embedding Configuration**
+  - Improved support for configuring and visualizing collection-level vectorizers and embedding settings
+- **Weaviate Client**
+  - Updated to `weaviate-client@^3.11.0` for latest API support and performance improvements
+
+### Fixed
+
+- Various stability fixes for RAG chat retrieval and connection handling
+- Improved error messaging for failed GraphQL queries and schema synchronization
 
 ## [1.4.0] - 2026-02-18
 

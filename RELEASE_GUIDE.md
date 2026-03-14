@@ -256,30 +256,78 @@ code --install-extension weaviate-studio-<version>.vsix
 - **Open VSX Registry:** https://open-vsx.org/
 - **GitHub Actions Documentation:** https://docs.github.com/en/actions
 
+## 📝 Release Notes & Documentation Style
+
+Our releases (v1.3.0+) follow a "Product Update" style rather than a simple changelog. Use this structure for GitHub Release descriptions:
+
+### 1. Structure & Tone
+
+- **Catchy Title:** Use a descriptive name (e.g., `v1.5.0 — GENERATIVE SEARCH & RBAC 🔭🛡️`)
+- **Enthusiastic Summary:** A brief, inviting summary of the release's value.
+- **Highlights Section:** 3-4 major impact changes with "Why this matters" context.
+- **Visual Categorization:** Use consistent emojis for headers:
+  - 🔭 **DATA EXPLORER / GENERATIVE SEARCH**
+  - 🛡️ **RBAC & SECURITY**
+  - ⚡ **PERFORMANCE IMPROVEMENTS**
+  - 🎨 **UX ENHANCEMENTS**
+  - 🐛 **BUG FIXES**
+- **PR & Issue Links:** Always link to relevant PRs (e.g., `(PR #63)`) or Issues.
+- **Installation Matrix:** Include a clear table with links to Marketplace, Open VSX, and direct VSIX downloads.
+
+### 2. Formatting Guidelines
+
+- Use horizontal separators (`---` or `----------------------------------------`) between major sections.
+- Use ALL CAPS for section headers.
+- Bold key features and technical terms for readability.
+- Acknowledge contributors and include test coverage statistics.
+
 ## 📝 Release Notes Template
 
 ```markdown
-## [X.Y.Z] - YYYY-MM-DD
+# [X.Y.Z] - YYYY-MM-DD — RELEASE TITLE 🚀
 
-### Added
+We're thrilled to announce the release of **vX.Y.Z**, which brings [brief summary of major theme].
 
-- New feature descriptions
+---
 
-### Changed
+### 🌟 HIGHLIGHTS
 
-- Updated feature descriptions
+- **Feature A:** Description...
+  - _Why this matters:_ Context...
+- **Feature B:** Description...
+  - _Why this matters:_ Context...
 
-### Fixed
+---
 
-- Bug fix descriptions
+### 🔭 [MAJOR FEATURE CATEGORY]
 
-### Security
+- **Detailed improvement 1:** Technical details... (PR #00)
+- **Detailed improvement 2:** Technical details...
 
-- Security-related changes
+### 🛡️ [SECURITY / RBAC]
 
-### Breaking
+- **Enhancement 1:** ...
+- **Enhancement 2:** ...
 
-- Changes that require user action or newer editor versions
+### ⚡ PERFORMANCE & UX
+
+- **Optimization:** ...
+- **UI Tweak:** ...
+
+### 🐛 BUG FIXES
+
+- **Fix 1:** ...
+- **Fix 2:** ...
+
+---
+
+### 📦 INSTALLATION
+
+| **VS Code**         | **Cursor / Windsurf** | **Manual**            |
+| :------------------ | :-------------------- | :-------------------- |
+| [Marketplace](LINK) | [Open VSX](LINK)      | [Download VSIX](LINK) |
+
+---
 ```
 
 ## ⚡ Quick Release Checklist (CI/CD Pipeline)

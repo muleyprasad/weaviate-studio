@@ -1,4 +1,4 @@
-# <img src="resources/weaviate-studio-color.png" alt="Weaviate Studio Logo" width="48" height="48" style="vertical-align:middle;"> Weaviate Studio
+# <img src="resources/weaviate-studio-color.png" alt="Weaviate Studio Logo" width="48" height="48" style="vertical-align:middle;"> [Weaviate](https://weaviate.io) Studio
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio)
 [![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-Registry-purple?style=flat-square&logo=eclipse-ide)](https://open-vsx.org/extension/prasadmuley/weaviate-studio)
@@ -16,6 +16,10 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 ### Data Explorer
 
 ![Data Explorer Demo](docs/images/data-explorer-demo.gif)
+
+### Generative Search
+
+![Generative Search Demo](docs/images/generative-search-demo.gif)
 
 ---
 
@@ -42,6 +46,8 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 - **Multiple Connections:** Manage several Weaviate instances at once
 - **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
 - **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
+- **RBAC & Security:** Manage users, roles, and groups with native RBAC support and API key rotation
+- **Read-Only Mode:** Connection-level guards to prevent accidental modifications to production data
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
 - **Cluster Management:** Comprehensive cluster information panel with health monitoring
 - **Schema Explorer:** Visualize and browse collections, properties, and nested object structures
@@ -99,6 +105,21 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - User preferences persistence per collection
 - Virtual scrolling for large datasets (1000+ objects)
 - See [Data Explorer README](src/data-explorer/README.md) for full details
+
+### RBAC & Security
+
+- Manage roles, users, and groups with native Weaviate RBAC support
+- Create and edit complex role permissions with intuitive UI
+- User management with API key rotation and OIDC password support
+- Status tracking for active and inactive users
+- Integrated into the connection management workflow
+
+### Read-Only Mode
+
+- Enable connection-level read-only guards to protect production data
+- Visual indicators in the tree view for read-only connections
+- Prevents destructive and creative operations (Add/Delete/Modify) across all studio tools
+- Toggle state persisted per connection
 
 ### Generative Search
 

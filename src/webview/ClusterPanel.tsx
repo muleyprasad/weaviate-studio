@@ -691,7 +691,9 @@ function ClusterPanelWebview() {
   }, [selectedNodeName, hasInitialized]);
 
   const filteredNodeStatusData = useMemo(() => {
-    if (!searchQuery.trim()) return nodeStatusData;
+    if (!searchQuery.trim()) {
+      return nodeStatusData;
+    }
     const q = searchQuery.toLowerCase();
     return nodeStatusData
       .map((node) => ({

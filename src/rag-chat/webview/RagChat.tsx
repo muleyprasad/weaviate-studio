@@ -79,7 +79,9 @@ const ICON_SVGS: Record<string, string> = {
  */
 function SvgIcon({ name, size = 16 }: { name: string; size?: number }) {
   const d = ICON_SVGS[name];
-  if (!d) return <span title={name}>?</span>;
+  if (!d) {
+    return <span title={name}>?</span>;
+  }
   return (
     <svg
       width={size}
@@ -136,7 +138,9 @@ function CollectionPills({
   size?: 'small' | 'default';
   className?: string;
 }) {
-  if (names.length === 0) return null;
+  if (names.length === 0) {
+    return null;
+  }
   const pillClass = size === 'small' ? 'rag-collection-pill-small' : 'rag-collection-pill';
   return (
     <div className={`rag-collection-pills-row${className ? ` ${className}` : ''}`}>
@@ -620,14 +624,22 @@ function ProviderSelector({
 }) {
   // Build a combined value string from the discriminated union
   const toValue = (p: GenerativeProviderSelection): string => {
-    if (p.kind === 'default') return 'default';
-    if (p.kind === 'module') return `module:${p.moduleName}`;
+    if (p.kind === 'default') {
+      return 'default';
+    }
+    if (p.kind === 'module') {
+      return `module:${p.moduleName}`;
+    }
     return 'custom';
   };
 
   const fromValue = (v: string): GenerativeProviderSelection => {
-    if (v === 'default') return { kind: 'default' };
-    if (v === 'custom') return { kind: 'custom' };
+    if (v === 'default') {
+      return { kind: 'default' };
+    }
+    if (v === 'custom') {
+      return { kind: 'custom' };
+    }
     return { kind: 'module', moduleName: v.replace('module:', '') };
   };
 
