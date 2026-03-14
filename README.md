@@ -1,4 +1,4 @@
-# <img src="resources/weaviate-studio-color.png" alt="Weaviate Studio Logo" width="48" height="48" style="vertical-align:middle;"> [Weaviate](https://weaviate.io) Studio
+# <img src="resources/weaviate-studio-color.png" alt="Weaviate Studio Logo" width="48" height="48" style="vertical-align:middle;"> Weaviate Studio
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=prasadmuley.weaviate-studio)
 [![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-Registry-purple?style=flat-square&logo=eclipse-ide)](https://open-vsx.org/extension/prasadmuley/weaviate-studio)
@@ -8,7 +8,7 @@
 
 ---
 
-**A powerful VS Code extension for managing Weaviate vector databases with an intuitive GraphQL
+**A powerful VS Code extension for managing [Weaviate](https://weaviate.io) vector databases with an intuitive GraphQL
 interface. Supports self-hosted and cloud Weaviate instances.**
 
 ![Extension Demo](docs/images/extension-demo.gif)
