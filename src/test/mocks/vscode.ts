@@ -20,6 +20,7 @@ const vscode = {
     uiKind: 1,
     isTelemetryEnabled: true,
     remoteName: '',
+    appName: 'VS Code',
   },
   workspace: {
     getConfiguration: jest.fn(() => ({

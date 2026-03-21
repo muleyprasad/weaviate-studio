@@ -25,6 +25,15 @@
     "remoteName": {
       "description": "Remote connection name if using remote development",
       "type": "string"
+    },
+    "hostName": {
+      "description": "Name of the host application (VS Code, Cursor, Windsurf, etc.)",
+      "type": "string",
+      "examples": ["VS Code", "Cursor", "Windsurf", "VS Code - Insiders"]
+    },
+    "hostVersion": {
+      "description": "Version of the host application",
+      "type": "string"
     }
   },
   "events": {

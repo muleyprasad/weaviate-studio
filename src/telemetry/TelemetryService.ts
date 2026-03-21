@@ -67,6 +67,8 @@ export class TelemetryService {
       extensionVersion: this.extensionVersion,
       uiKind: vscode.env.uiKind === vscode.UIKind.Desktop ? 'desktop' : 'web',
       remoteName: vscode.env.remoteName || 'local',
+      hostName: vscode.env.appName || 'unknown',
+      hostVersion: vscode.version || 'unknown',
     };
 
     const sanitized = sanitizeProperties(enriched);
