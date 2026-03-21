@@ -32,30 +32,34 @@ Thank you for your interest in contributing to Weaviate Studio! We welcome contr
    - Press `F5` in VS Code
    - Or use "Run Extension" from the Run and Debug panel
 
-## Telemetry Configuration
+## Telemetry Debugging
+
+**Want to test telemetry locally?** Set the env var and rebuild:
+
+```bash
+export APPLICATION_INSIGHTS_CONN_STRING="your-connection-string"
+npm install && npm run compile && npm run build:webview && npm run build:add-collection
+```
+
+Then restart VS Code. Telemetry events will appear in your Application Insights resource.
+
+**Get your connection string from:** Azure Portal → Application Insights → Overview → Connection String
+
+> **Note:** Telemetry is automatically disabled if no connection string is available—no errors, no user impact.
+
+---
+
+### How Telemetry Works
 
 The extension uses Azure Application Insights for anonymous usage telemetry. In production builds, the connection string is injected at build time via CI/CD secrets. Telemetry is automatically disabled if no connection string is available.
 
-### For Local Development
+| Environment | Connection String     | Result                |
+| ----------- | --------------------- | --------------------- |
+| Local dev   | Not set               | ❌ Telemetry disabled |
+| Local debug | Set via env var       | ✅ Telemetry enabled  |
+| CI/CD       | Set via GitHub Secret | ✅ Telemetry enabled  |
 
-By default, telemetry is disabled when developing locally (no connection string injected). To enable telemetry during local testing:
-
-1. Create a `.env` file in the project root (it's gitignored):
-
-   ```bash
-   echo "APPLICATION_INSIGHTS_CONN_STRING=your-connection-string" > .env
-   ```
-
-2. Set your Azure Application Insights connection string. Get it from:
-
-   - Azure Portal → Application Insights → Overview → Connection String
-
-3. Build with the env var:
-   ```bash
-   APPLICATION_INSIGHTS_CONN_STRING="your-connection-string" npm run compile
-   ```
-
-**Note:** If you don't configure a connection string, telemetry simply won't send any data—no errors, no user impact.
+See `.github/workflows/ci.yml` for the CI/CD injection configuration.
 
 ### Telemetry Event Naming Convention
 
