@@ -4064,20 +4064,27 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               result: 'success',
               durationMs: Date.now() - startTime,
             });
-            await this.fetchData(connectionId);
-            // Update cluster panel with latest node/collection stats
-            await this.fetchNodes(connectionId);
-            await this.updateClusterPanelIfOpen(connectionId);
-            // Shards start in lazy-loading state right after creation.
-            // Schedule a follow-up refresh so the panel shows the loaded shard status.
-            setTimeout(() => {
-              this.updateClusterPanelIfOpen(connectionId).catch((error) => {
-                console.error(
-                  'Error in delayed cluster panel refresh after collection creation:',
-                  error
-                );
-              });
-            }, 5000);
+
+            // Non-critical follow-up refresh work should not flip create result to failure
+            try {
+              await this.fetchData(connectionId);
+              // Update cluster panel with latest node/collection stats
+              await this.fetchNodes(connectionId);
+              await this.updateClusterPanelIfOpen(connectionId);
+              // Shards start in lazy-loading state right after creation.
+              // Schedule a follow-up refresh so the panel shows the loaded shard status.
+              setTimeout(() => {
+                this.updateClusterPanelIfOpen(connectionId).catch((error) => {
+                  console.error(
+                    'Error in delayed cluster panel refresh after collection creation:',
+                    error
+                  );
+                });
+              }, 5000);
+            } catch (refreshError) {
+              // Log refresh errors but don't affect create telemetry
+              console.error('Error in post-create refresh:', refreshError);
+            }
           } catch (error) {
             getTelemetryService().trackError(error, TELEMETRY_EVENTS.COLLECTION_CREATE_COMPLETED, {
               result: 'failure',

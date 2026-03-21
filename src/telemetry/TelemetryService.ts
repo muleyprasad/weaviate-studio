@@ -73,8 +73,22 @@ export class TelemetryService {
 
     const sanitized = sanitizeProperties(enriched);
 
+    // Separate string properties from numeric measurements per sendTelemetryEvent API
+    const stringProps: Record<string, string> = {};
+    const measurements: Record<string, number> = {};
+
+    for (const [key, value] of Object.entries(sanitized)) {
+      if (typeof value === 'number') {
+        measurements[key] = value;
+      } else if (typeof value === 'string') {
+        stringProps[key] = value;
+      } else if (value !== null && value !== undefined) {
+        stringProps[key] = String(value);
+      }
+    }
+
     try {
-      this.reporter.sendTelemetryEvent(eventName, sanitized as Record<string, string>);
+      this.reporter.sendTelemetryEvent(eventName, stringProps, measurements);
     } catch {
       // Swallow — telemetry must never break the extension.
     }

@@ -37,6 +37,10 @@
     }
   },
   "events": {
+    "queryEditor.opened": {
+      "description": "Emitted when the Query Editor panel is opened",
+      "properties": []
+    },
     "extension.activated": {
       "description": "Emitted when the extension is activated",
       "properties": []

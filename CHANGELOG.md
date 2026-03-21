@@ -5,9 +5,9 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-03-21
 
-### Added - Telemetry System
+### 🔭 Added - Telemetry System
 
 - **Azure Application Insights Integration** — Anonymous usage analytics for product improvement
 
@@ -24,8 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Connection Telemetry** — Monitor connection patterns and reliability
 
-  - `connection.connectStarted` / `connection.connectCompleted` / `connection.connectFailed` — Full connection lifecycle
-  - `connection.disconnectCompleted` — Clean disconnection tracking
   - Tracks connection type (Cloud vs Custom), transport, and outcome
 
 - **Feature Activation Events** — Track when users open major feature panels
@@ -42,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `queryEditor.queryCompleted` — GraphQL query executed
   - `ragChat.requestCompleted` — RAG chat response received
   - `collection.createCompleted` — New collection created
-  - `backup.completed` / `backup.restoreCompleted` — Backup operations
+  - `backup.completed` — Backup create/restore operations
 
 ### Added - Telemetry Developer Experience
 

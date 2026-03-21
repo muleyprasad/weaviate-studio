@@ -65,7 +65,7 @@ See `.github/workflows/ci.yml` for the CI/CD injection configuration.
 
 When adding new telemetry events, follow these patterns:
 
-- **Feature activation**: `{feature}.opened` — emitted when a user opens/opens a feature panel (e.g., `queryEditor.opened`, `ragChat.opened`)
+- **Feature activation**: `{feature}.opened` — emitted when a user opens a feature panel (e.g., `queryEditor.opened`, `ragChat.opened`)
 - **Operation completion**: `{feature}.{action}Completed` — emitted when a user completes an action (e.g., `queryEditor.queryCompleted`, `backup.completed`)
 
 Events should be added to `src/telemetry/TelemetryTypes.ts` and tracked in the appropriate `createOrShow()` method for panels.
