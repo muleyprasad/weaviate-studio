@@ -67,7 +67,6 @@ export class RbacGroupPanel {
     const existingPanel = RbacGroupPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_GROUP_OPENED);
       return existingPanel;
     }
 

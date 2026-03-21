@@ -115,7 +115,6 @@ export class AliasPanel {
         mode,
         aliasToEdit,
       });
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.ALIAS_OPENED);
       return existingPanel;
     }
 

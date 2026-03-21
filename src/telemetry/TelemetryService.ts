@@ -113,9 +113,16 @@ export class TelemetryService {
   }
 }
 
-/**
- * Classify an error into a high-level category for telemetry.
- */
+const ERROR_PATTERNS: Array<{ pattern: RegExp; category: TelemetryErrorCategory }> = [
+  { pattern: /validation|invalid|required|schema/i, category: 'validation' },
+  { pattern: /authentication|unauthorized|401|api key|access denied/i, category: 'auth' },
+  { pattern: /permission|forbidden|403/i, category: 'permission' },
+  { pattern: /network|connection|econnrefused|enotfound/i, category: 'network' },
+  { pattern: /timeout|timed out|etimedout/i, category: 'timeout' },
+  { pattern: /server|50[0-4]|internal/i, category: 'server' },
+  { pattern: /client|400|404|bad request|not found/i, category: 'client' },
+];
+
 function classifyError(error: unknown): TelemetryErrorCategory {
   if (!error) {
     return 'unknown';
@@ -123,27 +130,12 @@ function classifyError(error: unknown): TelemetryErrorCategory {
 
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
 
-  if (/validation|invalid|required|schema/.test(msg)) {
-    return 'validation';
+  for (const { pattern, category } of ERROR_PATTERNS) {
+    if (pattern.test(msg)) {
+      return category;
+    }
   }
-  if (/authentication|unauthorized|401|api key|access denied/.test(msg)) {
-    return 'auth';
-  }
-  if (/permission|forbidden|403/.test(msg)) {
-    return 'permission';
-  }
-  if (/network|connection|econnrefused|enotfound/.test(msg)) {
-    return 'network';
-  }
-  if (/timeout|timed out|etimedout/.test(msg)) {
-    return 'timeout';
-  }
-  if (/server|50[0-4]|internal/.test(msg)) {
-    return 'server';
-  }
-  if (/client|400|404|bad request|not found/.test(msg)) {
-    return 'client';
-  }
+
   return 'unknown';
 }
 

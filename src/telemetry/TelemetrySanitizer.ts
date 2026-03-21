@@ -25,6 +25,8 @@ const FORBIDDEN_PROPERTY_NAMES = [
   'auth_token',
 ];
 
+const FORBIDDEN_NAMES_LOWER = new Set(FORBIDDEN_PROPERTY_NAMES.map((s) => s.toLowerCase()));
+
 /**
  * List of forbidden property patterns
  */
@@ -62,12 +64,10 @@ export function sanitizeString(value: string | undefined | null): string | undef
 export function isForbiddenPropertyName(propertyName: string): boolean {
   const lowerName = propertyName.toLowerCase();
 
-  // Check exact matches
-  if (FORBIDDEN_PROPERTY_NAMES.some((forbidden) => forbidden.toLowerCase() === lowerName)) {
+  if (FORBIDDEN_NAMES_LOWER.has(lowerName)) {
     return true;
   }
 
-  // Check patterns
   if (FORBIDDEN_PROPERTY_PATTERNS.some((pattern) => pattern.test(propertyName))) {
     return true;
   }
@@ -133,107 +133,5 @@ export function sanitizeConnectionUrl(url: string | undefined): string {
     return 'custom';
   } catch {
     return 'unknown';
-  }
-}
-
-/**
- * Sanitize a collection name to prevent PII leakage
- * Returns only structural metadata
- */
-export function sanitizeCollectionName(name: string | undefined): string {
-  if (!name) {
-    return 'unknown';
-  }
-
-  // Return a hash or generic identifier instead of the actual name
-  return `[collection_${name.length}]`;
-}
-
-/**
- * Sanitize GraphQL query to prevent query text leakage
- * Returns only high-level shape information
- */
-export function sanitizeGraphQLQuery(query: string | undefined): {
-  hasNearText: boolean;
-  hasNearVector: boolean;
-  hasHybrid: boolean;
-  hasGenerative: boolean;
-  hasAggregate: boolean;
-  hasGet: boolean;
-} {
-  if (!query) {
-    return {
-      hasNearText: false,
-      hasNearVector: false,
-      hasHybrid: false,
-      hasGenerative: false,
-      hasAggregate: false,
-      hasGet: false,
-    };
-  }
-
-  return {
-    hasNearText: /nearText/i.test(query),
-    hasNearVector: /nearVector/i.test(query),
-    hasHybrid: /hybrid/i.test(query),
-    hasGenerative: /generative/i.test(query),
-    hasAggregate: /aggregate/i.test(query),
-    hasGet: /\bget\b/i.test(query),
-  };
-}
-
-/**
- * Sanitize a prompt or user input to prevent content leakage
- */
-export function sanitizePrompt(prompt: string | undefined): string | undefined {
-  if (!prompt) {
-    return undefined;
-  }
-
-  // Never send the actual prompt content
-  return `[prompt_${prompt.length} chars]`;
-}
-
-/**
- * Validate that properties don't contain forbidden fields
- * Returns an array of validation errors
- */
-export function validateProperties(
-  properties: Record<string, unknown>
-): Array<{ key: string; reason: string }> {
-  const errors: Array<{ key: string; reason: string }> = [];
-
-  for (const [key, value] of Object.entries(properties)) {
-    if (isForbiddenPropertyName(key)) {
-      errors.push({ key, reason: 'Forbidden property name' });
-    }
-
-    if (typeof value === 'string') {
-      // Check for potential API key patterns in values
-      if (/[A-Za-z0-9]{32,}/.test(value)) {
-        errors.push({ key, reason: 'Potential API key detected in value' });
-      }
-
-      // Check for potential URLs with credentials
-      if (/https?:\/\/[^:]+:[^@]+@/.test(value)) {
-        errors.push({ key, reason: 'URL with credentials detected' });
-      }
-    }
-  }
-
-  return errors;
-}
-
-/**
- * Log telemetry validation errors for debugging (internal only, no UI popups)
- */
-export function logTelemetryValidation(
-  eventName: string,
-  errors: Array<{ key: string; reason: string }>
-): void {
-  if (errors.length > 0) {
-    const errorMessages = errors.map((e) => `${e.key}: ${e.reason}`).join(', ');
-    // Log to console only - never show UI popups for telemetry validation failures
-    console.warn(`[Telemetry] Validation warnings for ${eventName}: ${errorMessages}`);
   }
 }

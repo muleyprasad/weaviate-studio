@@ -112,7 +112,6 @@ export class BackupRestorePanel {
         );
       }
 
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_RESTORE_OPENED);
       return panel;
     }
 

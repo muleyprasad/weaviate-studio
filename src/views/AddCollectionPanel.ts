@@ -86,7 +86,6 @@ export class AddCollectionPanel {
           schema: initialSchema,
         });
       }
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.COLLECTION_CREATE_OPENED);
       return AddCollectionPanel.currentPanel;
     }
 

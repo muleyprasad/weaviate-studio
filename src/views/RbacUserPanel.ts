@@ -62,7 +62,6 @@ export class RbacUserPanel {
     const existingPanel = RbacUserPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_USER_OPENED);
       return existingPanel;
     }
 

@@ -69,7 +69,6 @@ export class BackupPanel {
       BackupPanel.currentPanel._panel.reveal(column);
       // Send reset command to the webview to clear the form
       BackupPanel.currentPanel.postMessage({ command: 'resetForm' });
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_OPENED);
       return BackupPanel.currentPanel;
     }
 
