@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Weaviate Studio Telemetry Events",
+  "description": "Documentation of all telemetry events emitted by Weaviate Studio extension",
+  "version": "1.0.0",
+  "commonProperties": {
+    "schemaVersion": {
+      "description": "Version of the telemetry schema",
+      "type": "string",
+      "example": "1.0.0"
+    },
+    "sessionId": {
+      "description": "Ephemeral identifier for the current VS Code session",
+      "type": "string"
+    },
+    "extensionVersion": {
+      "description": "Version of the Weaviate Studio extension",
+      "type": "string"
+    },
+    "uiKind": {
+      "description": "Type of VS Code UI",
+      "type": "string",
+      "enum": ["desktop", "web"]
+    },
+    "remoteName": {
+      "description": "Remote connection name if using remote development",
+      "type": "string"
+    },
+    "hostName": {
+      "description": "Name of the host application (VS Code, Cursor, Windsurf, etc.)",
+      "type": "string",
+      "examples": ["VS Code", "Cursor", "Windsurf", "VS Code - Insiders"]
+    },
+    "hostVersion": {
+      "description": "Version of the host application",
+      "type": "string"
+    }
+  },
+  "events": {
+    "extension.activated": {
+      "description": "Emitted when the extension is activated",
+      "properties": []
+    },
+    "extension.deactivated": {
+      "description": "Emitted when the extension is deactivated",
+      "properties": ["sessionDurationMs"]
+    },
+    "extension.unhandledError": {
+      "description": "Emitted when an unhandled error occurs in the extension",
+      "properties": ["errorCategory"]
+    },
+    "connection.connectCompleted": {
+      "description": "Emitted when a connection attempt completes",
+      "properties": ["result", "durationMs", "errorCategory"]
+    },
+    "dataExplorer.opened": {
+      "description": "Emitted when the Data Explorer panel is opened",
+      "properties": []
+    },
+    "queryEditor.queryCompleted": {
+      "description": "Emitted when a query execution completes",
+      "properties": ["result", "durationMs", "errorCategory"]
+    },
+    "ragChat.requestCompleted": {
+      "description": "Emitted when a RAG request completes",
+      "properties": ["result", "durationMs", "errorCategory"]
+    },
+    "collection.createCompleted": {
+      "description": "Emitted when a collection creation completes",
+      "properties": ["result", "durationMs", "errorCategory"]
+    },
+    "backup.completed": {
+      "description": "Emitted when a backup create or restore operation completes",
+      "properties": ["result", "operation", "durationMs", "errorCategory"]
+    }
+  },
+  "privacy": {
+    "notCollected": [
+      "User prompts or queries",
+      "GraphQL query text",
+      "Object payloads or data",
+      "Collection names",
+      "Connection URLs or hosts",
+      "API keys or credentials",
+      "Passwords or tokens",
+      "Raw stack traces",
+      "User identifiers",
+      "Email addresses",
+      "IP addresses"
+    ],
+    "consent": [
+      "Requires VS Code telemetry to be enabled",
+      "Requires weaviate.telemetry.enabled setting to be true",
+      "Users can opt-out at any time via settings"
+    ]
+  }
+}

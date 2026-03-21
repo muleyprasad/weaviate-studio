@@ -7,6 +7,7 @@ import type { WeaviateConnection } from '../../services/ConnectionManager';
 import * as http from 'http';
 import * as https from 'https';
 import { WEAVIATE_INTEGRATION_HEADER } from '../../constants';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../../telemetry';
 
 // Helper function to generate a nonce
 function getNonce() {
@@ -453,6 +454,9 @@ export class QueryEditorPanel {
     const newEditor = new QueryEditorPanel(panel, context, { ...options, tabId });
     QueryEditorPanel.activePanel = newEditor;
     QueryEditorPanel.panels.set(panelKey, newEditor);
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.QUERY_EDITOR_OPENED);
   }
 
   public static sendCommandToActive(type: 'cmdRun' | 'cmdStop' | 'cmdClear'): boolean {
@@ -785,18 +789,31 @@ export class QueryEditorPanel {
       return;
     }
 
+    const startTime = Date.now();
     try {
       const result = await this._performGraphQLQuery(query, signal);
       this._sendResultToWebview(result);
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.QUERY_EDITOR_QUERY_COMPLETED, {
+        result: 'success',
+        durationMs: Date.now() - startTime,
+      });
     } catch (error) {
       const errAny: any = error;
       const msg = errAny?.message || '';
       const isAbort = errAny?.name === 'AbortError' || /aborted|abort/i.test(msg);
       if (isAbort) {
         this._panel.webview.postMessage({ type: 'queryCancelled' });
+        getTelemetryService().trackUsage(TELEMETRY_EVENTS.QUERY_EDITOR_QUERY_COMPLETED, {
+          result: 'cancelled',
+          durationMs: Date.now() - startTime,
+        });
       } else {
         const errorMsg = errAny instanceof Error ? errAny.message : 'Unknown error occurred';
         this._sendErrorToWebview(errorMsg, errAny?.details || errAny?.stack);
+        getTelemetryService().trackError(error, TELEMETRY_EVENTS.QUERY_EDITOR_QUERY_COMPLETED, {
+          result: 'failure',
+          durationMs: Date.now() - startTime,
+        });
       }
     }
   }

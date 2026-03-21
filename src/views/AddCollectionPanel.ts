@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SchemaClass } from '../types';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Discriminated union of all messages the webview can send to the extension.
@@ -117,6 +118,9 @@ export class AddCollectionPanel {
     );
 
     // Note: initial schema will also be sent when the webview signals it's ready
+
+    // Track feature opened event (new panel created)
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.COLLECTION_CREATE_OPENED);
 
     return AddCollectionPanel.currentPanel;
   }

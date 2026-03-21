@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import type { AliasItem, AliasCreateData, AliasUpdateData } from '../types';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Manages the Alias webview panel
@@ -165,6 +166,9 @@ export class AliasPanel {
 
     // Store panel in map
     AliasPanel.panels.set(panelKey, aliasPanel);
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.ALIAS_OPENED);
 
     return aliasPanel;
   }

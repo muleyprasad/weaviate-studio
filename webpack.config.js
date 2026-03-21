@@ -3,12 +3,13 @@
 'use strict';
 
 const path = require('path');
+const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
-/** @type WebpackConfig */
+/** @type {WebpackConfig} */
 const extensionConfig = {
   target: 'node', // VS Code extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
 	mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
@@ -53,7 +54,12 @@ const extensionConfig = {
           to: 'resources'
         }
       ]
-    })
+    }),
+    new webpack.DefinePlugin({
+      'process.env.APPLICATION_INSIGHTS_CONN_STRING': JSON.stringify(
+        process.env.APPLICATION_INSIGHTS_CONN_STRING || ''
+      ),
+    }),
   ]
 };
 module.exports = [ extensionConfig ];

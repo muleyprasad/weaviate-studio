@@ -6,6 +6,7 @@ import weaviate, {
   WeaviateClient,
 } from 'weaviate-client';
 import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 export interface ConnectionLink {
   name: string;
@@ -459,6 +460,8 @@ export class ConnectionManager {
       return null;
     }
 
+    const startTime = Date.now();
+
     try {
       let client: WeaviateClient | undefined;
       const headers = {
@@ -585,8 +588,16 @@ export class ConnectionManager {
 
       this.clients.set(id, client);
       const updated = await this.updateConnection(id, { status: 'connected' });
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.CONNECTION_CONNECT_COMPLETED, {
+        result: 'success',
+        durationMs: Date.now() - startTime,
+      });
       return updated || null;
     } catch (error) {
+      getTelemetryService().trackError(error, TELEMETRY_EVENTS.CONNECTION_CONNECT_COMPLETED, {
+        result: 'failure',
+        durationMs: Date.now() - startTime,
+      });
       vscode.window.showErrorMessage(`Failed to connect to ${connection.name}: ${error}`);
       return null;
     }

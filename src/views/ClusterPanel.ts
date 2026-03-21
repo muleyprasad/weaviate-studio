@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Manages the Cluster Panel webview
@@ -107,6 +108,9 @@ export class ClusterPanel {
     // Posting immediately would race against the React bundle loading and the
     // message would be lost before the event listener is attached.
     ClusterPanel.currentPanel._pendingInitData = { nodeStatusData, openClusterViewOnConnect };
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.CLUSTER_OPENED);
 
     return ClusterPanel.currentPanel;
   }

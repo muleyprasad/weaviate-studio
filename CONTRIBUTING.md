@@ -32,6 +32,48 @@ Thank you for your interest in contributing to Weaviate Studio! We welcome contr
    - Press `F5` in VS Code
    - Or use "Run Extension" from the Run and Debug panel
 
+## Telemetry Debugging
+
+**Want to test telemetry locally?** Set the env var and rebuild:
+
+```bash
+export APPLICATION_INSIGHTS_CONN_STRING="your-connection-string"
+npm install && npm run compile && npm run build:webview && npm run build:add-collection
+```
+
+Then restart VS Code. Telemetry events will appear in your Application Insights resource.
+
+**Get your connection string from:** Azure Portal → Application Insights → Overview → Connection String
+
+> **Note:** Telemetry is automatically disabled if no connection string is available—no errors, no user impact.
+
+---
+
+### How Telemetry Works
+
+The extension uses Azure Application Insights for anonymous usage telemetry. In production builds, the connection string is injected at build time via CI/CD secrets. Telemetry is automatically disabled if no connection string is available.
+
+| Environment | Connection String     | Result                |
+| ----------- | --------------------- | --------------------- |
+| Local dev   | Not set               | ❌ Telemetry disabled |
+| Local debug | Set via env var       | ✅ Telemetry enabled  |
+| CI/CD       | Set via GitHub Secret | ✅ Telemetry enabled  |
+
+See `.github/workflows/ci.yml` for the CI/CD injection configuration.
+
+### Telemetry Event Naming Convention
+
+When adding new telemetry events, follow these patterns:
+
+- **Feature activation**: `{feature}.opened` — emitted when a user opens/opens a feature panel (e.g., `queryEditor.opened`, `ragChat.opened`)
+- **Operation completion**: `{feature}.{action}Completed` — emitted when a user completes an action (e.g., `queryEditor.queryCompleted`, `backup.completed`)
+
+Events should be added to `src/telemetry/TelemetryTypes.ts` and tracked in the appropriate `createOrShow()` method for panels.
+
+### For CI/CD
+
+The GitHub Actions pipeline injects `APPLICATION_INSIGHTS_CONN_STRING` from the `APPLICATION_INSIGHTS_CONN_STRING` repository secret. See `.github/workflows/ci.yml` for details.
+
 ## Development Workflow
 
 1. **Create a Feature Branch**

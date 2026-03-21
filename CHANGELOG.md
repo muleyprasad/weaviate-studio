@@ -2,8 +2,65 @@
 
 All notable changes to the Weaviate Studio extension will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added - Telemetry System
+
+- **Azure Application Insights Integration** — Anonymous usage analytics for product improvement
+
+  - Centralized `TelemetryService` singleton with queue-based event batching and automatic retries
+  - Connection string injection at build time via CI/CD secrets; gracefully disabled for local development
+  - IP address scrubbing and PII sanitization to ensure no sensitive data leaves the user's environment
+  - Event deduplication and offline buffering for reliable delivery
+
+- **Lifecycle Events** — Track extension activation and health
+
+  - `extension.activated` — Extension startup
+  - `extension.deactivated` — Extension shutdown
+  - `extension.unhandledError` — Unhandled exceptions for stability monitoring
+
+- **Connection Telemetry** — Monitor connection patterns and reliability
+
+  - `connection.connectStarted` / `connection.connectCompleted` / `connection.connectFailed` — Full connection lifecycle
+  - `connection.disconnectCompleted` — Clean disconnection tracking
+  - Tracks connection type (Cloud vs Custom), transport, and outcome
+
+- **Feature Activation Events** — Track when users open major feature panels
+
+  - `queryEditor.opened` — GraphQL Query Editor panel
+  - `ragChat.opened` — Generative Search (RAG) panel
+  - `collection.createOpened` — Create Collection panel
+  - `backup.opened` / `backup.restoreOpened` — Backup and Restore panels
+  - `cluster.opened` — Cluster Information panel
+  - `alias.opened` — Alias Management panel
+  - `rbac.roleOpened` / `rbac.userOpened` / `rbac.groupOpened` — RBAC management panels
+
+- **Operation Completion Events** — Track successful user actions
+  - `queryEditor.queryCompleted` — GraphQL query executed
+  - `ragChat.requestCompleted` — RAG chat response received
+  - `collection.createCompleted` — New collection created
+  - `backup.completed` / `backup.restoreCompleted` — Backup operations
+
+### Added - Telemetry Developer Experience
+
+- Telemetry event definitions in `TelemetryTypes.ts` with comprehensive event naming conventions
+- Contribution guide section for adding new telemetry events to panels
+- `.env` support for local telemetry testing with Application Insights connection string
+- Automated CI/CD injection of telemetry connection string without exposing secrets
+
+### Changed
+
+- **CI/CD Pipeline** — Enhanced GitHub Actions workflow with telemetry connection string injection
+- **Webpack Configuration** — Added `dotenv-webpack` for secure client-side environment variable handling
+- **Git Ignore** — Added `.env` to prevent accidental secret commits
+
+### Internal
+
+- Built-in telemetry sanitizer for scrubbing potentially sensitive data from events
+- Comprehensive test coverage for telemetry service with mock-based unit tests
 
 ## [1.5.0] - 2026-03-14
 

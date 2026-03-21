@@ -18,6 +18,7 @@ import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-c
 import * as https from 'https';
 import * as http from 'http';
 import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -4056,22 +4057,34 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const panel = AddCollectionPanel.createOrShow(
         this.context.extensionUri,
         async (schema: SchemaClass) => {
-          // On create callback
-          await this.createCollection(connectionId, schema);
-          await this.fetchData(connectionId);
-          // Update cluster panel with latest node/collection stats
-          await this.fetchNodes(connectionId);
-          await this.updateClusterPanelIfOpen(connectionId);
-          // Shards start in lazy-loading state right after creation.
-          // Schedule a follow-up refresh so the panel shows the loaded shard status.
-          setTimeout(() => {
-            this.updateClusterPanelIfOpen(connectionId).catch((error) => {
-              console.error(
-                'Error in delayed cluster panel refresh after collection creation:',
-                error
-              );
+          const startTime = Date.now();
+          try {
+            await this.createCollection(connectionId, schema);
+            getTelemetryService().trackUsage(TELEMETRY_EVENTS.COLLECTION_CREATE_COMPLETED, {
+              result: 'success',
+              durationMs: Date.now() - startTime,
             });
-          }, 5000);
+            await this.fetchData(connectionId);
+            // Update cluster panel with latest node/collection stats
+            await this.fetchNodes(connectionId);
+            await this.updateClusterPanelIfOpen(connectionId);
+            // Shards start in lazy-loading state right after creation.
+            // Schedule a follow-up refresh so the panel shows the loaded shard status.
+            setTimeout(() => {
+              this.updateClusterPanelIfOpen(connectionId).catch((error) => {
+                console.error(
+                  'Error in delayed cluster panel refresh after collection creation:',
+                  error
+                );
+              });
+            }, 5000);
+          } catch (error) {
+            getTelemetryService().trackError(error, TELEMETRY_EVENTS.COLLECTION_CREATE_COMPLETED, {
+              result: 'failure',
+              durationMs: Date.now() - startTime,
+            });
+            throw error;
+          }
         },
         async (
           message: WebviewToExtensionMessage,
