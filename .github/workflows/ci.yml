@@ -9,13 +9,6 @@ on:
     branches: [main]
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: 'Skip tests (faster build)'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   lint:
@@ -58,7 +51,6 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
-        if: github.event.inputs.skip_tests != 'true'
 
       - name: Build extension
         run: npm run compile
@@ -72,7 +64,7 @@ jobs:
   build:
     needs: [lint, test]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'release'
 
     steps:
       - uses: actions/checkout@v4
@@ -106,9 +98,8 @@ jobs:
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          name: weaviate-studio-vsix-${{ github.run_id }}
+          name: weaviate-studio-extension
           path: '*.vsix'
-          retention-days: 7
 
   publish:
     needs: build
