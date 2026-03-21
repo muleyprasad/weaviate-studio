@@ -7,3 +7,5 @@ coverage
 .DS_Store
 .weaviate-samples/
 firebase-debug.log
+.env
+.serena

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Manages the Backup webview panel
@@ -68,6 +69,7 @@ export class BackupPanel {
       BackupPanel.currentPanel._panel.reveal(column);
       // Send reset command to the webview to clear the form
       BackupPanel.currentPanel.postMessage({ command: 'resetForm' });
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_OPENED);
       return BackupPanel.currentPanel;
     }
 
@@ -99,6 +101,9 @@ export class BackupPanel {
       onCreateCallback,
       onMessageCallback
     );
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_OPENED);
 
     return BackupPanel.currentPanel;
   }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Manages the RBAC Group webview panel (Add / Edit)
@@ -66,6 +67,7 @@ export class RbacGroupPanel {
     const existingPanel = RbacGroupPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_GROUP_OPENED);
       return existingPanel;
     }
 
@@ -97,6 +99,10 @@ export class RbacGroupPanel {
       onSaveCallback
     );
     RbacGroupPanel.panels.set(panelKey, rbacGroupPanel);
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_GROUP_OPENED);
+
     return rbacGroupPanel;
   }
 

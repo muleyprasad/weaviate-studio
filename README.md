@@ -226,6 +226,14 @@ See the GraphQL Templates Guide for detailed usage, examples, and best practices
 
 ---
 
+## Telemetry & Privacy
+
+Weaviate Studio collects anonymous usage telemetry (extension activation and error categories) to help improve the extension. We **never** collect prompts, queries, data, credentials, collection names, or personally identifiable information.
+
+Telemetry requires **dual consent** — both VS Code telemetry and the `weaviate.telemetry.enabled` setting must be enabled. Disable either to opt out completely. All collected events are documented in [`telemetry.json`](telemetry.json).
+
+---
+
 ## Development & Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, development, and pull request guidelines.

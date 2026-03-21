@@ -16,6 +16,16 @@ const vscode = {
     executeCommand: jest.fn(),
     setContext: jest.fn(),
   },
+  env: {
+    uiKind: 1,
+    isTelemetryEnabled: true,
+    remoteName: '',
+  },
+  workspace: {
+    getConfiguration: jest.fn(() => ({
+      get: jest.fn(() => true),
+    })),
+  },
   EventEmitter: class {
     private listeners: Array<(...args: unknown[]) => void> = [];
     fire(...args: unknown[]) {
@@ -38,6 +48,10 @@ const vscode = {
     constructor(id: string) {
       this.id = id;
     }
+  },
+  UIKind: {
+    Desktop: 1,
+    Web: 2,
   },
   TreeItemCollapsibleState: {
     None: 0,

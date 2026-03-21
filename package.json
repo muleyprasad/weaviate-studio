@@ -51,6 +51,26 @@
           "type": "number",
           "default": 120000,
           "description": "Timeout in milliseconds for RAG (Retrieval-Augmented Generation) queries. Increase if using local vectorizers or large datasets."
+        },
+        "weaviate.telemetry.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable anonymous Weaviate Studio usage telemetry. This setting is only honored when VS Code telemetry is also enabled.",
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
+          "scope": "application"
+        },
+        "weaviate.telemetry.connectionString": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Application Insights connection string for telemetry. Leave empty to use the built-in connection string (injected at build time). Get your connection string from Azure Portal > Application Insights > Overview > Connection String.",
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
+          "scope": "application"
         }
       }
     },
@@ -838,6 +858,7 @@
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",
+    "@vscode/extension-telemetry": "^1.5.1",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "graphql-language-service-interface": "^2.10.2",
     "markdown-to-jsx": "^9.7.8",

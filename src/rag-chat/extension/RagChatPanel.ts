@@ -23,6 +23,7 @@ import {
   validateRagQueryInput,
   safeJsonStringify,
 } from './utils';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../../telemetry';
 
 /**
  * Manages the RAG Chat webview panel
@@ -167,6 +168,9 @@ export class RagChatPanel {
     );
 
     RagChatPanel.panels.set(panelKey, ragChatPanel);
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_OPENED);
 
     return ragChatPanel;
   }
@@ -384,6 +388,11 @@ export class RagChatPanel {
       // Merge results — extracts answers, stamps collectionName on context objects
       const { answer, contextObjects, allFailed } = mergeSettledResults(settled, collectionNames);
 
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: allFailed ? 'failure' : 'success',
+        durationMs,
+      });
+
       this.postMessage({
         command: 'ragResponse',
         answer,
@@ -396,6 +405,11 @@ export class RagChatPanel {
 
       this._requestTracker.complete(message.requestId);
     } catch (error) {
+      getTelemetryService().trackError(error, TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: 'failure',
+        durationMs: Date.now() - startTime,
+      });
+
       // Only send error if this request is still active
       if (!this._requestTracker.isStale(message.requestId)) {
         const errorMessage = error instanceof Error ? error.message : 'RAG query failed.';

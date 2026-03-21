@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 
 /**
  * Manages the RBAC User webview panel (Add / Edit)
@@ -61,6 +62,7 @@ export class RbacUserPanel {
     const existingPanel = RbacUserPanel.panels.get(panelKey);
     if (existingPanel) {
       existingPanel._panel.reveal(column);
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_USER_OPENED);
       return existingPanel;
     }
 
@@ -92,6 +94,10 @@ export class RbacUserPanel {
       onSaveCallback
     );
     RbacUserPanel.panels.set(panelKey, rbacUserPanel);
+
+    // Track feature opened event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.RBAC_USER_OPENED);
+
     return rbacUserPanel;
   }
 

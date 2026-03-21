@@ -22,6 +22,7 @@ import type {
   AliasCreateData,
   AliasUpdateData,
 } from './types';
+import { getTelemetryService, disposeTelemetryService, TELEMETRY_EVENTS } from './telemetry';
 
 /** Typed arguments for the weaviate.openDataExplorer command */
 interface DataExplorerCommandArgs {
@@ -359,6 +360,16 @@ async function pushRoleListToOpenPanels(client: any, connectionId: string): Prom
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
+  // Initialize telemetry
+  const telemetryService = getTelemetryService();
+  const connectionString = vscode.workspace
+    .getConfiguration('weaviate')
+    .get<string>('telemetry.connectionString', '');
+  telemetryService.initialize(connectionString || undefined).then(() => {
+    telemetryService.sendActivatedEvent();
+  });
+  context.subscriptions.push({ dispose: () => disposeTelemetryService() });
+
   // RBAC: Context commands
   context.subscriptions.push(
     vscode.commands.registerCommand('weaviate.rbac.addRole', async (item) => {
@@ -1495,6 +1506,7 @@ export function activate(context: vscode.ExtensionContext) {
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
         const getClient = () => connectionManager.getClient(connectionId);
 
+        getTelemetryService().trackUsage(TELEMETRY_EVENTS.DATA_EXPLORER_OPENED);
         DataExplorerPanel.createOrShow(
           context.extensionUri,
           connectionId,
@@ -1851,7 +1863,22 @@ export function activate(context: vscode.ExtensionContext) {
               backupConfig.config.compressionLevel = backupData.compressionLevel;
             }
 
-            await client.backup.create(backupConfig);
+            const backupStartTime = Date.now();
+            try {
+              await client.backup.create(backupConfig);
+              getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                result: 'success',
+                operation: 'create',
+                durationMs: Date.now() - backupStartTime,
+              });
+            } catch (error) {
+              getTelemetryService().trackError(error, TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                result: 'failure',
+                operation: 'create',
+                durationMs: Date.now() - backupStartTime,
+              });
+              throw error;
+            }
           },
           async (message, postMessage) => {
             // Handle additional messages
@@ -1985,6 +2012,7 @@ export function activate(context: vscode.ExtensionContext) {
                   collectionNames,
                   { ...backupDetails, backend },
                   async (restoreData) => {
+                    const restoreStartTime = Date.now();
                     try {
                       const restoreConfig: any = {
                         backupId: restoreData.backupId,
@@ -2024,6 +2052,11 @@ export function activate(context: vscode.ExtensionContext) {
                       }
 
                       const result = await client.backup.restore(restoreConfig);
+                      getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                        result: 'success',
+                        operation: 'restore',
+                        durationMs: Date.now() - restoreStartTime,
+                      });
 
                       vscode.window.showInformationMessage(
                         `Backup restore initiated. Status: ${result.status}`
@@ -2036,6 +2069,11 @@ export function activate(context: vscode.ExtensionContext) {
                         }
                       }, 2000);
                     } catch (error) {
+                      getTelemetryService().trackError(error, TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                        result: 'failure',
+                        operation: 'restore',
+                        durationMs: Date.now() - restoreStartTime,
+                      });
                       throw error;
                     }
                   },
@@ -2368,6 +2406,7 @@ export function activate(context: vscode.ExtensionContext) {
           collectionNames,
           backupDetails,
           async (restoreData) => {
+            const restoreStartTime = Date.now();
             try {
               // Restore backup - build config object
               const restoreConfig: any = {
@@ -2405,6 +2444,11 @@ export function activate(context: vscode.ExtensionContext) {
               }
               console.log('calling backup.restore with config:', restoreConfig);
               const result = await client.backup.restore(restoreConfig);
+              getTelemetryService().trackUsage(TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                result: 'success',
+                operation: 'restore',
+                durationMs: Date.now() - restoreStartTime,
+              });
 
               vscode.window.showInformationMessage(
                 `Backup restore initiated. Status: ${result.status}`
@@ -2418,6 +2462,11 @@ export function activate(context: vscode.ExtensionContext) {
                 }
               }, 2000);
             } catch (error) {
+              getTelemetryService().trackError(error, TELEMETRY_EVENTS.BACKUP_COMPLETED, {
+                result: 'failure',
+                operation: 'restore',
+                durationMs: Date.now() - restoreStartTime,
+              });
               throw error; // Re-throw to be handled by the panel
             }
           },
@@ -2636,4 +2685,6 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export async function deactivate() {
+  await disposeTelemetryService();
+}

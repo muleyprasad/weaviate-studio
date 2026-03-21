@@ -32,6 +32,44 @@ Thank you for your interest in contributing to Weaviate Studio! We welcome contr
    - Press `F5` in VS Code
    - Or use "Run Extension" from the Run and Debug panel
 
+## Telemetry Configuration
+
+The extension uses Azure Application Insights for anonymous usage telemetry. In production builds, the connection string is injected at build time via CI/CD secrets. Telemetry is automatically disabled if no connection string is available.
+
+### For Local Development
+
+By default, telemetry is disabled when developing locally (no connection string injected). To enable telemetry during local testing:
+
+1. Create a `.env` file in the project root (it's gitignored):
+
+   ```bash
+   echo "APPLICATION_INSIGHTS_CONN_STRING=your-connection-string" > .env
+   ```
+
+2. Set your Azure Application Insights connection string. Get it from:
+
+   - Azure Portal → Application Insights → Overview → Connection String
+
+3. Build with the env var:
+   ```bash
+   APPLICATION_INSIGHTS_CONN_STRING="your-connection-string" npm run compile
+   ```
+
+**Note:** If you don't configure a connection string, telemetry simply won't send any data—no errors, no user impact.
+
+### Telemetry Event Naming Convention
+
+When adding new telemetry events, follow these patterns:
+
+- **Feature activation**: `{feature}.opened` — emitted when a user opens/opens a feature panel (e.g., `queryEditor.opened`, `ragChat.opened`)
+- **Operation completion**: `{feature}.{action}Completed` — emitted when a user completes an action (e.g., `queryEditor.queryCompleted`, `backup.completed`)
+
+Events should be added to `src/telemetry/TelemetryTypes.ts` and tracked in the appropriate `createOrShow()` method for panels.
+
+### For CI/CD
+
+The GitHub Actions pipeline injects `APPLICATION_INSIGHTS_CONN_STRING` from the `APPLICATION_INSIGHTS_CONN_STRING` repository secret. See `.github/workflows/ci.yml` for details.
+
 ## Development Workflow
 
 1. **Create a Feature Branch**
