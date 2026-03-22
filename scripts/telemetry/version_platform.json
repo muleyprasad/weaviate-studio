@@ -1,0 +1,124 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": { "json": "## Version & Platform Analytics\nTrack extension versions, host platforms, and adoption trends." },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Version = tostring(customDimensions.extensionVersion)\n| order by Users desc\n| render piechart",
+        "size": 0,
+        "title": "Extension Version Distribution",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "piechart"
+      },
+      "name": "version_dist"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Platform = tostring(customDimensions.hostName)\n| order by Users desc\n| render barchart",
+        "size": 0,
+        "title": "Platform Distribution (VS Code, Cursor, Windsurf, etc.)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "platform_dist"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by UIKind = tostring(customDimensions.uiKind)\n| order by Users desc\n| render piechart",
+        "size": 0,
+        "title": "UI Kind (Desktop vs Web)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "piechart"
+      },
+      "name": "ui_kind_dist"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)), Versions = dcount(tostring(customDimensions.extensionVersion)) by Day = bin(timestamp, 1d)\n| extend VersionDiversity = round(100.0 * Versions / Users, 2)\n| project Day, Users, Versions, VersionDiversity\n| render timechart",
+        "size": 0,
+        "title": "Version Diversity Over Time (Unique Versions / Users)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "version_diversity"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Platform = tostring(customDimensions.hostName), Version = tostring(customDimensions.extensionVersion)\n| order by Platform, Version desc\n| take 100",
+        "size": 0,
+        "title": "Version by Platform Matrix",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "version_platform_matrix"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize count() by HostVersion = tostring(customDimensions.hostVersion), Platform = tostring(customDimensions.hostName)\n| order by count_ desc\n| take 20\n| render barchart",
+        "size": 0,
+        "title": "Host App Version Distribution",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "host_version_dist"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| extend versionDay = bin(timestamp, 1d)\n| summarize dailyUsers = dcount(tostring(customDimensions.sessionId)) by versionDay, Version = tostring(customDimensions.extensionVersion)\n| order by versionDay asc, Version asc\n| extend prevVersionUsers = prev(dailyUsers)\n| extend adoptionRate = round(100.0 * dailyUsers / (dailyUsers + prevVersionUsers), 2)\n| project versionDay, Version, dailyUsers, adoptionRate\n| render timechart",
+        "size": 0,
+        "title": "New Version Adoption Rate",
+        "timeContext": { "durationMs": 7776000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "version_adoption"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where tostring(customDimensions.result) == \"failure\" or name == \"extension.unhandledError\"\n| summarize ErrorCount = count() by Version = tostring(customDimensions.extensionVersion), Platform = tostring(customDimensions.hostName)\n| order by ErrorCount desc\n| take 20",
+        "size": 0,
+        "title": "Errors by Version & Platform",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "errors_by_version"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

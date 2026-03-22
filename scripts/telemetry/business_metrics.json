@@ -1,0 +1,68 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": { "json": "## Business Metrics Dashboard\nHigh-level product health for executives." },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize MAU = dcount(tostring(customDimensions.sessionId)) by Month = startofmonth(timestamp)\n| render columnchart",
+        "size": 0,
+        "title": "Monthly Active Users (MAU)",
+        "timeContext": { "durationMs": 7776000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "mau"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Week = startofweek(timestamp)\n| order by Week asc\n| extend PrevWeek = prev(Users), GrowthRate = round(100.0 * (Users - prev(Users)) / prev(Users), 2)\n| project Week, Users, GrowthRate",
+        "size": 0,
+        "title": "Week-over-Week Growth Rate",
+        "timeContext": { "durationMs": 7776000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "wow_growth"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \".opened\"\n| summarize FeaturesUsed = dcount(name) by Session = tostring(customDimensions.sessionId), Day = bin(timestamp, 1d)\n| summarize AvgFeatures = avg(FeaturesUsed), P50 = percentile(FeaturesUsed, 50), P90 = percentile(FeaturesUsed, 90) by Day\n| render timechart",
+        "size": 0,
+        "title": "Feature Stickiness (Avg features per session)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "stickiness"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \".opened\"\n| summarize Features = dcount(name) by Session = tostring(customDimensions.sessionId), Day = bin(timestamp, 1d)\n| extend IsPowerUser = Features >= 3\n| summarize PowerUserPct = 100.0 * countif(IsPowerUser) / count() by Day\n| render timechart",
+        "size": 0,
+        "title": "Power Users (3+ features per session)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "power_users"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

@@ -1,0 +1,68 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": { "json": "## Error Analysis Dashboard\nProactive issue detection and debugging." },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where tostring(customDimensions.result) == \"failure\" or name == \"extension.unhandledError\"\n| summarize ErrorCount = count(), AvgDuration = avg(toint(customMeasurements.durationMs)) by Operation = name, ErrorCategory = tostring(customDimensions.errorCategory)\n| order by ErrorCount desc\n| take 20\n| render barchart",
+        "size": 0,
+        "title": "Top Failing Operations",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "top_failures"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where tostring(customDimensions.result) == \"failure\" or name == \"extension.unhandledError\"\n| extend hour = datetime_part(\"hour\", timestamp), day = datetime_part(\"dayofweek\", timestamp)\n| summarize Errors = count() by hour, day",
+        "size": 0,
+        "title": "Error Heatmap (Hour vs Day of Week)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "heatmap"
+      },
+      "name": "error_heatmap"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let baseline = customEvents\n    | where timestamp between (ago(8d) .. ago(1d))\n    | where name == \"extension.unhandledError\"\n    | summarize by ErrorCategory = tostring(customDimensions.errorCategory);\ncustomEvents\n| where timestamp > ago(1d)\n| where name == \"extension.unhandledError\"\n| summarize count() by ErrorCategory = tostring(customDimensions.errorCategory)\n| join kind=leftanti baseline on ErrorCategory\n| project Alert = \"NEW ERROR TYPE\", ErrorCategory, count_",
+        "size": 0,
+        "title": "New Error Types (Last 24h)",
+        "timeContext": { "durationMs": 86400000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "new_errors"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"connection.connectCompleted\"\n| where tostring(customDimensions.result) == \"failure\"\n| summarize count() by ErrorCategory = tostring(customDimensions.errorCategory), bin(timestamp, 1h)\n| render timechart",
+        "size": 0,
+        "title": "Connection Failures by Type",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "conn_failures"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
