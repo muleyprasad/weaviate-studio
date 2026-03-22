@@ -6,14 +6,14 @@ This guide covers the recommended Azure Application Insights dashboards for moni
 
 ## Overview
 
-| Dashboard                                                                | Purpose                        | Audience    |
-| ------------------------------------------------------------------------ | ------------------------------ | ----------- |
-| [Extension Health](#1-extension-health-dashboard)                        | Monitor stability and adoption | Engineering |
-| [Feature Adoption](#2-feature-adoption-dashboard)                        | Track feature usage            | Product     |
-| [Performance](#3-performance-dashboard)                                  | SLA monitoring                 | Engineering |
-| [Error Analysis](#4-error-analysis-dashboard)                            | Debug issues                   | Engineering |
-| [Business Metrics](#5-business-metrics-dashboard)                        | High-level product health      | Executive   |
-| [Version & Platform Analytics](#6-version--platform-analytics-dashboard) | Track versions and platforms   | Engineering |
+| Dashboard                                                      | Purpose                        | Audience    |
+| -------------------------------------------------------------- | ------------------------------ | ----------- |
+| [Extension Health](#1-extension-health-dashboard)              | Monitor stability and adoption | Engineering |
+| [Feature Adoption](#2-feature-adoption-dashboard)              | Track feature usage            | Product     |
+| [Performance](#3-performance-dashboard)                        | SLA monitoring                 | Engineering |
+| [Error Analysis](#4-error-analysis-dashboard)                  | Debug issues                   | Engineering |
+| [Business Metrics](#5-business-metrics-dashboard)              | High-level product health      | Executive   |
+| [Version & Platform Analytics](#6-version--platform-analytics) | Track versions and platforms   | Engineering |
 
 ---
 

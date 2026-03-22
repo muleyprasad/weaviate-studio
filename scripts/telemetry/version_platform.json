@@ -94,7 +94,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name == \"extension.activated\"\n| extend versionDay = bin(timestamp, 1d)\n| summarize dailyUsers = dcount(tostring(customDimensions.sessionId)) by versionDay, Version = tostring(customDimensions.extensionVersion)\n| order by versionDay asc, Version asc\n| extend prevVersionUsers = prev(dailyUsers)\n| extend adoptionRate = round(100.0 * dailyUsers / (dailyUsers + prevVersionUsers), 2)\n| project versionDay, Version, dailyUsers, adoptionRate\n| render timechart",
+        "query": "customEvents\n| where name == \"extension.activated\"\n| extend versionDay = bin(timestamp, 1d)\n| summarize dailyUsers = dcount(tostring(customDimensions.sessionId)) by versionDay, Version = tostring(customDimensions.extensionVersion)\n| order by Version asc, versionDay asc\n| serialize\n| extend prevVersion = prev(Version), prevVersionUsers = prev(dailyUsers)\n| extend prevVersionUsers = iif(prevVersion == Version, prevVersionUsers, real(null))\n| extend adoptionRate = round(100.0 * dailyUsers / (dailyUsers + coalesce(prevVersionUsers, 0.0)), 2)\n| project versionDay, Version, dailyUsers, adoptionRate\n| render timechart",
         "size": 0,
         "title": "New Version Adoption Rate",
         "timeContext": { "durationMs": 7776000000 },

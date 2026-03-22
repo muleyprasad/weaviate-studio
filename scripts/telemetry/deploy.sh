@@ -196,7 +196,14 @@ deploy_workbook() {
         return 1
     fi
     
-    # Generate ARM template
+    local arm_file
+    arm_file="$(mktemp "${TMPDIR:-/tmp}/weaviate-arm-${name}.XXXXXX.json")"
+    if [[ -z "$arm_file" ]] || [[ ! -f "$arm_file" ]]; then
+        log_error "Failed to create temp file for: $display_name"
+        FAILED_DEPLOYMENTS+=("$display_name")
+        return 1
+    fi
+    
     python3 -c "
 import json, uuid, sys
 
@@ -225,12 +232,13 @@ try:
         }]
     }
     
-    with open('/tmp/arm_$name.json', 'w') as f:
+    with open('$arm_file', 'w') as f:
         json.dump(template, f, indent=2)
 except Exception as e:
     print(f'Error: {e}', file=sys.stderr)
     sys.exit(1)
 " || {
+        rm -f "$arm_file"
         log_error "Failed to generate ARM template for: $display_name"
         FAILED_DEPLOYMENTS+=("$display_name")
         return 1
@@ -240,13 +248,15 @@ except Exception as e:
     if az deployment group create \
         --subscription "$SUBSCRIPTION_ID" \
         -g "$RESOURCE_GROUP" \
-        --template-file "/tmp/arm_$name.json" \
+        --template-file "$arm_file" \
         --name "deploy-wb-$name-$(date +%s)" \
-        --only-show-errors 2>&1 > /dev/null; then
+        --only-show-errors > /dev/null 2>&1; then
+        rm -f "$arm_file"
         log_success "$display_name"
         SUCCESSFUL_DEPLOYMENTS+=("$display_name")
         return 0
     else
+        rm -f "$arm_file"
         log_error "$display_name (deployment failed)"
         FAILED_DEPLOYMENTS+=("$display_name")
         return 1
@@ -283,8 +293,7 @@ deploy_workbook "error_analysis" "Error Analysis"
 deploy_workbook "business_metrics" "Business Metrics"
 deploy_workbook "version_platform" "Version & Platform Analytics"
 
-# Cleanup temp files
-rm -f /tmp/arm_*.json
+
 
 echo ""
 log_info "=== Deployment Summary ==="

@@ -64,7 +64,7 @@ export AZURE_SUBSCRIPTION_ID="your-subscription-id"
 ./deploy.sh --skip-cleanup   # Deploy without cleanup
 ```
 
-See [docs/TELEMETRY_DASHBOARDS.md](../docs/TELEMETRY_DASHBOARDS.md) for detailed dashboard documentation and Kusto queries.
+See [docs/TELEMETRY_DASHBOARDS.md](docs/TELEMETRY_DASHBOARDS.md) for detailed dashboard documentation and Kusto queries.
 
 ---
 
