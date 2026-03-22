@@ -47,6 +47,25 @@ Then restart VS Code. Telemetry events will appear in your Application Insights 
 
 > **Note:** Telemetry is automatically disabled if no connection string is available—no errors, no user impact.
 
+### Dashboards
+
+View pre-built dashboards for monitoring extension usage:
+
+```bash
+# Deploy to Azure Application Insights (requires az CLI login)
+cd scripts/telemetry
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+
+# Interactive mode (prompts for cleanup choice)
+./deploy.sh
+
+# Or use command-line flags for CI/CD:
+./deploy.sh --cleanup        # Cleanup first, then deploy
+./deploy.sh --skip-cleanup   # Deploy without cleanup
+```
+
+See [docs/TELEMETRY_DASHBOARDS.md](docs/TELEMETRY_DASHBOARDS.md) for detailed dashboard documentation and Kusto queries.
+
 ---
 
 ### How Telemetry Works

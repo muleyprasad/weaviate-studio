@@ -1,0 +1,68 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": { "json": "## Performance Dashboard\nTrack operation speed and reliability SLAs." },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"queryEditor.queryCompleted\"\n| where tostring(customDimensions.result) == \"success\"\n| extend duration = toint(customMeasurements.durationMs)\n| summarize P50 = percentile(duration, 50), P95 = percentile(duration, 95), P99 = percentile(duration, 99), Avg = avg(duration), Count = count() by bin(timestamp, 1h)\n| render timechart",
+        "size": 0,
+        "title": "Query Performance Trends (P50/P95/P99)",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "query_perf"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"ragChat.requestCompleted\"\n| where tostring(customDimensions.result) == \"success\"\n| extend duration = toint(customMeasurements.durationMs)\n| summarize percentile(duration, 50), percentile(duration, 95), percentile(duration, 99), count() by bin(timestamp, 1d)\n| render timechart",
+        "size": 0,
+        "title": "RAG Chat Latency Distribution",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "rag_latency"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name == \"connection.connectCompleted\"\n| summarize Success = countif(tostring(customDimensions.result) == \"success\"), Failure = countif(tostring(customDimensions.result) == \"failure\"), Total = count() by bin(timestamp, 1h)\n| extend SuccessRate = round(100.0 * Success / Total, 2)\n| project timestamp, SuccessRate, Failure\n| render timechart",
+        "size": 0,
+        "title": "Connection Success Rate",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "connection_rate"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where toint(customMeasurements.durationMs) > 10000\n| extend duration = toint(customMeasurements.durationMs)\n| project timestamp, name, duration, result = tostring(customDimensions.result)\n| order by duration desc\n| take 100",
+        "size": 0,
+        "title": "Slow Operations (>10s)",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "slow_ops"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

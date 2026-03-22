@@ -1,0 +1,54 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": { "json": "## Feature Adoption Dashboard\nUnderstand which features users love and user journeys." },
+      "name": "title"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \".opened\"\n| summarize Count = count() by Feature = name\n| top 10 by Count desc\n| render barchart",
+        "size": 0,
+        "title": "Feature Popularity (Top 10)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "feature_popularity"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let steps = dynamic([\"connection.connectCompleted\",\"dataExplorer.opened\",\"queryEditor.opened\",\"queryEditor.queryCompleted\",\"ragChat.opened\",\"ragChat.requestCompleted\"]);\ncustomEvents\n| where name in (steps)\n| where tostring(customDimensions.result) == \"success\" or tostring(customDimensions.result) == \"\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Step = name\n| extend Order = array_index_of(steps, Step)\n| order by Order asc\n| project Step, Users\n| render columnchart",
+        "size": 0,
+        "title": "User Journey Funnel",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "funnel"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let usersWhoOpened = customEvents\n    | where name endswith \".opened\"\n    | summarize firstSeen = min(timestamp) by sessionId = tostring(customDimensions.sessionId), feature = name;\nlet usersWhoReturned = customEvents\n    | where name endswith \".opened\"\n    | extend sessionId = tostring(customDimensions.sessionId)\n    | join kind=inner usersWhoOpened on sessionId, $left.name == $right.feature\n    | where timestamp > firstSeen + 7d\n    | summarize returnedUsers = dcount(tostring(sessionId)) by feature;\nusersWhoOpened\n| summarize totalUsers = dcount(tostring(sessionId)) by feature\n| join kind=leftouter usersWhoReturned on feature\n| extend retentionRate = round(100.0 * todouble(returnedUsers) / totalUsers, 2)\n| project feature, totalUsers, returnedUsers, retentionRate\n| order by retentionRate desc",
+        "size": 0,
+        "title": "Feature Retention (7-day)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "retention"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
