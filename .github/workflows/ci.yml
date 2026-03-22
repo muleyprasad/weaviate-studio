@@ -107,6 +107,10 @@ jobs:
     if: github.event_name == 'release'
     environment: marketplace
 
+    env:
+      APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -122,21 +126,8 @@ jobs:
       - name: Install vsce
         run: npm install -g vsce
 
-      - name: Build extension
-        run: npm run compile
-        env:
-          APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
-
-      - name: Build webview
-        run: npm run build:webview
-
-      - name: Build add-collection webview
-        run: npm run build:add-collection
-
       - name: Publish to VS Code Marketplace
         run: vsce publish
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Create GitHub Release Asset
         run: vsce package -o weaviate-studio-${{ github.event.release.tag_name }}.vsix
@@ -156,6 +147,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
 
+    env:
+      APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
+      TAG_NAME: ${{ github.event.release.tag_name }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -173,24 +169,10 @@ jobs:
       - name: Install ovsx
         run: npm install -g ovsx
 
-      - name: Build extension
-        run: npm run compile
-        env:
-          APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
-
-      - name: Build webview
-        run: npm run build:webview
-
-      - name: Build add-collection webview
-        run: npm run build:add-collection
-
       - name: Package extension
         run: vsce package
 
       - name: Publish to Open VSX Registry
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           FILE_VERSION=${TAG_NAME#v}
           ovsx publish "weaviate-studio-${FILE_VERSION}.vsix" -p "$OVSX_PAT"
