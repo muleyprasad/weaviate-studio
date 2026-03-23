@@ -66,6 +66,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
 
+    env:
+      APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,17 +83,6 @@ jobs:
 
       - name: Install vsce
         run: npm install -g vsce
-
-      - name: Build extension
-        run: npm run compile
-        env:
-          APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
-
-      - name: Build webview
-        run: npm run build:webview
-
-      - name: Build add-collection webview
-        run: npm run build:add-collection
 
       - name: Package extension
         run: vsce package
