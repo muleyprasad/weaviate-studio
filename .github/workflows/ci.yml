@@ -9,6 +9,7 @@ on:
     branches: [main]
   release:
     types: [published]
+  workflow_dispatch: # Manual trigger for testing build pipeline
 
 jobs:
   lint:
@@ -64,7 +65,7 @@ jobs:
   build:
     needs: [lint, test]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
 
     env:
       APPLICATION_INSIGHTS_CONN_STRING: ${{ secrets.APPLICATION_INSIGHTS_CONN_STRING }}
