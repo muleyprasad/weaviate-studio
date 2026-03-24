@@ -1965,6 +1965,22 @@ export function activate(context: vscode.ExtensionContext) {
                   message: error instanceof Error ? error.message : String(error),
                 });
               }
+            } else if (message.command === 'refreshCollections') {
+              try {
+                const updatedCollections = await client.collections.listAll();
+                const updatedCollectionNames = Object.keys(updatedCollections).map(
+                  (key: string) => (updatedCollections as any)[key].name
+                );
+                postMessage({
+                  command: 'collectionsUpdated',
+                  collections: updatedCollectionNames,
+                });
+              } catch (error) {
+                postMessage({
+                  command: 'error',
+                  message: error instanceof Error ? error.message : String(error),
+                });
+              }
             } else if (message.command === 'cancelBackup') {
               try {
                 const { backupId, backend } = message;

@@ -172,6 +172,9 @@ function NewBackupWebview() {
             }
           }
           break;
+        case 'collectionsUpdated':
+          setCollections(message.collections || []);
+          break;
         case 'backupCreated':
           setIsCreating(false);
           setCurrentBackupId(message.backupId);
@@ -553,7 +556,19 @@ function NewBackupWebview() {
               </div>
 
               <div className="form-section">
-                <h3 className="collections-section-title">Collections (optional):</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 className="collections-section-title" style={{ margin: 0 }}>
+                    Collections (optional):
+                  </h3>
+                  <button
+                    className="theme-button-secondary-compact"
+                    onClick={() => vscode && vscode.postMessage({ command: 'refreshCollections' })}
+                    disabled={isCreating}
+                    title="Refresh collection list"
+                  >
+                    Refresh
+                  </button>
+                </div>
                 <p className="muted-text collections-hint">
                   Include and exclude options are mutually exclusive. Select one or leave as "All
                   Collections".

@@ -39,6 +39,19 @@ export class BackupPanel {
     // Listen for when the panel is disposed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
+    // Refresh collections whenever the panel becomes visible again
+    this._panel.onDidChangeViewState(
+      async (e) => {
+        if (e.webviewPanel.visible && this.onMessageCallback) {
+          await this.onMessageCallback({ command: 'refreshCollections' }, (msg) =>
+            this._panel.webview.postMessage(msg)
+          );
+        }
+      },
+      null,
+      this._disposables
+    );
+
     // Handle messages from the webview
     this._panel.webview.onDidReceiveMessage(
       async (message) => {
