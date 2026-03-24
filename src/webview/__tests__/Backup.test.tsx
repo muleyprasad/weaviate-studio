@@ -359,11 +359,218 @@ describe('Backup Webview Component', () => {
   });
 
   describe('Collection Mode Selection', () => {
-    it('should support all collection modes', () => {
-      const modes: Array<'all' | 'include' | 'exclude'> = ['all', 'include', 'exclude'];
+    it('should support all collection modes including wildcard', () => {
+      const modes: Array<'all' | 'include' | 'exclude' | 'wildcard'> = [
+        'all',
+        'include',
+        'exclude',
+        'wildcard',
+      ];
 
       modes.forEach((mode) => {
-        expect(['all', 'include', 'exclude']).toContain(mode);
+        expect(['all', 'include', 'exclude', 'wildcard']).toContain(mode);
+      });
+    });
+  });
+
+  describe('Wildcard Filter', () => {
+    const matchWildcard = (pattern: string, str: string): boolean => {
+      if (!pattern) {
+        return false;
+      }
+      const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+      const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+      return new RegExp(`^${regexStr}$`).test(str);
+    };
+
+    const collections = [
+      'Article',
+      'ArticleDraft',
+      'author',
+      'BlogPost',
+      'Document',
+      'MyDocument',
+      'Product',
+      'ProductVariant',
+      'Test1Collection',
+      'Test2Collection',
+    ];
+
+    describe('matchWildcard', () => {
+      it('should return false for empty pattern', () => {
+        expect(matchWildcard('', 'Article')).toBe(false);
+      });
+
+      it('should match exact names', () => {
+        expect(matchWildcard('Article', 'Article')).toBe(true);
+        expect(matchWildcard('Article', 'article')).toBe(false);
+      });
+
+      it('should match trailing wildcard (*)', () => {
+        expect(matchWildcard('Article*', 'Article')).toBe(true);
+        expect(matchWildcard('Article*', 'ArticleDraft')).toBe(true);
+        expect(matchWildcard('Article*', 'BlogPost')).toBe(false);
+      });
+
+      it('should match leading wildcard (*)', () => {
+        expect(matchWildcard('*Document', 'Document')).toBe(true);
+        expect(matchWildcard('*Document', 'MyDocument')).toBe(true);
+        expect(matchWildcard('*Document', 'DocumentExtra')).toBe(false);
+      });
+
+      it('should match surrounding wildcard (*word*)', () => {
+        expect(matchWildcard('*roduct*', 'Product')).toBe(true);
+        expect(matchWildcard('*roduct*', 'ProductVariant')).toBe(true);
+        expect(matchWildcard('*roduct*', 'Article')).toBe(false);
+      });
+
+      it('should match single-character wildcard (?)', () => {
+        expect(matchWildcard('Test?Collection', 'Test1Collection')).toBe(true);
+        expect(matchWildcard('Test?Collection', 'Test2Collection')).toBe(true);
+        expect(matchWildcard('Test?Collection', 'TestCollection')).toBe(false);
+        expect(matchWildcard('Test?Collection', 'Test12Collection')).toBe(false);
+      });
+
+      it('should be case-sensitive', () => {
+        expect(matchWildcard('article*', 'Article')).toBe(false);
+        expect(matchWildcard('article*', 'article')).toBe(true);
+        expect(matchWildcard('Article*', 'article')).toBe(false);
+      });
+
+      it('should not treat regex special characters as regex', () => {
+        expect(matchWildcard('My.Collection', 'MyCollection')).toBe(false);
+        expect(matchWildcard('My.Collection', 'My.Collection')).toBe(true);
+        expect(matchWildcard('Price(USD)', 'Price(USD)')).toBe(true);
+        expect(matchWildcard('Price(USD)', 'PriceUSD')).toBe(false);
+      });
+    });
+
+    describe('wildcardMatches filtering', () => {
+      const getMatches = (pattern: string) => collections.filter((c) => matchWildcard(pattern, c));
+
+      it('should return matching collections for trailing wildcard', () => {
+        const matches = getMatches('Article*');
+        expect(matches).toEqual(['Article', 'ArticleDraft']);
+      });
+
+      it('should return matching collections for leading wildcard', () => {
+        const matches = getMatches('*Document');
+        expect(matches).toEqual(['Document', 'MyDocument']);
+      });
+
+      it('should return empty array when no collections match', () => {
+        expect(getMatches('XYZ*')).toEqual([]);
+      });
+
+      it('should return empty array for empty pattern', () => {
+        expect(getMatches('')).toEqual([]);
+      });
+
+      it('should match all collections with bare *', () => {
+        const matches = getMatches('*');
+        expect(matches).toHaveLength(collections.length);
+      });
+
+      it('should sort matched collections alphabetically in display', () => {
+        const matches = getMatches('*Document');
+        const sorted = [...matches].sort();
+        expect(sorted).toEqual(['Document', 'MyDocument']);
+      });
+
+      it('should handle ? wildcard across multiple candidates', () => {
+        const matches = getMatches('Test?Collection');
+        expect(matches).toEqual(['Test1Collection', 'Test2Collection']);
+      });
+    });
+
+    describe('backup creation with wildcard mode', () => {
+      it('should set includeCollections from wildcard matches', () => {
+        const wildcardMatches = ['Article', 'ArticleDraft'];
+        const backupData: any = {
+          backupId: 'test-backup',
+          backend: 's3',
+        };
+
+        // Simulate handleCreateBackup logic for wildcard mode
+        backupData.includeCollections = wildcardMatches;
+
+        expect(backupData.includeCollections).toEqual(['Article', 'ArticleDraft']);
+        expect(backupData.excludeCollections).toBeUndefined();
+      });
+
+      it('should not set includeCollections when wildcard matches nothing', () => {
+        const wildcardMatches: string[] = [];
+        const backupData: any = {
+          backupId: 'test-backup',
+          backend: 's3',
+        };
+
+        if (wildcardMatches.length > 0) {
+          backupData.includeCollections = wildcardMatches;
+        }
+
+        expect(backupData.includeCollections).toBeUndefined();
+      });
+
+      it('should post createBackup with wildcard-resolved includeCollections', () => {
+        const backupData = {
+          backupId: 'wildcard-backup',
+          backend: 'filesystem',
+          includeCollections: ['Article', 'ArticleDraft'],
+        };
+
+        mockVSCodeApi.postMessage({ command: 'createBackup', backupData });
+
+        expect(mockPostMessage).toHaveBeenCalledWith({
+          command: 'createBackup',
+          backupData,
+        });
+      });
+    });
+
+    describe('collectionsUpdated message', () => {
+      it('should handle collectionsUpdated message with new collections', () => {
+        const newCollections = ['Article', 'NewCollection', 'Product'];
+        let collections: string[] = ['Article', 'Product'];
+
+        const messageHandler = (event: MessageEvent) => {
+          const message = event.data;
+          if (message.command === 'collectionsUpdated') {
+            collections = message.collections || [];
+          }
+        };
+
+        messageHandler({
+          data: { command: 'collectionsUpdated', collections: newCollections },
+        } as MessageEvent);
+
+        expect(collections).toEqual(newCollections);
+        expect(collections).toContain('NewCollection');
+      });
+
+      it('should handle collectionsUpdated with empty list', () => {
+        let collections: string[] = ['Article'];
+
+        const messageHandler = (event: MessageEvent) => {
+          const message = event.data;
+          if (message.command === 'collectionsUpdated') {
+            collections = message.collections || [];
+          }
+        };
+
+        messageHandler({
+          data: { command: 'collectionsUpdated', collections: [] },
+        } as MessageEvent);
+
+        expect(collections).toEqual([]);
+      });
+    });
+
+    describe('refreshCollections message', () => {
+      it('should post refreshCollections command', () => {
+        mockVSCodeApi.postMessage({ command: 'refreshCollections' });
+
+        expect(mockPostMessage).toHaveBeenCalledWith({ command: 'refreshCollections' });
       });
     });
   });

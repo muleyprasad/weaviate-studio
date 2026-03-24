@@ -641,38 +641,39 @@ function NewBackupWebview() {
                 </div>
 
                 {collectionMode === 'wildcard' && (
-                  <div className="collections-list">
-                    <div className="form-field" style={{ marginBottom: '8px' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={wildcardPattern}
-                        onChange={(e) => setWildcardPattern(e.target.value)}
-                        placeholder="e.g. Article*, *Document*, Test?"
-                        disabled={isCreating}
-                      />
+                  <>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={wildcardPattern}
+                      onChange={(e) => setWildcardPattern(e.target.value)}
+                      placeholder="e.g. Article*, *Document*, Test?"
+                      disabled={isCreating}
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <div className="collections-list">
+                      {wildcardPattern && (
+                        <>
+                          <p className="muted-text" style={{ marginBottom: '4px' }}>
+                            {wildcardMatches.length === 0
+                              ? 'No collections match this pattern'
+                              : `${wildcardMatches.length} collection(s) will be included:`}
+                          </p>
+                          <div>
+                            {[...wildcardMatches].sort().map((collection) => (
+                              <div
+                                key={collection}
+                                className="collection-checkbox"
+                                style={{ cursor: 'default' }}
+                              >
+                                <span className="collection-name">{collection}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
-                    {wildcardPattern && (
-                      <>
-                        <p className="muted-text" style={{ marginBottom: '4px' }}>
-                          {wildcardMatches.length === 0
-                            ? 'No collections match this pattern'
-                            : `${wildcardMatches.length} collection(s) will be included:`}
-                        </p>
-                        <div>
-                          {wildcardMatches.map((collection) => (
-                            <div
-                              key={collection}
-                              className="collection-checkbox"
-                              style={{ cursor: 'default' }}
-                            >
-                              <span className="collection-name">{collection}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  </>
                 )}
 
                 {(collectionMode === 'include' || collectionMode === 'exclude') && (
