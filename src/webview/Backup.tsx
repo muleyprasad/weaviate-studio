@@ -51,8 +51,11 @@ function NewBackupWebview() {
   const [availableModules, setAvailableModules] = useState<any>(null);
   const [backupId, setBackupId] = useState<string>('');
   const [selectedBackend, setSelectedBackend] = useState<string>('');
-  const [collectionMode, setCollectionMode] = useState<'all' | 'include' | 'exclude'>('all');
+  const [collectionMode, setCollectionMode] = useState<'all' | 'include' | 'exclude' | 'wildcard'>(
+    'all'
+  );
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [wildcardPattern, setWildcardPattern] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [backups, setBackups] = useState<BackupStatus[]>([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState<boolean>(false);
@@ -71,6 +74,21 @@ function NewBackupWebview() {
     BACKUP_CONFIG.COMPRESSION_LEVELS[0]
   );
   const [path, setPath] = useState<string>('');
+
+  // Match a collection name against a wildcard pattern (* = any chars, ? = single char)
+  const matchWildcard = (pattern: string, str: string): boolean => {
+    if (!pattern) {
+      return false;
+    }
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+    return new RegExp(`^${regexStr}$`).test(str);
+  };
+
+  const wildcardMatches =
+    collectionMode === 'wildcard'
+      ? collections.filter((c) => matchWildcard(wildcardPattern, c))
+      : [];
 
   // Sanitize backup ID to only allow lowercase, 0-9, _, -
   const sanitizeBackupId = (value: string): string => {
@@ -154,6 +172,9 @@ function NewBackupWebview() {
             }
           }
           break;
+        case 'collectionsUpdated':
+          setCollections(message.collections || []);
+          break;
         case 'backupCreated':
           setIsCreating(false);
           setCurrentBackupId(message.backupId);
@@ -175,6 +196,7 @@ function NewBackupWebview() {
           setBackupId(generateBackupId());
           setCollectionMode('all');
           setSelectedCollections([]);
+          setWildcardPattern('');
           setIsCreating(false);
           setCurrentBackupId('');
           setShowForm(true);
@@ -262,6 +284,8 @@ function NewBackupWebview() {
       backupData.includeCollections = selectedCollections;
     } else if (collectionMode === 'exclude' && selectedCollections.length > 0) {
       backupData.excludeCollections = selectedCollections;
+    } else if (collectionMode === 'wildcard' && wildcardMatches.length > 0) {
+      backupData.includeCollections = wildcardMatches;
     }
 
     // Add optional configuration parameters
@@ -319,6 +343,7 @@ function NewBackupWebview() {
     setBackupId(generateBackupId());
     setCollectionMode('all');
     setSelectedCollections([]);
+    setWildcardPattern('');
     setIsCreating(false);
     setCurrentBackupId('');
     setShowForm(true);
@@ -531,7 +556,19 @@ function NewBackupWebview() {
               </div>
 
               <div className="form-section">
-                <h3 className="collections-section-title">Collections (optional):</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 className="collections-section-title" style={{ margin: 0 }}>
+                    Collections (optional):
+                  </h3>
+                  <button
+                    className="theme-button-secondary-compact"
+                    onClick={() => vscode && vscode.postMessage({ command: 'refreshCollections' })}
+                    disabled={isCreating}
+                    title="Refresh collection list"
+                  >
+                    Refresh
+                  </button>
+                </div>
                 <p className="muted-text collections-hint">
                   Include and exclude options are mutually exclusive. Select one or leave as "All
                   Collections".
@@ -585,9 +622,61 @@ function NewBackupWebview() {
                     />
                     <span>Exclude specific collections</span>
                   </label>
+
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      name="collectionMode"
+                      value="wildcard"
+                      className="radio-input"
+                      checked={collectionMode === 'wildcard'}
+                      onChange={() => {
+                        setCollectionMode('wildcard');
+                        setSelectedCollections([]);
+                      }}
+                      disabled={isCreating}
+                    />
+                    <span>Wildcard filter</span>
+                  </label>
                 </div>
 
-                {collectionMode !== 'all' && (
+                {collectionMode === 'wildcard' && (
+                  <>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={wildcardPattern}
+                      onChange={(e) => setWildcardPattern(e.target.value)}
+                      placeholder="e.g. Article*, *Document*, Test?"
+                      disabled={isCreating}
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <div className="collections-list">
+                      {wildcardPattern && (
+                        <>
+                          <p className="muted-text" style={{ marginBottom: '4px' }}>
+                            {wildcardMatches.length === 0
+                              ? 'No collections match this pattern'
+                              : `${wildcardMatches.length} collection(s) will be included:`}
+                          </p>
+                          <div>
+                            {[...wildcardMatches].sort().map((collection) => (
+                              <div
+                                key={collection}
+                                className="collection-checkbox"
+                                style={{ cursor: 'default' }}
+                              >
+                                <span className="collection-name">{collection}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {(collectionMode === 'include' || collectionMode === 'exclude') && (
                   <div className="collections-list">
                     {collections.length === 0 ? (
                       <p className="muted-text collections-empty">No collections available</p>
@@ -612,7 +701,13 @@ function NewBackupWebview() {
                 <button
                   className="theme-button"
                   onClick={handleCreateBackup}
-                  disabled={isCreating || !backupId.trim() || !selectedBackend || !hasBackupModule}
+                  disabled={
+                    isCreating ||
+                    !backupId.trim() ||
+                    !selectedBackend ||
+                    !hasBackupModule ||
+                    (collectionMode === 'wildcard' && wildcardMatches.length === 0)
+                  }
                 >
                   {isCreating ? 'Creating...' : 'Create Backup'}
                 </button>
