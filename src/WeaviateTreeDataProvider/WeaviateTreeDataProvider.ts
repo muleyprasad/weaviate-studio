@@ -418,6 +418,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         mtCount > 0
           ? 'Some collections share identical schemas — they could use Multi-Tenancy'
           : 'Collections in this instance';
+      // Use a distinct contextValue when there's an MT warning so we can show the inline button
+      element.contextValue =
+        mtCount > 0 ? 'weaviateCollectionsGroupMtWarning' : 'weaviateCollectionsGroup';
     } else if (element.itemType === 'backups') {
       if (!element.iconPath) {
         element.iconPath = new vscode.ThemeIcon('archive');
@@ -1254,18 +1257,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
 
       // Add cluster nodes section
+      const cachedNodes = this.clusterNodesCache[element.connectionId];
+      const nodesLoading = cachedNodes === undefined;
       const stats = this.clusterStatisticsCache[element.connectionId];
-      let nodes_synchronized = stats?.synchronized ? 'Synchronized' : 'Not Synchronized';
-      let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
+      const nodesLabel = nodesLoading
+        ? 'Loading nodes…'
+        : `${cachedNodes.length} Node${cachedNodes.length === 1 ? '' : 's'} ${stats?.synchronized ? 'Synchronized' : 'Not Synchronized'}`;
       items.push(
         new WeaviateTreeItem(
-          `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${nodes_synchronized}`,
+          nodesLabel,
           vscode.TreeItemCollapsibleState.Expanded,
           'clusterNodes',
           element.connectionId,
           undefined,
           'clusterNodes',
-          new vscode.ThemeIcon('terminal-ubuntu'),
+          nodesLoading
+            ? new vscode.ThemeIcon('loading~spin')
+            : new vscode.ThemeIcon('terminal-ubuntu'),
           'weaviateClusterNodes'
         )
       );
@@ -3227,8 +3235,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const connection = this.connections.find((c) => c.id === connectionId);
     if (connection) {
       await this.connectionManager.disconnect(connectionId);
-      // Clear collections for this connection
+      // Clear collections and cached cluster data for this connection
       delete this.collections[connectionId];
+      delete this.clusterNodesCache[connectionId];
+      delete this.clusterStatisticsCache[connectionId];
       // Close cluster panel if it's open for this connection
       ClusterPanel.closeForConnection(connectionId);
       // Refresh connections and update tree view

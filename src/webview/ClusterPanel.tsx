@@ -913,6 +913,11 @@ function ClusterPanelWebview() {
           setChecksResult(message.result ?? null);
           setIsRunningChecks(false);
           break;
+        case 'switchTab':
+          if (message.tab === 'node' || message.tab === 'collection' || message.tab === 'checks') {
+            setViewType(message.tab);
+          }
+          break;
       }
     };
 

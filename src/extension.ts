@@ -1733,7 +1733,7 @@ export function activate(context: vscode.ExtensionContext) {
           weaviateTreeDataProvider.getCachedClusterNodes(item.connectionId) ?? null;
 
         // Open panel immediately — show cached data right away or loading state if no cache.
-        ClusterPanel.createOrShow(
+        const clusterPanel = ClusterPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
           cachedNodeData,
@@ -1826,9 +1826,25 @@ export function activate(context: vscode.ExtensionContext) {
           connection?.openClusterViewOnConnect,
           weaviateTreeDataProvider.getLastChecksResult(item.connectionId)
         );
+
+        // If a specific tab was requested (e.g. opening directly to the Checks tab),
+        // tell the webview to switch to it after the panel is shown.
+        if (item.openTab) {
+          clusterPanel.postMessage({ command: 'switchTab', tab: item.openTab });
+        }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         vscode.window.showErrorMessage(`Failed to get cluster information: ${errorMessage}`);
+      }
+    }),
+
+    vscode.commands.registerCommand('weaviate.openMtChecks', (item) => {
+      const connectionId = item?.connectionId;
+      if (connectionId) {
+        vscode.commands.executeCommand('weaviate.viewClusterInfo', {
+          connectionId,
+          openTab: 'checks',
+        });
       }
     }),
 
