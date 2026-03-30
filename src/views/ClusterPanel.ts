@@ -7,7 +7,7 @@ import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
  * Manages the Cluster Panel webview
  */
 export class ClusterPanel {
-  public static currentPanel: ClusterPanel | undefined;
+  private static _panels: Map<string, ClusterPanel> = new Map();
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
@@ -49,7 +49,8 @@ export class ClusterPanel {
   }
 
   /**
-   * Creates or shows the Cluster panel
+   * Creates or shows the Cluster panel for the given connection.
+   * Each connection gets its own panel instance.
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
@@ -64,18 +65,19 @@ export class ClusterPanel {
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // If we already have a panel, show it and update data.
-    if (ClusterPanel.currentPanel) {
-      ClusterPanel.currentPanel._panel.reveal(column);
+    // If we already have a panel for this connection, show it and update data.
+    const existing = ClusterPanel._panels.get(connectionId);
+    if (existing) {
+      existing._panel.reveal(column);
       // Only send update if we have real data; if null, caller will send updateData separately.
       if (nodeStatusData != null) {
-        ClusterPanel.currentPanel.postMessage({
+        existing.postMessage({
           command: 'updateData',
           nodeStatusData,
           openClusterViewOnConnect,
         });
       }
-      return ClusterPanel.currentPanel;
+      return existing;
     }
 
     // Otherwise, create a new panel.
@@ -98,24 +100,21 @@ export class ClusterPanel {
     };
     panel.iconPath = iconPath;
 
-    ClusterPanel.currentPanel = new ClusterPanel(
-      panel,
-      extensionUri,
-      connectionId,
-      onMessageCallback
-    );
+    const clusterPanel = new ClusterPanel(panel, extensionUri, connectionId, onMessageCallback);
 
     // Store init data — sent when the webview signals ready.
-    ClusterPanel.currentPanel._pendingInitData = {
+    clusterPanel._pendingInitData = {
       nodeStatusData,
       openClusterViewOnConnect,
       checksResult,
     };
 
+    ClusterPanel._panels.set(connectionId, clusterPanel);
+
     // Track feature opened event
     getTelemetryService().trackUsage(TELEMETRY_EVENTS.CLUSTER_OPENED);
 
-    return ClusterPanel.currentPanel;
+    return clusterPanel;
   }
 
   /**
@@ -129,7 +128,7 @@ export class ClusterPanel {
    * Disposes the panel
    */
   public dispose(): void {
-    ClusterPanel.currentPanel = undefined;
+    ClusterPanel._panels.delete(this._connectionId);
     this._panel.dispose();
     while (this._disposables.length) {
       const disposable = this._disposables.pop();
@@ -143,10 +142,12 @@ export class ClusterPanel {
     return this._connectionId;
   }
 
+  public static getPanel(connectionId: string): ClusterPanel | undefined {
+    return ClusterPanel._panels.get(connectionId);
+  }
+
   public static closeForConnection(connectionId: string): void {
-    if (ClusterPanel.currentPanel && ClusterPanel.currentPanel.getConnectionId() === connectionId) {
-      ClusterPanel.currentPanel.dispose();
-    }
+    ClusterPanel._panels.get(connectionId)?.dispose();
   }
 
   private async _handleMessage(message: any): Promise<void> {

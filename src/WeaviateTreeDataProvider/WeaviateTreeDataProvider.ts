@@ -4356,8 +4356,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    */
   private async updateClusterPanelIfOpen(connectionId: string): Promise<void> {
     try {
-      // Check if cluster panel is open
-      if (!ClusterPanel.currentPanel) {
+      // Check if cluster panel is open for this connection
+      const clusterPanel = ClusterPanel.getPanel(connectionId);
+      if (!clusterPanel) {
         return;
       }
 
@@ -4374,7 +4375,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const connection = this.connectionManager.getConnection(connectionId);
 
       // Send update to the panel
-      ClusterPanel.currentPanel.postMessage({
+      clusterPanel.postMessage({
         command: 'updateData',
         nodeStatusData: nodeStatusData,
         openClusterViewOnConnect: connection?.openClusterViewOnConnect,

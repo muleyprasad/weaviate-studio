@@ -852,6 +852,10 @@ function ClusterPanelWebview() {
       if (message.openClusterViewOnConnect !== undefined) {
         setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
       }
+      // Still apply checksResult from globalState even while node data is loading.
+      if (message.checksResult) {
+        setChecksResult(message.checksResult);
+      }
       return;
     }
 

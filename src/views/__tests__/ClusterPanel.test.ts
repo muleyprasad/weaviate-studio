@@ -10,8 +10,8 @@ describe('ClusterPanel', () => {
   let mockExtensionUri: vscode.Uri;
 
   beforeEach(() => {
-    // Reset singleton
-    (ClusterPanel as any).currentPanel = undefined;
+    // Reset panels map
+    (ClusterPanel as any)._panels = new Map();
 
     mockPanel = {
       webview: {
@@ -76,12 +76,12 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
 
-      expect(ClusterPanel.currentPanel).toBeDefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeDefined();
 
       // Close for the same connection
       ClusterPanel.closeForConnection(connectionId);
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeUndefined();
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -91,14 +91,14 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
 
-      const panelBefore = ClusterPanel.currentPanel;
+      const panelBefore = ClusterPanel.getPanel(connectionId);
       expect(panelBefore).toBeDefined();
 
       // Try to close for a different connection
       ClusterPanel.closeForConnection('different-connection-456');
 
       // Panel should still be open
-      expect(ClusterPanel.currentPanel).toBe(panelBefore);
+      expect(ClusterPanel.getPanel(connectionId)).toBe(panelBefore);
       expect(mockPanel.dispose).not.toHaveBeenCalled();
     });
 
@@ -132,6 +132,43 @@ describe('ClusterPanel', () => {
       );
     });
 
+    test('creates separate panels for different connections', () => {
+      const connectionId1 = 'connection-aaa';
+      const connectionId2 = 'connection-bbb';
+
+      jest.mocked(vscode.window.createWebviewPanel).mockClear();
+
+      const panel1 = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId1,
+        { nodes: [{ name: 'node-a' }] },
+        'Connection A'
+      );
+
+      // createWebviewPanel is called once so far
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+
+      const panel2 = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId2,
+        { nodes: [{ name: 'node-b' }] },
+        'Connection B'
+      );
+
+      // A second panel should have been created
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
+
+      // They must be distinct instances tracked separately
+      expect(panel1).not.toBe(panel2);
+      expect(ClusterPanel.getPanel(connectionId1)).toBe(panel1);
+      expect(ClusterPanel.getPanel(connectionId2)).toBe(panel2);
+
+      // Closing one should not affect the other
+      ClusterPanel.closeForConnection(connectionId1);
+      expect(ClusterPanel.getPanel(connectionId1)).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId2)).toBe(panel2);
+    });
+
     test('disposes panel when dispose is called', () => {
       const connectionId = 'test-connection-123';
       const nodeStatusData = { nodes: [] };
@@ -143,14 +180,14 @@ describe('ClusterPanel', () => {
         'Test Connection'
       );
 
-      expect(ClusterPanel.currentPanel).toBe(panel);
+      expect(ClusterPanel.getPanel(connectionId)).toBe(panel);
 
       // Manually call the dispose callback to simulate panel disposal
       if (mockPanel._disposeCallback) {
         mockPanel._disposeCallback();
       }
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeUndefined();
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
   });
@@ -833,14 +870,14 @@ describe('ClusterPanel', () => {
   });
 
   describe('Dispose and cleanup', () => {
-    test('clears singleton on dispose', () => {
+    test('removes panel from map on dispose', () => {
       const panel = ClusterPanel.createOrShow(mockExtensionUri, 'test-id', { nodes: [] }, 'Test');
 
-      expect(ClusterPanel.currentPanel).toBe(panel);
+      expect(ClusterPanel.getPanel('test-id')).toBe(panel);
 
       panel.dispose();
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel('test-id')).toBeUndefined();
     });
 
     test('disposes all registered disposables', () => {
