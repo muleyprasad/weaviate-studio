@@ -13,8 +13,11 @@ export class ClusterPanel {
   private _disposables: vscode.Disposable[] = [];
   private readonly _connectionId: string;
   /** Holds the init payload until the webview signals it is ready. */
-  private _pendingInitData: { nodeStatusData: any; openClusterViewOnConnect?: boolean } | null =
-    null;
+  private _pendingInitData: {
+    nodeStatusData: any;
+    openClusterViewOnConnect?: boolean;
+    checksResult?: any;
+  } | null = null;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -54,7 +57,8 @@ export class ClusterPanel {
     nodeStatusData: any,
     connectionName: string,
     onMessageCallback?: (message: any, postMessage: (msg: any) => void) => Promise<void>,
-    openClusterViewOnConnect?: boolean
+    openClusterViewOnConnect?: boolean,
+    checksResult?: any
   ): ClusterPanel {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -63,12 +67,14 @@ export class ClusterPanel {
     // If we already have a panel, show it and update data.
     if (ClusterPanel.currentPanel) {
       ClusterPanel.currentPanel._panel.reveal(column);
-      // Send update command to the webview with new data
-      ClusterPanel.currentPanel.postMessage({
-        command: 'updateData',
-        nodeStatusData,
-        openClusterViewOnConnect,
-      });
+      // Only send update if we have real data; if null, caller will send updateData separately.
+      if (nodeStatusData != null) {
+        ClusterPanel.currentPanel.postMessage({
+          command: 'updateData',
+          nodeStatusData,
+          openClusterViewOnConnect,
+        });
+      }
       return ClusterPanel.currentPanel;
     }
 
@@ -78,16 +84,11 @@ export class ClusterPanel {
       `Cluster Info: ${connectionName}`,
       column || vscode.ViewColumn.One,
       {
-        // Enable javascript in the webview
         enableScripts: true,
-
-        // And restrict the webview to only loading content from our extension's directory.
         localResourceRoots: [
           vscode.Uri.joinPath(extensionUri, 'dist'),
           vscode.Uri.joinPath(extensionUri, 'out'),
         ],
-
-        // Retain content when hidden
         retainContextWhenHidden: true,
       }
     );
@@ -104,10 +105,12 @@ export class ClusterPanel {
       onMessageCallback
     );
 
-    // Store init data to be delivered once the webview signals it is ready.
-    // Posting immediately would race against the React bundle loading and the
-    // message would be lost before the event listener is attached.
-    ClusterPanel.currentPanel._pendingInitData = { nodeStatusData, openClusterViewOnConnect };
+    // Store init data — sent when the webview signals ready.
+    ClusterPanel.currentPanel._pendingInitData = {
+      nodeStatusData,
+      openClusterViewOnConnect,
+      checksResult,
+    };
 
     // Track feature opened event
     getTelemetryService().trackUsage(TELEMETRY_EVENTS.CLUSTER_OPENED);
@@ -127,10 +130,7 @@ export class ClusterPanel {
    */
   public dispose(): void {
     ClusterPanel.currentPanel = undefined;
-
-    // Clean up resources
     this._panel.dispose();
-
     while (this._disposables.length) {
       const disposable = this._disposables.pop();
       if (disposable) {
@@ -139,43 +139,37 @@ export class ClusterPanel {
     }
   }
 
-  /**
-   * Gets the connection ID for this panel
-   */
   public getConnectionId(): string {
     return this._connectionId;
   }
 
-  /**
-   * Closes the panel if it's for the specified connection
-   */
   public static closeForConnection(connectionId: string): void {
     if (ClusterPanel.currentPanel && ClusterPanel.currentPanel.getConnectionId() === connectionId) {
       ClusterPanel.currentPanel.dispose();
     }
   }
 
-  /**
-   * Handles messages from the webview
-   */
   private async _handleMessage(message: any): Promise<void> {
+    // Handle 'ready' immediately — send init before awaiting any async callback,
+    // so the webview is never blocked waiting for a long-running handler.
+    if (message.command === 'ready') {
+      if (this._pendingInitData) {
+        this.postMessage({
+          command: 'init',
+          nodeStatusData: this._pendingInitData.nodeStatusData,
+          openClusterViewOnConnect: this._pendingInitData.openClusterViewOnConnect,
+          checksResult: this._pendingInitData.checksResult,
+        });
+        // Keep a copy so repeated 'ready' from React StrictMode double-invoke still works.
+        this._pendingInitData = null;
+      }
+    }
+
     if (this.onMessageCallback) {
       await this.onMessageCallback(message, this.postMessage.bind(this));
     }
 
     switch (message.command) {
-      case 'ready':
-        // Webview has mounted and its message listener is now active.
-        // Flush any pending init data that was stored before the webview was ready.
-        if (this._pendingInitData) {
-          this.postMessage({
-            command: 'init',
-            nodeStatusData: this._pendingInitData.nodeStatusData,
-            openClusterViewOnConnect: this._pendingInitData.openClusterViewOnConnect,
-          });
-          this._pendingInitData = null;
-        }
-        break;
       case 'error':
         vscode.window.showErrorMessage(message.text);
         break;
@@ -185,36 +179,22 @@ export class ClusterPanel {
     }
   }
 
-  /**
-   * Updates the webview HTML content
-   */
   private _update(): void {
-    const webview = this._panel.webview;
-    this._panel.webview.html = this._getHtmlForWebview(webview);
+    this._panel.webview.html = this._getHtmlForWebview(this._panel.webview);
   }
 
-  /**
-   * Generates the HTML content for the webview
-   */
   private _getHtmlForWebview(webview: vscode.Webview): string {
-    // Path to dist/webview folder
     const distPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview');
-
-    // Try to read the built HTML file
     const htmlPath = path.join(distPath.fsPath, 'cluster.html');
 
     let html: string;
     try {
       html = fs.readFileSync(htmlPath, 'utf8');
     } catch (error) {
-      // If the file doesn't exist, show an error message
-      return `<!DOCTYPE html>
-        <html>
-        <body>
-          <h1>Error loading Cluster panel</h1>
-          <p>The webview bundle has not been built. Please run: npm run build:webview</p>
-        </body>
-        </html>`;
+      return `<!DOCTYPE html><html><body>
+        <h1>Error loading Cluster panel</h1>
+        <p>The webview bundle has not been built. Please run: npm run build:webview</p>
+        </body></html>`;
     }
 
     // Replace asset paths to use webview URIs
@@ -241,9 +221,6 @@ export class ClusterPanel {
     return html;
   }
 
-  /**
-   * Generates a nonce for CSP
-   */
   private _getNonce(): string {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

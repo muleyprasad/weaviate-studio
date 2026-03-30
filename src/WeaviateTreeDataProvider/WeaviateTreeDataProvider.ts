@@ -19,6 +19,12 @@ import * as https from 'https';
 import * as http from 'http';
 import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
 import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
+import {
+  findMultiTenantCandidates,
+  computeCandidatesDismissKey,
+  MtCandidateGroup,
+  ChecksResult,
+} from '../utils/multiTenancyCheck';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -97,6 +103,9 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
   /** Cache of aliases per connection */
   private aliasesCache: Record<string, AliasItem[]> = {};
+
+  /** MT candidate groups per connection, sorted by totalObjects descending. */
+  private mtCandidates: Record<string, MtCandidateGroup[]> = {};
 
   /** VS Code extension context */
   private readonly context: vscode.ExtensionContext;
@@ -395,10 +404,20 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
       element.tooltip = 'Available Weaviate modules';
     } else if (element.itemType === 'collectionsGroup') {
-      if (!element.iconPath) {
-        element.iconPath = new vscode.ThemeIcon('database');
-      }
-      element.tooltip = 'Collections in this instance';
+      const mtCount = element.connectionId
+        ? (this.mtCandidates[element.connectionId]?.length ?? 0)
+        : 0;
+      element.iconPath =
+        mtCount > 0
+          ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
+          : new vscode.ThemeIcon('database');
+      // @ts-ignore — description is read-only on TreeItem but safe to set here
+      element.description =
+        mtCount > 0 ? `⚠ ${mtCount} MT candidate${mtCount > 1 ? 's' : ''}` : undefined;
+      element.tooltip =
+        mtCount > 0
+          ? 'Some collections share identical schemas — they could use Multi-Tenancy'
+          : 'Collections in this instance';
     } else if (element.itemType === 'backups') {
       if (!element.iconPath) {
         element.iconPath = new vscode.ThemeIcon('archive');
@@ -3412,13 +3431,123 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this.collections[connectionId] = [];
       }
 
+      // Compute MT candidates before refresh so badges render immediately
+      const objectCounts = this._getObjectCountsFromNodes(connectionId);
+      const candidates = findMultiTenantCandidates(this.collections[connectionId], objectCounts);
+      this.mtCandidates[connectionId] = candidates;
+
       // Refresh the tree view
       this.refresh();
+
+      // Show notification async — fire and forget so it does not block the tree
+      if (candidates.length > 0) {
+        this._notifyMtCandidates(connectionId, candidates).catch(console.error);
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error in fetchCollectionsData:', error);
       vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Shows a warning notification when collections share identical schemas.
+   * Respects the per-connection dismiss state stored in globalState.
+   * If the user clicks Update, the dismiss state is cleared and collections are re-fetched.
+   */
+  private async _notifyMtCandidates(
+    connectionId: string,
+    candidates: MtCandidateGroup[]
+  ): Promise<void> {
+    const dismissKey = `mtDismissed.${connectionId}`;
+    const storedKey = this.context.globalState.get<string>(dismissKey);
+    const currentKey = computeCandidatesDismissKey(candidates);
+
+    if (storedKey === currentKey) {
+      return; // User already dismissed this exact candidate state
+    }
+
+    const groupCount = candidates.length;
+    const msg =
+      `${groupCount} collection group${groupCount > 1 ? 's' : ''} share identical schemas ` +
+      `— they could use Weaviate Multi-Tenancy.`;
+
+    const action = await vscode.window.showWarningMessage(msg, 'Learn More', 'Update', 'Dismiss');
+
+    switch (action) {
+      case 'Learn More':
+        vscode.env.openExternal(
+          vscode.Uri.parse('https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy')
+        );
+        break;
+      case 'Update':
+        // Clear dismiss state so the warning reappears with fresh data
+        await this.context.globalState.update(dismissKey, undefined);
+        await this.fetchCollectionsData(connectionId);
+        break;
+      case 'Dismiss':
+        await this.context.globalState.update(dismissKey, currentKey);
+        break;
+    }
+  }
+
+  /**
+   * Derives per-collection object counts from cached cluster node shard data.
+   * Sums objectCount across all shards and all nodes for each collection name.
+   */
+  private _getObjectCountsFromNodes(connectionId: string): Record<string, number> {
+    const nodes = this.clusterNodesCache[connectionId] ?? [];
+    const counts: Record<string, number> = {};
+    for (const node of nodes) {
+      for (const shard of (node as any).shards ?? []) {
+        const col = shard.class as string;
+        if (col) {
+          counts[col] = (counts[col] ?? 0) + (shard.objectCount ?? 0);
+        }
+      }
+    }
+    return counts;
+  }
+
+  /**
+   * Runs all checks for a connection, saves the result to globalState, and returns it.
+   * Called from the ClusterPanel "Run Checks" button.
+   */
+  public async runChecks(connectionId: string): Promise<ChecksResult> {
+    const collections = this.collections[connectionId] ?? [];
+    const objectCounts = this._getObjectCountsFromNodes(connectionId);
+    const groups = findMultiTenantCandidates(collections, objectCounts);
+
+    const result: ChecksResult = {
+      timestamp: new Date().toISOString(),
+      multiTenancy: {
+        groups,
+        hasIssues: groups.length > 0,
+      },
+    };
+
+    // Persist so the result survives panel close/reopen
+    await this.context.globalState.update(`checksResults.${connectionId}`, result);
+
+    // Update badge
+    this.mtCandidates[connectionId] = groups;
+    this.refresh();
+
+    return result;
+  }
+
+  /**
+   * Returns the last saved checks result for a connection, or null if none exists.
+   */
+  /**
+   * Returns the cached verbose nodes for a connection, if available.
+   */
+  public getCachedClusterNodes(connectionId: string): Node<'verbose'>[] | undefined {
+    return this.clusterNodesCache[connectionId];
+  }
+
+  public getLastChecksResult(connectionId: string): ChecksResult | null {
+    return this.context.globalState.get<ChecksResult>(`checksResults.${connectionId}`) ?? null;
   }
 
   /**
