@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import './theme.css';
 import './Cluster.css';
@@ -14,6 +14,28 @@ try {
   </div>`;
   throw error;
 }
+
+// ── Module-level init handshake ──────────────────────────────────────────────
+// We send 'ready' and capture the 'init' reply here, BEFORE React mounts.
+// This avoids React StrictMode double-effect races where the message lands on
+// a discarded effect instance and its state setters have no effect.
+
+let __initPayload: {
+  nodeStatusData: any;
+  openClusterViewOnConnect?: boolean;
+  checksResult?: any;
+} | null = null;
+let __onInitPayload: ((payload: typeof __initPayload) => void) | null = null;
+
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.command === 'init') {
+    __initPayload = event.data;
+    __onInitPayload?.(event.data); // notify React if already mounted
+  }
+});
+
+// Send ready immediately — extension will queue the init reply.
+vscode.postMessage({ command: 'ready' });
 
 // Types
 interface Shard {
@@ -42,6 +64,172 @@ interface Node {
   };
   status: string;
   version: string;
+}
+
+// Checks types (mirrored from multiTenancyCheck.ts — kept local to avoid bundling src/utils)
+interface MtCollectionEntry {
+  name: string;
+  objectCount: number;
+}
+
+interface MtCandidateGroup {
+  collections: MtCollectionEntry[];
+  count: number;
+  totalObjects: number;
+}
+
+interface ChecksResult {
+  timestamp: string;
+  multiTenancy: {
+    groups: MtCandidateGroup[];
+    hasIssues: boolean;
+  };
+}
+
+// ─── ChecksView ───────────────────────────────────────────────────────────────
+
+interface ChecksViewProps {
+  checksResult: ChecksResult | null;
+  isRunning: boolean;
+  onRunChecks: () => void;
+}
+
+function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
+  const groups = checksResult?.multiTenancy.groups ?? [];
+  const timestamp = checksResult?.timestamp
+    ? new Date(checksResult.timestamp).toLocaleString()
+    : null;
+
+  return (
+    <div className="checks-view">
+      <div className="checks-header">
+        <div className="checks-meta">
+          {timestamp && <span className="checks-timestamp">Last run: {timestamp}</span>}
+        </div>
+        <button
+          className="run-checks-button"
+          onClick={onRunChecks}
+          disabled={isRunning}
+          title="Run all checks"
+        >
+          {isRunning ? 'Running…' : 'Run Checks'}
+        </button>
+      </div>
+
+      {!checksResult && !isRunning && (
+        <div className="checks-empty">
+          <p>
+            No checks have been run yet. Click <strong>Run Checks</strong> to analyse your
+            collections.
+          </p>
+        </div>
+      )}
+
+      {checksResult && (
+        <div className="checks-results">
+          <div className="checks-section">
+            <h3 className="checks-section-title">Multi-Tenancy Candidates</h3>
+            {groups.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                No collections share identical schemas. No action needed.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following groups of collections share identical schemas and could be
+                  consolidated into a single multi-tenant collection.{' '}
+                  <a
+                    href="https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      vscode.postMessage({
+                        command: 'openExternal',
+                        url: 'https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy',
+                      });
+                    }}
+                  >
+                    Learn more ↗
+                  </a>
+                </p>
+                {groups.map((group, idx) => (
+                  <div key={idx} className="checks-group">
+                    <div className="checks-group-header">
+                      <span className="checks-group-label">Group {idx + 1}</span>
+                      <span className="checks-group-count">{group.count} collections</span>
+                      {group.totalObjects > 0 && (
+                        <span className="checks-group-total">
+                          {group.totalObjects.toLocaleString()} total objects
+                        </span>
+                      )}
+                    </div>
+                    <ul className="checks-group-list">
+                      {group.collections.map((col) => (
+                        <li key={col.name} className="checks-group-item">
+                          <span className="checks-col-name">{col.name}</span>
+                          <span className="checks-col-count">
+                            {col.objectCount.toLocaleString()} objects
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Truncated name with click-to-copy
+function TruncatedName({ name, tag: Tag = 'span' }: { name: string; tag?: 'span' | 'h3' | 'h4' }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(name).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <Tag className="truncated-name" title={copied ? '✓ Copied!' : name} onClick={handleClick}>
+      {name}
+    </Tag>
+  );
+}
+
+// Checks warning banner shown on Node and Collection views
+interface ChecksWarningBannerProps {
+  checksResult: ChecksResult | null;
+  onOpenChecks: () => void;
+  onDismiss: () => void;
+}
+
+function ChecksWarningBanner({ checksResult, onOpenChecks, onDismiss }: ChecksWarningBannerProps) {
+  const hasIssues = checksResult?.multiTenancy?.hasIssues;
+
+  return (
+    <div className={`checks-warning-banner ${hasIssues ? 'has-issues' : 'info'}`}>
+      <div className="checks-warning-body">
+        <span className="checks-warning-icon">{hasIssues ? '⚠️' : 'ℹ️'}</span>
+        <span className="checks-warning-text">
+          Your cluster has potential issues on your collections schema.{' '}
+          <button className="checks-warning-link" onClick={onOpenChecks}>
+            View Checks →
+          </button>
+        </span>
+      </div>
+      <button className="checks-warning-dismiss" onClick={onDismiss} title="Dismiss">
+        ✕
+      </button>
+    </div>
+  );
 }
 
 // Shard Component
@@ -94,7 +282,7 @@ function ShardComponent({ shard, nodeName, isSelected, onSelect }: ShardComponen
     <div className={`shard-item ${isSelected ? 'selected' : ''}`} onClick={onSelect}>
       <div className="shard-header">
         <div className="shard-title-group">
-          <h4>{shard.class}</h4>
+          <TruncatedName name={shard.class} tag="h4" />
           <span className="shard-name">{shard.name}</span>
         </div>
         <div className="shard-menu-container" ref={menuRef}>
@@ -154,6 +342,73 @@ function ShardComponent({ shard, nodeName, isSelected, onSelect }: ShardComponen
         </div>
       )}
     </div>
+  );
+}
+
+// Paginated shard grid — renders a page of ShardComponents with prev/next controls.
+const SHARDS_PAGE_SIZE = 50;
+
+interface PaginatedShardGridProps {
+  shards: Shard[];
+  nodeName: string;
+  selectedShardName: string | null;
+  onShardSelect: (shardName: string) => void;
+}
+
+function PaginatedShardGrid({
+  shards,
+  nodeName,
+  selectedShardName,
+  onShardSelect,
+}: PaginatedShardGridProps) {
+  const [page, setPage] = useState(0);
+
+  // Reset to first page whenever the shard list changes (node switch, filter, etc.)
+  const shardsKey = shards.map((s) => s.name).join(',');
+  useEffect(() => {
+    setPage(0);
+  }, [shardsKey]);
+
+  const pageCount = Math.ceil(shards.length / SHARDS_PAGE_SIZE);
+  const pageShards = shards.slice(page * SHARDS_PAGE_SIZE, (page + 1) * SHARDS_PAGE_SIZE);
+  const start = page * SHARDS_PAGE_SIZE + 1;
+  const end = Math.min((page + 1) * SHARDS_PAGE_SIZE, shards.length);
+
+  return (
+    <>
+      {pageCount > 1 && (
+        <div className="shards-pagination">
+          <button
+            className="shards-page-btn"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            ‹ Prev
+          </button>
+          <span className="shards-page-info">
+            {start}–{end} of {shards.length}
+          </span>
+          <button
+            className="shards-page-btn"
+            disabled={page === pageCount - 1}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next ›
+          </button>
+        </div>
+      )}
+      <div className="shards-grid">
+        {pageShards.map((shard) => (
+          <ShardComponent
+            key={shard.name}
+            shard={shard}
+            nodeName={nodeName}
+            isSelected={selectedShardName === shard.name}
+            onSelect={() => onShardSelect(shard.name)}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -308,27 +563,15 @@ function NodeComponent({
 
           <div className="shards-container">
             <h4>Shards ({shards.length})</h4>
-            <div className="shards-grid">
-              {[...shards]
-                .sort((a, b) => {
-                  // First sort by collection name
-                  const collectionCompare = a.class.localeCompare(b.class);
-                  if (collectionCompare !== 0) {
-                    return collectionCompare;
-                  }
-                  // Then sort by shard name
-                  return a.name.localeCompare(b.name);
-                })
-                .map((shard) => (
-                  <ShardComponent
-                    key={shard.name}
-                    shard={shard}
-                    nodeName={node.name}
-                    isSelected={selectedShardName === shard.name}
-                    onSelect={() => onShardSelect(shard.name)}
-                  />
-                ))}
-            </div>
+            <PaginatedShardGrid
+              shards={[...shards].sort((a, b) => {
+                const c = a.class.localeCompare(b.class);
+                return c !== 0 ? c : a.name.localeCompare(b.name);
+              })}
+              nodeName={node.name}
+              selectedShardName={selectedShardName}
+              onShardSelect={onShardSelect}
+            />
           </div>
         </>
       )}
@@ -558,19 +801,14 @@ function CollectionView({
 
                           {isNodeSelected && (
                             <div className="shards-container">
-                              <div className="shards-grid">
-                                {nodeData.shards
-                                  .sort((a, b) => a.name.localeCompare(b.name))
-                                  .map((shard) => (
-                                    <ShardComponent
-                                      key={shard.name}
-                                      shard={shard}
-                                      nodeName={nodeData.nodeName}
-                                      isSelected={selectedShardName === shard.name}
-                                      onSelect={() => onShardSelect(shard.name)}
-                                    />
-                                  ))}
-                              </div>
+                              <PaginatedShardGrid
+                                shards={[...nodeData.shards].sort((a, b) =>
+                                  a.name.localeCompare(b.name)
+                                )}
+                                nodeName={nodeData.nodeName}
+                                selectedShardName={selectedShardName}
+                                onShardSelect={onShardSelect}
+                              />
                             </div>
                           )}
                         </div>
@@ -594,8 +832,10 @@ function ClusterPanelWebview() {
   const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [openClusterViewOnConnect, setOpenClusterViewOnConnect] = useState<boolean>(true);
-  const [viewType, setViewType] = useState<'node' | 'collection'>('node');
-  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [viewType, setViewType] = useState<'node' | 'collection' | 'checks'>('node');
+  const [checksResult, setChecksResult] = useState<ChecksResult | null>(null);
+  const [isRunningChecks, setIsRunningChecks] = useState(false);
+  const [checksWarningDismissed, setChecksWarningDismissed] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<'off' | '5s' | '10s' | '30s'>(
     'off'
   );
@@ -605,90 +845,88 @@ function ClusterPanelWebview() {
   const scrollPositionRef = useRef<number>(0);
   const prevNodeStatusDataRef = useRef<Node[]>([]);
 
-  // Signal to the extension that the webview is ready to receive data.
-  // This must run before the message listener is set up so the extension
-  // can respond with the initial 'init' payload without a race condition.
-  useEffect(() => {
-    vscode.postMessage({ command: 'ready' });
+  const applyInitOrUpdate = useCallback((message: any) => {
+    if (message.nodeStatusData == null) {
+      // null means the extension has no cached data yet and is fetching in the background.
+      // Keep isLoading=true so the spinner stays visible until updateData arrives.
+      if (message.openClusterViewOnConnect !== undefined) {
+        setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
+      }
+      // Still apply checksResult from globalState even while node data is loading.
+      if (message.checksResult) {
+        setChecksResult(message.checksResult);
+      }
+      return;
+    }
+
+    const newData: Node[] = message.nodeStatusData || [];
+    prevNodeStatusDataRef.current = newData;
+
+    // Use startTransition so React yields to the browser between renders,
+    // preventing the UI thread from freezing on large datasets.
+    startTransition(() => {
+      setNodeStatusData(newData);
+      setIsLoading(false);
+
+      if (message.openClusterViewOnConnect !== undefined) {
+        setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
+      }
+      if (message.checksResult) {
+        setChecksResult(message.checksResult);
+      }
+    });
   }, []);
 
   useEffect(() => {
-    // Handle messages from the extension
+    // If the module-level listener already captured the init payload, apply it now.
+    if (__initPayload) {
+      applyInitOrUpdate(__initPayload);
+    }
+
+    // Register callback for init arriving after this effect runs.
+    __onInitPayload = (payload) => applyInitOrUpdate(payload);
+
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
-
       switch (message.command) {
-        case 'init':
-        case 'updateData':
-          // Only update if data has actually changed (using ref to avoid stale closure)
-          const newData = message.nodeStatusData || [];
-          const hasDataChanged =
-            JSON.stringify(newData) !== JSON.stringify(prevNodeStatusDataRef.current);
-
-          // Only update state if there are actual changes
-          if (hasDataChanged || prevNodeStatusDataRef.current.length === 0) {
-            prevNodeStatusDataRef.current = newData;
+        case 'updateData': {
+          const newData: Node[] = message.nodeStatusData || [];
+          prevNodeStatusDataRef.current = newData;
+          const scrollPos = scrollPositionRef.current;
+          startTransition(() => {
             setNodeStatusData(newData);
-
-            // Update openClusterViewOnConnect state
+            setIsLoading(false);
             if (message.openClusterViewOnConnect !== undefined) {
               setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
             }
-
-            // Auto-select defaults on initial load only, not on refresh
-            if (message.nodeStatusData && message.nodeStatusData.length > 0 && !hasInitialized) {
-              const data: Node[] = message.nodeStatusData;
-
-              // Node view: expand the first node in the list
-              setSelectedNodeName(data[0].name);
-
-              // Collection view: expand the first collection (alphabetically) and its first node
-              const allCollectionNames = new Set<string>();
-              data.forEach((node) => {
-                (node.shards || []).forEach((shard) => allCollectionNames.add(shard.class));
-              });
-              const sortedCollections = Array.from(allCollectionNames).sort((a, b) =>
-                a.localeCompare(b)
-              );
-              if (sortedCollections.length > 0) {
-                const firstCollection = sortedCollections[0];
-                setSelectedCollectionName(firstCollection);
-                // Find the first node (alphabetically) that has shards in this collection
-                const nodesInFirstCollection = data
-                  .filter((node) =>
-                    (node.shards || []).some((shard) => shard.class === firstCollection)
-                  )
-                  .sort((a, b) => a.name.localeCompare(b.name));
-                if (nodesInFirstCollection.length > 0) {
-                  setSelectedNodeName(nodesInFirstCollection[0].name);
-                }
+          });
+          if (contentRef.current && scrollPos > 0) {
+            setTimeout(() => {
+              if (contentRef.current) {
+                contentRef.current.scrollTop = scrollPos;
               }
-
-              setHasInitialized(true);
-            }
-
-            // Restore scroll position after data update
-            if (contentRef.current && scrollPositionRef.current > 0) {
-              setTimeout(() => {
-                if (contentRef.current) {
-                  contentRef.current.scrollTop = scrollPositionRef.current;
-                }
-              }, 0);
-            }
+            }, 0);
           }
-
-          // Always stop loading indicator
-          setIsLoading(false);
+          break;
+        }
+        case 'checksResult':
+          setChecksResult(message.result ?? null);
+          setIsRunningChecks(false);
+          break;
+        case 'switchTab':
+          if (message.tab === 'node' || message.tab === 'collection' || message.tab === 'checks') {
+            setViewType(message.tab);
+          }
           break;
       }
     };
 
     window.addEventListener('message', messageHandler);
-
     return () => {
+      __onInitPayload = null;
       window.removeEventListener('message', messageHandler);
     };
-  }, [selectedNodeName, hasInitialized]);
+  }, [applyInitOrUpdate]);
 
   const filteredNodeStatusData = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -743,6 +981,11 @@ function ClusterPanelWebview() {
       });
       return newValue;
     });
+  }, []);
+
+  const handleRunChecks = useCallback(() => {
+    setIsRunningChecks(true);
+    vscode.postMessage({ command: 'runChecks' });
   }, []);
 
   const handleAutoRefreshChange = useCallback((interval: 'off' | '5s' | '10s' | '30s') => {
@@ -803,6 +1046,59 @@ function ClusterPanelWebview() {
     };
   }, [showAutoRefreshMenu]);
 
+  // Must be called unconditionally — cannot be inside a ternary (Rules of Hooks)
+  const nodeOrCollectionContent = useMemo(
+    () =>
+      nodeStatusData && nodeStatusData.length > 0 ? (
+        viewType === 'node' ? (
+          <div className="nodes-list">
+            {filteredNodeStatusData.length > 0 ? (
+              filteredNodeStatusData.map((node) => (
+                <NodeComponent
+                  key={node.name}
+                  node={node}
+                  isSelected={selectedNodeName === node.name}
+                  onSelect={() => handleNodeSelect(node.name)}
+                  selectedShardName={selectedShardName}
+                  onShardSelect={handleShardSelect}
+                />
+              ))
+            ) : (
+              <div className="no-data">
+                <p>No results match your search</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <CollectionView
+            nodeStatusData={filteredNodeStatusData}
+            selectedNodeName={selectedNodeName}
+            selectedShardName={selectedShardName}
+            selectedCollectionName={selectedCollectionName}
+            onNodeSelect={handleNodeSelect}
+            onShardSelect={handleShardSelect}
+            onCollectionSelect={handleCollectionSelect}
+          />
+        )
+      ) : isLoading ? (
+        <div className="no-data">
+          <p>Loading cluster data…</p>
+        </div>
+      ) : (
+        <div className="no-data">
+          <p>No cluster data available</p>
+        </div>
+      ),
+    [
+      nodeStatusData,
+      filteredNodeStatusData,
+      viewType,
+      selectedNodeName,
+      selectedShardName,
+      selectedCollectionName,
+    ]
+  );
+
   return (
     <div className="cluster-panel">
       <div className="cluster-header">
@@ -844,6 +1140,15 @@ function ClusterPanelWebview() {
               onClick={() => setViewType('collection')}
             >
               Collection
+            </button>
+            <button
+              className={`view-toggle-button ${viewType === 'checks' ? 'active' : ''}`}
+              onClick={() => setViewType('checks')}
+            >
+              Checks
+              {checksResult?.multiTenancy?.groups?.length
+                ? ` (${checksResult.multiTenancy.groups.length})`
+                : ''}
             </button>
           </div>
           <div className="refresh-button-group">
@@ -901,52 +1206,21 @@ function ClusterPanelWebview() {
       </div>
 
       <div className="cluster-content" ref={contentRef}>
-        {useMemo(
-          () =>
-            nodeStatusData && nodeStatusData.length > 0 ? (
-              viewType === 'node' ? (
-                <div className="nodes-list">
-                  {filteredNodeStatusData.length > 0 ? (
-                    filteredNodeStatusData.map((node) => (
-                      <NodeComponent
-                        key={node.name}
-                        node={node}
-                        isSelected={selectedNodeName === node.name}
-                        onSelect={() => handleNodeSelect(node.name)}
-                        selectedShardName={selectedShardName}
-                        onShardSelect={handleShardSelect}
-                      />
-                    ))
-                  ) : (
-                    <div className="no-data">
-                      <p>No results match your search</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <CollectionView
-                  nodeStatusData={filteredNodeStatusData}
-                  selectedNodeName={selectedNodeName}
-                  selectedShardName={selectedShardName}
-                  selectedCollectionName={selectedCollectionName}
-                  onNodeSelect={handleNodeSelect}
-                  onShardSelect={handleShardSelect}
-                  onCollectionSelect={handleCollectionSelect}
-                />
-              )
-            ) : (
-              <div className="no-data">
-                <p>No cluster data available</p>
-              </div>
-            ),
-          [
-            nodeStatusData,
-            filteredNodeStatusData,
-            viewType,
-            selectedNodeName,
-            selectedShardName,
-            selectedCollectionName,
-          ]
+        {viewType !== 'checks' && !checksWarningDismissed && (
+          <ChecksWarningBanner
+            checksResult={checksResult}
+            onOpenChecks={() => setViewType('checks')}
+            onDismiss={() => setChecksWarningDismissed(true)}
+          />
+        )}
+        {viewType === 'checks' ? (
+          <ChecksView
+            checksResult={checksResult}
+            isRunning={isRunningChecks}
+            onRunChecks={handleRunChecks}
+          />
+        ) : (
+          nodeOrCollectionContent
         )}
       </div>
 
