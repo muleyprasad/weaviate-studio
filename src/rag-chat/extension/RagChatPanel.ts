@@ -9,6 +9,8 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
+import { QueryAgentService } from './queryAgent/QueryAgentService';
+import { ConnectionManager } from '../../services/ConnectionManager';
 import type {
   RagChatExtensionMessage,
   RagChatWebviewMessage,
@@ -347,6 +349,16 @@ export class RagChatPanel {
       return;
     }
 
+    // Route to Agent Mode if enabled and connection is cloud
+    if (message.agentModeEnabled) {
+      const connManager = ConnectionManager.getInstance(this._context);
+      const connection = connManager.getConnection(this._connectionId);
+      if (connection?.type === 'cloud') {
+        await this._handleAgentQuery(message);
+        return;
+      }
+    }
+
     // Clamp limit to [1, 100]
     const limit = clampLimit(message.limit);
 
@@ -413,6 +425,103 @@ export class RagChatPanel {
       // Only send error if this request is still active
       if (!this._requestTracker.isStale(message.requestId)) {
         const errorMessage = error instanceof Error ? error.message : 'RAG query failed.';
+        this.postMessage({
+          command: 'ragError',
+          error: errorMessage,
+          requestId: message.requestId,
+        });
+        this._requestTracker.complete(message.requestId);
+      }
+    }
+  }
+
+  /**
+   * Handle Query Agent query (Agent Mode ON)
+   *
+   * Instantiates a QueryAgentService, calls .ask() with the message,
+   * and posts back an agentResponse with trace metadata.
+   * Falls back to generative search if agent instantiation/call fails.
+   */
+  private async _handleAgentQuery(message: RagChatWebviewMessage): Promise<void> {
+    const connManager = ConnectionManager.getInstance(this._context);
+    const connection = connManager.getConnection(this._connectionId);
+
+    // Validate connection exists
+    if (!connection) {
+      this.postMessage({
+        command: 'ragError',
+        error: 'Connection not found.',
+        requestId: message.requestId,
+      });
+      return;
+    }
+
+    // Track active requests to ignore stale responses
+    this._requestTracker.track(message.requestId);
+
+    const startTime = Date.now();
+
+    try {
+      // Get the Weaviate client from ConnectionManager
+      const weaviateClient = connManager.getClient(this._connectionId);
+      if (!weaviateClient) {
+        throw new Error('Weaviate client not initialized');
+      }
+
+      // Get agent configuration from connection
+      const agentSystemPrompt = connManager.getAgentSystemPrompt(this._connectionId);
+      const inferenceProviderApiKey = await connManager.getInferenceProviderApiKey(
+        this._connectionId
+      );
+
+      if (!inferenceProviderApiKey) {
+        throw new Error('Inference provider API key not configured');
+      }
+
+      // Instantiate QueryAgentService
+      const collectionNames = message.collectionNames ?? [];
+      const service = new QueryAgentService(
+        weaviateClient,
+        collectionNames,
+        agentSystemPrompt || ''
+      );
+
+      // Call agent.ask() with the question (no chat history in this story)
+      const { answer, trace } = await service.ask(message.question || '');
+
+      // Check if this request is still active
+      if (this._requestTracker.isStale(message.requestId)) {
+        return;
+      }
+
+      const durationMs = Date.now() - startTime;
+
+      // Post agent response with trace
+      this.postMessage({
+        command: 'agentResponse',
+        answer,
+        question: message.question,
+        requestId: message.requestId,
+        durationMs,
+        trace,
+      });
+
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: 'success',
+        durationMs,
+      });
+
+      this._requestTracker.complete(message.requestId);
+    } catch (error) {
+      // Log telemetry for agent error
+      getTelemetryService().trackError(error, TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: 'failure',
+        durationMs: Date.now() - startTime,
+      });
+
+      // Only send error if this request is still active
+      if (!this._requestTracker.isStale(message.requestId)) {
+        const errorMessage = error instanceof Error ? error.message : 'Agent query failed.';
         this.postMessage({
           command: 'ragError',
           error: errorMessage,

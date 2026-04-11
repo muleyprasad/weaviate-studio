@@ -114,6 +114,7 @@ export type RagChatExtensionMessageCommand =
   | 'init'
   | 'ragResponse'
   | 'ragError'
+  | 'agentResponse'
   | 'collectionsLoaded'
   | 'addCollection'
   | 'advancedSettingsLoaded';
@@ -149,6 +150,8 @@ export interface RagChatExtensionMessage {
   availableModules?: string[];
   /** Advanced settings from VS Code globalState */
   advancedSettings?: AdvancedRagSettings;
+  /** Query Agent trace (for agentResponse command) */
+  trace?: unknown;
 }
 
 /**
@@ -191,6 +194,10 @@ export interface RagChatWebviewMessage {
   provider?: GenerativeProviderSelection;
   /** Advanced settings payload to save */
   advancedSettings?: AdvancedRagSettings;
+  /** Whether Agent Mode is enabled (cloud-only) */
+  agentModeEnabled?: boolean;
+  /** Scope: single collection or all */
+  scopeMode?: 'single' | 'all';
 }
 
 // =====================================================
