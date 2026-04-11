@@ -34,6 +34,7 @@ interface InitConnectionData {
   links: ConnectionLink[];
   authType: 'apiKey' | 'clientPassword';
   username: string;
+  agentSystemPrompt?: string;
 }
 
 type ApiKeyAction = 'keep' | 'remove' | 'update';
@@ -76,6 +77,13 @@ function ConnectionFormWebview() {
   const [passwordAction, setPasswordAction] = useState<CredentialAction>('keep');
   const [passwordInput, setPasswordInput] = useState('');
 
+  // Agent settings state (cloud only)
+  const [agentSystemPrompt, setAgentSystemPrompt] = useState('');
+  const [inferenceProviderApiKeyPresent, setInferenceProviderApiKeyPresent] = useState(false);
+  const [inferenceProviderApiKeyAction, setInferenceProviderApiKeyAction] =
+    useState<CredentialAction>('keep');
+  const [inferenceProviderApiKeyInput, setInferenceProviderApiKeyInput] = useState('');
+
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -109,6 +117,11 @@ function ConnectionFormWebview() {
           setApiKeyAction(message.apiKeyPresent ? 'keep' : 'update');
           setPasswordPresent(!!message.passwordPresent);
           setPasswordAction(message.passwordPresent ? 'keep' : 'update');
+          setAgentSystemPrompt(conn.agentSystemPrompt || '');
+          setInferenceProviderApiKeyPresent(!!message.inferenceProviderApiKeyPresent);
+          setInferenceProviderApiKeyAction(
+            message.inferenceProviderApiKeyPresent ? 'keep' : 'update'
+          );
           setIsEditMode(!!message.isEditMode);
           setConnectionVersion(message.connectionVersion || '');
           setIsReady(true);
@@ -212,7 +225,13 @@ function ConnectionFormWebview() {
       payload = {
         ...payload,
         cloudUrl: cloudUrl.trim(),
+        agentSystemPrompt: agentSystemPrompt.trim() || undefined,
       };
+
+      // Handle inference provider API key (cloud only)
+      if (inferenceProviderApiKeyAction === 'update' && inferenceProviderApiKeyInput.trim()) {
+        payload.inferenceProviderApiKey = inferenceProviderApiKeyInput.trim();
+      }
     }
 
     // Handle API key auth
@@ -247,6 +266,9 @@ function ConnectionFormWebview() {
     if (passwordAction === 'remove') {
       message.removePassword = true;
     }
+    if (inferenceProviderApiKeyAction === 'remove') {
+      message.removeInferenceProviderApiKey = true;
+    }
 
     if (vscode) {
       vscode.postMessage(message);
@@ -266,6 +288,9 @@ function ConnectionFormWebview() {
     }
     if (passwordAction === 'remove') {
       message.removePassword = true;
+    }
+    if (inferenceProviderApiKeyAction === 'remove') {
+      message.removeInferenceProviderApiKey = true;
     }
 
     if (vscode) {
@@ -571,6 +596,65 @@ function ConnectionFormWebview() {
           </>
         )}
       </div>
+
+      {/* Agent Settings (Cloud only) */}
+      {connectionType === 'cloud' && (
+        <details className="form-section">
+          <summary className="details-summary">▸ Agent Settings (Weaviate Cloud)</summary>
+          <div style={{ paddingTop: '12px' }}>
+            <div className="form-group">
+              <label htmlFor="inferenceProviderApiKey">Inference Provider API Key</label>
+              {inferenceProviderApiKeyPresent && inferenceProviderApiKeyAction !== 'remove' && (
+                <p className="field-info">
+                  An API key is already stored. Leave blank to keep the existing key, or enter a new
+                  one to update it.
+                </p>
+              )}
+              <input
+                type="password"
+                id="inferenceProviderApiKey"
+                placeholder="Your inference provider API key"
+                value={inferenceProviderApiKeyInput}
+                onChange={(e) => {
+                  setInferenceProviderApiKeyInput(e.target.value);
+                  if (inferenceProviderApiKeyAction === 'remove') {
+                    setInferenceProviderApiKeyAction('update');
+                  }
+                }}
+              />
+              {inferenceProviderApiKeyPresent && (
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => {
+                    setInferenceProviderApiKeyAction('remove');
+                    setInferenceProviderApiKeyInput('');
+                  }}
+                >
+                  {inferenceProviderApiKeyAction === 'remove' ? 'Cancel removal' : 'Remove API key'}
+                </button>
+              )}
+              {inferenceProviderApiKeyAction === 'remove' && (
+                <span className="label-hint"> (will be removed on save)</span>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="agentSystemPrompt">System Prompt</label>
+              <p className="field-info">
+                Customize how the Query Agent responds. If empty, a default prompt will be used.
+              </p>
+              <textarea
+                id="agentSystemPrompt"
+                placeholder="You are a helpful assistant that answers questions about Weaviate..."
+                value={agentSystemPrompt}
+                onChange={(e) => setAgentSystemPrompt(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+        </details>
+      )}
 
       {/* Advanced settings */}
       <div>

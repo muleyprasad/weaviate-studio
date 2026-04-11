@@ -913,9 +913,14 @@ export class ConnectionManager {
                   links: connection?.links || [],
                   authType: connection?.authType || 'apiKey',
                   username: connection?.username || '',
+                  agentSystemPrompt: connection?.agentSystemPrompt || '',
                 },
                 apiKeyPresent: !!(connection?.apiKeyPresent ?? !!connection?.apiKey),
                 passwordPresent: !!(connection?.passwordPresent ?? !!connection?.password),
+                inferenceProviderApiKeyPresent: !!(
+                  connection?.inferenceProviderApiKeyPresent ??
+                  !!connection?.inferenceProviderApiKey
+                ),
                 isEditMode,
                 connectionVersion:
                   connection?.connectionVersion || ConnectionManager.currentVersion,
@@ -977,13 +982,30 @@ export class ConnectionManager {
                   const updatePayload = { ...message.connection };
                   delete updatePayload.removeApiKey;
                   delete updatePayload.removePassword;
+                  delete updatePayload.removeInferenceProviderApiKey;
                   if (message.removeApiKey === true) {
                     updatePayload.apiKey = undefined;
                   }
                   if (message.removePassword === true) {
                     updatePayload.password = undefined;
                   }
+                  if (message.removeInferenceProviderApiKey === true) {
+                    updatePayload.inferenceProviderApiKey = undefined;
+                  }
                   updatedConnection = await this.updateConnection(connection.id, updatePayload);
+
+                  // Handle Agent settings separately (secrets + globalState)
+                  if (updatedConnection) {
+                    if (message.removeInferenceProviderApiKey === true) {
+                      await this.deleteSecret(updatedConnection.id, 'inferenceProviderApiKey');
+                      updatedConnection.inferenceProviderApiKeyPresent = false;
+                    } else if (message.connection.inferenceProviderApiKey) {
+                      await this.setInferenceProviderApiKey(
+                        updatedConnection.id,
+                        message.connection.inferenceProviderApiKey
+                      );
+                    }
+                  }
                 } else {
                   // Add new connection
                   updatedConnection = await this.addConnection({
@@ -1000,6 +1022,7 @@ export class ConnectionManager {
                     password: message.connection.password?.trim() || undefined,
                     type: message.connection.cloudUrl === undefined ? 'custom' : 'cloud',
                     cloudUrl: message.connection.cloudUrl?.trim() || undefined,
+                    agentSystemPrompt: message.connection.agentSystemPrompt?.trim() || undefined,
                     timeoutInit: message.connection.timeoutInit || undefined,
                     timeoutQuery: message.connection.timeoutQuery || undefined,
                     timeoutInsert: message.connection.timeoutInsert || undefined,
@@ -1008,6 +1031,14 @@ export class ConnectionManager {
                     openClusterViewOnConnect: message.connection.openClusterViewOnConnect,
                     links: message.connection.links || [],
                   });
+
+                  // Handle inference provider API key for new connection (cloud only)
+                  if (updatedConnection && message.connection.inferenceProviderApiKey) {
+                    await this.setInferenceProviderApiKey(
+                      updatedConnection.id,
+                      message.connection.inferenceProviderApiKey
+                    );
+                  }
                 }
 
                 if (updatedConnection) {
@@ -1083,13 +1114,30 @@ export class ConnectionManager {
                   const updatePayload = { ...message.connection };
                   delete updatePayload.removeApiKey;
                   delete updatePayload.removePassword;
+                  delete updatePayload.removeInferenceProviderApiKey;
                   if (message.removeApiKey === true) {
                     updatePayload.apiKey = undefined;
                   }
                   if (message.removePassword === true) {
                     updatePayload.password = undefined;
                   }
+                  if (message.removeInferenceProviderApiKey === true) {
+                    updatePayload.inferenceProviderApiKey = undefined;
+                  }
                   updatedConnection = await this.updateConnection(connection.id, updatePayload);
+
+                  // Handle Agent settings separately (secrets + globalState)
+                  if (updatedConnection) {
+                    if (message.removeInferenceProviderApiKey === true) {
+                      await this.deleteSecret(updatedConnection.id, 'inferenceProviderApiKey');
+                      updatedConnection.inferenceProviderApiKeyPresent = false;
+                    } else if (message.connection.inferenceProviderApiKey) {
+                      await this.setInferenceProviderApiKey(
+                        updatedConnection.id,
+                        message.connection.inferenceProviderApiKey
+                      );
+                    }
+                  }
                 } else {
                   // Add new connection
                   updatedConnection = await this.addConnection({
@@ -1106,6 +1154,7 @@ export class ConnectionManager {
                     password: message.connection.password?.trim() || undefined,
                     type: message.connection.cloudUrl === undefined ? 'custom' : 'cloud',
                     cloudUrl: message.connection.cloudUrl?.trim() || undefined,
+                    agentSystemPrompt: message.connection.agentSystemPrompt?.trim() || undefined,
                     timeoutInit: message.connection.timeoutInit || undefined,
                     timeoutQuery: message.connection.timeoutQuery || undefined,
                     timeoutInsert: message.connection.timeoutInsert || undefined,
@@ -1114,6 +1163,14 @@ export class ConnectionManager {
                     openClusterViewOnConnect: message.connection.openClusterViewOnConnect,
                     links: message.connection.links || [],
                   });
+
+                  // Handle inference provider API key for new connection (cloud only)
+                  if (updatedConnection && message.connection.inferenceProviderApiKey) {
+                    await this.setInferenceProviderApiKey(
+                      updatedConnection.id,
+                      message.connection.inferenceProviderApiKey
+                    );
+                  }
                 }
 
                 if (updatedConnection) {
