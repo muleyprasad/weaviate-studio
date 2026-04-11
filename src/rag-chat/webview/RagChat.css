@@ -1090,3 +1090,164 @@
   border-top: 1px solid var(--vscode-panel-border, #333);
   line-height: 1.4;
 }
+/* ===== Query Trace Disclosure ===== */
+.query-trace {
+  margin-top: 12px;
+  padding: 0;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  padding-top: 8px;
+}
+
+.query-trace-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  margin: 0;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground, #0098ff);
+  font-size: 12px;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.query-trace-toggle:hover {
+  opacity: 0.8;
+}
+
+.query-trace-chevron {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.query-trace-unavailable {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+}
+
+.query-trace-content {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
+  border-radius: 2px;
+  border-left: 2px solid var(--vscode-textLink-foreground, #0098ff);
+}
+
+.query-trace-section {
+  margin-bottom: 12px;
+}
+
+.query-trace-section:last-child {
+  margin-bottom: 0;
+}
+
+.query-trace-heading {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.query-trace-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.query-trace-list > li {
+  margin-bottom: 4px;
+  padding: 4px 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.query-trace-code {
+  background-color: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #ccc);
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-family: monospace;
+  font-size: 11px;
+  flex: 1;
+  min-width: 150px;
+}
+
+.query-trace-annotation {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  background-color: var(--vscode-editor-background, #1e1e1e);
+  padding: 2px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.query-trace-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.query-trace-pill {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #ccc);
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.query-trace-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.query-trace-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.query-trace-label {
+  color: var(--vscode-descriptionForeground, #888);
+  min-width: 90px;
+  font-weight: 500;
+}
+
+.query-trace-value {
+  color: var(--vscode-editor-foreground, #ccc);
+  font-family: monospace;
+}
+
+.query-trace-row.query-trace-warning {
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+.query-trace-source-link {
+  background: none;
+  border: none;
+  color: var(--vscode-textLink-foreground, #0098ff);
+  padding: 0;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 11px;
+  text-decoration: underline;
+  transition: opacity 0.2s ease;
+}
+
+.query-trace-source-link:hover {
+  opacity: 0.8;
+}

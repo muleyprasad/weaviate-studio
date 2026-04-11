@@ -101,6 +101,11 @@ export interface RagChatHistoryEntry {
   loading: boolean;
   /** Unix timestamp of when the query was initiated */
   timestamp: number;
+  /** Agent Mode trace data (only for agent responses) */
+  trace?: {
+    rawResponse: unknown;
+    traceExpanded: boolean;
+  };
 }
 
 // =====================================================

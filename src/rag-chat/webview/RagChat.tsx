@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Markdown from 'markdown-to-jsx';
+import { QueryTrace } from './components/QueryTrace';
 import type {
   RagChatHistoryEntry,
   RagContextObject,
@@ -308,6 +309,7 @@ function ChatEntry({
 }) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [traceExpanded, setTraceExpanded] = useState(entry.trace?.traceExpanded ?? false);
 
   const handleCopyAnswer = useCallback(() => {
     if (entry.response?.answer) {
@@ -411,6 +413,13 @@ function ChatEntry({
               </div>
             </div>
             {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
+            {entry.trace && entry.trace.rawResponse && (
+              <QueryTrace
+                rawResponse={entry.trace.rawResponse}
+                expanded={traceExpanded}
+                onToggleExpanded={() => setTraceExpanded((v) => !v)}
+              />
+            )}
           </>
         )}
       </div>
@@ -902,7 +911,7 @@ export function RagChat() {
           break;
         }
         case 'agentResponse': {
-          // Handle Query Agent response - treat like ragResponse for now
+          // Handle Query Agent response with trace data
           setHistory((prev) =>
             prev.map((entry) =>
               entry.id === msg.requestId
@@ -917,6 +926,12 @@ export function RagChat() {
                       durationMs: msg.durationMs,
                       hasError: false,
                     },
+                    trace: msg.trace
+                      ? {
+                          rawResponse: msg.trace,
+                          traceExpanded: false, // Collapsed by default
+                        }
+                      : undefined,
                   }
                 : entry
             )
