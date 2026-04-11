@@ -152,6 +152,10 @@ export interface RagChatExtensionMessage {
   advancedSettings?: AdvancedRagSettings;
   /** Query Agent trace (for agentResponse command) */
   trace?: unknown;
+  /** Connection type (cloud or custom) - used for UI feature gating */
+  connectionType?: 'cloud' | 'custom';
+  /** Agent Mode enabled state (for init command) */
+  agentModeEnabled?: boolean;
 }
 
 /**
@@ -163,7 +167,9 @@ export type RagChatWebviewMessageCommand =
   | 'getCollections'
   | 'openInDataExplorer'
   | 'getAdvancedSettings'
-  | 'saveAdvancedSettings';
+  | 'saveAdvancedSettings'
+  | 'getAgentModeState'
+  | 'setAgentModeState';
 
 /**
  * Message sent from the webview to the extension
@@ -198,6 +204,8 @@ export interface RagChatWebviewMessage {
   agentModeEnabled?: boolean;
   /** Scope: single collection or all */
   scopeMode?: 'single' | 'all';
+  /** Agent Mode state to persist (for setAgentModeState command) */
+  enabled?: boolean;
 }
 
 // =====================================================

@@ -33,6 +33,13 @@
   gap: 0;
 }
 
+.rag-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .rag-clear-btn {
   background-color: transparent;
   color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #ccc));
@@ -51,6 +58,37 @@
   background-color: var(--vscode-button-secondaryHoverBackground,
       rgba(255, 255, 255, 0.1)) !important;
   border-color: var(--vscode-focusBorder, #0e639c) !important;
+}
+
+/* Agent Mode Toggle */
+.rag-agent-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.rag-agent-mode-toggle:hover {
+  background-color: var(--vscode-editor-hoverBackground, rgba(255, 255, 255, 0.05));
+}
+
+.rag-agent-mode-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--vscode-checkbox-background, #007acc);
+}
+
+.rag-agent-mode-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
 }
 
 .rag-chat-title {

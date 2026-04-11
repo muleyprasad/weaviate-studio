@@ -275,6 +275,16 @@ export class RagChatPanel {
             await this._handleSaveAdvancedSettings(message.advancedSettings);
           }
           break;
+
+        case 'getAgentModeState':
+          this._handleGetAgentModeState();
+          break;
+
+        case 'setAgentModeState':
+          if (message.enabled !== undefined) {
+            await this._handleSetAgentModeState(message.enabled);
+          }
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -288,17 +298,28 @@ export class RagChatPanel {
   }
 
   /**
-   * Handles initialization - sends collections list to webview
+   * Handles initialization - sends collections list and connection info to webview
    */
   private async _handleInitialize(): Promise<void> {
     try {
       this._collectionInfosCache = await this._api!.getCollectionInfos();
       const modules = await this._api!.getAvailableGenerativeModules();
 
+      // Get connection type for feature gating
+      const connManager = ConnectionManager.getInstance(this._context);
+      const connection = connManager.getConnection(this._connectionId);
+      const connectionType = connection?.type as 'cloud' | 'custom' | undefined;
+
+      // Get Agent Mode state (default false)
+      const agentModeKey = `ragChat.agentMode.${this._connectionId}`;
+      const agentModeEnabled = this._context.workspaceState.get<boolean>(agentModeKey) ?? false;
+
       this.postMessage({
         command: 'init',
         collectionInfos: this._collectionInfosCache,
         availableModules: modules,
+        connectionType,
+        agentModeEnabled,
       });
     } catch (error) {
       console.error('RagChatPanel: Failed to load collections:', error);
@@ -544,6 +565,26 @@ export class RagChatPanel {
 
   private async _handleSaveAdvancedSettings(settings: AdvancedRagSettings): Promise<void> {
     await this._context.globalState.update('weaviate.ragChat.advancedSettings', settings);
+  }
+
+  /**
+   * Get Agent Mode state for the current connection
+   */
+  private _handleGetAgentModeState(): void {
+    const agentModeKey = `ragChat.agentMode.${this._connectionId}`;
+    const agentModeEnabled = this._context.workspaceState.get<boolean>(agentModeKey) ?? false;
+    this.postMessage({
+      command: 'init', // Reuse init command to send agent mode state
+      agentModeEnabled,
+    });
+  }
+
+  /**
+   * Set Agent Mode state for the current connection
+   */
+  private async _handleSetAgentModeState(enabled: boolean): Promise<void> {
+    const agentModeKey = `ragChat.agentMode.${this._connectionId}`;
+    await this._context.workspaceState.update(agentModeKey, enabled);
   }
 
   /**

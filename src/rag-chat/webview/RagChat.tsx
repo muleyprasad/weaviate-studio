@@ -24,6 +24,7 @@ interface RagChatInitialData {
   connectionName: string | null;
   inheritedFilters?: import('../types').FilterCondition[] | null;
   inheritedFilterMatchMode?: import('../types').FilterMatchMode | null;
+  connectionType?: 'cloud' | 'custom';
 }
 
 function getInitialData(): RagChatInitialData | undefined {
@@ -780,6 +781,11 @@ export function RagChat() {
     model: '',
   });
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [connectionType, setConnectionType] = useState<'cloud' | 'custom' | undefined>(
+    initialData?.connectionType
+  );
+  const [agentModeEnabled, setAgentModeEnabled] = useState(false);
+  const [showAgentKeyWarning, setShowAgentKeyWarning] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -813,6 +819,16 @@ export function RagChat() {
           setAllCollections(names);
           if (msg.command === 'init' && msg.availableModules) {
             setAvailableModules(msg.availableModules);
+          }
+          // Extract connection type and agent mode state from init message
+          if (msg.command === 'init') {
+            if (msg.connectionType) {
+              setConnectionType(msg.connectionType);
+            }
+            if (msg.agentModeEnabled !== undefined) {
+              setAgentModeEnabled(msg.agentModeEnabled);
+              setShowAgentKeyWarning(false); // Reset warning on fresh init
+            }
           }
           // If we had a pre-selected collection from initialData and it
           // exists in the list, keep it. Otherwise keep whatever is valid.
@@ -879,6 +895,29 @@ export function RagChat() {
             prev.map((entry) =>
               entry.id === msg.requestId
                 ? { ...entry, loading: false, error: msg.error ?? 'Unknown error' }
+                : entry
+            )
+          );
+          setLoading(false);
+          break;
+        }
+        case 'agentResponse': {
+          // Handle Query Agent response - treat like ragResponse for now
+          setHistory((prev) =>
+            prev.map((entry) =>
+              entry.id === msg.requestId
+                ? {
+                    ...entry,
+                    loading: false,
+                    response: {
+                      answer: msg.answer ?? '',
+                      contextObjects: [], // Agent mode doesn't return context objects in this story
+                      query: entry.query,
+                      timestamp: Date.now(),
+                      durationMs: msg.durationMs,
+                      hasError: false,
+                    },
+                  }
                 : entry
             )
           );
@@ -959,6 +998,7 @@ export function RagChat() {
       requestId,
       provider: selectedProvider,
       advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
+      agentModeEnabled,
     } satisfies RagChatWebviewMessage);
   }, [
     question,
@@ -968,6 +1008,7 @@ export function RagChat() {
     loading,
     selectedProvider,
     advancedSettings,
+    agentModeEnabled,
   ]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
@@ -1001,9 +1042,10 @@ export function RagChat() {
         requestId: newRequestId,
         provider: selectedProvider,
         advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
+        agentModeEnabled,
       } satisfies RagChatWebviewMessage);
     },
-    [queryTimeout, selectedProvider, advancedSettings]
+    [queryTimeout, selectedProvider, advancedSettings, agentModeEnabled]
   );
 
   const handleKeyDown = useCallback(
@@ -1039,17 +1081,37 @@ export function RagChat() {
             Retrieve, ground, and generate from selected collections
           </span>
         </div>
-        {history.length > 0 && (
-          <button
-            type="button"
-            className="rag-clear-btn"
-            onClick={handleClearChat}
-            title="Clear chat"
-            aria-label="Clear chat"
-          >
-            Clear
-          </button>
-        )}
+        <div className="rag-header-right">
+          {connectionType === 'cloud' && (
+            <label className="rag-agent-mode-toggle" title="Query Agent mode (cloud-only)">
+              <input
+                type="checkbox"
+                checked={agentModeEnabled}
+                onChange={(e) => {
+                  setAgentModeEnabled(e.target.checked);
+                  vscodeApi.postMessage({
+                    command: 'setAgentModeState',
+                    enabled: e.target.checked,
+                  } satisfies RagChatWebviewMessage);
+                  // Reset warning when toggling
+                  setShowAgentKeyWarning(false);
+                }}
+              />
+              <span className="rag-agent-mode-label">Agent Mode</span>
+            </label>
+          )}
+          {history.length > 0 && (
+            <button
+              type="button"
+              className="rag-clear-btn"
+              onClick={handleClearChat}
+              title="Clear chat"
+              aria-label="Clear chat"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Connection status bar */}
