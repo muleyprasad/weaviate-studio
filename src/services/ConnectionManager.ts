@@ -45,6 +45,10 @@ export interface WeaviateConnection {
   // Cloud connection fields
   cloudUrl?: string;
 
+  // Agent fields (cloud only)
+  inferenceProviderApiKey?: string; // API key for inference provider, cloud-only, stored in context.secrets
+  agentSystemPrompt?: string; // System prompt to guide the Query Agent's behavior
+
   // Advanced settings
   timeoutInit?: number;
   timeoutQuery?: number;
@@ -56,10 +60,18 @@ export interface WeaviateConnection {
   // Secret presence flags (actual values stored in context.secrets, not globalState)
   apiKeyPresent?: boolean;
   passwordPresent?: boolean;
+  inferenceProviderApiKeyPresent?: boolean;
 
   // backwards compatibility
   url?: string; // old field, to be migrated
 }
+
+/**
+ * Default system prompt for the Query Agent.
+ * Guides the agent's behavior and response style.
+ */
+export const DEFAULT_AGENT_SYSTEM_PROMPT =
+  'You are a helpful assistant that answers questions about the Weaviate vector database. Provide accurate, concise answers based on the retrieved information.';
 
 export class ConnectionManager {
   private static instance: ConnectionManager;
@@ -67,23 +79,29 @@ export class ConnectionManager {
   private readonly storageKey = 'weaviate-connections';
 
   // --- Secret storage helpers ---
-  private secretKey(id: string, field: 'apiKey' | 'password'): string {
+  private secretKey(id: string, field: 'apiKey' | 'password' | 'inferenceProviderApiKey'): string {
     return `weaviate-connection-${id}-${field}`;
   }
 
   private async storeSecret(
     id: string,
-    field: 'apiKey' | 'password',
+    field: 'apiKey' | 'password' | 'inferenceProviderApiKey',
     value: string
   ): Promise<void> {
     await this.context.secrets.store(this.secretKey(id, field), value);
   }
 
-  private async getSecret(id: string, field: 'apiKey' | 'password'): Promise<string | undefined> {
+  private async getSecret(
+    id: string,
+    field: 'apiKey' | 'password' | 'inferenceProviderApiKey'
+  ): Promise<string | undefined> {
     return this.context.secrets.get(this.secretKey(id, field));
   }
 
-  private async deleteSecret(id: string, field: 'apiKey' | 'password'): Promise<void> {
+  private async deleteSecret(
+    id: string,
+    field: 'apiKey' | 'password' | 'inferenceProviderApiKey'
+  ): Promise<void> {
     await this.context.secrets.delete(this.secretKey(id, field));
   }
 
@@ -260,6 +278,9 @@ export class ConnectionManager {
         }
         if (conn.passwordPresent) {
           conn.password = await this.getSecret(conn.id, 'password');
+        }
+        if (conn.inferenceProviderApiKeyPresent) {
+          conn.inferenceProviderApiKey = await this.getSecret(conn.id, 'inferenceProviderApiKey');
         }
       }
       // Notify listeners (e.g. tree view) that connections are ready
@@ -747,6 +768,81 @@ export class ConnectionManager {
     }
 
     return connection.links || [];
+  }
+
+  // --- Agent Settings Helpers ---
+
+  /**
+   * Get the Agent system prompt for a connection
+   * @param connectionId - The ID of the connection
+   * @returns The system prompt, or undefined if not set
+   */
+  public getAgentSystemPrompt(connectionId: string): string | undefined {
+    const connection = this.getConnection(connectionId);
+    return connection?.agentSystemPrompt;
+  }
+
+  /**
+   * Set the Agent system prompt for a connection
+   * @param connectionId - The ID of the connection
+   * @param prompt - The system prompt to set
+   */
+  public async setAgentSystemPrompt(connectionId: string, prompt: string): Promise<void> {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+
+    connection.agentSystemPrompt = prompt;
+    await this.saveConnections();
+    this._onConnectionsChanged.fire();
+  }
+
+  /**
+   * Get the Inference Provider API Key for a connection
+   * @param connectionId - The ID of the connection
+   * @returns The API key, or undefined if not set
+   */
+  public async getInferenceProviderApiKey(connectionId: string): Promise<string | undefined> {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      return undefined;
+    }
+
+    // Return cached value if already loaded
+    if (connection.inferenceProviderApiKey) {
+      return connection.inferenceProviderApiKey;
+    }
+
+    // Fetch from secrets if present flag is set
+    if (connection.inferenceProviderApiKeyPresent) {
+      return await this.getSecret(connectionId, 'inferenceProviderApiKey');
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Set the Inference Provider API Key for a connection
+   * @param connectionId - The ID of the connection
+   * @param apiKey - The API key to set
+   */
+  public async setInferenceProviderApiKey(connectionId: string, apiKey: string): Promise<void> {
+    const connection = this.getConnection(connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+
+    // Store the secret
+    await this.storeSecret(connectionId, 'inferenceProviderApiKey', apiKey);
+
+    // Set the presence flag and cache
+    connection.inferenceProviderApiKeyPresent = true;
+    connection.inferenceProviderApiKey = apiKey;
+
+    // Save the updated connection (without the actual key in globalState)
+    await this.saveConnections();
+    this._onConnectionsChanged.fire();
   }
 
   public async showAddConnectionDialog(): Promise<{
