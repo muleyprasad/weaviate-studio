@@ -19,18 +19,19 @@ Weaviate Studio is a **VS Code extension** (v1.6.2) for managing Weaviate vector
 
 ### Runtime Dependencies
 
-| Package                                    | Purpose                                          |
-| ------------------------------------------ | ------------------------------------------------ |
-| `weaviate-client ^3.11.0`                  | Official Weaviate JS/TS client (REST + gRPC)     |
-| `monaco-editor ^0.52.2`                    | Code editor for GraphQL queries                  |
-| `monaco-graphql ^1.7.0`                    | GraphQL language support for Monaco              |
-| `react-json-tree` / `react-json-view-lite` | JSON visualization in results                    |
-| `markdown-to-jsx ^9.7.8`                   | Markdown rendering in RAG chat                   |
-| `@tanstack/react-virtual ^3.13.18`         | Virtual scrolling for large datasets             |
-| `@vscode/webview-ui-toolkit ^1.4.0`        | VS Code design system for webviews               |
-| `@vscode/extension-telemetry ^1.5.1`       | Azure Application Insights telemetry             |
-| `graphql-language-service-interface`       | GraphQL language features                        |
-| `weaviate-add-collection`                  | External React component for collection creation |
+| Package                                    | Purpose                                                 |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `weaviate-client ^3.11.0`                  | Official Weaviate JS/TS client (REST + gRPC)            |
+| `monaco-editor ^0.52.2`                    | Code editor for GraphQL queries                         |
+| `monaco-graphql ^1.7.0`                    | GraphQL language support for Monaco                     |
+| `react-json-tree` / `react-json-view-lite` | JSON visualization in results                           |
+| `markdown-to-jsx ^9.7.8`                   | Markdown rendering in RAG chat                          |
+| `@tanstack/react-virtual ^3.13.18`         | Virtual scrolling for large datasets                    |
+| `@vscode/webview-ui-toolkit ^1.4.0`        | VS Code design system for webviews                      |
+| `@vscode/extension-telemetry ^1.5.1`       | Azure Application Insights telemetry                    |
+| `graphql-language-service-interface`       | GraphQL language features                               |
+| `weaviate-agents`                          | Weaviate Query Agent SDK for multi-collection AI search |
+| `weaviate-add-collection`                  | External React component for collection creation        |
 
 ### Dev Dependencies
 
@@ -98,16 +99,24 @@ src/
 │       ├── GraphQLEditor.ts        # Monaco editor integration
 │       ├── GraphQLSchemaProvider.ts # Schema-aware completions
 │       └── graphqlTemplates.ts     # Schema-aware query templates
-├── rag-chat/                       # Generative Search (RAG) feature module
+├── rag-chat/                       # Generative Search (RAG) + Query Agent module
 │   ├── extension/
 │   │   ├── RagChatPanel.ts         # Panel host (extension side)
 │   │   ├── RagChatAPI.ts           # Weaviate generative API bridge
-│   │   └── utils.ts                # RAG utilities
+│   │   ├── utils.ts                # RAG utilities
+│   │   └── queryAgent/             # Query Agent integration (cloud-only)
+│   │       ├── QueryAgentService.ts    # Agent wrapper (ask/search/stream)
+│   │       ├── commandRouting.ts       # Slash command parser
+│   │       ├── traceMapping.ts         # Response → trace UI mapping
+│   │       └── types.ts                # SDK type aliases
 │   ├── types/
 │   │   └── index.ts                # RAG message/response types
 │   └── webview/
 │       ├── RagChat.tsx             # Chat UI React component
-│       └── RagChat.css
+│       ├── RagChat.css
+│       └── components/
+│           ├── QueryTrace.tsx      # Trace disclosure component
+│           └── SlashMenu.tsx       # Slash command autocomplete
 ├── webview/                        # Shared webview components & pages
 │   ├── index.tsx                   # Query editor webview entry
 │   ├── ConnectionForm.tsx          # Connection add/edit form
@@ -199,6 +208,15 @@ src/
 - Click telescope icon to open context objects in Data Explorer
 - Filter inheritance from Data Explorer
 - Relies on server-side generative config (no extra API keys)
+- **Query Agent Mode** (cloud-only): routes through `weaviate-agents` SDK
+  - Pill toggle with ⚡ icon, green/gray status dot, panel-wide visual indicator
+  - "All Collections" scope with single badge pill (no N-pill expansion)
+  - Slash commands: `/ask`, `/search`, `/explore`, `/fetch`, `/query`, `/collections`
+  - Streaming token-by-token rendering with blinking cursor
+  - "▸ How this was answered" trace disclosure (sub-queries, collections, sources, model units)
+  - Styled error bubbles with expandable error details
+  - Agent system prompt + inference provider API key per connection
+  - 5 telemetry events (no PII)
 
 ### RBAC Management ✅
 
@@ -252,6 +270,7 @@ All Weaviate interactions go through the **`weaviate-client` v3** SDK:
 | Collections | `client.collections.listAll()`, `client.collections.get()`, `client.collections.create()`, `client.collections.delete()`                                                                   |
 | Data CRUD   | `collection.query.fetchObjects()`, `collection.query.nearText()`, `collection.query.nearObject()`, `collection.query.nearVector()`, `collection.query.hybrid()`, `collection.query.bm25()` |
 | Generative  | `collection.generate.nearText()`                                                                                                                                                           |
+| Query Agent | `QueryAgent.ask()`, `QueryAgent.search()`, `QueryAgent.stream()` (via `weaviate-agents` SDK, cloud-only)                                                                                   |
 | Schema      | `collection.config.get()`, `collection.config.updateShards()`                                                                                                                              |
 | Cluster     | `client.cluster.nodes({ output: 'verbose' })`                                                                                                                                              |
 | Backups     | `client.backup.create()`, `client.backup.restore()`, `client.backup.getStatus()`, `client.collections.listAll()` (for include/exclude)                                                     |
@@ -266,8 +285,8 @@ All Weaviate interactions go through the **`weaviate-client` v3** SDK:
 
 No local database — all data lives in connected Weaviate instances. Extension state stored in:
 
-- **`context.globalState`** — Connection configs (keyed `weaviate-connections`), user preferences
-- **`context.secrets`** — API keys and passwords (keyed `weaviate-connection-{id}-{apiKey|password}`)
+- **`context.globalState`** — Connection configs (keyed `weaviate-connections`), user preferences, advanced RAG settings
+- **`context.secrets`** — API keys and passwords (keyed `weaviate-connection-{id}-{apiKey|password|inferenceProviderApiKey}`)
 - **In-memory** — Active `WeaviateClient` instances (Map), collection schemas, cached node status
 
 ### Key Internal Types

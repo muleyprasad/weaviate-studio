@@ -483,8 +483,10 @@ function CollectionSelector({
   onAdd,
   onRemove,
   onSelectAllCollections,
+  onDeselectAll,
   loading,
   connectionType,
+  scopeMode,
 }: {
   allCollections: string[];
   collectionInfos: CollectionInfo[];
@@ -492,8 +494,10 @@ function CollectionSelector({
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
   onSelectAllCollections: () => void;
+  onDeselectAll: () => void;
   loading: boolean;
   connectionType?: 'cloud' | 'custom';
+  scopeMode: 'single' | 'all';
 }) {
   // Collections available for adding (not yet selected)
   const availableCollections = allCollections.filter((c) => !selectedCollections.includes(c));
@@ -514,6 +518,7 @@ function CollectionSelector({
   );
 
   const selectedCount = selectedCollections.length;
+  const isAllScope = scopeMode === 'all';
   const infoMap = useMemo(
     () => new Map(collectionInfos.map((c) => [c.name, c])),
     [collectionInfos]
@@ -526,13 +531,31 @@ function CollectionSelector({
           Collections
         </label>
         <span className="rag-collection-helper">Used as retrieval sources</span>
-        {selectedCount >= 3 && (
+        {!isAllScope && selectedCount >= 3 && (
           <span className="rag-collection-summary">{selectedCount} collections selected</span>
         )}
       </div>
 
-      {/* Selected collections as removable pills */}
-      {selectedCount > 0 && (
+      {/* "All Collections" badge — shown when scope is 'all' */}
+      {isAllScope && (
+        <div className="rag-collection-pills" role="list" aria-label="Selected collections">
+          <span className="rag-collection-pill rag-collection-pill--all" role="listitem">
+            ⚡ All Collections ({allCollections.length})
+            <button
+              type="button"
+              className="rag-pill-remove"
+              onClick={onDeselectAll}
+              aria-label="Deselect all collections"
+              title="Deselect all collections"
+            >
+              ×
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* Selected collections as removable pills (only in single mode) */}
+      {!isAllScope && selectedCount > 0 && (
         <div className="rag-collection-pills" role="list" aria-label="Selected collections">
           {selectedCollections.map((name) => {
             const info = infoMap.get(name);
@@ -570,8 +593,8 @@ function CollectionSelector({
         </span>
       ) : (
         <>
-          {/* Add collection dropdown — auto-adds on selection */}
-          {allCollections.length > 0 && (
+          {/* Add collection dropdown — auto-adds on selection (hidden in "all" scope) */}
+          {allCollections.length > 0 && !isAllScope && (
             <select
               className="rag-select rag-select-auto"
               aria-labelledby="rag-collection-label"
@@ -581,8 +604,10 @@ function CollectionSelector({
               <option value="" disabled>
                 {selectedCount === 0 ? 'Select a collection…' : 'Add another collection…'}
               </option>
-              {/* "All Collections" option — cloud-only or shows fallback note */}
-              <option value="ALL_COLLECTIONS">All Collections</option>
+              {/* "All Collections" option — only for cloud connections */}
+              {connectionType === 'cloud' && (
+                <option value="ALL_COLLECTIONS">All Collections</option>
+              )}
               {availableCollections.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -592,7 +617,7 @@ function CollectionSelector({
           )}
 
           {/* Validation hint */}
-          {selectedCount === 0 && allCollections.length > 0 && (
+          {!isAllScope && selectedCount === 0 && allCollections.length > 0 && (
             <span className="rag-validation-hint">Select at least one collection to start</span>
           )}
 
@@ -1151,16 +1176,29 @@ export function RagChat() {
     setScopeMode('single');
   }, []);
 
-  const handleRemoveCollection = useCallback((name: string) => {
-    setSelectedCollections((prev) => prev.filter((c) => c !== name));
-  }, []);
+  const handleRemoveCollection = useCallback(
+    (name: string) => {
+      setSelectedCollections((prev) => prev.filter((c) => c !== name));
+      // If user removes a pill while in "all" scope, revert to single mode
+      if (scopeMode === 'all') {
+        setScopeMode('single');
+      }
+    },
+    [scopeMode]
+  );
 
   const handleSelectAllCollections = useCallback(() => {
     if (connectionType === 'cloud') {
-      // Enable agent mode and select all collections
-      setSelectedCollections([...allCollections]);
+      // Enable agent mode — don't expand into individual pills;
+      // keep selectedCollections empty and let scopeMode='all' signal the backend
+      setSelectedCollections([]);
       setAgentModeEnabled(true);
       setScopeMode('all');
+      setAllCollectionsFallbackNote(false);
+      vscodeApi.postMessage({
+        command: 'setAgentModeState',
+        enabled: true,
+      } satisfies RagChatWebviewMessage);
     } else {
       // Local connection: fallback to first collection and show inline note
       if (allCollections.length > 0) {
@@ -1170,6 +1208,11 @@ export function RagChat() {
       setAllCollectionsFallbackNote(true);
     }
   }, [connectionType, allCollections]);
+
+  const handleDeselectAll = useCallback(() => {
+    setScopeMode('single');
+    setSelectedCollections([]);
+  }, []);
 
   const [allCollectionsFallbackNote, setAllCollectionsFallbackNote] = useState(false);
   const [settingsSavedFlash, setSettingsSavedFlash] = useState(false);
@@ -1188,7 +1231,9 @@ export function RagChat() {
 
   const handleSubmit = useCallback(() => {
     const trimmed = question.trim();
-    if (!trimmed || selectedCollections.length === 0 || loading) {
+    const effectiveCollections =
+      scopeMode === 'all' ? [...allCollections] : [...selectedCollections];
+    if (!trimmed || effectiveCollections.length === 0 || loading) {
       return;
     }
 
@@ -1199,10 +1244,12 @@ export function RagChat() {
 
     const requestId = generateRequestId();
 
+    const displayCollectionNames = scopeMode === 'all' ? ['All Collections'] : effectiveCollections;
+
     const entry: RagChatHistoryEntry = {
       id: requestId,
       query: {
-        collectionNames: [...selectedCollections],
+        collectionNames: displayCollectionNames,
         question: trimmed,
         limit: topK,
       },
@@ -1229,7 +1276,7 @@ export function RagChat() {
 
     vscodeApi.postMessage({
       command: 'executeRagQuery',
-      collectionNames: [...selectedCollections],
+      collectionNames: effectiveCollections,
       question: trimmed,
       limit: topK,
       timeout: queryTimeout,
@@ -1243,6 +1290,7 @@ export function RagChat() {
   }, [
     question,
     selectedCollections,
+    allCollections,
     topK,
     queryTimeout,
     loading,
@@ -1376,42 +1424,62 @@ export function RagChat() {
   const handleClearChat = useCallback(() => {
     setHistory([]);
     setQuestion('');
+    setScopeMode('single');
     setSelectedCollections(
       initialData?.initialCollectionName ? [initialData.initialCollectionName] : []
     );
   }, [initialData]);
 
   const connectionId = initialData?.connectionId ?? '';
-  const canSubmit = question.trim().length > 0 && selectedCollections.length > 0 && !loading;
+  const hasCollections = scopeMode === 'all' || selectedCollections.length > 0;
+  const canSubmit = question.trim().length > 0 && hasCollections && !loading;
 
   return (
-    <div className="rag-chat">
+    <div className={`rag-chat${agentModeEnabled ? ' rag-chat--agent-active' : ''}`}>
       {/* Header */}
       <header className="rag-chat-header">
         <div className="rag-header-left">
           <h1 className="rag-chat-title">Generative Search</h1>
           <span className="rag-chat-tagline">
-            Retrieve, ground, and generate from selected collections
+            {agentModeEnabled
+              ? 'Query Agent — multi-collection AI search'
+              : 'Retrieve, ground, and generate from selected collections'}
           </span>
         </div>
         <div className="rag-header-right">
           {connectionType === 'cloud' && (
-            <label className="rag-agent-mode-toggle" title="Query Agent mode (cloud-only)">
-              <input
-                type="checkbox"
-                checked={agentModeEnabled}
-                onChange={(e) => {
-                  setAgentModeEnabled(e.target.checked);
-                  vscodeApi.postMessage({
-                    command: 'setAgentModeState',
-                    enabled: e.target.checked,
-                  } satisfies RagChatWebviewMessage);
-                  // Reset warning when toggling
-                  setShowAgentKeyWarning(false);
-                }}
+            <button
+              type="button"
+              className={`rag-agent-pill-toggle${agentModeEnabled ? ' rag-agent-pill-toggle--active' : ''}`}
+              onClick={() => {
+                const next = !agentModeEnabled;
+                setAgentModeEnabled(next);
+                vscodeApi.postMessage({
+                  command: 'setAgentModeState',
+                  enabled: next,
+                } satisfies RagChatWebviewMessage);
+                // Reset warning when toggling
+                setShowAgentKeyWarning(false);
+                // If turning off agent mode while in "all" scope, reset
+                if (!next && scopeMode === 'all') {
+                  setScopeMode('single');
+                  setSelectedCollections([]);
+                }
+              }}
+              title={
+                agentModeEnabled
+                  ? 'Disable Query Agent mode'
+                  : 'Enable Query Agent mode (cloud-only)'
+              }
+              aria-pressed={agentModeEnabled}
+              aria-label={`Agent Mode ${agentModeEnabled ? 'enabled' : 'disabled'}`}
+            >
+              <span className="rag-agent-pill-icon">⚡</span>
+              <span className="rag-agent-pill-label">Agent</span>
+              <span
+                className={`rag-agent-pill-dot${agentModeEnabled ? ' rag-agent-pill-dot--on' : ''}`}
               />
-              <span className="rag-agent-mode-label">Agent Mode</span>
-            </label>
+            </button>
           )}
           {history.length > 0 && (
             <button
@@ -1444,7 +1512,7 @@ export function RagChat() {
             <p>Select one or more collections below and type your question to get started.</p>
           </div>
         )}
-        {showAgentKeyWarning && (
+        {showAgentKeyWarning && agentModeEnabled && (
           <div className="rag-system-message rag-system-warning" role="alert">
             ⚠ Agent Mode is on but no Inference Provider Key is configured. Add it in connection
             settings.
@@ -1473,8 +1541,10 @@ export function RagChat() {
             onAdd={handleAddCollection}
             onRemove={handleRemoveCollection}
             onSelectAllCollections={handleSelectAllCollections}
+            onDeselectAll={handleDeselectAll}
             loading={collectionsLoading}
             connectionType={connectionType}
+            scopeMode={scopeMode}
           />
           {allCollectionsFallbackNote && (
             <span className="rag-scope-note rag-scope-note-fallback">

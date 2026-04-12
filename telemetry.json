@@ -76,6 +76,26 @@
     "backup.completed": {
       "description": "Emitted when a backup create or restore operation completes",
       "properties": ["result", "operation", "durationMs", "errorCategory"]
+    },
+    "ragChat.agentModeToggled": {
+      "description": "Emitted when the user toggles Agent Mode on or off",
+      "properties": ["enabled"]
+    },
+    "ragChat.agentQuerySent": {
+      "description": "Emitted when a query is sent via the Query Agent",
+      "properties": ["method", "scopeMode", "streaming"]
+    },
+    "ragChat.agentQuerySuccess": {
+      "description": "Emitted when a Query Agent request succeeds",
+      "properties": ["method", "durationMs"]
+    },
+    "ragChat.agentQueryError": {
+      "description": "Emitted when a Query Agent request fails",
+      "properties": ["method", "errorType", "durationMs"]
+    },
+    "ragChat.slashCommandUsed": {
+      "description": "Emitted when a slash command is selected from the autocomplete menu",
+      "properties": ["command"]
     }
   },
   "privacy": {

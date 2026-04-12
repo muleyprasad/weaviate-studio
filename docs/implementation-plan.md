@@ -387,6 +387,55 @@ Below is a chronological sequence of atomic stories. Each leaves the extension i
 
 ---
 
+## Story 16 — UX/Usability Review Fixes ✅ COMPLETE
+
+**Goal:** Address visual indicator gaps and "All Collections" selection bugs found during manual testing and UX review.
+
+**Files Modified:**
+
+- `src/rag-chat/webview/RagChat.tsx` — Pill toggle, "All Collections" badge, scope state fixes
+- `src/rag-chat/webview/RagChat.css` — Pill toggle styles, agent-active indicator, "All Collections" pill
+
+**Changes:**
+
+✅ **Agent Mode pill toggle** — Replaced plain checkbox with styled pill button:
+
+- ⚡ icon + "Agent" label + green/gray status dot
+- `.rag-agent-pill-toggle` with `--active` variant (blue accent background)
+- `aria-pressed` for accessibility
+
+✅ **Panel-wide agent mode indicator** — Added `rag-chat--agent-active` class to root:
+
+- Blue accent border on header when active
+- Tinted connection bar background
+
+✅ **Dynamic tagline** — Header tagline updates contextually:
+
+- "Query Agent — multi-collection AI search" when agent mode is on
+- Original tagline when off
+
+✅ **"All Collections" badge pill** — Replaced N-pill expansion with single badge:
+
+- "⚡ All Collections (N)" styled badge with dismiss button
+- Dropdown hidden while in "all" scope (no duplicate controls)
+- `rag-collection-pill--all` variant with blue accent background
+
+✅ **"All Collections" cloud-only** — Option removed from dropdown for non-cloud connections
+
+✅ **Scope mode state management** — Fixed multiple stale state bugs:
+
+- `handleRemoveCollection` resets `scopeMode` to `'single'`
+- `handleClearChat` resets `scopeMode` to `'single'`
+- Turning off Agent Mode resets "all" scope and clears selection
+- `canSubmit` now permits submitting when `scopeMode === 'all'`
+- `handleSubmit` resolves effective collections from `allCollections` when in "all" scope
+
+✅ **Warning bubble gate** — Now also checks `agentModeEnabled`, so disabling agent hides warning
+
+**Test state:** ✅ All tests pass (1575 tests, 65 suites). Production build succeeds.
+
+---
+
 ## Dependency graph (informal)
 
 ```
@@ -394,7 +443,7 @@ Below is a chronological sequence of atomic stories. Each leaves the extension i
      │
      └─▶ 4 ─▶ 5 ─▶ 6 ─▶ 7
                   │       │
-                  │       └─▶ 12 (streaming) ─▶ 13 (errors) ─▶ 14 (telemetry) ─▶ 15 (QA)
+                  │       └─▶ 12 (streaming) ─▶ 13 (errors) ─▶ 14 (telemetry) ─▶ 15 (QA) ─▶ 16 (UX fixes)
                   │
                   └─▶ 8 (slash UI) ─▶ 9 (slash routing) ─▶ 10 (search cards) ─▶ 11 (all-collections)
 ```
@@ -409,9 +458,10 @@ Stories 3 and 4 can run in parallel; 8–10 and 11 can be swapped; everything el
 - **After Story 7**: first user-visible version — cloud users can flip a toggle and get agent `.ask()` with trace. Could be released behind an experimental flag.
 - **After Story 12**: feature-complete happy path. Strong candidate for v1.7.0 release.
 - **After Story 15**: spec-complete.
+- **After Story 16**: UX-polished, ready for v1.7.0 release.
 
 ---
 
-## Next Steps
+## Status
 
-Choose a story to begin with and let me know. I'll write the actual implementation code, tests, and integrate it into the codebase following the project's style and conventions.
+All stories (0–16) are complete. Feature is spec-complete and UX-polished. Documentation updated across CHANGELOG.md, README.md, CLAUDE.md, telemetry.json, and this implementation plan.

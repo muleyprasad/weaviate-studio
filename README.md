@@ -45,6 +45,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 - **Multiple Connections:** Manage several Weaviate instances at once
 - **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
+- **Query Agent Mode:** Route queries through the official Weaviate Query Agent (cloud-only) for autonomous multi-collection search with streaming responses, slash commands, and query trace inspection
 - **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
 - **RBAC & Security:** Manage users, roles, and groups with native RBAC support and API key rotation
 - **Read-Only Mode:** Connection-level guards to prevent accidental modifications to production data
@@ -145,6 +146,18 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Loading, error, and empty states matching the rest of the extension UX
 - Clear chat button to reset conversation history
 - Enter to send, Shift+Enter for newline
+- **Query Agent Mode** (Weaviate Cloud only):
+  - Pill-style toggle with ⚡ icon and visual status indicator (green dot = active)
+  - Panel-wide blue accent border when Agent Mode is active
+  - Routes queries through the official Weaviate Query Agent for autonomous multi-collection search
+  - "All Collections" scope option — queries all collections simultaneously with a single badge pill
+  - Slash command autocomplete (`/ask`, `/search`, `/explore`, `/fetch`, `/query`, `/collections`)
+  - `/search` uses pure retrieval (1 WCD request) vs `/ask` with LLM generation (4 WCD requests)
+  - Streaming token-by-token response rendering with blinking cursor
+  - "▸ How this was answered" trace disclosure on agent responses (sub-queries, collections, sources)
+  - Clickable source links in trace open objects directly in Data Explorer
+  - Styled error bubbles with expandable "▸ Error details" for agent failures
+  - Connection-level Agent Settings: inference provider API key + custom system prompt
 
 ### Data Visualization
 
@@ -246,7 +259,7 @@ Weaviate Studio uses a modular architecture with external React components for e
 
 - **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection) ([Live Demo](https://dudanogueira.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
 - **Extension Core**: TypeScript-based VS Code extension
-- **Generative Search**: Self-contained module (`src/rag-chat/`) for generative search with its own panel, API wrapper, and React webview
+- **Generative Search + Query Agent**: Self-contained module (`src/rag-chat/`) for generative search and Query Agent integration, with its own panel, API wrapper, Query Agent service, and React webview
 - **Webviews**: React-based UIs with Monaco editor integration
 
 For details on updating external dependencies, see the [Working with Dependencies](CONTRIBUTING.md#working-with-dependencies) section in CONTRIBUTING.md.

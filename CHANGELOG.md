@@ -5,6 +5,70 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-04-12
+
+### ⚡ Added - Query Agent Integration (Weaviate Cloud)
+
+- **Query Agent Mode** — Optional routing through the official Weaviate Query Agent (`weaviate-agents` npm package) for cloud connections
+
+  - Pill-style toggle in the RAG Chat header with ⚡ icon and green/gray status dot
+  - Panel-wide visual indicator (blue accent header border) when Agent Mode is active
+  - Dynamic tagline updates: "Query Agent — multi-collection AI search" when enabled
+  - Persisted per-connection via VS Code `workspaceState`
+  - Only visible on Weaviate Cloud connections — hidden for local/custom
+
+- **All Collections Scope** — Query across every collection simultaneously with a single click
+
+  - "All Collections" option in the collection dropdown (cloud-only)
+  - Displays a single styled badge pill "⚡ All Collections (N)" instead of expanding into N individual pills
+  - Auto-enables Agent Mode when selected
+  - Graceful fallback for non-cloud connections with inline explanation
+  - Proper scope mode state management — removing the badge reverts to single-collection scope
+
+- **Slash Command Autocomplete** — Discoverable command palette in the chat input
+
+  - `/ask`, `/search`, `/explore`, `/fetch`, `/query`, `/collections` commands
+  - Keyboard-navigable popup (↑/↓, Enter/Tab to select, Escape to close)
+  - `/search` routes to `QueryAgent.search()` for cheaper pure retrieval (1 WCD request vs 4)
+  - Command prefix stripped before sending to the agent SDK
+
+- **Streaming Responses** — Token-by-token rendering for agent `.ask()` calls
+
+  - Blinking cursor animation during streaming
+  - Silent fallback to non-streaming if unavailable
+  - Mid-stream error recovery
+
+- **Query Trace Disclosure** — Expandable "▸ How this was answered" section on agent responses
+
+  - Sub-queries run, collections used, execution time, model units
+  - Clickable source links that open objects in Data Explorer
+  - Partial answer and missing information warnings
+  - Only shown for `.ask()` responses (not `.search()`)
+
+- **Agent Error UX** — Styled error bubbles with expandable error details
+
+  - User-friendly message: "Agent couldn't answer this. Try rephrasing or disable Agent Mode."
+  - `▸ Error details` disclosure with raw error message for debugging
+
+- **Connection Config: Agent Settings** — New collapsible "Agent Settings (Weaviate Cloud)" section in connection form
+
+  - Inference Provider API Key (stored securely in `context.secrets`)
+  - Customizable Agent System Prompt per connection
+
+- **Telemetry** — 5 new agent-specific events (no PII in payloads)
+  - `ragChat.agentModeToggled`, `ragChat.agentQuerySent`, `ragChat.agentQuerySuccess`, `ragChat.agentQueryError`, `ragChat.slashCommandUsed`
+
+### Changed
+
+- **Collection Selector UX** — "All Collections" option only appears for cloud connections (previously shown for all)
+- **Scope Mode State** — Removing individual collection pills now correctly resets scope from "all" to "single"
+- **Clear Chat** — Now resets scope mode back to "single" alongside clearing history
+
+### Fixed
+
+- **Stale Scope Mode** — Fixed bug where removing a collection pill while in "All Collections" mode left scope as "all" despite no longer having all collections selected
+- **Agent Mode Toggle Reset** — Turning off Agent Mode now properly resets "All Collections" scope and clears selection
+
 ## [1.6.0] - 2026-03-21
 
 ### 🔭 Added - Telemetry System

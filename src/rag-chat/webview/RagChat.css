@@ -60,35 +60,73 @@
   border-color: var(--vscode-focusBorder, #0e639c) !important;
 }
 
-/* Agent Mode Toggle */
-.rag-agent-mode-toggle {
-  display: flex;
+/* Agent Mode Pill Toggle */
+.rag-agent-pill-toggle {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 12px 4px 10px;
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 16px;
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground, #888);
   cursor: pointer;
   user-select: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.rag-agent-mode-toggle:hover {
+.rag-agent-pill-toggle:hover {
+  border-color: var(--vscode-focusBorder, #0e639c);
+  color: var(--vscode-foreground);
   background-color: var(--vscode-editor-hoverBackground, rgba(255, 255, 255, 0.05));
 }
 
-.rag-agent-mode-toggle input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: var(--vscode-checkbox-background, #007acc);
+.rag-agent-pill-toggle--active {
+  border-color: var(--vscode-button-background, #0e639c);
+  background-color: rgba(14, 99, 156, 0.15);
+  color: var(--vscode-foreground);
 }
 
-.rag-agent-mode-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--vscode-foreground);
-  white-space: nowrap;
+.rag-agent-pill-toggle--active:hover {
+  background-color: rgba(14, 99, 156, 0.25);
+}
+
+.rag-agent-pill-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.rag-agent-pill-label {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.rag-agent-pill-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--vscode-descriptionForeground, #666);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.rag-agent-pill-dot--on {
+  background-color: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.5);
+}
+
+/* Panel-wide agent mode active indicator */
+.rag-chat--agent-active .rag-chat-header {
+  border-bottom-color: var(--vscode-button-background, #0e639c);
+  border-bottom-width: 2px;
+}
+
+.rag-chat--agent-active .rag-connection-bar {
+  background-color: rgba(14, 99, 156, 0.05);
 }
 
 .rag-chat-title {
@@ -699,6 +737,14 @@
   font-weight: 500;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+/* "All Collections" special pill variant */
+.rag-collection-pill--all {
+  background-color: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .rag-pill-remove {
