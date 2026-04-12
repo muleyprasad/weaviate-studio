@@ -58,7 +58,9 @@ interface SlashMenuProps {
 }
 
 export function SlashMenu({ open, selectedIndex, onSelect, onClose, onNavigate }: SlashMenuProps) {
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="rag-slash-menu" role="listbox">

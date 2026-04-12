@@ -1258,7 +1258,9 @@ export function RagChat() {
   );
 
   const handleSlashMenuSelect = useCallback((cmd: SlashCommand) => {
-    if (!textareaRef.current) return;
+    if (!textareaRef.current) {
+      return;
+    }
 
     // Insert the template
     const textarea = textareaRef.current;
