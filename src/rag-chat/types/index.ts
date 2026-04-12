@@ -120,6 +120,7 @@ export type RagChatExtensionMessageCommand =
   | 'ragResponse'
   | 'ragError'
   | 'agentResponse'
+  | 'agentSearchResponse'
   | 'collectionsLoaded'
   | 'addCollection'
   | 'advancedSettingsLoaded';
@@ -161,6 +162,8 @@ export interface RagChatExtensionMessage {
   connectionType?: 'cloud' | 'custom';
   /** Agent Mode enabled state (for init command) */
   agentModeEnabled?: boolean;
+  /** Search result objects (for agentSearchResponse command) */
+  searchObjects?: RagContextObject[];
 }
 
 /**

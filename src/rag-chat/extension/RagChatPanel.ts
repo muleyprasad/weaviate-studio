@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import { QueryAgentService } from './queryAgent/QueryAgentService';
+import { parseCommand } from './queryAgent/commandRouting';
 import { ConnectionManager } from '../../services/ConnectionManager';
 import type {
   RagChatExtensionMessage,
@@ -507,8 +508,8 @@ export class RagChatPanel {
         agentSystemPrompt || ''
       );
 
-      // Call agent.ask() with the question (no chat history in this story)
-      const { answer, trace } = await service.ask(message.question || '');
+      // Parse command to determine routing
+      const { method, cleanMessage } = parseCommand(message.question || '');
 
       // Check if this request is still active
       if (this._requestTracker.isStale(message.requestId)) {
@@ -517,15 +518,32 @@ export class RagChatPanel {
 
       const durationMs = Date.now() - startTime;
 
-      // Post agent response with trace
-      this.postMessage({
-        command: 'agentResponse',
-        answer,
-        question: message.question,
-        requestId: message.requestId,
-        durationMs,
-        trace,
-      });
+      if (method === 'search') {
+        // Pure retrieval path — no LLM answer generated
+        const searchResponse = await service.search(cleanMessage);
+        const objects = searchResponse.searchResults?.objects || [];
+
+        // Post search response with result objects
+        this.postMessage({
+          command: 'agentSearchResponse',
+          searchObjects: objects,
+          requestId: message.requestId,
+          durationMs,
+        });
+      } else {
+        // Standard ask path — retrieval + LLM answer generation
+        const { answer, trace } = await service.ask(cleanMessage);
+
+        // Post agent response with trace
+        this.postMessage({
+          command: 'agentResponse',
+          answer,
+          question: message.question,
+          requestId: message.requestId,
+          durationMs,
+          trace,
+        });
+      }
 
       getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
         result: 'success',
