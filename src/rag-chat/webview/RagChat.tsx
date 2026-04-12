@@ -372,23 +372,27 @@ function ChatEntry({
           <>
             {/* Only show answer section if there's an answer (not a search-only response) */}
             {entry.response.answer && (
-              <div className="rag-bubble-content rag-answer">
+              <div
+                className={`rag-bubble-content ${entry.response.hasError ? 'rag-error-bubble' : 'rag-answer'}`}
+              >
                 {/* Action buttons as a top header row for the answer */}
-                <div className="rag-answer-actions">
-                  <IconButton
-                    icon={copied ? 'check' : 'copy'}
-                    title={copied ? 'Copied!' : 'Copy answer to clipboard'}
-                    onClick={handleCopyAnswer}
-                  />
-                  <button
-                    type="button"
-                    className="rag-toggle-btn"
-                    onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-                    title={showRawMarkdown ? 'Show rendered preview' : 'Show raw markdown'}
-                  >
-                    {showRawMarkdown ? 'Preview' : 'Raw'}
-                  </button>
-                </div>
+                {!entry.response.hasError && (
+                  <div className="rag-answer-actions">
+                    <IconButton
+                      icon={copied ? 'check' : 'copy'}
+                      title={copied ? 'Copied!' : 'Copy answer to clipboard'}
+                      onClick={handleCopyAnswer}
+                    />
+                    <button
+                      type="button"
+                      className="rag-toggle-btn"
+                      onClick={() => setShowRawMarkdown(!showRawMarkdown)}
+                      title={showRawMarkdown ? 'Show rendered preview' : 'Show raw markdown'}
+                    >
+                      {showRawMarkdown ? 'Preview' : 'Raw'}
+                    </button>
+                  </div>
+                )}
 
                 {showRawMarkdown ? (
                   <pre className="rag-raw-markdown">
@@ -400,6 +404,17 @@ function ChatEntry({
                     <Markdown>{entry.response.answer}</Markdown>
                     {entry.loading && <span className="rag-streaming-cursor">|</span>}
                   </div>
+                )}
+
+                {/* Error details disclosure for agent errors */}
+                {entry.response.hasError && entry.errorDetails && (
+                  <details className="rag-error-details">
+                    <summary className="rag-error-details-summary">
+                      <span className="rag-disclosure-triangle">▸</span>
+                      Error details
+                    </summary>
+                    <pre className="rag-error-details-content">{entry.errorDetails.rawMessage}</pre>
+                  </details>
                 )}
               </div>
             )}
@@ -1065,6 +1080,38 @@ export function RagChat() {
                             traceExpanded: false,
                           }
                         : undefined,
+                  }
+                : entry
+            )
+          );
+          setLoading(false);
+          break;
+        }
+        case 'agentErrorBubble': {
+          // Handle agent error bubble: render styled error message with disclosure
+          const userFacingError =
+            msg.error ?? "Agent couldn't answer this. Try rephrasing or disable Agent Mode.";
+          const rawDetails = msg.rawDetails ?? '';
+
+          setHistory((prev) =>
+            prev.map((entry) =>
+              entry.id === msg.requestId
+                ? {
+                    ...entry,
+                    loading: false,
+                    response: {
+                      answer: userFacingError,
+                      contextObjects: [],
+                      query: entry.query,
+                      timestamp: Date.now(),
+                      durationMs: msg.durationMs,
+                      hasError: true,
+                    },
+                    errorDetails: {
+                      rawMessage: rawDetails,
+                      errorType: msg.errorType,
+                      disclosed: false,
+                    },
                   }
                 : entry
             )

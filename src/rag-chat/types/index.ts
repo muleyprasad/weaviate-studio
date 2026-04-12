@@ -106,6 +106,12 @@ export interface RagChatHistoryEntry {
     rawResponse: unknown;
     traceExpanded: boolean;
   };
+  /** Agent error details (only for agent error responses) */
+  errorDetails?: {
+    rawMessage: string;
+    errorType?: string;
+    disclosed: boolean;
+  };
 }
 
 // =====================================================
@@ -121,6 +127,7 @@ export type RagChatExtensionMessageCommand =
   | 'ragError'
   | 'agentResponse'
   | 'agentSearchResponse'
+  | 'agentErrorBubble'
   | 'streamChunk'
   | 'streamEnd'
   | 'collectionsLoaded'
@@ -172,6 +179,10 @@ export interface RagChatExtensionMessage {
   streamEnded?: boolean;
   /** Error flag during streaming (for streamEnd command) */
   streamError?: boolean;
+  /** Error type for agent error bubble (for agentErrorBubble command) */
+  errorType?: string;
+  /** Raw error details for disclosure (for agentErrorBubble command) */
+  rawDetails?: string;
 }
 
 /**

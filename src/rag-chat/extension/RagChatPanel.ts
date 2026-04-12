@@ -548,18 +548,25 @@ export class RagChatPanel {
       this._requestTracker.complete(message.requestId);
     } catch (error) {
       // Log telemetry for agent error
+      const durationMs = Date.now() - startTime;
       getTelemetryService().trackError(error, TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
         result: 'failure',
-        durationMs: Date.now() - startTime,
+        durationMs,
       });
 
       // Only send error if this request is still active
       if (!this._requestTracker.isStale(message.requestId)) {
         const errorMessage = error instanceof Error ? error.message : 'Agent query failed.';
+        const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+
+        // Post error bubble message for agent errors (non-blocking, user-visible)
         this.postMessage({
-          command: 'ragError',
-          error: errorMessage,
+          command: 'agentErrorBubble',
+          error: "Agent couldn't answer this. Try rephrasing or disable Agent Mode.",
+          errorType,
+          rawDetails: errorMessage,
           requestId: message.requestId,
+          durationMs,
         });
         this._requestTracker.complete(message.requestId);
       }

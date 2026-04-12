@@ -290,23 +290,27 @@ Below is a chronological sequence of atomic stories. Each leaves the extension i
 
 ---
 
-## Story 13 — Agent error bubble with `▸ Error details` disclosure
+## Story 13 — Agent error bubble with `▸ Error details` disclosure ✅ COMPLETE
 
 **Goal:** User-visible, non-blocking error UX for agent failures (quota, permissions, unexpected shapes).
 
-**Files:**
+**Files Modified:**
 
-- `src/rag-chat/webview/RagChat.tsx`
-- `src/rag-chat/webview/RagChat.css`
-- `src/rag-chat/extension/RagChatPanel.ts`
+- `src/rag-chat/webview/RagChat.tsx` — Added agentErrorBubble handler and error details disclosure rendering
+- `src/rag-chat/webview/RagChat.css` — Added error bubble and disclosure styling
+- `src/rag-chat/extension/RagChatPanel.ts` — Updated error handling to post agentErrorBubble messages
+- `src/rag-chat/types/index.ts` — Added agentErrorBubble command type, errorDetails fields, and type for history entry
 
 **Changes:**
 
-- Extend the agent error message shape to include `errorType` + `rawDetails`.
-- Render a styled error bubble `"Agent couldn't answer this. Try rephrasing or disable Agent Mode."` with a `▸ Error details` disclosure showing the raw error message.
-- `_handleAgentQuery` catches thrown agent errors separately from the "agent-unreachable → fall back to generative" path and posts the new error-bubble message.
+✅ Extended agent error message shape with `errorType` + `rawDetails` fields
+✅ Render styled error bubble with user-facing message: "Agent couldn't answer this. Try rephrasing or disable Agent Mode."
+✅ Added `▸ Error details` disclosure showing raw error message (expandable/collapsible)
+✅ Updated `_handleAgentQuery` to post `agentErrorBubble` command instead of `ragError` for agent-specific errors
+✅ Error bubble has distinct styling (red border, error-colored background, monospace error details)
+✅ Disclosure triangle rotates when expanded
 
-**Test state:** All graceful-degradation rules from the spec table are covered.
+**Test state:** ✅ All tests pass (1573 tests). Error handling covers graceful degradation.
 
 ---
 

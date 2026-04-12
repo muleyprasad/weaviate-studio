@@ -1357,3 +1357,59 @@
   animation: blink 1s infinite;
   font-weight: bold;
 }
+
+
+/* Error bubble styling for agent errors */
+.rag-error-bubble {
+  background-color: var(--vscode-editorError-background, rgba(255, 0, 0, 0.1));
+  border: 1px solid var(--vscode-editorError-foreground, #f48771);
+  border-radius: 4px;
+  padding: 12px 16px;
+  color: var(--vscode-editorError-foreground, #f48771);
+}
+
+/* Error details disclosure */
+.rag-error-details {
+  margin-top: 12px;
+  padding: 8px 0;
+}
+
+.rag-error-details-summary {
+  cursor: pointer;
+  padding: 8px;
+  margin: -8px 0 0 -8px;
+  border-radius: 2px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-editorError-foreground, #f48771);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rag-error-details-summary:hover {
+  background-color: var(--vscode-editorError-background, rgba(255, 0, 0, 0.05));
+}
+
+.rag-disclosure-triangle {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
+.rag-error-details[open] .rag-disclosure-triangle {
+  transform: rotate(90deg);
+}
+
+.rag-error-details-content {
+  background-color: var(--vscode-editorError-background, rgba(255, 0, 0, 0.05));
+  border: 1px solid var(--vscode-editorError-foreground, #f48771);
+  border-radius: 2px;
+  padding: 8px 12px;
+  margin: 8px 0 0 0;
+  font-size: 11px;
+  color: var(--vscode-editorError-foreground, #f48771);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
