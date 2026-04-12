@@ -67,6 +67,11 @@ jest.mock('crypto', () => ({
   randomBytes: jest.fn().mockReturnValue(Buffer.from('deadbeefdeadbeef', 'hex')),
 }));
 
+// Mock weaviate-agents ESM module to prevent Jest parsing errors
+jest.mock('weaviate-agents', () => ({
+  QueryAgent: jest.fn(),
+}));
+
 // Mock RagChatAPI so the constructor doesn't try to call a real Weaviate instance
 jest.mock('../rag-chat/extension/RagChatAPI', () => ({
   RagChatAPI: jest.fn().mockImplementation(() => ({

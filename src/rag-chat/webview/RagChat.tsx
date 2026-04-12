@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Markdown from 'markdown-to-jsx';
 import { QueryTrace } from './components/QueryTrace';
+import { SlashMenu, SLASH_COMMANDS, type SlashCommand } from './components/SlashMenu';
 import type {
   RagChatHistoryEntry,
   RagContextObject,
@@ -795,6 +796,8 @@ export function RagChat() {
   );
   const [agentModeEnabled, setAgentModeEnabled] = useState(false);
   const [showAgentKeyWarning, setShowAgentKeyWarning] = useState(false);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashMenuSelectedIndex, setSlashMenuSelectedIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1063,14 +1066,77 @@ export function RagChat() {
     [queryTimeout, selectedProvider, advancedSettings, agentModeEnabled]
   );
 
+  const handleSlashMenuSelect = useCallback((cmd: SlashCommand) => {
+    if (!textareaRef.current) return;
+
+    // Insert the template
+    const textarea = textareaRef.current;
+    textarea.value = cmd.template;
+    setQuestion(cmd.template);
+
+    // Close menu
+    setSlashMenuOpen(false);
+    setSlashMenuSelectedIndex(0);
+
+    // Fire telemetry (stub for now)
+    // This will be wired in Story 12
+
+    // Set cursor position if specified
+    if (cmd.cursorOffset !== undefined) {
+      setTimeout(() => {
+        textarea.selectionStart = cmd.cursorOffset!;
+        textarea.selectionEnd = cmd.cursorOffset!;
+        textarea.focus();
+      }, 0);
+    } else {
+      // Focus and place cursor at end
+      setTimeout(() => {
+        textarea.focus();
+        textarea.selectionStart = textarea.value.length;
+        textarea.selectionEnd = textarea.value.length;
+      }, 0);
+    }
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Handle slash menu keyboard navigation
+      if (slashMenuOpen) {
+        switch (e.key) {
+          case 'ArrowUp':
+            e.preventDefault();
+            setSlashMenuSelectedIndex((prev) =>
+              prev === 0 ? SLASH_COMMANDS.length - 1 : prev - 1
+            );
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            setSlashMenuSelectedIndex((prev) =>
+              prev === SLASH_COMMANDS.length - 1 ? 0 : prev + 1
+            );
+            break;
+          case 'Enter':
+          case 'Tab':
+            e.preventDefault();
+            handleSlashMenuSelect(SLASH_COMMANDS[slashMenuSelectedIndex]);
+            break;
+          case 'Escape':
+            e.preventDefault();
+            setSlashMenuOpen(false);
+            break;
+          default:
+            break;
+        }
+        return;
+      }
+
+      // Standard textarea behavior when menu is closed
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit]
+    [slashMenuOpen, slashMenuSelectedIndex, handleSubmit, handleSlashMenuSelect]
   );
 
   // initialData is a module-level constant from getInitialData(), so it's
@@ -1200,11 +1266,39 @@ export function RagChat() {
           onShowContextChange={setShowContext}
         />
         <div className="rag-chat-input-row">
+          {/* Slash command menu */}
+          <SlashMenu
+            open={slashMenuOpen}
+            selectedIndex={slashMenuSelectedIndex}
+            onSelect={handleSlashMenuSelect}
+            onClose={() => setSlashMenuOpen(false)}
+            onNavigate={(direction) => {
+              setSlashMenuSelectedIndex((prev) =>
+                direction === 'up'
+                  ? prev === 0
+                    ? SLASH_COMMANDS.length - 1
+                    : prev - 1
+                  : prev === SLASH_COMMANDS.length - 1
+                    ? 0
+                    : prev + 1
+              );
+            }}
+          />
           <textarea
             ref={textareaRef}
             className="rag-textarea"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQuestion(val);
+              // Open slash menu only if "/" is the first character
+              if (val.startsWith('/') && val.length === 1) {
+                setSlashMenuOpen(true);
+                setSlashMenuSelectedIndex(0);
+              } else if (!val.startsWith('/')) {
+                setSlashMenuOpen(false);
+              }
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Ask a question about the selected collections…"
             aria-label="Question input"

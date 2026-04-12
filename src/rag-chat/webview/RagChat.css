@@ -1251,3 +1251,85 @@
 .query-trace-source-link:hover {
   opacity: 0.8;
 }
+
+/* ===== Slash Command Menu ===== */
+.rag-slash-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-width: 100%;
+  background-color: var(--vscode-dropdown-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  z-index: 10;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.rag-slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: transparent;
+  border: none;
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.rag-slash-menu-item:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.rag-slash-menu-item:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+.rag-slash-menu-item:hover,
+.rag-slash-menu-item.selected {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+.rag-slash-menu-item.selected {
+  background-color: var(--vscode-list-activeSelectionBackground, #094771);
+  color: var(--vscode-list-activeSelectionForeground, #ffffff);
+}
+
+.rag-slash-menu-command {
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--vscode-textLink-foreground, #0098ff);
+  min-width: 80px;
+}
+
+.rag-slash-menu-item.selected .rag-slash-menu-command {
+  color: inherit;
+}
+
+.rag-slash-menu-description {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  flex: 1;
+}
+
+.rag-slash-menu-item.selected .rag-slash-menu-description {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* Positioning for slash menu relative to input row */
+.rag-chat-input-row {
+  position: relative;
+}
