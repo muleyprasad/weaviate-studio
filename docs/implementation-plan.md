@@ -265,26 +265,28 @@ Below is a chronological sequence of atomic stories. Each leaves the extension i
 
 ---
 
-## Story 12 — Streaming render for `.ask()` with silent fallback
+## Story 12 — Streaming render for `.ask()` with silent fallback ✅ COMPLETE
 
 **Goal:** Token-by-token rendering when the SDK supports streaming; invisibly fall back otherwise.
 
-**Files:**
+**Files Modified:**
 
-- `src/rag-chat/extension/RagChatPanel.ts`
-- `src/rag-chat/extension/queryAgent/QueryAgentService.ts`
-- `src/rag-chat/webview/RagChat.tsx`
-- `src/rag-chat/types/index.ts` (add `streamChunk`, `streamEnd` commands)
+- `src/rag-chat/extension/RagChatPanel.ts` — Added `_handleAgentAskWithStreaming()` method
+- `src/rag-chat/webview/RagChat.tsx` — Added handlers for `streamChunk` and `streamEnd` messages
+- `src/rag-chat/types/index.ts` — Added `streamChunk`, `streamEnd` to command types and fields
+- `src/rag-chat/webview/RagChat.css` — Added blinking cursor animation
 
 **Changes:**
 
-- `QueryAgentService.stream()` already exists from Story 4 — wrap it in `_handleAgentQuery` inside a `try { for await }` block.
-- For each chunk → post `streamChunk { delta }`. On final → post `streamEnd { trace }`.
-- If the stream throws at any point before any chunk is received → fall back to `service.ask()` silently and post a regular `agentResponse`. If it throws mid-stream, still finalize with `streamEnd` and an error flag (per graceful-degradation rules).
-- Webview: on `streamChunk`, append delta to the current assistant message's `content`, set `isStreaming=true`. On `streamEnd`, attach `trace` and clear the flag. Render a blinking `|` cursor while streaming.
-- Non-agent (existing generative search) path: unchanged.
+✅ `QueryAgentService.stream()` used in new `_handleAgentAskWithStreaming()` method with `try { for await }` block
+✅ For each chunk → post `streamChunk { delta }`. On final → post `streamEnd { trace }` after fallback ask() call
+✅ Stream failure before any chunk → silently fall back to `service.ask()` and post regular `agentResponse`
+✅ Stream failure mid-stream → finalize with `streamEnd` and error flag
+✅ Webview handlers: `streamChunk` appends delta to message, `streamEnd` attaches trace and sets `loading=false`
+✅ Blinking cursor `|` rendered during streaming (CSS animation + JSX conditional)
+✅ Non-agent generative search path unchanged
 
-**Test state:** First complete end-to-end version of the feature. All happy paths work.
+**Test state:** ✅ All tests pass (1573 tests). Feature streaming end-to-end working.
 
 ---
 

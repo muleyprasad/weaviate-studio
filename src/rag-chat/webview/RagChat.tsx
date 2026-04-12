@@ -391,9 +391,15 @@ function ChatEntry({
                 </div>
 
                 {showRawMarkdown ? (
-                  <pre className="rag-raw-markdown">{entry.response.answer}</pre>
+                  <pre className="rag-raw-markdown">
+                    {entry.response.answer}
+                    {entry.loading && <span className="rag-streaming-cursor">|</span>}
+                  </pre>
                 ) : (
-                  <Markdown>{entry.response.answer}</Markdown>
+                  <div>
+                    <Markdown>{entry.response.answer}</Markdown>
+                    {entry.loading && <span className="rag-streaming-cursor">|</span>}
+                  </div>
                 )}
               </div>
             )}
@@ -990,6 +996,75 @@ export function RagChat() {
                       durationMs: msg.durationMs,
                       hasError: false,
                     },
+                  }
+                : entry
+            )
+          );
+          setLoading(false);
+          break;
+        }
+        case 'streamChunk': {
+          // Handle streaming token chunk: append to current message
+          const delta = msg.delta ?? '';
+          setHistory((prev) =>
+            prev.map((entry) =>
+              entry.id === msg.requestId
+                ? {
+                    ...entry,
+                    loading: true, // Keep loading flag true during streaming
+                    response: entry.response
+                      ? {
+                          ...entry.response,
+                          answer: entry.response.answer + delta, // Append token
+                        }
+                      : {
+                          answer: delta,
+                          contextObjects: [],
+                          query: entry.query,
+                          timestamp: Date.now(),
+                        },
+                  }
+                : entry
+            )
+          );
+          break;
+        }
+        case 'streamEnd': {
+          // Handle stream completion: attach final trace and clear streaming flag
+          const trace = msg.trace;
+          const durationMs = msg.durationMs;
+          const hasStreamError = msg.streamError ?? false;
+          const answer = msg.answer ?? '';
+          const error = msg.error;
+
+          setHistory((prev) =>
+            prev.map((entry) =>
+              entry.id === msg.requestId
+                ? {
+                    ...entry,
+                    loading: false,
+                    response: entry.response
+                      ? {
+                          ...entry.response,
+                          answer: answer || entry.response.answer,
+                          durationMs,
+                          hasError: hasStreamError,
+                        }
+                      : {
+                          answer,
+                          contextObjects: [],
+                          query: entry.query,
+                          timestamp: Date.now(),
+                          durationMs,
+                          hasError: hasStreamError,
+                        },
+                    trace:
+                      trace && !hasStreamError
+                        ? {
+                            rawResponse: trace,
+                            traceExpanded: false,
+                          }
+                        : undefined,
                   }
                 : entry
             )

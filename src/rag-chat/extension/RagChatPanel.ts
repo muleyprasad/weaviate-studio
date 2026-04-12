@@ -531,18 +531,13 @@ export class RagChatPanel {
           durationMs,
         });
       } else {
-        // Standard ask path — retrieval + LLM answer generation
-        const { answer, trace } = await service.ask(cleanMessage);
-
-        // Post agent response with trace
-        this.postMessage({
-          command: 'agentResponse',
-          answer,
-          question: message.question,
-          requestId: message.requestId,
-          durationMs,
-          trace,
-        });
+        // Standard ask path — try streaming first, fall back to ask() if stream fails
+        await this._handleAgentAskWithStreaming(
+          service,
+          cleanMessage,
+          message.requestId,
+          message.question
+        );
       }
 
       getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
@@ -567,6 +562,146 @@ export class RagChatPanel {
           requestId: message.requestId,
         });
         this._requestTracker.complete(message.requestId);
+      }
+    }
+  }
+
+  /**
+   * Handles ask queries with streaming support and fallback to non-streaming
+   */
+  private async _handleAgentAskWithStreaming(
+    service: QueryAgentService,
+    message: string,
+    requestId: string | undefined,
+    originalQuestion: string | undefined
+  ): Promise<void> {
+    const startTime = Date.now();
+    let hasReceivedChunk = false;
+
+    try {
+      // Try streaming first
+      let finalAnswer = '';
+      let trace: unknown = null;
+
+      for await (const chunk of service.stream(message)) {
+        // Check if request is stale
+        if (requestId && this._requestTracker.isStale(requestId)) {
+          return;
+        }
+
+        hasReceivedChunk = true;
+
+        // Post each chunk as it arrives
+        if (chunk.outputType === 'streamedTokens' && chunk.delta) {
+          finalAnswer += chunk.delta;
+          this.postMessage({
+            command: 'streamChunk',
+            delta: chunk.delta,
+            requestId,
+          });
+        }
+      }
+
+      // After streaming completes, get the final trace via a fallback ask() call
+      // (since stream doesn't provide full trace data)
+      try {
+        const { trace: fullTrace } = await service.ask(message);
+        trace = fullTrace;
+      } catch {
+        // If trace retrieval fails, proceed without it (graceful degradation)
+        trace = null;
+      }
+
+      // Post final message with complete trace
+      const durationMs = Date.now() - startTime;
+      this.postMessage({
+        command: 'streamEnd',
+        answer: finalAnswer,
+        trace,
+        question: originalQuestion,
+        requestId,
+        durationMs,
+        streamEnded: true,
+      });
+
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: 'success',
+        durationMs,
+      });
+
+      if (requestId) {
+        this._requestTracker.complete(requestId);
+      }
+    } catch (streamError) {
+      // If stream fails before any chunk was received, fall back to non-streaming ask()
+      if (!hasReceivedChunk) {
+        try {
+          const { answer, trace } = await service.ask(message);
+          const durationMs = Date.now() - startTime;
+
+          // Post regular agent response (non-streaming)
+          this.postMessage({
+            command: 'agentResponse',
+            answer,
+            trace,
+            question: originalQuestion,
+            requestId,
+            durationMs,
+          });
+
+          getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+            result: 'success',
+            durationMs,
+          });
+
+          if (requestId) {
+            this._requestTracker.complete(requestId);
+          }
+          return;
+        } catch (fallbackError) {
+          // Both streaming and fallback failed
+          const errorMessage =
+            fallbackError instanceof Error ? fallbackError.message : 'Agent query failed.';
+          getTelemetryService().trackError(
+            fallbackError,
+            TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED,
+            {
+              result: 'failure',
+              durationMs: Date.now() - startTime,
+            }
+          );
+
+          if (requestId && !this._requestTracker.isStale(requestId)) {
+            this.postMessage({
+              command: 'ragError',
+              error: errorMessage,
+              requestId,
+            });
+            this._requestTracker.complete(requestId);
+          }
+          return;
+        }
+      }
+
+      // Stream failed mid-stream: send streamEnd with error flag
+      const durationMs = Date.now() - startTime;
+      const errorMessage = streamError instanceof Error ? streamError.message : 'Stream error';
+
+      getTelemetryService().trackError(streamError, TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
+        result: 'failure',
+        durationMs,
+      });
+
+      if (requestId && !this._requestTracker.isStale(requestId)) {
+        this.postMessage({
+          command: 'streamEnd',
+          streamEnded: true,
+          streamError: true,
+          error: errorMessage,
+          requestId,
+          durationMs,
+        });
+        this._requestTracker.complete(requestId);
       }
     }
   }

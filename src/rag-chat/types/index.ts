@@ -121,6 +121,8 @@ export type RagChatExtensionMessageCommand =
   | 'ragError'
   | 'agentResponse'
   | 'agentSearchResponse'
+  | 'streamChunk'
+  | 'streamEnd'
   | 'collectionsLoaded'
   | 'addCollection'
   | 'advancedSettingsLoaded';
@@ -156,7 +158,7 @@ export interface RagChatExtensionMessage {
   availableModules?: string[];
   /** Advanced settings from VS Code globalState */
   advancedSettings?: AdvancedRagSettings;
-  /** Query Agent trace (for agentResponse command) */
+  /** Query Agent trace (for agentResponse or streamEnd command) */
   trace?: unknown;
   /** Connection type (cloud or custom) - used for UI feature gating */
   connectionType?: 'cloud' | 'custom';
@@ -164,6 +166,12 @@ export interface RagChatExtensionMessage {
   agentModeEnabled?: boolean;
   /** Search result objects (for agentSearchResponse command) */
   searchObjects?: RagContextObject[];
+  /** Streamed token delta (for streamChunk command) */
+  delta?: string;
+  /** Whether streaming has completed (for streamEnd command) */
+  streamEnded?: boolean;
+  /** Error flag during streaming (for streamEnd command) */
+  streamError?: boolean;
 }
 
 /**
