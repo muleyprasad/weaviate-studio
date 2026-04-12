@@ -457,14 +457,18 @@ function CollectionSelector({
   selectedCollections,
   onAdd,
   onRemove,
+  onSelectAllCollections,
   loading,
+  connectionType,
 }: {
   allCollections: string[];
   collectionInfos: CollectionInfo[];
   selectedCollections: string[];
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
+  onSelectAllCollections: () => void;
   loading: boolean;
+  connectionType?: 'cloud' | 'custom';
 }) {
   // Collections available for adding (not yet selected)
   const availableCollections = allCollections.filter((c) => !selectedCollections.includes(c));
@@ -473,12 +477,15 @@ function CollectionSelector({
   const handleSelectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
-      if (value) {
+      if (value === 'ALL_COLLECTIONS') {
+        onSelectAllCollections();
+        e.target.value = ''; // Reset to placeholder
+      } else if (value) {
         onAdd(value);
         e.target.value = ''; // Reset to placeholder
       }
     },
-    [onAdd]
+    [onAdd, onSelectAllCollections]
   );
 
   const selectedCount = selectedCollections.length;
@@ -539,7 +546,7 @@ function CollectionSelector({
       ) : (
         <>
           {/* Add collection dropdown — auto-adds on selection */}
-          {availableCollections.length > 0 && (
+          {allCollections.length > 0 && (
             <select
               className="rag-select rag-select-auto"
               aria-labelledby="rag-collection-label"
@@ -549,6 +556,8 @@ function CollectionSelector({
               <option value="" disabled>
                 {selectedCount === 0 ? 'Select a collection…' : 'Add another collection…'}
               </option>
+              {/* "All Collections" option — cloud-only or shows fallback note */}
+              <option value="ALL_COLLECTIONS">All Collections</option>
               {availableCollections.map((name) => (
                 <option key={name} value={name}>
                   {name}
@@ -1014,6 +1023,20 @@ export function RagChat() {
     setSelectedCollections((prev) => prev.filter((c) => c !== name));
   }, []);
 
+  const handleSelectAllCollections = useCallback(() => {
+    if (connectionType === 'cloud') {
+      // Enable agent mode and select all collections
+      setSelectedCollections([...allCollections]);
+      setAgentModeEnabled(true);
+    } else {
+      // Local connection: fallback to first collection and show note
+      // Note: in Story 11 spec, show an inline note, but for now we just select first collection
+      if (allCollections.length > 0) {
+        setSelectedCollections([allCollections[0]]);
+      }
+    }
+  }, [connectionType, allCollections]);
+
   const [settingsSavedFlash, setSettingsSavedFlash] = useState(false);
   const handleSaveAdvancedSettings = useCallback(() => {
     vscodeApi.postMessage({
@@ -1274,7 +1297,9 @@ export function RagChat() {
             selectedCollections={selectedCollections}
             onAdd={handleAddCollection}
             onRemove={handleRemoveCollection}
+            onSelectAllCollections={handleSelectAllCollections}
             loading={collectionsLoading}
+            connectionType={connectionType}
           />
           <ProviderSelector
             availableModules={availableModules}
