@@ -196,7 +196,8 @@ export type RagChatWebviewMessageCommand =
   | 'getAdvancedSettings'
   | 'saveAdvancedSettings'
   | 'getAgentModeState'
-  | 'setAgentModeState';
+  | 'setAgentModeState'
+  | 'slashCommandSelected';
 
 /**
  * Message sent from the webview to the extension
@@ -233,6 +234,8 @@ export interface RagChatWebviewMessage {
   scopeMode?: 'single' | 'all';
   /** Agent Mode state to persist (for setAgentModeState command) */
   enabled?: boolean;
+  /** Slash command name (for slashCommandSelected command) */
+  slashCommand?: string;
 }
 
 // =====================================================

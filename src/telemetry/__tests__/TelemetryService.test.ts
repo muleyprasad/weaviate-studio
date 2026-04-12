@@ -35,7 +35,15 @@ describe('TELEMETRY_EVENTS', () => {
     expect(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED).toBe('ragChat.requestCompleted');
   });
 
-  it('should have exactly 19 events', () => {
-    expect(Object.keys(TELEMETRY_EVENTS)).toHaveLength(19);
+  it('should define agent mode event names', () => {
+    expect(TELEMETRY_EVENTS.RAG_CHAT_AGENT_MODE_TOGGLED).toBe('ragChat.agentModeToggled');
+    expect(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SENT).toBe('ragChat.agentQuerySent');
+    expect(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SUCCESS).toBe('ragChat.agentQuerySuccess');
+    expect(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_ERROR).toBe('ragChat.agentQueryError');
+    expect(TELEMETRY_EVENTS.RAG_CHAT_SLASH_COMMAND_USED).toBe('ragChat.slashCommandUsed');
+  });
+
+  it('should have exactly 24 events', () => {
+    expect(Object.keys(TELEMETRY_EVENTS)).toHaveLength(24);
   });
 });

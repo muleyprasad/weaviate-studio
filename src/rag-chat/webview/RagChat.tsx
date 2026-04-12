@@ -1269,8 +1269,11 @@ export function RagChat() {
     setSlashMenuOpen(false);
     setSlashMenuSelectedIndex(0);
 
-    // Fire telemetry (stub for now)
-    // This will be wired in Story 12
+    // Fire telemetry event for slash command selection
+    vscodeApi.postMessage({
+      command: 'slashCommandSelected',
+      slashCommand: cmd.command,
+    });
 
     // Set cursor position if specified
     if (cmd.cursorOffset !== undefined) {

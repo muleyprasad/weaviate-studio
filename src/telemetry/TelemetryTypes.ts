@@ -42,6 +42,13 @@ export const TELEMETRY_EVENTS = {
   RAG_CHAT_REQUEST_COMPLETED: 'ragChat.requestCompleted',
   COLLECTION_CREATE_COMPLETED: 'collection.createCompleted',
   BACKUP_COMPLETED: 'backup.completed',
+
+  // Agent Mode events
+  RAG_CHAT_AGENT_MODE_TOGGLED: 'ragChat.agentModeToggled',
+  RAG_CHAT_AGENT_QUERY_SENT: 'ragChat.agentQuerySent',
+  RAG_CHAT_AGENT_QUERY_SUCCESS: 'ragChat.agentQuerySuccess',
+  RAG_CHAT_AGENT_QUERY_ERROR: 'ragChat.agentQueryError',
+  RAG_CHAT_SLASH_COMMAND_USED: 'ragChat.slashCommandUsed',
 } as const;
 
 export type TelemetryEventName = (typeof TELEMETRY_EVENTS)[keyof typeof TELEMETRY_EVENTS];

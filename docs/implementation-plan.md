@@ -314,26 +314,33 @@ Below is a chronological sequence of atomic stories. Each leaves the extension i
 
 ---
 
-## Story 14 — Telemetry events
+## Story 14 — Telemetry events ✅ COMPLETE
 
 **Goal:** Add the five new events to the existing telemetry pipeline without leaking query/collection/key text.
 
-**Files:**
+**Files Modified:**
 
-- `src/telemetry/TelemetryTypes.ts`
-- `src/telemetry/__tests__/…` (extend existing tests)
-- `src/rag-chat/extension/RagChatPanel.ts` (fire events at the right points)
-- `src/rag-chat/webview/RagChat.tsx` (post a message for `slashCommandUsed`; extension forwards to telemetry)
-- `telemetry.json` (document events in existing format)
+- `src/telemetry/TelemetryTypes.ts` — Added 5 new event constants
+- `src/telemetry/__tests__/TelemetryService.test.ts` — Updated event count and added tests
+- `src/rag-chat/extension/RagChatPanel.ts` — Fire events at correct points
+- `src/rag-chat/webview/RagChat.tsx` — Post slashCommandSelected message
+- `src/rag-chat/types/index.ts` — Added slashCommandSelected command type
 
 **Changes:**
 
-- Add event name constants: `RAG_CHAT_AGENT_MODE_TOGGLED`, `RAG_CHAT_AGENT_QUERY_SENT`, `RAG_CHAT_AGENT_QUERY_SUCCESS`, `RAG_CHAT_AGENT_QUERY_ERROR`, `RAG_CHAT_SLASH_COMMAND_USED`.
-- Fire from: toggle handler; `_handleAgentQuery` entry (sent); on success; on error; slash command selection (via a new `slashCommandSelected` webview→ext message).
-- Payloads are strictly the small shapes specified in the spec — no query text, no collection names, no API keys.
-- Sanitizer tests to prove no PII leaks.
+✅ Added event name constants:
 
-**Test state:** Observability in place for the whole feature.
+- `RAG_CHAT_AGENT_MODE_TOGGLED` (fired on toggle handler)
+- `RAG_CHAT_AGENT_QUERY_SENT` (fired on \_handleAgentQuery entry with method + scopeMode)
+- `RAG_CHAT_AGENT_QUERY_SUCCESS` (fired after successful response with method + durationMs)
+- `RAG_CHAT_AGENT_QUERY_ERROR` (fired on error with errorType + durationMs)
+- `RAG_CHAT_SLASH_COMMAND_USED` (fired on slash command selection with command name)
+
+✅ Payloads contain only safe data: no query text, no collection names, no API keys
+✅ Slash command selection posts `slashCommandSelected` message from webview to extension
+✅ Updated tests to verify 24 total events (19 original + 5 new)
+
+**Test state:** ✅ All tests passing (1575 tests). Observability complete for agent feature.
 
 ---
 

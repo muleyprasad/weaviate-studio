@@ -286,6 +286,14 @@ export class RagChatPanel {
             await this._handleSetAgentModeState(message.enabled);
           }
           break;
+
+        case 'slashCommandSelected':
+          if (message.slashCommand) {
+            getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_SLASH_COMMAND_USED, {
+              command: message.slashCommand,
+            });
+          }
+          break;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -516,6 +524,12 @@ export class RagChatPanel {
         return;
       }
 
+      // Track agent query sent event
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SENT, {
+        method,
+        scopeMode: message.scopeMode,
+      });
+
       const durationMs = Date.now() - startTime;
 
       if (method === 'search') {
@@ -540,6 +554,12 @@ export class RagChatPanel {
         );
       }
 
+      // Track agent query success
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SUCCESS, {
+        method,
+        durationMs,
+      });
+
       getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
         result: 'success',
         durationMs,
@@ -549,6 +569,14 @@ export class RagChatPanel {
     } catch (error) {
       // Log telemetry for agent error
       const durationMs = Date.now() - startTime;
+      const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+
+      // Track agent query error event
+      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_ERROR, {
+        errorType,
+        durationMs,
+      });
+
       getTelemetryService().trackError(error, TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
         result: 'failure',
         durationMs,
@@ -557,7 +585,6 @@ export class RagChatPanel {
       // Only send error if this request is still active
       if (!this._requestTracker.isStale(message.requestId)) {
         const errorMessage = error instanceof Error ? error.message : 'Agent query failed.';
-        const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
 
         // Post error bubble message for agent errors (non-blocking, user-visible)
         this.postMessage({
@@ -745,6 +772,11 @@ export class RagChatPanel {
   private async _handleSetAgentModeState(enabled: boolean): Promise<void> {
     const agentModeKey = `ragChat.agentMode.${this._connectionId}`;
     await this._context.workspaceState.update(agentModeKey, enabled);
+
+    // Track Agent Mode toggle event
+    getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_MODE_TOGGLED, {
+      enabled,
+    });
   }
 
   /**
