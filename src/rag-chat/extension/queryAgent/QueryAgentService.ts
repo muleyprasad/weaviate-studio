@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * QueryAgentService — Wrapper around weaviate-agents QueryAgent SDK
  *
@@ -9,9 +8,9 @@
  *
  * Response shapes are mapped to internal types via traceMapping.ts
  *
- * Note: @ts-nocheck suppresses ESM/CommonJS type incompatibility warnings.
- * Webpack handles the actual transpilation correctly; TypeScript just doesn't
- * understand the hybrid module setup. See types.ts for context.
+ * Note: Targeted @ts-ignore comments suppress ESM/CommonJS type incompatibility
+ * on the specific weaviate-agents import and QueryAgent instantiation.
+ * Webpack handles actual module resolution at runtime. See types.ts for context.
  */
 
 import type { WeaviateClient } from 'weaviate-client';
@@ -23,6 +22,7 @@ import {
   type QueryAgentStreamChunk,
 } from './types';
 // Import QueryAgentCollection directly from weaviate-agents since it's not re-exported in types.ts
+// @ts-ignore -- ESM/CommonJS: weaviate-agents is ESM-only; Webpack resolves this at runtime
 import type { QueryAgentCollection } from 'weaviate-agents';
 import { mapAskResponseToTrace, mapChatHistory } from './traceMapping';
 import type { QueryAgentTrace } from './types';
@@ -44,6 +44,7 @@ export class QueryAgentService {
    * @param systemPrompt - System prompt to guide the agent's behavior
    */
   constructor(client: WeaviateClient, collections: QueryAgentCollection[], systemPrompt: string) {
+    // @ts-ignore -- ESM/CommonJS: QueryAgent is a runtime value from ESM weaviate-agents
     this.agent = new QueryAgent(client, {
       collections,
       systemPrompt,
@@ -86,25 +87,30 @@ export class QueryAgentService {
   }
 
   /**
-   * Stream tokens from the agent response (stub for future implementation)
+   * Stream tokens from the agent response.
+   *
+   * Yields StreamedTokens chunks for token-by-token rendering, followed by
+   * the final AskModeResponse (outputType === 'finalState') which contains
+   * full trace metadata. This avoids a second ask() call just for trace data.
    *
    * @param message - The question to stream
    * @param chatHistory - Optional chat history
-   * @returns AsyncGenerator yielding streamed tokens only (filters out progress messages)
+   * @returns AsyncGenerator yielding token chunks and then a final state with trace
    */
   async *stream(
     message: string,
     chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
-  ): AsyncGenerator<QueryAgentStreamChunk> {
+  ): AsyncGenerator<QueryAgentStreamChunk | QueryAgentAskResponse> {
     const query: QueryAgentChatMessage[] | string = chatHistory
       ? [...mapChatHistory(chatHistory), { role: 'user', content: message }]
       : message;
 
     for await (const chunk of this.agent.askStream(query, {
-      includeFinalState: false,
+      includeProgress: false,
+      includeFinalState: true,
     })) {
-      // Only yield StreamedTokens, filter out ProgressMessage
-      if (chunk.outputType === 'streamedTokens') {
+      // Yield both StreamedTokens and the final AskModeResponse (trace data)
+      if (chunk.outputType === 'streamedTokens' || chunk.outputType === 'finalState') {
         yield chunk;
       }
     }

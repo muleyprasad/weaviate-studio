@@ -1342,6 +1342,32 @@
 }
 
 
+/* System / warning messages */
+.rag-system-message {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+.rag-system-warning {
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.1));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+/* Scope / Agent Mode inline notes */
+.rag-scope-note {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  margin-top: 4px;
+  display: block;
+}
+
+.rag-scope-note-fallback {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
 /* Streaming cursor animation */
 @keyframes blink {
   0%, 49% {

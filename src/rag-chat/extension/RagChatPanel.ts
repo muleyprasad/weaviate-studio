@@ -11,7 +11,8 @@ import type { WeaviateClient } from 'weaviate-client';
 import { RagChatAPI } from './RagChatAPI';
 import { QueryAgentService } from './queryAgent/QueryAgentService';
 import { parseCommand } from './queryAgent/commandRouting';
-import { ConnectionManager } from '../../services/ConnectionManager';
+import { mapAskResponseToTrace } from './queryAgent/traceMapping';
+import { ConnectionManager, DEFAULT_AGENT_SYSTEM_PROMPT } from '../../services/ConnectionManager';
 import type {
   RagChatExtensionMessage,
   RagChatWebviewMessage,
@@ -323,12 +324,16 @@ export class RagChatPanel {
       const agentModeKey = `ragChat.agentMode.${this._connectionId}`;
       const agentModeEnabled = this._context.workspaceState.get<boolean>(agentModeKey) ?? false;
 
+      // Tell the webview whether an inference provider key is configured (presence only — not the value)
+      const inferenceProviderApiKeyPresent = connection?.inferenceProviderApiKeyPresent ?? false;
+
       this.postMessage({
         command: 'init',
         collectionInfos: this._collectionInfosCache,
         availableModules: modules,
         connectionType,
         agentModeEnabled,
+        inferenceProviderApiKeyPresent,
       });
     } catch (error) {
       console.error('RagChatPanel: Failed to load collections:', error);
@@ -492,29 +497,27 @@ export class RagChatPanel {
     const startTime = Date.now();
 
     try {
-      // Get the Weaviate client from ConnectionManager
-      const weaviateClient = connManager.getClient(this._connectionId);
-      if (!weaviateClient) {
-        throw new Error('Weaviate client not initialized');
-      }
-
       // Get agent configuration from connection
-      const agentSystemPrompt = connManager.getAgentSystemPrompt(this._connectionId);
+      const agentSystemPrompt =
+        connManager.getAgentSystemPrompt(this._connectionId) || DEFAULT_AGENT_SYSTEM_PROMPT;
       const inferenceProviderApiKey = await connManager.getInferenceProviderApiKey(
         this._connectionId
       );
 
-      if (!inferenceProviderApiKey) {
-        throw new Error('Inference provider API key not configured');
+      // Use a dedicated client with the inference provider key header when available;
+      // fall back to the shared client otherwise (server may have a default provider).
+      const baseClient = connManager.getClient(this._connectionId);
+      if (!baseClient) {
+        throw new Error('Weaviate client not initialized');
       }
+      const weaviateClient = inferenceProviderApiKey
+        ? ((await connManager.createAgentClient(this._connectionId, inferenceProviderApiKey)) ??
+          baseClient)
+        : baseClient;
 
       // Instantiate QueryAgentService
       const collectionNames = message.collectionNames ?? [];
-      const service = new QueryAgentService(
-        weaviateClient,
-        collectionNames,
-        agentSystemPrompt || ''
-      );
+      const service = new QueryAgentService(weaviateClient, collectionNames, agentSystemPrompt);
 
       // Parse command to determine routing
       const { method, cleanMessage } = parseCommand(message.question || '');
@@ -530,12 +533,11 @@ export class RagChatPanel {
         scopeMode: message.scopeMode,
       });
 
-      const durationMs = Date.now() - startTime;
-
       if (method === 'search') {
         // Pure retrieval path — no LLM answer generated
         const searchResponse = await service.search(cleanMessage);
         const objects = searchResponse.searchResults?.objects || [];
+        const durationMs = Date.now() - startTime;
 
         // Post search response with result objects
         this.postMessage({
@@ -544,26 +546,22 @@ export class RagChatPanel {
           requestId: message.requestId,
           durationMs,
         });
+
+        getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SUCCESS, {
+          method,
+          durationMs,
+        });
       } else {
         // Standard ask path — try streaming first, fall back to ask() if stream fails
+        // durationMs is tracked inside _handleAgentAskWithStreaming
         await this._handleAgentAskWithStreaming(
           service,
           cleanMessage,
           message.requestId,
-          message.question
+          message.question,
+          message.chatHistory
         );
       }
-
-      // Track agent query success
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_AGENT_QUERY_SUCCESS, {
-        method,
-        durationMs,
-      });
-
-      getTelemetryService().trackUsage(TELEMETRY_EVENTS.RAG_CHAT_REQUEST_COMPLETED, {
-        result: 'success',
-        durationMs,
-      });
 
       this._requestTracker.complete(message.requestId);
     } catch (error) {
@@ -607,7 +605,8 @@ export class RagChatPanel {
     service: QueryAgentService,
     message: string,
     requestId: string | undefined,
-    originalQuestion: string | undefined
+    originalQuestion: string | undefined,
+    chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<void> {
     const startTime = Date.now();
     let hasReceivedChunk = false;
@@ -617,7 +616,7 @@ export class RagChatPanel {
       let finalAnswer = '';
       let trace: unknown = null;
 
-      for await (const chunk of service.stream(message)) {
+      for await (const chunk of service.stream(message, chatHistory)) {
         // Check if request is stale
         if (requestId && this._requestTracker.isStale(requestId)) {
           return;
@@ -625,25 +624,18 @@ export class RagChatPanel {
 
         hasReceivedChunk = true;
 
-        // Post each chunk as it arrives
         if (chunk.outputType === 'streamedTokens' && chunk.delta) {
+          // Token chunk — append to answer and send to webview
           finalAnswer += chunk.delta;
           this.postMessage({
             command: 'streamChunk',
             delta: chunk.delta,
             requestId,
           });
+        } else if (chunk.outputType === 'finalState') {
+          // Final state chunk — extract trace without a second ask() call
+          trace = mapAskResponseToTrace(chunk as any);
         }
-      }
-
-      // After streaming completes, get the final trace via a fallback ask() call
-      // (since stream doesn't provide full trace data)
-      try {
-        const { trace: fullTrace } = await service.ask(message);
-        trace = fullTrace;
-      } catch {
-        // If trace retrieval fails, proceed without it (graceful degradation)
-        trace = null;
       }
 
       // Post final message with complete trace
@@ -670,7 +662,7 @@ export class RagChatPanel {
       // If stream fails before any chunk was received, fall back to non-streaming ask()
       if (!hasReceivedChunk) {
         try {
-          const { answer, trace } = await service.ask(message);
+          const { answer, trace } = await service.ask(message, chatHistory);
           const durationMs = Date.now() - startTime;
 
           // Post regular agent response (non-streaming)

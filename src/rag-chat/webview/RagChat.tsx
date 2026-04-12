@@ -14,6 +14,7 @@ import type {
   RagContextObject,
   RagChatExtensionMessage,
   RagChatWebviewMessage,
+  RagChatVSCodeAPI,
   CollectionInfo,
   GenerativeProviderSelection,
   AdvancedRagSettings,
@@ -303,10 +304,12 @@ function ChatEntry({
   entry,
   showContext,
   onRetry,
+  vscodeApi,
 }: {
   entry: RagChatHistoryEntry;
   showContext: boolean;
   onRetry?: (entry: RagChatHistoryEntry) => void;
+  vscodeApi: RagChatVSCodeAPI;
 }) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -462,6 +465,7 @@ function ChatEntry({
                 rawResponse={entry.trace.rawResponse}
                 expanded={traceExpanded}
                 onToggleExpanded={() => setTraceExpanded((v) => !v)}
+                vscodeApi={vscodeApi}
               />
             )}
           </>
@@ -847,6 +851,8 @@ export function RagChat() {
     initialData?.connectionType
   );
   const [agentModeEnabled, setAgentModeEnabled] = useState(false);
+  const [scopeMode, setScopeMode] = useState<'single' | 'all'>('single');
+  const [inferenceKeyPresent, setInferenceKeyPresent] = useState(false);
   const [showAgentKeyWarning, setShowAgentKeyWarning] = useState(false);
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const [slashMenuSelectedIndex, setSlashMenuSelectedIndex] = useState(0);
@@ -884,7 +890,7 @@ export function RagChat() {
           if (msg.command === 'init' && msg.availableModules) {
             setAvailableModules(msg.availableModules);
           }
-          // Extract connection type and agent mode state from init message
+          // Extract connection type, agent mode state, and key presence from init message
           if (msg.command === 'init') {
             if (msg.connectionType) {
               setConnectionType(msg.connectionType);
@@ -892,6 +898,9 @@ export function RagChat() {
             if (msg.agentModeEnabled !== undefined) {
               setAgentModeEnabled(msg.agentModeEnabled);
               setShowAgentKeyWarning(false); // Reset warning on fresh init
+            }
+            if (msg.inferenceProviderApiKeyPresent !== undefined) {
+              setInferenceKeyPresent(msg.inferenceProviderApiKeyPresent);
             }
           }
           // If we had a pre-selected collection from initialData and it
@@ -1139,6 +1148,7 @@ export function RagChat() {
   // Collection add/remove handlers
   const handleAddCollection = useCallback((name: string) => {
     setSelectedCollections((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setScopeMode('single');
   }, []);
 
   const handleRemoveCollection = useCallback((name: string) => {
@@ -1150,15 +1160,18 @@ export function RagChat() {
       // Enable agent mode and select all collections
       setSelectedCollections([...allCollections]);
       setAgentModeEnabled(true);
+      setScopeMode('all');
     } else {
-      // Local connection: fallback to first collection and show note
-      // Note: in Story 11 spec, show an inline note, but for now we just select first collection
+      // Local connection: fallback to first collection and show inline note
       if (allCollections.length > 0) {
         setSelectedCollections([allCollections[0]]);
       }
+      setScopeMode('single');
+      setAllCollectionsFallbackNote(true);
     }
   }, [connectionType, allCollections]);
 
+  const [allCollectionsFallbackNote, setAllCollectionsFallbackNote] = useState(false);
   const [settingsSavedFlash, setSettingsSavedFlash] = useState(false);
   const handleSaveAdvancedSettings = useCallback(() => {
     vscodeApi.postMessage({
@@ -1177,6 +1190,11 @@ export function RagChat() {
     const trimmed = question.trim();
     if (!trimmed || selectedCollections.length === 0 || loading) {
       return;
+    }
+
+    // Show one-time warning if agent mode is on without an inference provider key
+    if (agentModeEnabled && !inferenceKeyPresent && !showAgentKeyWarning) {
+      setShowAgentKeyWarning(true);
     }
 
     const requestId = generateRequestId();
@@ -1198,6 +1216,17 @@ export function RagChat() {
     setLoading(true);
     setQuestion('');
 
+    // Build chat history for multi-turn agent queries (role + content only)
+    const chatHistory = agentModeEnabled
+      ? history
+          .filter((h) => h.response?.answer)
+          .map((h) => [
+            { role: 'user' as const, content: h.query.question },
+            { role: 'assistant' as const, content: h.response!.answer },
+          ])
+          .flat()
+      : undefined;
+
     vscodeApi.postMessage({
       command: 'executeRagQuery',
       collectionNames: [...selectedCollections],
@@ -1208,6 +1237,8 @@ export function RagChat() {
       provider: selectedProvider,
       advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
       agentModeEnabled,
+      scopeMode,
+      chatHistory,
     } satisfies RagChatWebviewMessage);
   }, [
     question,
@@ -1218,6 +1249,10 @@ export function RagChat() {
     selectedProvider,
     advancedSettings,
     agentModeEnabled,
+    inferenceKeyPresent,
+    showAgentKeyWarning,
+    scopeMode,
+    history,
   ]);
 
   /** Retry a failed entry: reset it to loading state and re-send the same query */
@@ -1252,9 +1287,10 @@ export function RagChat() {
         provider: selectedProvider,
         advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
         agentModeEnabled,
+        scopeMode,
       } satisfies RagChatWebviewMessage);
     },
-    [queryTimeout, selectedProvider, advancedSettings, agentModeEnabled]
+    [queryTimeout, selectedProvider, advancedSettings, agentModeEnabled, scopeMode]
   );
 
   const handleSlashMenuSelect = useCallback((cmd: SlashCommand) => {
@@ -1408,8 +1444,20 @@ export function RagChat() {
             <p>Select one or more collections below and type your question to get started.</p>
           </div>
         )}
+        {showAgentKeyWarning && (
+          <div className="rag-system-message rag-system-warning" role="alert">
+            ⚠ Agent Mode is on but no Inference Provider Key is configured. Add it in connection
+            settings.
+          </div>
+        )}
         {history.map((entry) => (
-          <ChatEntry key={entry.id} entry={entry} showContext={showContext} onRetry={handleRetry} />
+          <ChatEntry
+            key={entry.id}
+            entry={entry}
+            showContext={showContext}
+            onRetry={handleRetry}
+            vscodeApi={vscodeApi}
+          />
         ))}
         <div ref={chatEndRef} />
       </main>
@@ -1428,6 +1476,16 @@ export function RagChat() {
             loading={collectionsLoading}
             connectionType={connectionType}
           />
+          {allCollectionsFallbackNote && (
+            <span className="rag-scope-note rag-scope-note-fallback">
+              Agent Mode requires Weaviate Cloud. Querying active collection only.
+            </span>
+          )}
+          {scopeMode === 'all' && agentModeEnabled && (
+            <span className="rag-scope-note">
+              Agent Mode enabled — required for multi-collection queries
+            </span>
+          )}
           <ProviderSelector
             availableModules={availableModules}
             selectedProvider={selectedProvider}

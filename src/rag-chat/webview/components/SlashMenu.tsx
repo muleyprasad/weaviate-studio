@@ -72,9 +72,6 @@ export function SlashMenu({ open, selectedIndex, onSelect, onClose, onNavigate }
           aria-selected={selectedIndex === idx}
           className={`rag-slash-menu-item ${selectedIndex === idx ? 'selected' : ''}`}
           onClick={() => onSelect(cmd)}
-          onMouseEnter={() => {
-            // Update selected index on hover (optional enhancement)
-          }}
         >
           <span className="rag-slash-menu-command">{cmd.command}</span>
           <span className="rag-slash-menu-description">{cmd.description}</span>

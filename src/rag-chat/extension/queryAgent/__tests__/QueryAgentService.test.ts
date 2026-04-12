@@ -258,7 +258,8 @@ describe('QueryAgentService', () => {
       }
 
       expect(mockAgent.askStream).toHaveBeenCalledWith('Stream this?', {
-        includeFinalState: false,
+        includeProgress: false,
+        includeFinalState: true,
       });
       expect(tokens).toEqual(['Hello ', 'world']);
     });
@@ -288,7 +289,8 @@ describe('QueryAgentService', () => {
           { role: 'user', content: 'Continue' },
         ]),
         {
-          includeFinalState: false,
+          includeProgress: false,
+          includeFinalState: true,
         }
       );
     });

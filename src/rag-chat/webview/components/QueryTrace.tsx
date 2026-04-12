@@ -10,17 +10,21 @@
  */
 
 import React from 'react';
-import type { RagChatWebviewMessage } from '../../types';
+import type { RagChatVSCodeAPI, RagChatWebviewMessage } from '../../types';
 
 interface QueryTraceProps {
   rawResponse: unknown;
   expanded: boolean;
   onToggleExpanded: () => void;
+  vscodeApi: RagChatVSCodeAPI;
 }
 
-export function QueryTrace({ rawResponse, expanded, onToggleExpanded }: QueryTraceProps) {
-  const vscodeApi = (window as any).acquireVsCodeApi?.();
-
+export function QueryTrace({
+  rawResponse,
+  expanded,
+  onToggleExpanded,
+  vscodeApi,
+}: QueryTraceProps) {
   if (!rawResponse || typeof rawResponse !== 'object') {
     return (
       <div className="query-trace">

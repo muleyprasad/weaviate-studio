@@ -295,7 +295,9 @@ export class ConnectionManager {
 
   private async saveConnections() {
     // Strip raw secret values — only boolean presence flags are persisted to globalState
-    const toSave = this.connections.map(({ apiKey, password, ...conn }) => conn);
+    const toSave = this.connections.map(
+      ({ apiKey, password, inferenceProviderApiKey, ...conn }) => conn
+    );
     await this.context.globalState.update(this.storageKey, toSave);
     this._onConnectionsChanged.fire();
   }
@@ -843,6 +845,47 @@ export class ConnectionManager {
     // Save the updated connection (without the actual key in globalState)
     await this.saveConnections();
     this._onConnectionsChanged.fire();
+  }
+
+  /**
+   * Create a Weaviate client for agent queries, adding the inference provider API key
+   * as the X-INFERENCE-PROVIDER-API-KEY header per the Query Agent spec.
+   * Only valid for cloud connections.
+   *
+   * @param connectionId - The ID of the connection
+   * @param inferenceProviderApiKey - The inference provider API key to add as a header
+   * @returns A new WeaviateClient with the inference key header, or undefined if connection not found/invalid
+   */
+  public async createAgentClient(
+    connectionId: string,
+    inferenceProviderApiKey: string
+  ): Promise<WeaviateClient | undefined> {
+    const connection = this.getConnection(connectionId);
+    if (!connection || connection.type !== 'cloud' || !connection.cloudUrl) {
+      return undefined;
+    }
+
+    const cloudAuthCredentials =
+      connection.authType === 'clientPassword' && connection.username
+        ? new AuthUserPasswordCredentials({
+            username: connection.username,
+            password: connection.password,
+          })
+        : new weaviate.ApiKey(connection.apiKey || '');
+
+    return weaviate.connectToWeaviateCloud(connection.cloudUrl, {
+      authCredentials: cloudAuthCredentials,
+      skipInitChecks: connection.skipInitChecks,
+      headers: {
+        'X-Weaviate-Client-Integration': WEAVIATE_INTEGRATION_HEADER,
+        'X-INFERENCE-PROVIDER-API-KEY': inferenceProviderApiKey,
+      },
+      timeout: {
+        init: connection.timeoutInit,
+        query: connection.timeoutQuery,
+        insert: connection.timeoutInsert,
+      },
+    });
   }
 
   public async showAddConnectionDialog(): Promise<{

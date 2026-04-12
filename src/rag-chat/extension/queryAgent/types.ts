@@ -1,5 +1,7 @@
-// @ts-nocheck
-
+// @ts-nocheck -- ESM/CommonJS toolchain incompatibility: weaviate-agents is ESM-only.
+// Webpack handles the actual module resolution correctly at runtime; TypeScript's
+// CommonJS type checker cannot resolve ESM-only packages. Every export in this
+// file is a re-export from weaviate-agents, so file-level suppression is warranted.
 /**
  * Query Agent SDK Type Aliases
  *

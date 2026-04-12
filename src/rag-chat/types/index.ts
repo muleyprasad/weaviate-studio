@@ -171,6 +171,8 @@ export interface RagChatExtensionMessage {
   connectionType?: 'cloud' | 'custom';
   /** Agent Mode enabled state (for init command) */
   agentModeEnabled?: boolean;
+  /** Whether an inference provider API key is configured — presence flag only, not the value */
+  inferenceProviderApiKeyPresent?: boolean;
   /** Search result objects (for agentSearchResponse command) */
   searchObjects?: RagContextObject[];
   /** Streamed token delta (for streamChunk command) */
@@ -232,6 +234,8 @@ export interface RagChatWebviewMessage {
   agentModeEnabled?: boolean;
   /** Scope: single collection or all */
   scopeMode?: 'single' | 'all';
+  /** Prior conversation turns for multi-turn agent queries (role + content only) */
+  chatHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   /** Agent Mode state to persist (for setAgentModeState command) */
   enabled?: boolean;
   /** Slash command name (for slashCommandSelected command) */
