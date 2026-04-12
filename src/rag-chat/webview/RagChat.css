@@ -1333,3 +1333,10 @@
 .rag-chat-input-row {
   position: relative;
 }
+
+/* Empty results message for search responses */
+.rag-empty-results {
+  color: var(--vscode-descriptionForeground, #888);
+  font-style: italic;
+  font-size: 12px;
+}

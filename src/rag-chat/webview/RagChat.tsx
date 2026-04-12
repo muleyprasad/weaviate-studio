@@ -370,30 +370,51 @@ function ChatEntry({
 
         {entry.response && (
           <>
-            <div className="rag-bubble-content rag-answer">
-              {/* Action buttons as a top header row for the answer */}
-              <div className="rag-answer-actions">
-                <IconButton
-                  icon={copied ? 'check' : 'copy'}
-                  title={copied ? 'Copied!' : 'Copy answer to clipboard'}
-                  onClick={handleCopyAnswer}
-                />
-                <button
-                  type="button"
-                  className="rag-toggle-btn"
-                  onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-                  title={showRawMarkdown ? 'Show rendered preview' : 'Show raw markdown'}
-                >
-                  {showRawMarkdown ? 'Preview' : 'Raw'}
-                </button>
-              </div>
+            {/* Only show answer section if there's an answer (not a search-only response) */}
+            {entry.response.answer && (
+              <div className="rag-bubble-content rag-answer">
+                {/* Action buttons as a top header row for the answer */}
+                <div className="rag-answer-actions">
+                  <IconButton
+                    icon={copied ? 'check' : 'copy'}
+                    title={copied ? 'Copied!' : 'Copy answer to clipboard'}
+                    onClick={handleCopyAnswer}
+                  />
+                  <button
+                    type="button"
+                    className="rag-toggle-btn"
+                    onClick={() => setShowRawMarkdown(!showRawMarkdown)}
+                    title={showRawMarkdown ? 'Show rendered preview' : 'Show raw markdown'}
+                  >
+                    {showRawMarkdown ? 'Preview' : 'Raw'}
+                  </button>
+                </div>
 
-              {showRawMarkdown ? (
-                <pre className="rag-raw-markdown">{entry.response.answer}</pre>
-              ) : (
-                <Markdown>{entry.response.answer}</Markdown>
+                {showRawMarkdown ? (
+                  <pre className="rag-raw-markdown">{entry.response.answer}</pre>
+                ) : (
+                  <Markdown>{entry.response.answer}</Markdown>
+                )}
+              </div>
+            )}
+
+            {/* Show context section — either objects from search or answer context */}
+            {showContext &&
+              entry.response.contextObjects &&
+              entry.response.contextObjects.length > 0 && (
+                <ContextSection contextObjects={entry.response.contextObjects} />
               )}
 
+            {/* If there's no answer but we have no context either, show empty state */}
+            {!entry.response.answer &&
+              (!entry.response.contextObjects || entry.response.contextObjects.length === 0) && (
+                <div className="rag-bubble-content">
+                  <span className="rag-empty-results">No matching objects found.</span>
+                </div>
+              )}
+
+            {/* Show query metadata */}
+            {entry.response.answer && (
               <div className="rag-query-meta">
                 <CollectionPills names={entry.response.query.collectionNames} size="small" />
                 <div className="rag-query-meta-right">
@@ -412,9 +433,10 @@ function ChatEntry({
                   )}
                 </div>
               </div>
-            </div>
-            {showContext && <ContextSection contextObjects={entry.response.contextObjects} />}
-            {entry.trace && entry.trace.rawResponse && (
+            )}
+
+            {/* Show trace only for ask responses (not search-only) */}
+            {entry.response.answer && entry.trace && entry.trace.rawResponse && (
               <QueryTrace
                 rawResponse={entry.trace.rawResponse}
                 expanded={traceExpanded}
@@ -935,6 +957,30 @@ export function RagChat() {
                           traceExpanded: false, // Collapsed by default
                         }
                       : undefined,
+                  }
+                : entry
+            )
+          );
+          setLoading(false);
+          break;
+        }
+        case 'agentSearchResponse': {
+          // Handle Query Agent search response (pure retrieval results)
+          const searchObjects = msg.searchObjects ?? [];
+          setHistory((prev) =>
+            prev.map((entry) =>
+              entry.id === msg.requestId
+                ? {
+                    ...entry,
+                    loading: false,
+                    response: {
+                      answer: '', // Search responses have no answer
+                      contextObjects: searchObjects, // Render as result cards
+                      query: entry.query,
+                      timestamp: Date.now(),
+                      durationMs: msg.durationMs,
+                      hasError: false,
+                    },
                   }
                 : entry
             )
