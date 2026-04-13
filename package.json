@@ -327,6 +327,12 @@
         "icon": "$(dashboard)"
       },
       {
+        "command": "weaviate.openMtChecks",
+        "title": "Open Checks",
+        "category": "Weaviate",
+        "icon": "$(checklist)"
+      },
+      {
         "command": "weaviate.openRagChat",
         "title": "Generative Search",
         "category": "Weaviate",
@@ -642,13 +648,23 @@
         },
         {
           "command": "weaviate.refreshCollections",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "when": "view == weaviateConnectionsView && viewItem =~ /^weaviateCollectionsGroup/",
           "group": "navigation@1"
         },
         {
           "command": "weaviate.refreshCollections",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "when": "view == weaviateConnectionsView && viewItem =~ /^weaviateCollectionsGroup/",
           "group": "inline@2"
+        },
+        {
+          "command": "weaviate.openMtChecks",
+          "when": "view == weaviateConnectionsView && viewItem =~ /^weaviateCollectionsGroup/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "weaviate.openMtChecks",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroupMtWarning",
+          "group": "inline@1"
         },
         {
           "command": "weaviate.refreshNodes",
@@ -701,13 +717,13 @@
         },
         {
           "command": "weaviate.addCollection",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "when": "view == weaviateConnectionsView && viewItem =~ /^weaviateCollectionsGroup/",
           "group": "inline@1",
           "icon": "$(add)"
         },
         {
           "command": "weaviate.deleteAllCollections",
-          "when": "view == weaviateConnectionsView && viewItem == weaviateCollectionsGroup",
+          "when": "view == weaviateConnectionsView && viewItem =~ /^weaviateCollectionsGroup/",
           "group": "3_modification@1"
         },
         {

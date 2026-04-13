@@ -599,6 +599,412 @@ describe('deleteAllCollections', () => {
   });
 });
 
+// ─── runChecks ────────────────────────────────────────────────────────────────
+
+describe('runChecks', () => {
+  let provider: WeaviateTreeDataProvider;
+
+  beforeEach(() => {
+    provider = makeProvider();
+    jest.clearAllMocks();
+    mockGetClient.mockReturnValue(mockClient);
+    mockGetConnection.mockReturnValue({ id: 'c1', name: 'TestConn' });
+  });
+
+  it('returns a ChecksResult with correct structure', async () => {
+    (provider as any).collections['c1'] = [];
+    (provider as any).clusterNodesCache['c1'] = [];
+
+    const result = await provider.runChecks('c1');
+
+    expect(result).toMatchObject({
+      timestamp: expect.any(String),
+      hasIssues: false,
+      multiTenancy: { groups: [], hasIssues: false },
+      emptyShards: { entries: [], hasIssues: false },
+      replicationImbalance: { collections: [], hasIssues: false },
+    });
+  });
+
+  it('persists the result to globalState', async () => {
+    (provider as any).collections['c1'] = [];
+    (provider as any).clusterNodesCache['c1'] = [];
+
+    await provider.runChecks('c1');
+
+    expect(mockCtx.globalState.update).toHaveBeenCalledWith(
+      'checksResults.c1',
+      expect.objectContaining({ hasIssues: false })
+    );
+  });
+
+  it('filters out shards from collections no longer in local state', async () => {
+    // Only 'Article' is in collections; 'Deleted' was removed but still in node cache
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      {
+        name: 'node-1',
+        shards: [
+          { class: 'Article', name: 'art-shard', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 0 }, // stale shard
+        ],
+      },
+    ];
+
+    const result = await provider.runChecks('c1');
+
+    // Stale shard from 'Deleted' collection must not appear in empty shards
+    expect(result.emptyShards.hasIssues).toBe(false);
+    expect(result.emptyShards.entries).toHaveLength(0);
+  });
+
+  it('reports empty shards for known collections', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      {
+        name: 'node-1',
+        shards: [{ class: 'Article', name: 'art-shard', objectCount: 0 }],
+      },
+    ];
+
+    const result = await provider.runChecks('c1');
+
+    expect(result.emptyShards.hasIssues).toBe(true);
+    expect(result.emptyShards.entries[0].collectionName).toBe('Article');
+  });
+
+  it('sets checksIssueSectionCount badge correctly', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 0 }] },
+    ];
+
+    await provider.runChecks('c1');
+
+    // Empty shards issue detected → count should be 1
+    expect((provider as any).checksIssueSectionCount['c1']).toBe(1);
+  });
+
+  it('detects replication imbalance when same shard has different counts across nodes', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 100 }] },
+      { name: 'node-2', shards: [{ class: 'Article', name: 'shard-1', objectCount: 90 }] },
+    ];
+
+    const result = await provider.runChecks('c1');
+
+    expect(result.replicationImbalance.hasIssues).toBe(true);
+    expect(result.replicationImbalance.collections).toHaveLength(1);
+    expect(result.replicationImbalance.collections[0].collectionName).toBe('Article');
+  });
+
+  it('does not flag replication imbalance when replicas match', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 100 }] },
+      { name: 'node-2', shards: [{ class: 'Article', name: 'shard-1', objectCount: 100 }] },
+    ];
+
+    const result = await provider.runChecks('c1');
+
+    expect(result.replicationImbalance.hasIssues).toBe(false);
+  });
+
+  it('filters stale shards from replication imbalance check too', async () => {
+    // 'Deleted' is no longer in collections but still in node cache on both nodes
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      {
+        name: 'node-1',
+        shards: [
+          { class: 'Article', name: 'shard-1', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 50 },
+        ],
+      },
+      {
+        name: 'node-2',
+        shards: [
+          { class: 'Article', name: 'shard-1', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 10 }, // would be imbalanced
+        ],
+      },
+    ];
+
+    const result = await provider.runChecks('c1');
+
+    expect(result.replicationImbalance.hasIssues).toBe(false);
+  });
+
+  it('counts all three issue sections in checksIssueSectionCount', async () => {
+    const props = [{ name: 'title', dataType: ['text'], tokenization: 'word' }];
+    (provider as any).collections['c1'] = [
+      // Two collections with identical schema → MT candidate
+      {
+        label: 'ColA',
+        collectionName: 'ColA',
+        schema: { properties: props, multiTenancy: { enabled: false } },
+      },
+      {
+        label: 'ColB',
+        collectionName: 'ColB',
+        schema: { properties: props, multiTenancy: { enabled: false } },
+      },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      // ColA has an empty shard + replication imbalance
+      { name: 'node-1', shards: [{ class: 'ColA', name: 'shard-1', objectCount: 0 }] },
+      { name: 'node-2', shards: [{ class: 'ColA', name: 'shard-1', objectCount: 5 }] },
+    ];
+
+    await provider.runChecks('c1');
+
+    // MT candidates (1) + empty shards (1) + replication imbalance (1) = 3
+    expect((provider as any).checksIssueSectionCount['c1']).toBe(3);
+  });
+});
+
+// ─── _recomputeChecksAndSend ──────────────────────────────────────────────────
+
+describe('_recomputeChecksAndSend', () => {
+  let provider: WeaviateTreeDataProvider;
+
+  beforeEach(() => {
+    provider = makeProvider();
+    jest.clearAllMocks();
+  });
+
+  it('filters out shards from deleted collections when recomputing', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    // Node cache still has shards for 'Deleted' — simulating API lag after deletion
+    (provider as any).clusterNodesCache['c1'] = [
+      {
+        name: 'node-1',
+        shards: [
+          { class: 'Article', name: 'art-shard', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 0 },
+        ],
+      },
+    ];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls.find(
+      (call: any[]) => call[0] === 'checksResults.c1'
+    );
+    expect(saved).toBeDefined();
+    const result = saved[1];
+    expect(result.emptyShards.hasIssues).toBe(false);
+    expect(result.emptyShards.entries).toHaveLength(0);
+  });
+
+  it('sets mtCandidates from recomputed result', async () => {
+    (provider as any).collections['c1'] = [];
+    (provider as any).clusterNodesCache['c1'] = [];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    expect((provider as any).mtCandidates['c1']).toEqual([]);
+  });
+
+  it('updates checksIssueSectionCount', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Col', collectionName: 'Col', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Col', name: 'shard-1', objectCount: 0 }] },
+    ];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    expect((provider as any).checksIssueSectionCount['c1']).toBe(1);
+  });
+
+  it('persists result to globalState', async () => {
+    (provider as any).collections['c1'] = [];
+    (provider as any).clusterNodesCache['c1'] = [];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    expect(mockCtx.globalState.update).toHaveBeenCalledWith(
+      'checksResults.c1',
+      expect.objectContaining({ timestamp: expect.any(String) })
+    );
+  });
+
+  it('detects empty shards for known collections', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 0 }] },
+    ];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls.find(
+      (call: any[]) => call[0] === 'checksResults.c1'
+    );
+    expect(saved[1].emptyShards.hasIssues).toBe(true);
+    expect(saved[1].emptyShards.entries[0].collectionName).toBe('Article');
+  });
+
+  it('detects replication imbalance for known collections', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    (provider as any).clusterNodesCache['c1'] = [
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 100 }] },
+      { name: 'node-2', shards: [{ class: 'Article', name: 'shard-1', objectCount: 80 }] },
+    ];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls.find(
+      (call: any[]) => call[0] === 'checksResults.c1'
+    );
+    expect(saved[1].replicationImbalance.hasIssues).toBe(true);
+    expect(saved[1].replicationImbalance.collections[0].collectionName).toBe('Article');
+  });
+
+  it('filters stale shards from replication imbalance check', async () => {
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    // 'Deleted' shard appears on both nodes with different counts — but collection was deleted
+    (provider as any).clusterNodesCache['c1'] = [
+      {
+        name: 'node-1',
+        shards: [
+          { class: 'Article', name: 'shard-1', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 50 },
+        ],
+      },
+      {
+        name: 'node-2',
+        shards: [
+          { class: 'Article', name: 'shard-1', objectCount: 100 },
+          { class: 'Deleted', name: 'del-shard', objectCount: 10 },
+        ],
+      },
+    ];
+
+    await (provider as any)._recomputeChecksAndSend('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls.find(
+      (call: any[]) => call[0] === 'checksResults.c1'
+    );
+    expect(saved[1].replicationImbalance.hasIssues).toBe(false);
+  });
+});
+
+// ─── deleteCollection — checks update ────────────────────────────────────────
+
+describe('deleteCollection — checks update', () => {
+  let provider: WeaviateTreeDataProvider;
+
+  beforeEach(() => {
+    provider = makeProvider();
+    jest.clearAllMocks();
+    mockGetClient.mockReturnValue(mockClient);
+    mockGetConnection.mockReturnValue({ id: 'c1', name: 'TestConn', status: 'connected' });
+    mockCollectionsDelete.mockResolvedValue(undefined);
+    // After fetchNodes the cache returns no shards for the deleted collection
+    mockClusterNodes.mockResolvedValue([
+      { name: 'node-1', shards: [{ class: 'Author', name: 'auth-shard', objectCount: 50 }] },
+    ]);
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+      { label: 'Author', collectionName: 'Author', schema: { multiTenancy: { enabled: false } } },
+    ];
+  });
+
+  it('recomputes and persists checks after deleting a collection', async () => {
+    await provider.deleteCollection('c1', 'Article');
+
+    expect(mockCtx.globalState.update).toHaveBeenCalledWith(
+      'checksResults.c1',
+      expect.objectContaining({ timestamp: expect.any(String) })
+    );
+  });
+
+  it('deleted collection shards do not appear in empty shards after deletion', async () => {
+    // Simulate API lag: node cache still has Article shard with 0 objects after delete
+    mockClusterNodes.mockResolvedValue([
+      {
+        name: 'node-1',
+        shards: [
+          { class: 'Article', name: 'art-shard', objectCount: 0 }, // stale
+          { class: 'Author', name: 'auth-shard', objectCount: 50 },
+        ],
+      },
+    ]);
+
+    await provider.deleteCollection('c1', 'Article');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls
+      .filter((call: any[]) => call[0] === 'checksResults.c1')
+      .pop();
+    expect(saved).toBeDefined();
+    expect(saved[1].emptyShards.hasIssues).toBe(false);
+    expect(saved[1].emptyShards.entries).toHaveLength(0);
+  });
+});
+
+// ─── deleteAllCollections — checks update ────────────────────────────────────
+
+describe('deleteAllCollections — checks update', () => {
+  let provider: WeaviateTreeDataProvider;
+
+  beforeEach(() => {
+    provider = makeProvider();
+    jest.clearAllMocks();
+    mockGetClient.mockReturnValue(mockClient);
+    mockGetConnection.mockReturnValue({ id: 'c1', name: 'TestConn', status: 'connected' });
+    mockCollectionsDeleteAll.mockResolvedValue(undefined);
+    mockClusterNodes.mockResolvedValue([]);
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+  });
+
+  it('recomputes and persists checks after deleting all collections', async () => {
+    await provider.deleteAllCollections('c1');
+
+    expect(mockCtx.globalState.update).toHaveBeenCalledWith(
+      'checksResults.c1',
+      expect.objectContaining({ hasIssues: false })
+    );
+  });
+
+  it('checks show no issues after all collections removed', async () => {
+    await provider.deleteAllCollections('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls
+      .filter((call: any[]) => call[0] === 'checksResults.c1')
+      .pop();
+    expect(saved).toBeDefined();
+    const result = saved[1];
+    expect(result.emptyShards.hasIssues).toBe(false);
+    expect(result.multiTenancy.hasIssues).toBe(false);
+    expect(result.replicationImbalance.hasIssues).toBe(false);
+  });
+});
+
 // ─── refreshCollections ───────────────────────────────────────────────────────
 
 describe('refreshCollections', () => {

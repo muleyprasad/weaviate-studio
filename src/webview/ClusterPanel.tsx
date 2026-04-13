@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import './theme.css';
 import './Cluster.css';
@@ -14,6 +14,28 @@ try {
   </div>`;
   throw error;
 }
+
+// ── Module-level init handshake ──────────────────────────────────────────────
+// We send 'ready' and capture the 'init' reply here, BEFORE React mounts.
+// This avoids React StrictMode double-effect races where the message lands on
+// a discarded effect instance and its state setters have no effect.
+
+let __initPayload: {
+  nodeStatusData: any;
+  openClusterViewOnConnect?: boolean;
+  checksResult?: any;
+} | null = null;
+let __onInitPayload: ((payload: typeof __initPayload) => void) | null = null;
+
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.data?.command === 'init') {
+    __initPayload = event.data;
+    __onInitPayload?.(event.data); // notify React if already mounted
+  }
+});
+
+// Send ready immediately — extension will queue the init reply.
+vscode.postMessage({ command: 'ready' });
 
 // Types
 interface Shard {
@@ -44,6 +66,373 @@ interface Node {
   version: string;
 }
 
+// Checks types (mirrored from multiTenancyCheck.ts — kept local to avoid bundling src/utils)
+interface MtCollectionEntry {
+  name: string;
+  objectCount: number;
+}
+
+interface MtCandidateGroup {
+  collections: MtCollectionEntry[];
+  count: number;
+  totalObjects: number;
+}
+
+interface EmptyShardEntry {
+  collectionName: string;
+  nodeName: string;
+  shardName: string;
+}
+
+interface ShardReplica {
+  nodeName: string;
+  objectCount: number;
+}
+
+interface ImbalancedShard {
+  shardName: string;
+  replicas: ShardReplica[];
+}
+
+interface ReplicationImbalanceCollection {
+  collectionName: string;
+  shards: ImbalancedShard[];
+}
+
+interface ChecksResult {
+  timestamp: string;
+  /** True when any individual check has issues. Present in newer results. */
+  hasIssues?: boolean;
+  multiTenancy: {
+    groups: MtCandidateGroup[];
+    hasIssues: boolean;
+  };
+  emptyShards?: {
+    entries: EmptyShardEntry[];
+    hasIssues: boolean;
+  };
+  replicationImbalance?: {
+    collections: ReplicationImbalanceCollection[];
+    hasIssues: boolean;
+  };
+}
+
+// ─── ChecksView ───────────────────────────────────────────────────────────────
+
+interface ChecksViewProps {
+  checksResult: ChecksResult | null;
+  isRunning: boolean;
+  onRunChecks: () => void;
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      className="loading-spinner"
+      width="20"
+      height="20"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165.033.163.071.345c0 1.654-1.346 3-3 3-.795 0-1.545-.311-2.107-.868-.563-.567-.873-1.317-.873-2.111 0-1.431 1.007-2.632 2.351-2.929v2.498l2.528-2.134-2.528-2.076v2.11C4.753 6.867 3 8.819 3 11.131c0 1.14.445 2.21 1.253 3.014.808.803 1.883 1.246 3.027 1.246 2.31 0 4.216-1.751 4.455-4.027.098-.858.451-1.935.832-2.489.167-.237.351-.469.555-.678l.131-.117zm-2.359.81c-.172-.268-.33-.518-.475-.748-1.303-2.066-2.916-2.758-4.093-2.758-1.087 0-2.1.563-2.7 1.5-.302.473-.5 1.013-.6 1.596l1.013.014c.087-.484.245-.95.465-1.371.437-.838 1.176-1.34 1.987-1.34.852 0 1.839.428 2.659 1.147.411.363.771.77 1.073 1.211.136.202.261.408.376.616.092-.085.184-.168.278-.25l.017-.017z" />
+    </svg>
+  );
+}
+
+function openExternalLink(url: string) {
+  vscode.postMessage({ command: 'openExternal', url });
+}
+
+function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
+  const groups = checksResult?.multiTenancy.groups ?? [];
+  const emptyShardEntries = checksResult?.emptyShards?.entries ?? [];
+  const replicationCollections = checksResult?.replicationImbalance?.collections ?? [];
+  const timestamp = checksResult?.timestamp
+    ? new Date(checksResult.timestamp).toLocaleString()
+    : null;
+
+  return (
+    <div className="checks-view">
+      <div className="checks-header">
+        <div className="checks-meta">
+          {timestamp && <span className="checks-timestamp">Last run: {timestamp}</span>}
+        </div>
+        <button
+          className="run-checks-button"
+          onClick={onRunChecks}
+          disabled={isRunning}
+          title="Run all checks"
+        >
+          {isRunning ? 'Running…' : 'Run Checks'}
+        </button>
+      </div>
+
+      {isRunning && (
+        <div className="checks-running">
+          <SpinnerIcon />
+          <p>Running checks…</p>
+        </div>
+      )}
+
+      {!checksResult && !isRunning && (
+        <div className="checks-empty">
+          <p>
+            No checks have been run yet. Click <strong>Run Checks</strong> to analyse your
+            collections.
+          </p>
+        </div>
+      )}
+
+      {checksResult && (
+        <div className="checks-results">
+          {/* ── Multi-Tenancy Candidates ──────────────────────────────── */}
+          <div className={`checks-section${groups.length > 0 ? ' checks-section--warning' : ''}`}>
+            <h3 className="checks-section-title">
+              {groups.length > 0 && <span className="checks-section-warning-icon">⚠</span>}
+              Multi-Tenancy Candidates
+            </h3>
+            {groups.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                No collections share identical schemas. No action needed.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following groups of collections share identical schemas and could be
+                  consolidated into a single multi-tenant collection.{' '}
+                  <a
+                    href="https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink(
+                        'https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy'
+                      );
+                    }}
+                  >
+                    Learn more ↗
+                  </a>
+                </p>
+                {groups.map((group, idx) => (
+                  <div key={idx} className="checks-group">
+                    <div className="checks-group-header">
+                      <span className="checks-group-label">Group {idx + 1}</span>
+                      <span className="checks-group-count">{group.count} collections</span>
+                      {group.totalObjects > 0 && (
+                        <span className="checks-group-total">
+                          {group.totalObjects.toLocaleString()} total objects
+                        </span>
+                      )}
+                    </div>
+                    <ul className="checks-group-list">
+                      {group.collections.map((col) => (
+                        <li key={col.name} className="checks-group-item">
+                          <span className="checks-col-name">{col.name}</span>
+                          <span className="checks-col-count">
+                            {col.objectCount.toLocaleString()} objects
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* ── Empty Shards ──────────────────────────────────────────── */}
+          <div
+            className={`checks-section${emptyShardEntries.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {emptyShardEntries.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Empty Shards
+            </h3>
+            {emptyShardEntries.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                No empty shards detected across the cluster.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following shards contain zero objects. Empty shards may indicate incomplete
+                  data ingestion or collections that are no longer in use. Even without any objects,
+                  an empty collection adds overhead to your cluster — consider deleting collections
+                  that are no longer needed.
+                </p>
+                <div className="checks-info-callout">
+                  <span className="checks-info-callout-icon">ℹ️</span>
+                  Object counts reported by node status are not immediately synchronized and may be
+                  slightly delayed — only act on shards that consistently show zero over time.
+                </div>
+                {Object.entries(
+                  emptyShardEntries.reduce<Record<string, EmptyShardEntry[]>>((acc, entry) => {
+                    (acc[entry.collectionName] ??= []).push(entry);
+                    return acc;
+                  }, {})
+                ).map(([collectionName, entries]) => (
+                  <div key={collectionName} className="checks-group">
+                    <div className="checks-group-header">
+                      <span className="checks-group-label">{collectionName}</span>
+                      <span className="checks-group-count">
+                        {entries.length} empty shard{entries.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <table className="checks-table">
+                      <thead>
+                        <tr>
+                          <th>Node</th>
+                          <th>Shard</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((entry, idx) => (
+                          <tr key={idx}>
+                            <td>{entry.nodeName}</td>
+                            <td className="checks-shard-name">{entry.shardName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* ── Replication Imbalance ─────────────────────────────────── */}
+          <div
+            className={`checks-section${replicationCollections.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {replicationCollections.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Replication Imbalance
+            </h3>
+            {replicationCollections.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                All shard replicas have consistent object counts.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following collections have shards whose replicas report different object
+                  counts across nodes. Persistent imbalances after ingestion finishes may indicate
+                  that async replication is disabled or lagging.{' '}
+                  <a
+                    href="https://docs.weaviate.io/deploy/configuration/async-rep"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink('https://docs.weaviate.io/deploy/configuration/async-rep');
+                    }}
+                  >
+                    Enable async replication ↗
+                  </a>
+                </p>
+                <div className="checks-info-callout">
+                  <span className="checks-info-callout-icon">ℹ️</span>
+                  If you are actively ingesting data, this is normal — replicas sync asynchronously
+                  and imbalances resolve once ingestion completes.
+                </div>
+                <div className="checks-info-callout">
+                  <span className="checks-info-callout-icon">ℹ️</span>
+                  Object counts reported by node status are not immediately synchronized and may be
+                  slightly delayed — only act on imbalances that persist over time.
+                </div>
+                {replicationCollections.map((col) => (
+                  <div key={col.collectionName} className="checks-group">
+                    <div className="checks-group-header">
+                      <span className="checks-group-label">{col.collectionName}</span>
+                      <span className="checks-group-count">
+                        {col.shards.length} imbalanced shard{col.shards.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {col.shards.map((shard) => (
+                      <div key={shard.shardName} className="checks-imbalance-shard">
+                        <span className="checks-shard-name">{shard.shardName}</span>
+                        <ul className="checks-replica-list">
+                          {shard.replicas.map((replica) => (
+                            <li key={replica.nodeName} className="checks-replica-item">
+                              <span className="checks-replica-node">{replica.nodeName}</span>
+                              <span className="checks-replica-count">
+                                {replica.objectCount.toLocaleString()} objects
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Truncated name with click-to-copy
+function TruncatedName({ name, tag: Tag = 'span' }: { name: string; tag?: 'span' | 'h3' | 'h4' }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard
+      .writeText(name)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch((err) => {
+        console.warn('Failed to copy to clipboard:', err);
+      });
+  };
+
+  return (
+    <Tag className="truncated-name" title={copied ? '✓ Copied!' : name} onClick={handleClick}>
+      {name}
+    </Tag>
+  );
+}
+
+// Checks warning banner shown on Node and Collection views
+interface ChecksWarningBannerProps {
+  checksResult: ChecksResult | null;
+  onOpenChecks: () => void;
+  onDismiss: () => void;
+}
+
+function ChecksWarningBanner({ checksResult, onOpenChecks, onDismiss }: ChecksWarningBannerProps) {
+  const hasIssues = checksResult?.hasIssues ?? checksResult?.multiTenancy?.hasIssues;
+
+  return (
+    <div className={`checks-warning-banner ${hasIssues ? 'has-issues' : 'info'}`}>
+      <div className="checks-warning-body">
+        <span className="checks-warning-icon">{hasIssues ? '⚠️' : 'ℹ️'}</span>
+        <span className="checks-warning-text">
+          Your cluster has potential issues on your collections schema.{' '}
+          <button className="checks-warning-link" onClick={onOpenChecks}>
+            View Checks →
+          </button>
+        </span>
+      </div>
+      <button className="checks-warning-dismiss" onClick={onDismiss} title="Dismiss">
+        ✕
+      </button>
+    </div>
+  );
+}
+
 // Shard Component
 interface ShardComponentProps {
   shard: Shard;
@@ -52,7 +441,7 @@ interface ShardComponentProps {
   onSelect: () => void;
 }
 
-function ShardComponent({ shard, nodeName, isSelected, onSelect }: ShardComponentProps) {
+function ShardComponent({ shard, isSelected, onSelect }: ShardComponentProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const statusOptions: Array<'READY' | 'READONLY'> = ['READY', 'READONLY'];
@@ -94,7 +483,7 @@ function ShardComponent({ shard, nodeName, isSelected, onSelect }: ShardComponen
     <div className={`shard-item ${isSelected ? 'selected' : ''}`} onClick={onSelect}>
       <div className="shard-header">
         <div className="shard-title-group">
-          <h4>{shard.class}</h4>
+          <TruncatedName name={shard.class} tag="h4" />
           <span className="shard-name">{shard.name}</span>
         </div>
         <div className="shard-menu-container" ref={menuRef}>
@@ -154,6 +543,73 @@ function ShardComponent({ shard, nodeName, isSelected, onSelect }: ShardComponen
         </div>
       )}
     </div>
+  );
+}
+
+// Paginated shard grid — renders a page of ShardComponents with prev/next controls.
+const SHARDS_PAGE_SIZE = 50;
+
+interface PaginatedShardGridProps {
+  shards: Shard[];
+  nodeName: string;
+  selectedShardName: string | null;
+  onShardSelect: (shardName: string) => void;
+}
+
+function PaginatedShardGrid({
+  shards,
+  nodeName,
+  selectedShardName,
+  onShardSelect,
+}: PaginatedShardGridProps) {
+  const [page, setPage] = useState(0);
+
+  // Reset to first page whenever the shard list changes (node switch, filter, etc.)
+  const shardsKey = shards.map((s) => s.name).join(',');
+  useEffect(() => {
+    setPage(0);
+  }, [shardsKey]);
+
+  const pageCount = Math.ceil(shards.length / SHARDS_PAGE_SIZE);
+  const pageShards = shards.slice(page * SHARDS_PAGE_SIZE, (page + 1) * SHARDS_PAGE_SIZE);
+  const start = page * SHARDS_PAGE_SIZE + 1;
+  const end = Math.min((page + 1) * SHARDS_PAGE_SIZE, shards.length);
+
+  return (
+    <>
+      {pageCount > 1 && (
+        <div className="shards-pagination">
+          <button
+            className="shards-page-btn"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            ‹ Prev
+          </button>
+          <span className="shards-page-info">
+            {start}–{end} of {shards.length}
+          </span>
+          <button
+            className="shards-page-btn"
+            disabled={page === pageCount - 1}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next ›
+          </button>
+        </div>
+      )}
+      <div className="shards-grid">
+        {pageShards.map((shard) => (
+          <ShardComponent
+            key={shard.name}
+            shard={shard}
+            nodeName={nodeName}
+            isSelected={selectedShardName === shard.name}
+            onSelect={() => onShardSelect(shard.name)}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -308,27 +764,15 @@ function NodeComponent({
 
           <div className="shards-container">
             <h4>Shards ({shards.length})</h4>
-            <div className="shards-grid">
-              {[...shards]
-                .sort((a, b) => {
-                  // First sort by collection name
-                  const collectionCompare = a.class.localeCompare(b.class);
-                  if (collectionCompare !== 0) {
-                    return collectionCompare;
-                  }
-                  // Then sort by shard name
-                  return a.name.localeCompare(b.name);
-                })
-                .map((shard) => (
-                  <ShardComponent
-                    key={shard.name}
-                    shard={shard}
-                    nodeName={node.name}
-                    isSelected={selectedShardName === shard.name}
-                    onSelect={() => onShardSelect(shard.name)}
-                  />
-                ))}
-            </div>
+            <PaginatedShardGrid
+              shards={[...shards].sort((a, b) => {
+                const c = a.class.localeCompare(b.class);
+                return c !== 0 ? c : a.name.localeCompare(b.name);
+              })}
+              nodeName={node.name}
+              selectedShardName={selectedShardName}
+              onShardSelect={onShardSelect}
+            />
           </div>
         </>
       )}
@@ -339,9 +783,9 @@ function NodeComponent({
 // Collection View Component
 interface CollectionViewProps {
   nodeStatusData: Node[];
-  selectedNodeName: string | null;
+  selectedNodeNames: Set<string>;
   selectedShardName: string | null;
-  selectedCollectionName: string | null;
+  selectedCollectionNames: Set<string>;
   onNodeSelect: (nodeName: string) => void;
   onShardSelect: (shardName: string) => void;
   onCollectionSelect: (collectionName: string) => void;
@@ -359,9 +803,9 @@ interface CollectionData {
 
 function CollectionView({
   nodeStatusData,
-  selectedNodeName,
+  selectedNodeNames,
   selectedShardName,
-  selectedCollectionName,
+  selectedCollectionNames,
   onNodeSelect,
   onShardSelect,
   onCollectionSelect,
@@ -371,7 +815,7 @@ function CollectionView({
     const collectionMap = new Map<string, CollectionData>();
 
     nodeStatusData.forEach((node) => {
-      node.shards.forEach((shard) => {
+      (node.shards ?? []).forEach((shard) => {
         if (!collectionMap.has(shard.class)) {
           collectionMap.set(shard.class, {
             name: shard.class,
@@ -401,19 +845,26 @@ function CollectionView({
   }, [nodeStatusData]);
 
   const handleCollectionSelect = (collectionName: string) => {
-    onCollectionSelect(collectionName === selectedCollectionName ? '' : collectionName);
-    onNodeSelect(''); // Reset node selection
+    onCollectionSelect(collectionName);
   };
 
   const handleNodeSelectInCollection = (nodeName: string) => {
-    onNodeSelect(nodeName === selectedNodeName ? '' : nodeName);
+    onNodeSelect(nodeName);
     onShardSelect(''); // Reset shard selection
   };
+
+  if (collections.length === 0) {
+    return (
+      <div className="no-data">
+        <p>No collections found in this cluster.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="collections-list">
       {collections.map((collection) => {
-        const isCollectionSelected = selectedCollectionName === collection.name;
+        const isCollectionSelected = selectedCollectionNames.has(collection.name);
 
         // Check for READONLY shards in this collection
         const readonlyShards = collection.nodes.flatMap((node) =>
@@ -516,7 +967,7 @@ function CollectionView({
                   {collection.nodes
                     .sort((a, b) => a.nodeName.localeCompare(b.nodeName))
                     .map((nodeData) => {
-                      const isNodeSelected = selectedNodeName === nodeData.nodeName;
+                      const isNodeSelected = selectedNodeNames.has(nodeData.nodeName);
                       const nodeReadonlyShards = nodeData.shards.filter(
                         (shard) => shard.vectorIndexingStatus === 'READONLY'
                       );
@@ -558,19 +1009,14 @@ function CollectionView({
 
                           {isNodeSelected && (
                             <div className="shards-container">
-                              <div className="shards-grid">
-                                {nodeData.shards
-                                  .sort((a, b) => a.name.localeCompare(b.name))
-                                  .map((shard) => (
-                                    <ShardComponent
-                                      key={shard.name}
-                                      shard={shard}
-                                      nodeName={nodeData.nodeName}
-                                      isSelected={selectedShardName === shard.name}
-                                      onSelect={() => onShardSelect(shard.name)}
-                                    />
-                                  ))}
-                              </div>
+                              <PaginatedShardGrid
+                                shards={[...nodeData.shards].sort((a, b) =>
+                                  a.name.localeCompare(b.name)
+                                )}
+                                nodeName={nodeData.nodeName}
+                                selectedShardName={selectedShardName}
+                                onShardSelect={onShardSelect}
+                              />
                             </div>
                           )}
                         </div>
@@ -589,13 +1035,15 @@ function CollectionView({
 function ClusterPanelWebview() {
   const [nodeStatusData, setNodeStatusData] = useState<Node[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedNodeName, setSelectedNodeName] = useState<string | null>(null);
+  const [selectedNodeNames, setSelectedNodeNames] = useState<Set<string>>(new Set());
   const [selectedShardName, setSelectedShardName] = useState<string | null>(null);
-  const [selectedCollectionName, setSelectedCollectionName] = useState<string | null>(null);
+  const [selectedCollectionNames, setSelectedCollectionNames] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [openClusterViewOnConnect, setOpenClusterViewOnConnect] = useState<boolean>(true);
-  const [viewType, setViewType] = useState<'node' | 'collection'>('node');
-  const [hasInitialized, setHasInitialized] = useState<boolean>(false);
+  const [viewType, setViewType] = useState<'node' | 'collection' | 'checks'>('node');
+  const [checksResult, setChecksResult] = useState<ChecksResult | null>(null);
+  const [isRunningChecks, setIsRunningChecks] = useState(false);
+  const [checksWarningDismissed, setChecksWarningDismissed] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<'off' | '5s' | '10s' | '30s'>(
     'off'
   );
@@ -605,90 +1053,95 @@ function ClusterPanelWebview() {
   const scrollPositionRef = useRef<number>(0);
   const prevNodeStatusDataRef = useRef<Node[]>([]);
 
-  // Signal to the extension that the webview is ready to receive data.
-  // This must run before the message listener is set up so the extension
-  // can respond with the initial 'init' payload without a race condition.
-  useEffect(() => {
-    vscode.postMessage({ command: 'ready' });
+  const applyInitOrUpdate = useCallback((message: any) => {
+    if (message.nodeStatusData == null) {
+      // null means the extension has no cached data yet and is fetching in the background.
+      // Keep isLoading=true so the spinner stays visible until updateData arrives.
+      if (message.openClusterViewOnConnect !== undefined) {
+        setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
+      }
+      // Still apply checksResult from globalState even while node data is loading.
+      if (message.checksResult) {
+        setChecksResult(message.checksResult);
+      }
+      return;
+    }
+
+    const newData: Node[] = message.nodeStatusData || [];
+    prevNodeStatusDataRef.current = newData;
+
+    // Use startTransition so React yields to the browser between renders,
+    // preventing the UI thread from freezing on large datasets.
+    startTransition(() => {
+      setNodeStatusData(newData);
+      setIsLoading(false);
+
+      if (message.openClusterViewOnConnect !== undefined) {
+        setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
+      }
+      if (message.checksResult) {
+        setChecksResult(message.checksResult);
+      }
+    });
   }, []);
 
   useEffect(() => {
-    // Handle messages from the extension
+    // If the module-level listener already captured the init payload, apply it now.
+    if (__initPayload) {
+      applyInitOrUpdate(__initPayload);
+    }
+
+    // Register callback for init arriving after this effect runs.
+    __onInitPayload = (payload) => applyInitOrUpdate(payload);
+
     const messageHandler = (event: MessageEvent) => {
       const message = event.data;
-
       switch (message.command) {
-        case 'init':
-        case 'updateData':
-          // Only update if data has actually changed (using ref to avoid stale closure)
-          const newData = message.nodeStatusData || [];
-          const hasDataChanged =
-            JSON.stringify(newData) !== JSON.stringify(prevNodeStatusDataRef.current);
-
-          // Only update state if there are actual changes
-          if (hasDataChanged || prevNodeStatusDataRef.current.length === 0) {
-            prevNodeStatusDataRef.current = newData;
+        case 'updateData': {
+          const newData: Node[] = message.nodeStatusData || [];
+          prevNodeStatusDataRef.current = newData;
+          const scrollPos = scrollPositionRef.current;
+          startTransition(() => {
             setNodeStatusData(newData);
-
-            // Update openClusterViewOnConnect state
+            setIsLoading(false);
             if (message.openClusterViewOnConnect !== undefined) {
               setOpenClusterViewOnConnect(message.openClusterViewOnConnect !== false);
             }
-
-            // Auto-select defaults on initial load only, not on refresh
-            if (message.nodeStatusData && message.nodeStatusData.length > 0 && !hasInitialized) {
-              const data: Node[] = message.nodeStatusData;
-
-              // Node view: expand the first node in the list
-              setSelectedNodeName(data[0].name);
-
-              // Collection view: expand the first collection (alphabetically) and its first node
-              const allCollectionNames = new Set<string>();
-              data.forEach((node) => {
-                (node.shards || []).forEach((shard) => allCollectionNames.add(shard.class));
-              });
-              const sortedCollections = Array.from(allCollectionNames).sort((a, b) =>
-                a.localeCompare(b)
-              );
-              if (sortedCollections.length > 0) {
-                const firstCollection = sortedCollections[0];
-                setSelectedCollectionName(firstCollection);
-                // Find the first node (alphabetically) that has shards in this collection
-                const nodesInFirstCollection = data
-                  .filter((node) =>
-                    (node.shards || []).some((shard) => shard.class === firstCollection)
-                  )
-                  .sort((a, b) => a.name.localeCompare(b.name));
-                if (nodesInFirstCollection.length > 0) {
-                  setSelectedNodeName(nodesInFirstCollection[0].name);
-                }
+          });
+          if (contentRef.current && scrollPos > 0) {
+            setTimeout(() => {
+              if (contentRef.current) {
+                contentRef.current.scrollTop = scrollPos;
               }
-
-              setHasInitialized(true);
-            }
-
-            // Restore scroll position after data update
-            if (contentRef.current && scrollPositionRef.current > 0) {
-              setTimeout(() => {
-                if (contentRef.current) {
-                  contentRef.current.scrollTop = scrollPositionRef.current;
-                }
-              }, 0);
-            }
+            }, 0);
           }
-
-          // Always stop loading indicator
-          setIsLoading(false);
+          break;
+        }
+        case 'checksResult': {
+          const newResult = message.result ?? null;
+          setChecksResult(newResult);
+          setIsRunningChecks(false);
+          // Re-show the banner whenever fresh results arrive with issues,
+          // even if the user previously dismissed it.
+          if (newResult?.hasIssues ?? newResult?.multiTenancy?.hasIssues) {
+            setChecksWarningDismissed(false);
+          }
+          break;
+        }
+        case 'switchTab':
+          if (message.tab === 'node' || message.tab === 'collection' || message.tab === 'checks') {
+            setViewType(message.tab);
+          }
           break;
       }
     };
 
     window.addEventListener('message', messageHandler);
-
     return () => {
+      __onInitPayload = null;
       window.removeEventListener('message', messageHandler);
     };
-  }, [selectedNodeName, hasInitialized]);
+  }, [applyInitOrUpdate]);
 
   const filteredNodeStatusData = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -720,7 +1173,15 @@ function ClusterPanelWebview() {
   }, []);
 
   const handleNodeSelect = useCallback((nodeName: string) => {
-    setSelectedNodeName((prev) => (prev === nodeName ? null : nodeName));
+    setSelectedNodeNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeName)) {
+        next.delete(nodeName);
+      } else {
+        next.add(nodeName);
+      }
+      return next;
+    });
     setSelectedShardName(null);
   }, []);
 
@@ -729,8 +1190,15 @@ function ClusterPanelWebview() {
   }, []);
 
   const handleCollectionSelect = useCallback((collectionName: string) => {
-    setSelectedCollectionName((prev) => (prev === collectionName ? null : collectionName));
-    setSelectedNodeName(null);
+    setSelectedCollectionNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(collectionName)) {
+        next.delete(collectionName);
+      } else {
+        next.add(collectionName);
+      }
+      return next;
+    });
     setSelectedShardName(null);
   }, []);
 
@@ -743,6 +1211,11 @@ function ClusterPanelWebview() {
       });
       return newValue;
     });
+  }, []);
+
+  const handleRunChecks = useCallback(() => {
+    setIsRunningChecks(true);
+    vscode.postMessage({ command: 'runChecks' });
   }, []);
 
   const handleAutoRefreshChange = useCallback((interval: 'off' | '5s' | '10s' | '30s') => {
@@ -803,34 +1276,100 @@ function ClusterPanelWebview() {
     };
   }, [showAutoRefreshMenu]);
 
+  // Must be called unconditionally — cannot be inside a ternary (Rules of Hooks)
+  const nodeOrCollectionContent = useMemo(
+    () =>
+      nodeStatusData && nodeStatusData.length > 0 ? (
+        viewType === 'node' ? (
+          <div className="nodes-list">
+            {filteredNodeStatusData.length > 0 ? (
+              filteredNodeStatusData.map((node) => (
+                <NodeComponent
+                  key={node.name}
+                  node={node}
+                  isSelected={selectedNodeNames.has(node.name)}
+                  onSelect={() => handleNodeSelect(node.name)}
+                  selectedShardName={selectedShardName}
+                  onShardSelect={handleShardSelect}
+                />
+              ))
+            ) : (
+              <div className="no-data">
+                <p>No results match your search</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <CollectionView
+            nodeStatusData={filteredNodeStatusData}
+            selectedNodeNames={selectedNodeNames}
+            selectedShardName={selectedShardName}
+            selectedCollectionNames={selectedCollectionNames}
+            onNodeSelect={handleNodeSelect}
+            onShardSelect={handleShardSelect}
+            onCollectionSelect={handleCollectionSelect}
+          />
+        )
+      ) : isLoading ? (
+        <div className="loading">
+          <svg
+            className="loading-spinner"
+            width="24"
+            height="24"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165.033.163.071.345c0 1.654-1.346 3-3 3-.795 0-1.545-.311-2.107-.868-.563-.567-.873-1.317-.873-2.111 0-1.431 1.007-2.632 2.351-2.929v2.498l2.528-2.134-2.528-2.076v2.11C4.753 6.867 3 8.819 3 11.131c0 1.14.445 2.21 1.253 3.014.808.803 1.883 1.246 3.027 1.246 2.31 0 4.216-1.751 4.455-4.027.098-.858.451-1.935.832-2.489.167-.237.351-.469.555-.678l.131-.117zm-2.359.81c-.172-.268-.33-.518-.475-.748-1.303-2.066-2.916-2.758-4.093-2.758-1.087 0-2.1.563-2.7 1.5-.302.473-.5 1.013-.6 1.596l1.013.014c.087-.484.245-.95.465-1.371.437-.838 1.176-1.34 1.987-1.34.852 0 1.839.428 2.659 1.147.411.363.771.77 1.073 1.211.136.202.261.408.376.616.092-.085.184-.168.278-.25l.017-.017z" />
+          </svg>
+          <p>Loading cluster data…</p>
+        </div>
+      ) : (
+        <div className="no-data">
+          <p>No cluster data available</p>
+        </div>
+      ),
+    [
+      isLoading,
+      nodeStatusData,
+      filteredNodeStatusData,
+      viewType,
+      selectedNodeNames,
+      selectedShardName,
+      selectedCollectionNames,
+    ]
+  );
+
   return (
     <div className="cluster-panel">
       <div className="cluster-header">
         <h1>Cluster Information</h1>
         <div className="header-controls">
-          <div className="search-input-wrapper">
-            <span className="search-icon">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" />
-              </svg>
-            </span>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Filter by collection, shard, status…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                className="search-clear-button"
-                onClick={() => setSearchQuery('')}
-                title="Clear search"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          {viewType !== 'checks' && (
+            <div className="search-input-wrapper">
+              <span className="search-icon">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z" />
+                </svg>
+              </span>
+              <input
+                className="search-input"
+                type="text"
+                placeholder="Filter by collection, shard, status…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  className="search-clear-button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
           <span className="view-toggle-label">View:</span>
           <div className="view-toggle">
             <button
@@ -844,6 +1383,21 @@ function ClusterPanelWebview() {
               onClick={() => setViewType('collection')}
             >
               Collection
+            </button>
+            <button
+              className={`view-toggle-button ${viewType === 'checks' ? 'active' : ''}`}
+              onClick={() => setViewType('checks')}
+            >
+              Checks
+              {(() => {
+                if (!checksResult) return '';
+                const issueCount = [
+                  checksResult.multiTenancy?.hasIssues,
+                  checksResult.emptyShards?.hasIssues,
+                  checksResult.replicationImbalance?.hasIssues,
+                ].filter(Boolean).length;
+                return issueCount > 0 ? ` (${issueCount})` : '';
+              })()}
             </button>
           </div>
           <div className="refresh-button-group">
@@ -901,52 +1455,23 @@ function ClusterPanelWebview() {
       </div>
 
       <div className="cluster-content" ref={contentRef}>
-        {useMemo(
-          () =>
-            nodeStatusData && nodeStatusData.length > 0 ? (
-              viewType === 'node' ? (
-                <div className="nodes-list">
-                  {filteredNodeStatusData.length > 0 ? (
-                    filteredNodeStatusData.map((node) => (
-                      <NodeComponent
-                        key={node.name}
-                        node={node}
-                        isSelected={selectedNodeName === node.name}
-                        onSelect={() => handleNodeSelect(node.name)}
-                        selectedShardName={selectedShardName}
-                        onShardSelect={handleShardSelect}
-                      />
-                    ))
-                  ) : (
-                    <div className="no-data">
-                      <p>No results match your search</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <CollectionView
-                  nodeStatusData={filteredNodeStatusData}
-                  selectedNodeName={selectedNodeName}
-                  selectedShardName={selectedShardName}
-                  selectedCollectionName={selectedCollectionName}
-                  onNodeSelect={handleNodeSelect}
-                  onShardSelect={handleShardSelect}
-                  onCollectionSelect={handleCollectionSelect}
-                />
-              )
-            ) : (
-              <div className="no-data">
-                <p>No cluster data available</p>
-              </div>
-            ),
-          [
-            nodeStatusData,
-            filteredNodeStatusData,
-            viewType,
-            selectedNodeName,
-            selectedShardName,
-            selectedCollectionName,
-          ]
+        {viewType !== 'checks' &&
+          !checksWarningDismissed &&
+          (checksResult?.hasIssues ?? checksResult?.multiTenancy?.hasIssues) && (
+            <ChecksWarningBanner
+              checksResult={checksResult}
+              onOpenChecks={() => setViewType('checks')}
+              onDismiss={() => setChecksWarningDismissed(true)}
+            />
+          )}
+        {viewType === 'checks' ? (
+          <ChecksView
+            checksResult={checksResult}
+            isRunning={isRunningChecks}
+            onRunChecks={handleRunChecks}
+          />
+        ) : (
+          nodeOrCollectionContent
         )}
       </div>
 

@@ -10,8 +10,8 @@ describe('ClusterPanel', () => {
   let mockExtensionUri: vscode.Uri;
 
   beforeEach(() => {
-    // Reset singleton
-    (ClusterPanel as any).currentPanel = undefined;
+    // Reset panels map
+    (ClusterPanel as any)._panels = new Map();
 
     mockPanel = {
       webview: {
@@ -76,12 +76,12 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
 
-      expect(ClusterPanel.currentPanel).toBeDefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeDefined();
 
       // Close for the same connection
       ClusterPanel.closeForConnection(connectionId);
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeUndefined();
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
 
@@ -91,14 +91,14 @@ describe('ClusterPanel', () => {
 
       ClusterPanel.createOrShow(mockExtensionUri, connectionId, nodeStatusData, 'Test Connection');
 
-      const panelBefore = ClusterPanel.currentPanel;
+      const panelBefore = ClusterPanel.getPanel(connectionId);
       expect(panelBefore).toBeDefined();
 
       // Try to close for a different connection
       ClusterPanel.closeForConnection('different-connection-456');
 
       // Panel should still be open
-      expect(ClusterPanel.currentPanel).toBe(panelBefore);
+      expect(ClusterPanel.getPanel(connectionId)).toBe(panelBefore);
       expect(mockPanel.dispose).not.toHaveBeenCalled();
     });
 
@@ -132,6 +132,43 @@ describe('ClusterPanel', () => {
       );
     });
 
+    test('creates separate panels for different connections', () => {
+      const connectionId1 = 'connection-aaa';
+      const connectionId2 = 'connection-bbb';
+
+      jest.mocked(vscode.window.createWebviewPanel).mockClear();
+
+      const panel1 = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId1,
+        { nodes: [{ name: 'node-a' }] },
+        'Connection A'
+      );
+
+      // createWebviewPanel is called once so far
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+
+      const panel2 = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId2,
+        { nodes: [{ name: 'node-b' }] },
+        'Connection B'
+      );
+
+      // A second panel should have been created
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(2);
+
+      // They must be distinct instances tracked separately
+      expect(panel1).not.toBe(panel2);
+      expect(ClusterPanel.getPanel(connectionId1)).toBe(panel1);
+      expect(ClusterPanel.getPanel(connectionId2)).toBe(panel2);
+
+      // Closing one should not affect the other
+      ClusterPanel.closeForConnection(connectionId1);
+      expect(ClusterPanel.getPanel(connectionId1)).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId2)).toBe(panel2);
+    });
+
     test('disposes panel when dispose is called', () => {
       const connectionId = 'test-connection-123';
       const nodeStatusData = { nodes: [] };
@@ -143,14 +180,14 @@ describe('ClusterPanel', () => {
         'Test Connection'
       );
 
-      expect(ClusterPanel.currentPanel).toBe(panel);
+      expect(ClusterPanel.getPanel(connectionId)).toBe(panel);
 
       // Manually call the dispose callback to simulate panel disposal
       if (mockPanel._disposeCallback) {
         mockPanel._disposeCallback();
       }
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel(connectionId)).toBeUndefined();
       expect(mockPanel.dispose).toHaveBeenCalled();
     });
   });
@@ -833,14 +870,14 @@ describe('ClusterPanel', () => {
   });
 
   describe('Dispose and cleanup', () => {
-    test('clears singleton on dispose', () => {
+    test('removes panel from map on dispose', () => {
       const panel = ClusterPanel.createOrShow(mockExtensionUri, 'test-id', { nodes: [] }, 'Test');
 
-      expect(ClusterPanel.currentPanel).toBe(panel);
+      expect(ClusterPanel.getPanel('test-id')).toBe(panel);
 
       panel.dispose();
 
-      expect(ClusterPanel.currentPanel).toBeUndefined();
+      expect(ClusterPanel.getPanel('test-id')).toBeUndefined();
     });
 
     test('disposes all registered disposables', () => {
@@ -864,6 +901,147 @@ describe('ClusterPanel', () => {
       panel.dispose();
 
       expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+  });
+
+  describe('Checks integration', () => {
+    const sampleChecksResult = {
+      timestamp: '2024-01-01T00:00:00.000Z',
+      hasIssues: true,
+      multiTenancy: {
+        groups: [
+          {
+            collections: [
+              { name: 'Col1', objectCount: 10 },
+              { name: 'Col2', objectCount: 5 },
+            ],
+            count: 2,
+            totalObjects: 15,
+          },
+        ],
+        hasIssues: true,
+      },
+      emptyShards: { entries: [], hasIssues: false },
+      replicationImbalance: { collections: [], hasIssues: false },
+    };
+
+    test('includes checksResult in init message when provided', () => {
+      const connectionId = 'test-connection-123';
+
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        { nodes: [] },
+        'Test',
+        undefined,
+        undefined,
+        sampleChecksResult
+      );
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'init',
+          checksResult: sampleChecksResult,
+        })
+      );
+    });
+
+    test('checksResult is null in init message when not provided', () => {
+      ClusterPanel.createOrShow(mockExtensionUri, 'test-id', { nodes: [] }, 'Test');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+
+      const initCall = mockPanel.webview.postMessage.mock.calls.find(
+        (call: any) => call[0].command === 'init'
+      );
+      expect(initCall).toBeDefined();
+      expect(initCall[0].checksResult).toBeUndefined();
+    });
+
+    test('postMessage sends checksResult to webview', () => {
+      const connectionId = 'test-connection-123';
+      const panel = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        { nodes: [] },
+        'Test'
+      );
+
+      mockPanel.webview.postMessage.mockClear();
+
+      panel.postMessage({ command: 'checksResult', result: sampleChecksResult });
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+        command: 'checksResult',
+        result: sampleChecksResult,
+      });
+    });
+
+    test('runChecks command is forwarded to onMessageCallback', async () => {
+      const onMessageCallback = jest.fn().mockResolvedValue(undefined);
+      const connectionId = 'test-connection-123';
+
+      ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        { nodes: [] },
+        'Test',
+        onMessageCallback
+      );
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      await messageHandler({ command: 'runChecks' });
+
+      expect(onMessageCallback).toHaveBeenCalledWith(
+        { command: 'runChecks' },
+        expect.any(Function)
+      );
+    });
+
+    test('switchTab command sent via setPendingTab before ready', () => {
+      const connectionId = 'test-connection-123';
+      const panel = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        { nodes: [] },
+        'Test'
+      );
+
+      panel.setPendingTab('checks');
+
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      mockPanel.webview.postMessage.mockClear();
+      messageHandler({ command: 'ready' });
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: 'switchTab', tab: 'checks' })
+      );
+    });
+
+    test('switchTab command sent immediately via setPendingTab after ready', () => {
+      const connectionId = 'test-connection-123';
+      const panel = ClusterPanel.createOrShow(
+        mockExtensionUri,
+        connectionId,
+        { nodes: [] },
+        'Test'
+      );
+
+      // Fire ready first so _pendingInitData is cleared
+      const messageHandler = mockPanel.webview.onDidReceiveMessage.mock.calls[0][0];
+      messageHandler({ command: 'ready' });
+      mockPanel.webview.postMessage.mockClear();
+
+      panel.setPendingTab('checks');
+
+      expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+        command: 'switchTab',
+        tab: 'checks',
+      });
     });
   });
 

@@ -9,3 +9,4 @@ coverage
 firebase-debug.log
 .env
 .serena
+.claude

@@ -19,6 +19,14 @@ import * as https from 'https';
 import * as http from 'http';
 import { WEAVIATE_INTEGRATION_HEADER } from '../constants';
 import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
+import {
+  findMultiTenantCandidates,
+  findEmptyShards,
+  findReplicationImbalances,
+  computeCandidatesDismissKey,
+  MtCandidateGroup,
+  ChecksResult,
+} from '../utils/multiTenancyCheck';
 
 /**
  * Provides data for the Weaviate Explorer tree view, displaying connections,
@@ -97,6 +105,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
   /** Cache of aliases per connection */
   private aliasesCache: Record<string, AliasItem[]> = {};
+
+  /** MT candidate groups per connection, sorted by totalObjects descending. */
+  private mtCandidates: Record<string, MtCandidateGroup[]> = {};
+
+  /** Number of check sections (MT, empty shards, replication) with issues, per connection. */
+  private checksIssueSectionCount: Record<string, number> = {};
 
   /** VS Code extension context */
   private readonly context: vscode.ExtensionContext;
@@ -395,10 +409,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
       element.tooltip = 'Available Weaviate modules';
     } else if (element.itemType === 'collectionsGroup') {
-      if (!element.iconPath) {
-        element.iconPath = new vscode.ThemeIcon('database');
-      }
-      element.tooltip = 'Collections in this instance';
+      const issueSections = element.connectionId
+        ? (this.checksIssueSectionCount[element.connectionId] ?? 0)
+        : 0;
+      const hasAnyIssue = issueSections > 0;
+      element.iconPath = hasAnyIssue
+        ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
+        : new vscode.ThemeIcon('database');
+      element.description = hasAnyIssue
+        ? `⚠ ${issueSections} check issue${issueSections > 1 ? 's' : ''}`
+        : undefined;
+      element.tooltip = hasAnyIssue
+        ? `${issueSections} check issue${issueSections > 1 ? 's' : ''} detected — open Checks for details`
+        : 'Collections in this instance';
+      // Use a distinct contextValue when there are any check warnings so we can show the inline button
+      element.contextValue = hasAnyIssue
+        ? 'weaviateCollectionsGroupMtWarning'
+        : 'weaviateCollectionsGroup';
     } else if (element.itemType === 'backups') {
       if (!element.iconPath) {
         element.iconPath = new vscode.ThemeIcon('archive');
@@ -1235,18 +1262,23 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       }
 
       // Add cluster nodes section
+      const cachedNodes = this.clusterNodesCache[element.connectionId];
+      const nodesLoading = cachedNodes === undefined;
       const stats = this.clusterStatisticsCache[element.connectionId];
-      let nodes_synchronized = stats?.synchronized ? 'Synchronized' : 'Not Synchronized';
-      let nodes_count = this.clusterNodesCache[element.connectionId]?.length;
+      const nodesLabel = nodesLoading
+        ? 'Loading nodes…'
+        : `${cachedNodes.length} Node${cachedNodes.length === 1 ? '' : 's'} ${stats?.synchronized ? 'Synchronized' : 'Not Synchronized'}`;
       items.push(
         new WeaviateTreeItem(
-          `${nodes_count || 0} Node${nodes_count === 1 ? '' : 's'} ${nodes_synchronized}`,
+          nodesLabel,
           vscode.TreeItemCollapsibleState.Expanded,
           'clusterNodes',
           element.connectionId,
           undefined,
           'clusterNodes',
-          new vscode.ThemeIcon('terminal-ubuntu'),
+          nodesLoading
+            ? new vscode.ThemeIcon('loading~spin')
+            : new vscode.ThemeIcon('terminal-ubuntu'),
           'weaviateClusterNodes'
         )
       );
@@ -3208,8 +3240,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const connection = this.connections.find((c) => c.id === connectionId);
     if (connection) {
       await this.connectionManager.disconnect(connectionId);
-      // Clear collections for this connection
+      // Clear collections and cached cluster data for this connection
       delete this.collections[connectionId];
+      delete this.clusterNodesCache[connectionId];
+      delete this.clusterStatisticsCache[connectionId];
       // Close cluster panel if it's open for this connection
       ClusterPanel.closeForConnection(connectionId);
       // Refresh connections and update tree view
@@ -3412,13 +3446,149 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         this.collections[connectionId] = [];
       }
 
+      // Recompute all checks and push the result to the ClusterPanel so badges
+      // and the panel banner always reflect the current collection state.
+      await this._recomputeChecksAndSend(connectionId);
+
       // Refresh the tree view
       this.refresh();
+
+      // Show notification async — fire and forget so it does not block the tree
+      const candidates = this.mtCandidates[connectionId] ?? [];
+      if (candidates.length > 0) {
+        this._notifyMtCandidates(connectionId, candidates).catch(console.error);
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error in fetchCollectionsData:', error);
       vscode.window.showErrorMessage(`Failed to fetch collections: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Shows a warning notification when collections share identical schemas.
+   * Respects the per-connection dismiss state stored in globalState.
+   * If the user clicks Update, the dismiss state is cleared and collections are re-fetched.
+   */
+  private async _notifyMtCandidates(
+    connectionId: string,
+    candidates: MtCandidateGroup[]
+  ): Promise<void> {
+    const dismissKey = `mtDismissed.${connectionId}`;
+    const storedKey = this.context.globalState.get<string>(dismissKey);
+    const currentKey = computeCandidatesDismissKey(candidates);
+
+    if (storedKey === currentKey) {
+      return; // User already dismissed this exact candidate state
+    }
+
+    const groupCount = candidates.length;
+    const msg =
+      `${groupCount} collection group${groupCount > 1 ? 's' : ''} share identical schemas ` +
+      `— they could use Weaviate Multi-Tenancy.`;
+
+    const action = await vscode.window.showWarningMessage(msg, 'Learn More', 'Update', 'Dismiss');
+
+    switch (action) {
+      case 'Learn More':
+        vscode.env.openExternal(
+          vscode.Uri.parse('https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy')
+        );
+        break;
+      case 'Update':
+        // Clear dismiss state so the warning reappears with fresh data
+        await this.context.globalState.update(dismissKey, undefined);
+        await this.fetchCollectionsData(connectionId);
+        break;
+      case 'Dismiss':
+        await this.context.globalState.update(dismissKey, currentKey);
+        break;
+    }
+  }
+
+  /**
+   * Derives per-collection object counts from cached cluster node shard data.
+   * Sums objectCount across all shards and all nodes for each collection name.
+   */
+  private _getObjectCountsFromNodes(connectionId: string): Record<string, number> {
+    const nodes = this.clusterNodesCache[connectionId] ?? [];
+    const counts: Record<string, number> = {};
+    for (const node of nodes) {
+      for (const shard of (node as any).shards ?? []) {
+        const col = shard.class as string;
+        if (col) {
+          counts[col] = (counts[col] ?? 0) + (shard.objectCount ?? 0);
+        }
+      }
+    }
+    return counts;
+  }
+
+  /**
+   * Runs all checks for a connection, saves the result to globalState, and returns it.
+   * Called from the ClusterPanel "Run Checks" button.
+   */
+  public async runChecks(connectionId: string): Promise<ChecksResult> {
+    const collections = this.collections[connectionId] ?? [];
+    const objectCounts = this._getObjectCountsFromNodes(connectionId);
+
+    const rawNodes = this.clusterNodesCache[connectionId] ?? [];
+    // Filter shards to only collections still present in local state so stale
+    // node status data cannot produce false positives immediately after a deletion.
+    const knownCollections = new Set(collections.map((c) => c.label));
+    const nodes = rawNodes.map((node) => ({
+      ...node,
+      shards: (node.shards ?? []).filter((shard) => knownCollections.has((shard as any).class)),
+    }));
+    const mtCollections = new Set(
+      collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
+    );
+
+    // All three checks are independent — run them in parallel.
+    const [groups, emptyShardEntries, replicationImbalances] = await Promise.all([
+      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+      Promise.resolve(findReplicationImbalances(nodes as any)),
+    ]);
+
+    const result: ChecksResult = {
+      timestamp: new Date().toISOString(),
+      hasIssues:
+        groups.length > 0 || emptyShardEntries.length > 0 || replicationImbalances.length > 0,
+      multiTenancy: { groups, hasIssues: groups.length > 0 },
+      emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
+      replicationImbalance: {
+        collections: replicationImbalances,
+        hasIssues: replicationImbalances.length > 0,
+      },
+    };
+
+    // Persist so the result survives panel close/reopen
+    await this.context.globalState.update(`checksResults.${connectionId}`, result);
+
+    // Update badges
+    this.mtCandidates[connectionId] = groups;
+    this.checksIssueSectionCount[connectionId] =
+      (groups.length > 0 ? 1 : 0) +
+      (emptyShardEntries.length > 0 ? 1 : 0) +
+      (replicationImbalances.length > 0 ? 1 : 0);
+    this.refresh();
+
+    return result;
+  }
+
+  /**
+   * Returns the cached verbose nodes for a connection, if available.
+   */
+  public getCachedClusterNodes(connectionId: string): Node<'verbose'>[] | undefined {
+    return this.clusterNodesCache[connectionId];
+  }
+
+  /**
+   * Returns the last saved checks result for a connection, or null if none exists.
+   */
+  public getLastChecksResult(connectionId: string): ChecksResult | null {
+    return this.context.globalState.get<ChecksResult>(`checksResults.${connectionId}`) ?? null;
   }
 
   /**
@@ -3791,9 +3961,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Refresh the tree view
       this.refresh();
 
-      // Update cluster panel with latest node/collection stats
+      // Refresh node cache first, then update the panel and recompute checks in parallel.
       await this.fetchNodes(connectionId);
-      await this.updateClusterPanelIfOpen(connectionId);
+      await Promise.all([
+        this.updateClusterPanelIfOpen(connectionId),
+        this._recomputeChecksAndSend(connectionId),
+      ]);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteCollection:', error);
@@ -3833,9 +4006,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Refresh the tree view
       this.refresh();
 
-      // Update cluster panel with latest node/collection stats
+      // Refresh node cache first, then update the panel and recompute checks in parallel.
       await this.fetchNodes(connectionId);
-      await this.updateClusterPanelIfOpen(connectionId);
+      await Promise.all([
+        this.updateClusterPanelIfOpen(connectionId),
+        this._recomputeChecksAndSend(connectionId),
+      ]);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteAllCollections:', error);
@@ -4225,10 +4401,63 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    * A warning notification is shown so the user knows the panel may be stale
    * and can manually refresh it.
    */
+  /**
+   * Recomputes all checks from the current cached collections and nodes, persists the result,
+   * and pushes a `checksResult` message to the ClusterPanel if it is open.
+   *
+   * Call this whenever collections or node shards change (fetch, delete, etc.) so the
+   * Checks tab and tree badges stay in sync without requiring a manual "Run Checks".
+   */
+  private async _recomputeChecksAndSend(connectionId: string): Promise<void> {
+    const collections = this.collections[connectionId] ?? [];
+    const objectCounts = this._getObjectCountsFromNodes(connectionId);
+
+    const rawNodes = this.clusterNodesCache[connectionId] ?? [];
+    // Filter shards to only collections still present in local state so stale
+    // node status data cannot produce false positives immediately after a deletion.
+    const knownCollections = new Set(collections.map((c) => c.label));
+    const nodes = rawNodes.map((node) => ({
+      ...node,
+      shards: (node.shards ?? []).filter((shard) => knownCollections.has((shard as any).class)),
+    }));
+    const mtCollections = new Set(
+      collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
+    );
+
+    // All three checks are independent — run them in parallel.
+    const [candidates, emptyShardEntries, replicationImbalances] = await Promise.all([
+      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+      Promise.resolve(findReplicationImbalances(nodes as any)),
+    ]);
+    this.mtCandidates[connectionId] = candidates;
+
+    const result: ChecksResult = {
+      timestamp: new Date().toISOString(),
+      hasIssues:
+        candidates.length > 0 || emptyShardEntries.length > 0 || replicationImbalances.length > 0,
+      multiTenancy: { groups: candidates, hasIssues: candidates.length > 0 },
+      emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
+      replicationImbalance: {
+        collections: replicationImbalances,
+        hasIssues: replicationImbalances.length > 0,
+      },
+    };
+
+    this.checksIssueSectionCount[connectionId] =
+      (candidates.length > 0 ? 1 : 0) +
+      (emptyShardEntries.length > 0 ? 1 : 0) +
+      (replicationImbalances.length > 0 ? 1 : 0);
+
+    await this.context.globalState.update(`checksResults.${connectionId}`, result);
+    ClusterPanel.getPanel(connectionId)?.postMessage({ command: 'checksResult', result });
+  }
+
   private async updateClusterPanelIfOpen(connectionId: string): Promise<void> {
     try {
-      // Check if cluster panel is open
-      if (!ClusterPanel.currentPanel) {
+      // Check if cluster panel is open for this connection
+      const clusterPanel = ClusterPanel.getPanel(connectionId);
+      if (!clusterPanel) {
         return;
       }
 
@@ -4245,7 +4474,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const connection = this.connectionManager.getConnection(connectionId);
 
       // Send update to the panel
-      ClusterPanel.currentPanel.postMessage({
+      clusterPanel.postMessage({
         command: 'updateData',
         nodeStatusData: nodeStatusData,
         openClusterViewOnConnect: connection?.openClusterViewOnConnect,

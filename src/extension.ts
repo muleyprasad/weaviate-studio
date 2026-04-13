@@ -1595,6 +1595,14 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.window.showInformationMessage(
             `Collection "${item.collectionName}" deleted successfully`
           );
+          // Re-run checks if a previous result exists, so stale candidates are cleared.
+          if (weaviateTreeDataProvider.getLastChecksResult(item.connectionId)) {
+            const updatedResult = await weaviateTreeDataProvider.runChecks(item.connectionId);
+            ClusterPanel.getPanel(item.connectionId)?.postMessage({
+              command: 'checksResult',
+              result: updatedResult,
+            });
+          }
         } catch (error) {
           vscode.window.showErrorMessage(
             `Failed to delete collection: ${error instanceof Error ? error.message : String(error)}`
@@ -1634,6 +1642,14 @@ export function activate(context: vscode.ExtensionContext) {
         try {
           await weaviateTreeDataProvider.deleteAllCollections(item.connectionId);
           vscode.window.showInformationMessage('All collections deleted successfully');
+          // Re-run checks if a previous result exists, so stale candidates are cleared.
+          if (weaviateTreeDataProvider.getLastChecksResult(item.connectionId)) {
+            const updatedResult = await weaviateTreeDataProvider.runChecks(item.connectionId);
+            ClusterPanel.getPanel(item.connectionId)?.postMessage({
+              command: 'checksResult',
+              result: updatedResult,
+            });
+          }
         } catch (error) {
           vscode.window.showErrorMessage(
             `Failed to delete all collections: ${error instanceof Error ? error.message : String(error)}`
@@ -1724,20 +1740,38 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Get node status data
-        const nodeStatusData = await client.cluster.nodes({ output: 'verbose' });
-
         // Get connection to access openClusterViewOnConnect setting
         const connection = connectionManager.getConnection(item.connectionId);
 
-        // Open cluster panel
-        ClusterPanel.createOrShow(
+        // Use cached node data (already fetched by the tree view) for immediate display.
+        // If the cache is empty, the panel will show a loading state until the fetch below completes.
+        const cachedNodeData =
+          weaviateTreeDataProvider.getCachedClusterNodes(item.connectionId) ?? null;
+
+        // Open panel immediately — show cached data right away or loading state if no cache.
+        const clusterPanel = ClusterPanel.createOrShow(
           context.extensionUri,
           item.connectionId,
-          nodeStatusData,
+          cachedNodeData,
           connection?.name || 'Unknown',
           async (message, postMessage) => {
-            if (message.command === 'refresh') {
+            if (message.command === 'ready' && cachedNodeData == null) {
+              // No cached data — fetch now and push to the panel when ready.
+              // The webview already received 'init' with null and is showing loading state.
+              try {
+                const updatedData = await client.cluster.nodes({ output: 'verbose' });
+                const updatedConnection = connectionManager.getConnection(item.connectionId);
+                postMessage({
+                  command: 'updateData',
+                  nodeStatusData: updatedData,
+                  openClusterViewOnConnect: updatedConnection?.openClusterViewOnConnect,
+                });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to load cluster data: ${errorMessage}`);
+                postMessage({ command: 'updateData', nodeStatusData: [] });
+              }
+            } else if (message.command === 'refresh') {
               // Refresh node status data
               const updatedData = await client.cluster.nodes({ output: 'verbose' });
               const updatedConnection = connectionManager.getConnection(item.connectionId);
@@ -1792,13 +1826,51 @@ export function activate(context: vscode.ExtensionContext) {
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                 vscode.window.showErrorMessage(`Failed to update shard status: ${errorMessage}`);
               }
+            } else if (message.command === 'runChecks') {
+              try {
+                // Refresh node status first so checks and the UI both use up-to-date data.
+                await weaviateTreeDataProvider.fetchNodes(item.connectionId);
+                const freshNodes =
+                  weaviateTreeDataProvider.getCachedClusterNodes(item.connectionId) ?? [];
+                const updatedConnection = connectionManager.getConnection(item.connectionId);
+                postMessage({
+                  command: 'updateData',
+                  nodeStatusData: freshNodes,
+                  openClusterViewOnConnect: updatedConnection?.openClusterViewOnConnect,
+                });
+                const result = await weaviateTreeDataProvider.runChecks(item.connectionId);
+                postMessage({ command: 'checksResult', result });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to run checks: ${errorMessage}`);
+                postMessage({ command: 'checksResult', result: null });
+              }
+            } else if (message.command === 'openExternal') {
+              vscode.env.openExternal(vscode.Uri.parse(message.url));
             }
           },
-          connection?.openClusterViewOnConnect
+          connection?.openClusterViewOnConnect,
+          weaviateTreeDataProvider.getLastChecksResult(item.connectionId)
         );
+
+        // If a specific tab was requested (e.g. opening directly to the Checks tab),
+        // queue the switch so it's safe for both new and already-open panels.
+        if (item.openTab) {
+          clusterPanel.setPendingTab(item.openTab);
+        }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         vscode.window.showErrorMessage(`Failed to get cluster information: ${errorMessage}`);
+      }
+    }),
+
+    vscode.commands.registerCommand('weaviate.openMtChecks', (item) => {
+      const connectionId = item?.connectionId;
+      if (connectionId) {
+        vscode.commands.executeCommand('weaviate.viewClusterInfo', {
+          connectionId,
+          openTab: 'checks',
+        });
       }
     }),
 

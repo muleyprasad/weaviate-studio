@@ -8,6 +8,7 @@
   "grpcPort": 50051,
   "grpcSecure": false,
   "connectionVersion": "2",
+  "readOnly": true,
   "links": [
     {
       "name": "Weaviate Docs",

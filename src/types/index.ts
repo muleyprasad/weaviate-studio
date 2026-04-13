@@ -165,6 +165,7 @@ export interface ConnectionConfig extends WeaviateConnection {
  * Extends vscode.TreeItem to include Weaviate-specific properties.
  */
 export class WeaviateTreeItem extends vscode.TreeItem {
+  declare public description?: string | boolean;
   /**
    * Creates a new instance of WeaviateTreeItem
    * @param label - The display label for the tree item
@@ -260,7 +261,6 @@ export class WeaviateTreeItem extends vscode.TreeItem {
     }
 
     if (description !== null && description !== undefined) {
-      // @ts-ignore - We're setting a read-only property here
       this.description = description;
     }
   }
