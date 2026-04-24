@@ -17,3 +17,11 @@ export { HybridSearchInput } from './HybridSearchInput';
 export { AlphaSlider } from './AlphaSlider';
 export { PropertySelector } from './PropertySelector';
 export { ScoreBreakdown } from './ScoreBreakdown';
+
+// Multi-target Vector Search Components
+export { VectorOptionsDrawer } from './VectorOptionsDrawer';
+export { TargetVectorList } from './TargetVectorList';
+export { JoinStrategySelector } from './JoinStrategySelector';
+export { WeightEditor } from './WeightEditor';
+export { MuveraBadge } from './MuveraBadge';
+export { CopyAsCode } from './CopyAsCode';

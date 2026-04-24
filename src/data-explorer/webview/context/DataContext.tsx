@@ -24,6 +24,8 @@ export interface DataContextState {
   availableTenants: TenantInfo[];
   selectedTenant: string | null;
   isMultiTenant: boolean;
+  // Server metadata
+  serverVersion: string | null;
   // Data
   objects: WeaviateObject[];
   totalCount: number;
@@ -46,6 +48,7 @@ type DataAction =
   | { type: 'CLEAR_ERROR' }
   | { type: 'REFRESH' }
   | { type: 'SET_FETCHED_OBJECT_DETAIL'; object: WeaviateObject | null }
+  | { type: 'SET_SERVER_VERSION'; version: string | null }
   // Multi-tenancy actions
   | { type: 'SET_TENANTS'; tenants: TenantInfo[]; isMultiTenant: boolean }
   | { type: 'SET_SELECTED_TENANT'; tenant: string | null };
@@ -60,6 +63,7 @@ const initialState: DataContextState = {
   availableTenants: [],
   selectedTenant: null,
   isMultiTenant: false,
+  serverVersion: null,
   objects: [],
   totalCount: 0,
   unfilteredTotalCount: 0,
@@ -147,6 +151,12 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         fetchedObjectDetail: null,
       };
 
+    case 'SET_SERVER_VERSION':
+      return {
+        ...state,
+        serverVersion: action.version,
+      };
+
     default:
       return state;
   }
@@ -165,6 +175,7 @@ export interface DataContextActions {
   clearError: () => void;
   refresh: () => void;
   setFetchedObjectDetail: (object: WeaviateObject | null) => void;
+  setServerVersion: (version: string | null) => void;
   // Multi-tenancy actions
   setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => void;
   setSelectedTenant: (tenant: string | null) => void;
@@ -229,6 +240,10 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
 
       setFetchedObjectDetail: (object: WeaviateObject | null) => {
         dispatch({ type: 'SET_FETCHED_OBJECT_DETAIL', object });
+      },
+
+      setServerVersion: (version: string | null) => {
+        dispatch({ type: 'SET_SERVER_VERSION', version });
       },
 
       setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => {

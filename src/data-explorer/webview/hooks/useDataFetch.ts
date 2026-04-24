@@ -83,6 +83,11 @@ export function useDataFetch() {
               dataActions.setCollection(message.collectionName);
               dataActions.setSchema(message.schema);
 
+              // Set server version for feature gating
+              if (message.serverVersion) {
+                dataActions.setServerVersion(message.serverVersion);
+              }
+
               // Check if multi-tenant
               const isMultiTenant =
                 message.isMultiTenant || !!(message.schema.multiTenancy as any)?.enabled;

@@ -199,6 +199,26 @@ export type FilterMatchMode = 'AND' | 'OR';
 // Vector search types for Phase 3
 export type VectorSearchType = 'none' | 'nearText' | 'nearVector' | 'nearObject' | 'hybrid';
 
+// Multi-target vector search types
+export type JoinStrategy = 'minimum' | 'sum' | 'average' | 'manual-weights' | 'relative-score';
+
+export interface MultiTargetPayload {
+  combination: JoinStrategy;
+  targetVectors: string[];
+  weights?: Record<string, number>;
+}
+
+export interface NamedVectorInfo {
+  name: string;
+  vectorizerName: string;
+  vectorizerConfig: unknown;
+  indexType: string;
+  indexConfig: unknown;
+  isMuvera: boolean;
+  isMultiVector: boolean;
+  properties?: string[];
+}
+
 export interface VectorSearchParams {
   type: VectorSearchType;
   // nearText parameters
@@ -211,7 +231,7 @@ export interface VectorSearchParams {
   certainty?: number;
   distance?: number;
   distanceMetric?: string;
-  targetVector?: string;
+  targetVector?: string | MultiTargetPayload;
   // Hybrid search parameters
   alpha?: number; // 0 = pure BM25, 1 = pure vector
   fusionType?: 'rankedFusion' | 'relativeScoreFusion';
@@ -293,6 +313,8 @@ export interface ExtensionMessage {
   tenants?: TenantInfo[];
   tenant?: string;
   isMultiTenant?: boolean;
+  // Server metadata
+  serverVersion?: string;
   // Phase 5: Aggregations and Export
   aggregations?: AggregationResult;
   exportResult?: ExportResult;

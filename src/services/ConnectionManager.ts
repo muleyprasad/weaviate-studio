@@ -524,12 +524,18 @@ export class ConnectionManager {
           // Detect gRPC compatibility error
           console.log('Initial connection error:', error);
 
-          // Check for gRPC compatibility issues more comprehensively
+          // Check for gRPC compatibility issues more comprehensively.
+          // 'fetch failed' and ECONNRESET/ECONNREFUSED can occur during the gRPC
+          // health-check init when the server does not support gRPC, so treat
+          // those as gRPC errors and fall back to HTTP-only.
           const isGrpcError =
             error.message.includes('gRPC') ||
             error.message.includes('is not supported') ||
             error.message.includes('v1.26.7') ||
             error.message.includes('v1.27.0') ||
+            error.message.includes('fetch failed') ||
+            error.message.includes('ECONNRESET') ||
+            error.message.includes('ECONNREFUSED') ||
             (error.name === 'WeaviateStartUpError' && error.message.includes('gRPC'));
 
           if (isGrpcError) {

@@ -1,3 +1,14 @@
+// Pin DNS result order to ipv4first at module load time — before any import
+// side-effects (weaviate-client, grpc-js) can open TCP sockets.  This suppresses
+// the Node 18.13+ "auto-select family attempt timeout to 1000ms" diagnostic that
+// fires when Happy Eyeballs (RFC 8305) probes both IPv4 and IPv6 simultaneously.
+import * as dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  /* non-fatal */
+}
+
 import * as vscode from 'vscode';
 import weaviate from 'weaviate-client';
 import { WeaviateTreeDataProvider } from './WeaviateTreeDataProvider/WeaviateTreeDataProvider';
@@ -360,6 +371,20 @@ async function pushRoleListToOpenPanels(client: any, connectionId: string): Prom
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
+  // Suppress the Node.js 'auto-select family attempt timeout to 1000ms' diagnostic.
+  // Node 18.13+ probes both IPv4 and IPv6 simultaneously (Happy Eyeballs / RFC 8305)
+  // when no DNS result order is set.  For local Weaviate connections this adds an
+  // unnecessary 1 s delay before every TCP handshake.  Pinning to ipv4first avoids
+  // the probe and resolves addresses deterministically.
+  try {
+    const dns = require('dns');
+    if (typeof dns.setDefaultResultOrder === 'function') {
+      dns.setDefaultResultOrder('ipv4first');
+    }
+  } catch {
+    // dns module unavailable — safe to ignore
+  }
+
   // Initialize telemetry
   const telemetryService = getTelemetryService();
   const connectionString = vscode.workspace

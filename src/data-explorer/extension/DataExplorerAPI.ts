@@ -85,8 +85,38 @@ export class DataExplorerAPI {
   private countCache = new Map<string, { count: number; timestamp: number }>();
   private readonly CACHE_TTL = 60000; // 1 minute
   private readonly REQUEST_TIMEOUT = DEFAULT_TIMEOUT_MS;
+  private serverVersion: string | null = null;
+  private serverVersionFetchedAt = 0;
+  private readonly VERSION_CACHE_TTL = 3600000; // 1 hour
 
   constructor(private client: WeaviateClient) {}
+
+  /**
+   * Get the Weaviate server version
+   * Cached for 1 hour to avoid repeated requests
+   */
+  async getServerVersion(): Promise<string | null> {
+    const now = Date.now();
+    if (this.serverVersion && now - this.serverVersionFetchedAt < this.VERSION_CACHE_TTL) {
+      return this.serverVersion;
+    }
+
+    try {
+      // Use misc.metaGetter().do() which fetches /meta and returns { version, ... }
+      const meta = await (this.client as any).misc.metaGetter().do();
+
+      if (meta && typeof meta === 'object' && 'version' in meta) {
+        this.serverVersion = (meta as any).version as string;
+        this.serverVersionFetchedAt = now;
+        return this.serverVersion;
+      }
+
+      return null;
+    } catch (err) {
+      console.warn('Failed to fetch server version:', err);
+      return null;
+    }
+  }
 
   /**
    * Helper method to check if a collection schema has multi-tenancy enabled
@@ -425,9 +455,48 @@ export class DataExplorerAPI {
       vectorOptions.distanceMetric = vectorSearch.distanceMetric;
     }
 
-    // Add target vector for named vectors
+    // Add target vector for named vectors or multi-target configuration
     if (vectorSearch.targetVector) {
-      vectorOptions.targetVector = vectorSearch.targetVector;
+      // Handle both single string (single target vector) and multi-target payload objects
+      if (typeof vectorSearch.targetVector === 'string') {
+        // Single target vector
+        vectorOptions.targetVector = vectorSearch.targetVector;
+      } else if (typeof vectorSearch.targetVector === 'object') {
+        // Multi-target payload
+        const mtPayload = vectorSearch.targetVector as any;
+        const { combination, targetVectors, weights } = mtPayload;
+
+        if (targetVectors && targetVectors.length > 0) {
+          try {
+            // Build multi-target join using SDK factory methods
+            let joinStrategy: any;
+
+            switch (combination) {
+              case 'sum':
+                joinStrategy = collection.multiTargetVector.sum(targetVectors);
+                break;
+              case 'average':
+                joinStrategy = collection.multiTargetVector.average(targetVectors);
+                break;
+              case 'manual-weights':
+                joinStrategy = collection.multiTargetVector.manualWeights(weights || {});
+                break;
+              case 'relative-score':
+                joinStrategy = collection.multiTargetVector.relativeScore(weights || {});
+                break;
+              case 'minimum':
+              default:
+                joinStrategy = collection.multiTargetVector.minimum(targetVectors);
+                break;
+            }
+
+            vectorOptions.targetVector = joinStrategy;
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            throw new Error(`Failed to build multi-target vector configuration: ${errorMsg}`);
+          }
+        }
+      }
     }
 
     // Execute appropriate vector search
