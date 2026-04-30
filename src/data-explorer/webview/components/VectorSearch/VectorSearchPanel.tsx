@@ -226,9 +226,15 @@ export function VectorSearchPanel({
     actions.normalizeWeights();
   }, [actions]);
 
-  // Update MUVERA flags when vectors change
+  // When a multi-vector collection loads, auto-select all vectors and update MUVERA flags.
+  // This prevents the "no target vectors were provided" error for first-time users who
+  // haven't interacted with the Target Vectors checkboxes yet.
   useEffect(() => {
-    if (hasMultipleVectors) {
+    if (hasMultipleVectors && namedVectors.length > 0) {
+      // Auto-select all vectors (user can deselect individually)
+      actions.setSelectedTargetVectors(namedVectors.map((v) => v.name));
+
+      // Update MUVERA flags
       const flags: Record<string, boolean> = {};
       namedVectors.forEach((vector) => {
         flags[vector.name] = vector.isMuvera;
@@ -275,8 +281,13 @@ export function VectorSearchPanel({
       return false;
     }
 
-    // If multi-target is active, validate it
-    if (selectedTargetVectors.length > 0) {
+    // Multi-vector collections MUST have at least one target vector selected
+    if (hasMultipleVectors && selectedTargetVectors.length === 0) {
+      return false;
+    }
+
+    // If multi-target is active (2+ vectors), validate the join strategy config
+    if (selectedTargetVectors.length > 1) {
       const validation = validateMultiTargetConfig(
         selectedTargetVectors,
         joinStrategy,
@@ -290,6 +301,7 @@ export function VectorSearchPanel({
     searchMode,
     searchParams,
     hasVectorizer,
+    hasMultipleVectors,
     isSearching,
     selectedTargetVectors,
     joinStrategy,
@@ -483,7 +495,12 @@ export function VectorSearchPanel({
               {/* Max Distance */}
               <div className="parameter-item">
                 <label htmlFor="max-distance">
-                  Max Distance: <strong>{searchParams.maxDistance.toFixed(2)}</strong>
+                  Max Distance:{' '}
+                  <strong>
+                    {searchParams.maxDistance >= 1.0
+                      ? `${searchParams.maxDistance.toFixed(2)} (no filter)`
+                      : searchParams.maxDistance.toFixed(2)}
+                  </strong>
                 </label>
                 <input
                   id="max-distance"
@@ -497,6 +514,7 @@ export function VectorSearchPanel({
                 />
                 <div className="range-labels">
                   <span>0 (exact)</span>
+                  <span>1.0 (no filter)</span>
                   <span>2 (distant)</span>
                 </div>
               </div>
@@ -541,34 +559,36 @@ export function VectorSearchPanel({
               )}
             </button>
 
-            {searchResults.length > 0 && (
-              <button
-                type="button"
-                className="clear-results-btn secondary"
-                onClick={() => actions.clearSearch()}
-                disabled={isSearching}
-              >
-                Clear Results
-              </button>
-            )}
+            <div className="search-action-secondary">
+              {searchResults.length > 0 && (
+                <button
+                  type="button"
+                  className="clear-results-btn secondary"
+                  onClick={() => actions.clearSearch()}
+                  disabled={isSearching}
+                >
+                  Clear Results
+                </button>
+              )}
 
-            <CopyAsCode
-              collectionName={schema?.name || ''}
-              searchMode={searchMode}
-              searchParams={searchParams}
-              targetVector={
-                selectedTargetVectors.length > 1
-                  ? {
-                      combination: joinStrategy,
-                      targetVectors: selectedTargetVectors,
-                      weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
-                    }
-                  : selectedTargetVectors.length === 1
-                    ? selectedTargetVectors[0]
-                    : undefined
-              }
-              disabled={isSearching}
-            />
+              <CopyAsCode
+                collectionName={schema?.name || ''}
+                searchMode={searchMode}
+                searchParams={searchParams}
+                targetVector={
+                  selectedTargetVectors.length > 1
+                    ? {
+                        combination: joinStrategy,
+                        targetVectors: selectedTargetVectors,
+                        weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+                      }
+                    : selectedTargetVectors.length === 1
+                      ? selectedTargetVectors[0]
+                      : undefined
+                }
+                disabled={isSearching}
+              />
+            </div>
           </div>
 
           {/* Search Results */}

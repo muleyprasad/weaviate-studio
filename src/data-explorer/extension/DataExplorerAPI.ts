@@ -102,11 +102,23 @@ export class DataExplorerAPI {
     }
 
     try {
-      // Use misc.metaGetter().do() which fetches /meta and returns { version, ... }
-      const meta = await (this.client as any).misc.metaGetter().do();
+      let meta: { version?: string } | null = null;
 
-      if (meta && typeof meta === 'object' && 'version' in meta) {
-        this.serverVersion = (meta as any).version as string;
+      // weaviate-client v4: client.getMeta() returns { version, ... }
+      if (typeof (this.client as any).getMeta === 'function') {
+        meta = await (this.client as any).getMeta();
+      } else {
+        // Fallback: v3-style misc.metaGetter().do()
+        meta = await (this.client as any).misc.metaGetter().do();
+      }
+
+      if (
+        meta &&
+        typeof meta === 'object' &&
+        'version' in meta &&
+        typeof meta.version === 'string'
+      ) {
+        this.serverVersion = meta.version;
         this.serverVersionFetchedAt = now;
         return this.serverVersion;
       }

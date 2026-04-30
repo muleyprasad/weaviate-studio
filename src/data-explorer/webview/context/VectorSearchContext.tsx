@@ -112,7 +112,9 @@ const initialSearchParams: VectorSearchParameters = {
   objectId: '',
   vector: '',
   distanceMetric: 'cosine',
-  maxDistance: 0.5,
+  maxDistance: 1.0, // Permissive default: allows results up to cosine distance 1.0 (orthogonal).
+  // At 0.5 many valid results were silently dropped. Users can tighten the
+  // slider; the query omits the distance filter entirely when at default (1.0).
   limit: 25,
   // Hybrid search parameters
   hybridAlpha: 0.5, // Balanced by default

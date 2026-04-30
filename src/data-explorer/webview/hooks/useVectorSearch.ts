@@ -179,7 +179,37 @@ export function useVectorSearch() {
 
   // Execute vector search based on current mode and params
   const executeSearch = useCallback(() => {
-    const { searchMode, searchParams } = searchState;
+    const { searchMode, searchParams, selectedTargetVectors, joinStrategy, vectorWeights } =
+      searchState;
+
+    // Build the targetVector field:
+    // - 0 selected  → undefined (let the server pick or error gracefully)
+    // - 1 selected  → plain string (single-target)
+    // - 2+ selected → multi-target object { combination, targetVectors, weights? }
+    let resolvedTargetVector:
+      | string
+      | { combination: string; targetVectors: string[]; weights?: Record<string, number> }
+      | undefined;
+
+    if (selectedTargetVectors.length === 1) {
+      resolvedTargetVector = selectedTargetVectors[0];
+    } else if (selectedTargetVectors.length > 1) {
+      resolvedTargetVector = {
+        combination: joinStrategy,
+        targetVectors: selectedTargetVectors,
+        weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+      };
+    } else {
+      // No vectors selected — fall back to legacy single searchParams.targetVector
+      resolvedTargetVector = searchParams.targetVector || undefined;
+    }
+
+    // Only apply a distance filter when the user has explicitly tightened the
+    // slider below the default (1.0). At the default we omit the field entirely
+    // so Weaviate returns pure top-N results with no distance ceiling.
+    const DEFAULT_MAX_DISTANCE = 1.0;
+    const effectiveDistance =
+      searchParams.maxDistance < DEFAULT_MAX_DISTANCE ? searchParams.maxDistance : undefined;
 
     // Validate input based on mode
     let isValid = false;
@@ -191,7 +221,7 @@ export function useVectorSearch() {
       distance?: number;
       limit?: number;
       distanceMetric?: string;
-      targetVector?: string;
+      targetVector?: typeof resolvedTargetVector;
       // Hybrid-specific params
       alpha?: number;
       fusionType?: string;
@@ -205,10 +235,10 @@ export function useVectorSearch() {
           vectorSearchPayload = {
             type: 'nearText',
             text: searchParams.query.trim(),
-            distance: searchParams.maxDistance,
+            distance: effectiveDistance,
             limit: searchParams.limit,
             distanceMetric: searchParams.distanceMetric,
-            targetVector: searchParams.targetVector,
+            targetVector: resolvedTargetVector,
           };
         }
         break;
@@ -220,10 +250,10 @@ export function useVectorSearch() {
           vectorSearchPayload = {
             type: 'nearObject',
             objectId: searchParams.objectId.trim(),
-            distance: searchParams.maxDistance,
+            distance: effectiveDistance,
             limit: searchParams.limit,
             distanceMetric: searchParams.distanceMetric,
-            targetVector: searchParams.targetVector,
+            targetVector: resolvedTargetVector,
           };
         }
         break;
@@ -236,10 +266,10 @@ export function useVectorSearch() {
             vectorSearchPayload = {
               type: 'nearVector',
               vector: parsed,
-              distance: searchParams.maxDistance,
+              distance: effectiveDistance,
               limit: searchParams.limit,
               distanceMetric: searchParams.distanceMetric,
-              targetVector: searchParams.targetVector,
+              targetVector: resolvedTargetVector,
             };
           } else {
             searchActions.setSearchError(
@@ -267,7 +297,7 @@ export function useVectorSearch() {
             properties:
               searchParams.searchProperties.length > 0 ? searchParams.searchProperties : undefined, // undefined means all text properties
             limit: searchParams.limit,
-            targetVector: searchParams.targetVector,
+            targetVector: resolvedTargetVector,
           };
         }
         break;

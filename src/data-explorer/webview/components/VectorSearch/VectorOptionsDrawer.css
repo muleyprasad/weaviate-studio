@@ -1,8 +1,8 @@
 .vector-options-drawer {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 2px;
-  overflow: hidden;
-  margin: 12px 0;
+  /* do NOT set overflow: hidden — it clips the expanded vector list */
+  margin: 0 16px 12px;
 }
 
 .vector-options-header {
@@ -53,6 +53,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Allow the drawer to grow; the outer body scrolls */
+  overflow: visible;
 }
 
 .vector-options-section {

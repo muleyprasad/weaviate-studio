@@ -30,14 +30,23 @@
 .target-vector-items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  /* Thin scrollbar so it doesn't eat into the narrow panel */
+  scrollbar-width: thin;
 }
 
 .target-vector-item {
-  padding: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 2px;
   background-color: var(--vscode-dropdown-background);
+  /* single-line row: checkbox + name side by side */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .target-vector-checkbox-label {
@@ -59,9 +68,9 @@
 
 .target-vector-metadata {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .target-vector-vectorizer {
