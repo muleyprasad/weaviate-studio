@@ -1,0 +1,99 @@
+.weight-editor {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+}
+
+.weight-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.weight-editor-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.weight-editor-normalize-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-button-border);
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.weight-editor-normalize-btn:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.weight-editor-normalize-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weight-editor-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.weight-editor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weight-editor-item.invalid {
+  border-left: 2px solid var(--vscode-errorForeground);
+  padding-left: 8px;
+}
+
+.weight-editor-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+
+.weight-editor-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.weight-editor-slider {
+  flex: 1;
+  min-width: 100px;
+}
+
+.weight-editor-input {
+  width: 60px;
+  padding: 4px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 2px;
+}
+
+.weight-editor-warning {
+  font-size: 11px;
+  color: var(--vscode-errorForeground);
+}
+
+.weight-editor-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  border-top: 1px solid var(--vscode-panel-border);
+  padding-top: 8px;
+}

@@ -338,8 +338,12 @@ export class DataExplorerPanel {
       return;
     }
 
-    // Get schema first
-    const schema = await this._api.getCollectionSchema(this._collectionName);
+    // Get schema and server version
+    const [schema, serverVersion] = await Promise.all([
+      this._api.getCollectionSchema(this._collectionName),
+      this._api.getServerVersion().catch(() => null),
+    ]);
+
     this._isMultiTenant = !!(schema.multiTenancy as any)?.enabled;
 
     // If multi-tenant, get tenants immediately and send everything together
@@ -355,6 +359,7 @@ export class DataExplorerPanel {
           collectionName: this._collectionName,
           isMultiTenant: true,
           tenants,
+          serverVersion: serverVersion || undefined,
         });
 
         // Do NOT fetch objects - wait for tenant selection
@@ -375,6 +380,7 @@ export class DataExplorerPanel {
       schema,
       collectionName: this._collectionName,
       isMultiTenant: false,
+      serverVersion: serverVersion || undefined,
     });
 
     // Fetch initial objects for non-multi-tenant collections

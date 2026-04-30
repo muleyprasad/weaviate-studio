@@ -1,0 +1,93 @@
+.target-vector-list {
+  margin-top: 8px;
+}
+
+.target-vector-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.target-vector-action {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-button-border);
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.target-vector-action:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.target-vector-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.target-vector-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  /* Thin scrollbar so it doesn't eat into the narrow panel */
+  scrollbar-width: thin;
+}
+
+.target-vector-item {
+  padding: 6px 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  background-color: var(--vscode-dropdown-background);
+  /* single-line row: checkbox + name side by side */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.target-vector-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.target-vector-checkbox-label input {
+  cursor: pointer;
+}
+
+.target-vector-name {
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+
+.target-vector-metadata {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.target-vector-vectorizer {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: var(--vscode-textCodeBlock-background);
+  color: var(--vscode-editor-foreground);
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+.target-vector-muvera {
+  margin-left: 0;
+}
+
+.target-vector-list-empty {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  padding: 8px;
+}

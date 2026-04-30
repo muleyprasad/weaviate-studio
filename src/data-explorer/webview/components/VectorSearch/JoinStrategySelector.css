@@ -1,0 +1,45 @@
+.join-strategy-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.join-strategy-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.join-strategy-control label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+
+.join-strategy-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.join-strategy-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.join-strategy-unsupported {
+  padding: 12px;
+  background-color: var(--vscode-notebookStatusErrorBackground);
+  border: 1px solid var(--vscode-errorForeground);
+  border-radius: 2px;
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+.join-strategy-unsupported p {
+  margin: 0;
+}

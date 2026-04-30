@@ -5,6 +5,40 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-04-30
+
+### ✨ Added — Multi-Vector Search (Muvera)
+
+- **Multi-Target Vector Search UI** — Full support for Weaviate's named-vector / Muvera search in the Data Explorer
+  - **Target Vector selector** in Vector Options drawer — check one or more named vectors per collection; each item shows the vectorizer badge (`text2vec-weaviate`, `none`, etc.)
+  - **Auto-selection** — all named vectors are pre-selected when opening a multi-vector collection, preventing the "no target vectors provided" error for first-time users
+  - **Join Strategy selector** — choose how distances from multiple vector spaces are combined:
+    - `Minimum` (default conservative merge)
+    - `Sum`, `Average`
+    - `Manual Weights`, `Relative Score` (reveal the Weight Editor for per-vector tuning)
+  - **Weight Editor** — sliders for fine-grained per-vector distance weighting with a "Normalize" button
+  - **Copy as Code** — generated TypeScript / Python snippets include the correct `multiTargetVector` combination call
+  - Requires Weaviate **v1.26+** for near queries and **v1.27+** for hybrid; a version-gate notice is shown on older servers
+
+### 🐛 Fixed
+
+- **Server version detection broken on weaviate-client v4** — `getServerVersion()` was calling the v3-only `misc.metaGetter().do()` API which silently threw on v4, returning `null`. The version gate therefore always showed the "requires v1.26+" warning even on v1.37+ servers. Fixed by preferring the v4 `client.getMeta()` method with a fallback to the v3 API (`DataExplorerAPI.ts`)
+
+- **Multi-target search payload never included selected vectors** — `useVectorSearch.ts` built the search payload using only `searchParams.targetVector` (a legacy single-string field), completely ignoring `selectedTargetVectors`, `joinStrategy`, and `vectorWeights` from context state. All checked vectors were silently discarded, producing the Weaviate error _"class has multiple vectors, but no target vectors were provided"_. Fixed by reading multi-target state from context and building the correct payload:
+  - 1 vector selected → single-string `targetVector`
+  - 2+ vectors selected → `{ combination, targetVectors, weights? }` object consumed by `multiTargetVector.*()` SDK factory methods
+
+### 🎨 Changed — Vector Search UX
+
+- **Max Distance default raised from `0.5` to `1.0`** — cosine distance `0.5` is strict (~0.75 certainty) and silently dropped many valid results. At `1.0` the distance filter is **omitted from the query entirely**, letting Weaviate return pure top-N results. Users can tighten the slider; the label shows **"1.00 (no filter)"** at the default position
+- **Distance slider** now has three range labels: `0 (exact)` · `1.0 (no filter)` · `2 (distant)` for clear semantic guidance
+- **Run Vector Search button** is disabled when a multi-vector collection has no target vectors checked, with a clear validation guard instead of a cryptic server error
+
+### Internal
+
+- Added `sandbox/populate_cloud_muvera.py` — reproducible test fixture for multi-vector cloud collections using `text2vec-weaviate` (built-in, no external API key required)
+- Added `sandbox/check_modules.py` — utility to inspect available vectorizer/generative modules on a Weaviate Cloud instance
+
 ## [1.6.0] - 2026-03-21
 
 ### 🔭 Added - Telemetry System

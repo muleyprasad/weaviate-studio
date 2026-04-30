@@ -10,7 +10,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react';
-import type { WeaviateObject } from '../../types';
+import type { WeaviateObject, JoinStrategy } from '../../types';
 
 // ============================================================================
 // Types
@@ -45,6 +45,8 @@ export interface VectorSearchParameters {
   maxDistance: number;
   limit: number;
   targetVector?: string; // For named vectors
+  certainty?: number; // Minimum certainty threshold (0-1)
+  distance?: number; // Maximum distance threshold
   // Hybrid search parameters
   hybridAlpha: number; // 0 = pure keyword (BM25), 1 = pure vector
   fusionType: FusionType;
@@ -67,6 +69,13 @@ export interface VectorSearchContextState {
   preSelectedObjectId: string | null;
   // Track if a search has been performed (for empty state messaging)
   hasSearched: boolean;
+  // Multi-target vector search state
+  vectorOptionsExpanded: boolean;
+  selectedTargetVectors: string[];
+  joinStrategy: JoinStrategy;
+  vectorWeights: Record<string, number>;
+  multiTargetActive: boolean;
+  muveraFlagsByVector: Record<string, boolean>;
 }
 
 // ============================================================================
@@ -84,7 +93,14 @@ type VectorSearchAction =
   | { type: 'SET_SEARCH_ERROR'; error: string | null }
   | { type: 'CLEAR_SEARCH' }
   | { type: 'FIND_SIMILAR'; objectId: string }
-  | { type: 'RESET_FOR_COLLECTION_CHANGE' };
+  | { type: 'RESET_FOR_COLLECTION_CHANGE' }
+  // Multi-target vector search actions
+  | { type: 'TOGGLE_VECTOR_OPTIONS' }
+  | { type: 'SET_SELECTED_TARGET_VECTORS'; vectors: string[] }
+  | { type: 'SET_JOIN_STRATEGY'; strategy: JoinStrategy }
+  | { type: 'SET_VECTOR_WEIGHT'; vectorName: string; weight: number }
+  | { type: 'NORMALIZE_WEIGHTS' }
+  | { type: 'SET_MUVERA_FLAGS'; flags: Record<string, boolean> };
 
 // ============================================================================
 // Initial State
@@ -96,7 +112,9 @@ const initialSearchParams: VectorSearchParameters = {
   objectId: '',
   vector: '',
   distanceMetric: 'cosine',
-  maxDistance: 0.5,
+  maxDistance: 1.0, // Permissive default: allows results up to cosine distance 1.0 (orthogonal).
+  // At 0.5 many valid results were silently dropped. Users can tighten the
+  // slider; the query omits the distance filter entirely when at default (1.0).
   limit: 25,
   // Hybrid search parameters
   hybridAlpha: 0.5, // Balanced by default
@@ -114,6 +132,13 @@ const initialState: VectorSearchContextState = {
   searchError: null,
   preSelectedObjectId: null,
   hasSearched: false,
+  // Multi-target vector search state
+  vectorOptionsExpanded: false,
+  selectedTargetVectors: [],
+  joinStrategy: 'minimum',
+  vectorWeights: {},
+  multiTargetActive: false,
+  muveraFlagsByVector: {},
 };
 
 // ============================================================================
@@ -231,6 +256,54 @@ function vectorSearchReducer(
         showVectorSearchPanel: state.showVectorSearchPanel,
       };
 
+    case 'TOGGLE_VECTOR_OPTIONS':
+      return {
+        ...state,
+        vectorOptionsExpanded: !state.vectorOptionsExpanded,
+      };
+
+    case 'SET_SELECTED_TARGET_VECTORS':
+      return {
+        ...state,
+        selectedTargetVectors: action.vectors,
+        multiTargetActive: action.vectors.length > 1,
+      };
+
+    case 'SET_JOIN_STRATEGY':
+      return {
+        ...state,
+        joinStrategy: action.strategy,
+      };
+
+    case 'SET_VECTOR_WEIGHT': {
+      const newWeights = { ...state.vectorWeights, [action.vectorName]: action.weight };
+      return {
+        ...state,
+        vectorWeights: newWeights,
+      };
+    }
+
+    case 'NORMALIZE_WEIGHTS': {
+      const totalWeight = Object.values(state.vectorWeights).reduce((a, b) => a + b, 0);
+      if (totalWeight <= 0) {
+        return state;
+      }
+      const normalizedWeights: Record<string, number> = {};
+      Object.entries(state.vectorWeights).forEach(([vector, weight]) => {
+        normalizedWeights[vector] = weight / totalWeight;
+      });
+      return {
+        ...state,
+        vectorWeights: normalizedWeights,
+      };
+    }
+
+    case 'SET_MUVERA_FLAGS':
+      return {
+        ...state,
+        muveraFlagsByVector: action.flags,
+      };
+
     default:
       return state;
   }
@@ -252,6 +325,13 @@ export interface VectorSearchContextActions {
   clearSearch: () => void;
   findSimilar: (objectId: string) => void;
   resetForCollectionChange: () => void;
+  // Multi-target vector search actions
+  toggleVectorOptions: () => void;
+  setSelectedTargetVectors: (vectors: string[]) => void;
+  setJoinStrategy: (strategy: JoinStrategy) => void;
+  setVectorWeight: (vectorName: string, weight: number) => void;
+  normalizeWeights: () => void;
+  setMuveraFlags: (flags: Record<string, boolean>) => void;
 }
 
 // ============================================================================
@@ -321,6 +401,31 @@ export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
 
       resetForCollectionChange: () => {
         dispatch({ type: 'RESET_FOR_COLLECTION_CHANGE' });
+      },
+
+      // Multi-target vector search actions
+      toggleVectorOptions: () => {
+        dispatch({ type: 'TOGGLE_VECTOR_OPTIONS' });
+      },
+
+      setSelectedTargetVectors: (vectors: string[]) => {
+        dispatch({ type: 'SET_SELECTED_TARGET_VECTORS', vectors });
+      },
+
+      setJoinStrategy: (strategy: JoinStrategy) => {
+        dispatch({ type: 'SET_JOIN_STRATEGY', strategy });
+      },
+
+      setVectorWeight: (vectorName: string, weight: number) => {
+        dispatch({ type: 'SET_VECTOR_WEIGHT', vectorName, weight });
+      },
+
+      normalizeWeights: () => {
+        dispatch({ type: 'NORMALIZE_WEIGHTS' });
+      },
+
+      setMuveraFlags: (flags: Record<string, boolean>) => {
+        dispatch({ type: 'SET_MUVERA_FLAGS', flags });
       },
     }),
     []

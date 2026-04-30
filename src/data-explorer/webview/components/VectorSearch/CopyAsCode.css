@@ -1,0 +1,42 @@
+.copy-as-code {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto; /* push to the right within the secondary row */
+}
+
+.copy-as-code-btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--vscode-button-border);
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-as-code-btn:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.copy-as-code-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.copy-as-code-language {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.copy-as-code-language:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

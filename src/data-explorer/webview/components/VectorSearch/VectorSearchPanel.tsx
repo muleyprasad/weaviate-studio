@@ -4,19 +4,30 @@
  */
 
 import React, { useCallback, useEffect, useMemo } from 'react';
-import type { CollectionConfig, WeaviateObject, PropertyConfig } from '../../../types';
+import type {
+  CollectionConfig,
+  WeaviateObject,
+  PropertyConfig,
+  JoinStrategy,
+} from '../../../types';
 import {
   useVectorSearchState,
   useVectorSearchActions,
   type VectorSearchMode,
   type DistanceMetric,
 } from '../../context';
+import { useDataState } from '../../context/DataContext';
 import { SearchModeSelector } from './SearchModeSelector';
 import { TextSearchInput } from './TextSearchInput';
 import { ObjectSearchInput } from './ObjectSearchInput';
 import { VectorInput } from './VectorInput';
 import { HybridSearchInput } from './HybridSearchInput';
 import { SearchResults } from './SearchResults';
+import { VectorOptionsDrawer } from './VectorOptionsDrawer';
+import { CopyAsCode } from './CopyAsCode';
+import { useNamedVectors } from '../../hooks/useNamedVectors';
+import { supportsMultiTargetNear, supportsMultiTargetHybrid } from '../../utils/versionCheck';
+import { validateMultiTargetConfig } from '../../utils/multiTargetBuilder';
 
 interface VectorSearchPanelProps {
   isOpen: boolean;
@@ -35,8 +46,37 @@ export function VectorSearchPanel({
 }: VectorSearchPanelProps) {
   const state = useVectorSearchState();
   const actions = useVectorSearchActions();
+  const dataState = useDataState();
 
-  const { searchMode, searchParams, searchResults, isSearching, searchError, hasSearched } = state;
+  const {
+    searchMode,
+    searchParams,
+    searchResults,
+    isSearching,
+    searchError,
+    hasSearched,
+    vectorOptionsExpanded,
+    selectedTargetVectors,
+    joinStrategy,
+    vectorWeights,
+  } = state;
+
+  // Get named vectors from schema
+  const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
+
+  // Check version support for multi-target features
+  const versionSupported = useMemo(() => {
+    const serverVersion = dataState.serverVersion;
+    if (!serverVersion) {
+      return false;
+    }
+
+    if (searchMode === 'hybrid') {
+      return supportsMultiTargetHybrid(serverVersion);
+    }
+    // For text, object, vector modes
+    return supportsMultiTargetNear(serverVersion);
+  }, [dataState.serverVersion, searchMode]);
 
   // Handle keyboard escape to close panel (only add listener when open)
   useEffect(() => {
@@ -152,33 +192,131 @@ export function VectorSearchPanel({
     actions.setSearchParams({ objectId: '' });
   }, [actions]);
 
+  // Multi-target vector search handlers
+  const handleToggleVectorOptions = useCallback(() => {
+    actions.toggleVectorOptions();
+  }, [actions]);
+
+  const handleSelectedVectorsChange = useCallback(
+    (vectors: string[]) => {
+      actions.setSelectedTargetVectors(vectors);
+      // Initialize weights for new vectors
+      vectors.forEach((vector) => {
+        if (!(vector in vectorWeights)) {
+          actions.setVectorWeight(vector, 0.5);
+        }
+      });
+    },
+    [actions, vectorWeights]
+  );
+
+  const handleJoinStrategyChange = useCallback(
+    (strategy: JoinStrategy) => {
+      actions.setJoinStrategy(strategy);
+    },
+    [actions]
+  );
+
+  const handleVectorWeightChange = useCallback(
+    (vectorName: string, weight: number) => {
+      actions.setVectorWeight(vectorName, weight);
+    },
+    [actions]
+  );
+
+  const handleNormalizeWeights = useCallback(() => {
+    actions.normalizeWeights();
+  }, [actions]);
+
+  // When a multi-vector collection loads, auto-select all vectors and update MUVERA flags.
+  // This prevents the "no target vectors were provided" error for first-time users who
+  // haven't interacted with the Target Vectors checkboxes yet.
+  useEffect(() => {
+    if (hasMultipleVectors && namedVectors.length > 0) {
+      // Auto-select all vectors (user can deselect individually)
+      actions.setSelectedTargetVectors(namedVectors.map((v) => v.name));
+
+      // Update MUVERA flags
+      const flags: Record<string, boolean> = {};
+      namedVectors.forEach((vector) => {
+        flags[vector.name] = vector.isMuvera;
+      });
+      actions.setMuveraFlags(flags);
+    }
+  }, [namedVectors, hasMultipleVectors, actions]);
+
   // Validate search can be performed
   const canSearch = useMemo(() => {
     if (isSearching) {
       return false;
     }
 
+    // First check mode-specific validation
+    let modeValid = false;
     switch (searchMode) {
       case 'text':
-        return hasVectorizer && searchParams.query.trim().length > 0;
+        modeValid = hasVectorizer && searchParams.query.trim().length > 0;
+        break;
       case 'object':
-        return searchParams.objectId.trim().length > 0;
+        modeValid = searchParams.objectId.trim().length > 0;
+        break;
       case 'vector':
         try {
           const parsed = JSON.parse(searchParams.vector);
-          return (
-            Array.isArray(parsed) && parsed.length > 0 && parsed.every((n) => typeof n === 'number')
-          );
+          modeValid =
+            Array.isArray(parsed) &&
+            parsed.length > 0 &&
+            parsed.every((n) => typeof n === 'number');
         } catch {
-          return false;
+          modeValid = false;
         }
+        break;
       case 'hybrid':
         // Hybrid search requires vectorizer and a query
-        return hasVectorizer && searchParams.query.trim().length > 0;
+        modeValid = hasVectorizer && searchParams.query.trim().length > 0;
+        break;
       default:
-        return false;
+        modeValid = false;
     }
-  }, [searchMode, searchParams, hasVectorizer, isSearching]);
+
+    if (!modeValid) {
+      return false;
+    }
+
+    // Multi-vector collections MUST have at least one target vector selected
+    if (hasMultipleVectors && selectedTargetVectors.length === 0) {
+      return false;
+    }
+
+    // If the server does not support multi-target, block searches with 2+ vectors.
+    // The UI already shows a version-gate warning; the Run button should also be
+    // disabled so users cannot submit a query they know will fail.
+    if (selectedTargetVectors.length > 1 && !versionSupported) {
+      return false;
+    }
+
+    // If multi-target is active (2+ vectors), validate the join strategy config
+    if (selectedTargetVectors.length > 1) {
+      const validation = validateMultiTargetConfig(
+        selectedTargetVectors,
+        joinStrategy,
+        vectorWeights
+      );
+      return validation.valid;
+    }
+
+    return true;
+  }, [
+    searchMode,
+    searchParams,
+    hasVectorizer,
+    hasMultipleVectors,
+    versionSupported,
+    isSearching,
+    selectedTargetVectors,
+    joinStrategy,
+    vectorWeights,
+  ]);
 
   // Distance metric options
   const distanceMetrics: { value: DistanceMetric; label: string }[] = [
@@ -321,6 +459,24 @@ export function VectorSearchPanel({
             )}
           </div>
 
+          {/* Multi-target Vector Options */}
+          {hasMultipleVectors && (
+            <VectorOptionsDrawer
+              availableVectors={namedVectors}
+              expanded={vectorOptionsExpanded}
+              selectedVectors={selectedTargetVectors}
+              joinStrategy={joinStrategy}
+              vectorWeights={vectorWeights}
+              onExpandedChange={handleToggleVectorOptions}
+              onSelectedVectorsChange={handleSelectedVectorsChange}
+              onJoinStrategyChange={handleJoinStrategyChange}
+              onWeightChange={handleVectorWeightChange}
+              onNormalize={handleNormalizeWeights}
+              versionSupported={versionSupported}
+              disabled={isSearching}
+            />
+          )}
+
           {/* Search Parameters */}
           <div className="search-parameters">
             <h3 className="parameters-title">
@@ -349,7 +505,12 @@ export function VectorSearchPanel({
               {/* Max Distance */}
               <div className="parameter-item">
                 <label htmlFor="max-distance">
-                  Max Distance: <strong>{searchParams.maxDistance.toFixed(2)}</strong>
+                  Max Distance:{' '}
+                  <strong>
+                    {searchParams.maxDistance >= 1.0
+                      ? `${searchParams.maxDistance.toFixed(2)} (no filter)`
+                      : searchParams.maxDistance.toFixed(2)}
+                  </strong>
                 </label>
                 <input
                   id="max-distance"
@@ -363,6 +524,7 @@ export function VectorSearchPanel({
                 />
                 <div className="range-labels">
                   <span>0 (exact)</span>
+                  <span>1.0 (no filter)</span>
                   <span>2 (distant)</span>
                 </div>
               </div>
@@ -386,7 +548,7 @@ export function VectorSearchPanel({
             </div>
           </div>
 
-          {/* Search Button */}
+          {/* Search Button and Actions */}
           <div className="search-action">
             <button
               type="button"
@@ -407,16 +569,36 @@ export function VectorSearchPanel({
               )}
             </button>
 
-            {searchResults.length > 0 && (
-              <button
-                type="button"
-                className="clear-results-btn secondary"
-                onClick={() => actions.clearSearch()}
+            <div className="search-action-secondary">
+              {searchResults.length > 0 && (
+                <button
+                  type="button"
+                  className="clear-results-btn secondary"
+                  onClick={() => actions.clearSearch()}
+                  disabled={isSearching}
+                >
+                  Clear Results
+                </button>
+              )}
+
+              <CopyAsCode
+                collectionName={schema?.name || ''}
+                searchMode={searchMode}
+                searchParams={searchParams}
+                targetVector={
+                  selectedTargetVectors.length > 1
+                    ? {
+                        combination: joinStrategy,
+                        targetVectors: selectedTargetVectors,
+                        weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+                      }
+                    : selectedTargetVectors.length === 1
+                      ? selectedTargetVectors[0]
+                      : undefined
+                }
                 disabled={isSearching}
-              >
-                Clear Results
-              </button>
-            )}
+              />
+            </div>
           </div>
 
           {/* Search Results */}

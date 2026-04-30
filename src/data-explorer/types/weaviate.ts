@@ -78,8 +78,8 @@ export interface WeaviateVectorQueryOptions extends Omit<WeaviateQueryOptions, '
   /** Distance metric override (if different from collection default) */
   distanceMetric?: string;
 
-  /** Target vector name for named vectors */
-  targetVector?: string;
+  /** Target vector name for named vectors or multi-target vector join configuration */
+  targetVector?: string | unknown; // unknown allows MultiTargetVectorJoin<V> from SDK
 
   /** Allow additional properties for SDK compatibility */
   [key: string]: unknown;

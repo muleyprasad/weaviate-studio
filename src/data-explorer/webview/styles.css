@@ -2430,6 +2430,13 @@ input[type="checkbox"]:focus-visible {
     border-bottom: 1px solid var(--vscode-panel-border, #333);
 }
 
+/* Row that holds secondary buttons (Clear + Copy as Code) */
+.search-action-secondary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .search-btn {
     display: flex;
     align-items: center;
