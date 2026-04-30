@@ -812,7 +812,7 @@ describe('VectorSearchContext', () => {
         objectId: '',
         vector: '',
         distanceMetric: 'cosine',
-        maxDistance: 0.5,
+        maxDistance: 1.0,
         limit: 25,
         hybridAlpha: 0.5,
         fusionType: 'rankedFusion',

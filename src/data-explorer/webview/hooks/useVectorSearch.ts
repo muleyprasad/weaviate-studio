@@ -194,10 +194,21 @@ export function useVectorSearch() {
     if (selectedTargetVectors.length === 1) {
       resolvedTargetVector = selectedTargetVectors[0];
     } else if (selectedTargetVectors.length > 1) {
+      // Filter weights to only the currently selected vectors.
+      // Stale weights from previously-deselected vectors must not reach the API —
+      // in manual-weights / relative-score strategies, Weaviate derives participating
+      // target vectors from weight keys, so stale keys silently include deselected vectors.
+      const selectedWeights: Record<string, number> = {};
+      selectedTargetVectors.forEach((vec) => {
+        if (vectorWeights[vec] !== undefined) {
+          selectedWeights[vec] = vectorWeights[vec];
+        }
+      });
+
       resolvedTargetVector = {
         combination: joinStrategy,
         targetVectors: selectedTargetVectors,
-        weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+        weights: Object.keys(selectedWeights).length > 0 ? selectedWeights : undefined,
       };
     } else {
       // No vectors selected — fall back to legacy single searchParams.targetVector

@@ -67,7 +67,9 @@ export function VectorSearchPanel({
   // Check version support for multi-target features
   const versionSupported = useMemo(() => {
     const serverVersion = dataState.serverVersion;
-    if (!serverVersion) return false;
+    if (!serverVersion) {
+      return false;
+    }
 
     if (searchMode === 'hybrid') {
       return supportsMultiTargetHybrid(serverVersion);
@@ -286,6 +288,13 @@ export function VectorSearchPanel({
       return false;
     }
 
+    // If the server does not support multi-target, block searches with 2+ vectors.
+    // The UI already shows a version-gate warning; the Run button should also be
+    // disabled so users cannot submit a query they know will fail.
+    if (selectedTargetVectors.length > 1 && !versionSupported) {
+      return false;
+    }
+
     // If multi-target is active (2+ vectors), validate the join strategy config
     if (selectedTargetVectors.length > 1) {
       const validation = validateMultiTargetConfig(
@@ -302,6 +311,7 @@ export function VectorSearchPanel({
     searchParams,
     hasVectorizer,
     hasMultipleVectors,
+    versionSupported,
     isSearching,
     selectedTargetVectors,
     joinStrategy,

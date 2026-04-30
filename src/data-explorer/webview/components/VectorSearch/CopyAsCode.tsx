@@ -64,9 +64,7 @@ function generateTypeScriptSnippet(
   if (searchParams.certainty) {
     lines.push(`    certainty: ${searchParams.certainty},`);
   }
-  lines.push('  })');
-  lines.push('  .withLimit(searchParams.limit)');
-  lines.push('  .do();');
+  lines.push('  });');
   lines.push('');
   lines.push('console.log(results);');
 
