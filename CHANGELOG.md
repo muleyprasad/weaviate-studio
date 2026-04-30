@@ -5,9 +5,9 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.2] - 2026-04-30
+## [1.7.0] - 2026-04-30
 
-### ✨ Added — Multi-Vector Search (Muvera)
+### ✨ Added — Multi-Vector Search (Muvera) (PR #74)
 
 - **Multi-Target Vector Search UI** — Full support for Weaviate's named-vector / Muvera search in the Data Explorer
   - **Target Vector selector** in Vector Options drawer — check one or more named vectors per collection; each item shows the vectorizer badge (`text2vec-weaviate`, `none`, etc.)
@@ -20,11 +20,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Copy as Code** — generated TypeScript / Python snippets include the correct `multiTargetVector` combination call
   - Requires Weaviate **v1.26+** for near queries and **v1.27+** for hybrid; a version-gate notice is shown on older servers
 
+### ✨ Added — Backup Wildcard Support (PR #71)
+
+- **Wildcard option for backup creation** — Select all collections at once using a wildcard (`*`) instead of individually picking each one, dramatically speeding up full-instance backups
+- **Improved Backup UX** — Cleaner backup creation flow with better visual feedback and validation during the backup/restore lifecycle
+
+### ✨ Added — Cluster Panel Improvements (PR #72)
+
+- **3 new collection health checks** available from the Cluster Panel and directly from the collection group in the sidebar:
+  - **Multi-Tenancy schema check** — detects collections that would benefit from enabling multi-tenancy and surfaces an actionable suggestion
+  - **Empty shards check** — flags shards with zero objects that may indicate misconfiguration or stale state
+  - **Replication imbalance check** — identifies uneven shard distribution across nodes that could affect availability and query latency
+- **Parallel health checks** — all checks now run concurrently, significantly reducing the time to load the full cluster health report
+- **Multi-panel support** — multiple Cluster Panel instances can now be open simultaneously (e.g., for comparing two connections side-by-side)
+- **Open Checks from collection group** — new button in the collection group header lets users jump directly into the health check view for a specific connection without navigating to the Cluster Panel first
+- **Readonly `.weaviate` file example** — added a reference example showing how to configure a read-only connection via a `.weaviate` file
+- **Better handling for large clusters** — improved latency and loading states when the cluster has many collections with slow schema responses
+
 ### 🐛 Fixed
 
-- **Server version detection broken on weaviate-client v4** — `getServerVersion()` was calling the v3-only `misc.metaGetter().do()` API which silently threw on v4, returning `null`. The version gate therefore always showed the "requires v1.26+" warning even on v1.37+ servers. Fixed by preferring the v4 `client.getMeta()` method with a fallback to the v3 API (`DataExplorerAPI.ts`)
+- **Server version detection broken on weaviate-client v4** — `getServerVersion()` was calling the v3-only `misc.metaGetter().do()` API which silently threw on v4, returning `null`. The version gate therefore always showed the "requires v1.26+" warning even on v1.37+ servers. Fixed by preferring the v4 `client.getMeta()` method with a fallback to the v3 API (`DataExplorerAPI.ts`) (PR #74)
 
-- **Multi-target search payload never included selected vectors** — `useVectorSearch.ts` built the search payload using only `searchParams.targetVector` (a legacy single-string field), completely ignoring `selectedTargetVectors`, `joinStrategy`, and `vectorWeights` from context state. All checked vectors were silently discarded, producing the Weaviate error _"class has multiple vectors, but no target vectors were provided"_. Fixed by reading multi-target state from context and building the correct payload:
+- **Multi-target search payload never included selected vectors** — `useVectorSearch.ts` built the search payload using only `searchParams.targetVector` (a legacy single-string field), completely ignoring `selectedTargetVectors`, `joinStrategy`, and `vectorWeights` from context state. All checked vectors were silently discarded, producing the Weaviate error _"class has multiple vectors, but no target vectors were provided"_. Fixed by reading multi-target state from context and building the correct payload: (PR #74)
   - 1 vector selected → single-string `targetVector`
   - 2+ vectors selected → `{ combination, targetVectors, weights? }` object consumed by `multiTargetVector.*()` SDK factory methods
 
