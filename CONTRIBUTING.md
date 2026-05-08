@@ -160,29 +160,29 @@ src/
 
 ### Updating weaviate-add-collection
 
-The Add Collection UI is provided by an external React component package: [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection).
+The Add Collection UI is provided by an external React component package: [`weaviate-add-collection`](https://github.com/weaviate/weaviate-add-collection).
 
-**Live Demo:** [https://dudanogueira.github.io/weaviate-add-collection/](https://dudanogueira.github.io/weaviate-add-collection/)
+**Live Demo:** [https://weaviate.github.io/weaviate-add-collection/](https://weaviate.github.io/weaviate-add-collection/)
 
 **To update to the latest version:**
 
 1. **Update the dependency**
 
    ```bash
-   npm install github:dudanogueira/weaviate-add-collection
+   npm install github:weaviate/weaviate-add-collection
    ```
 
 2. **Or to a specific commit/branch/tag:**
 
    ```bash
    # Specific commit
-   npm install github:dudanogueira/weaviate-add-collection#commit-hash
+   npm install github:weaviate/weaviate-add-collection#commit-hash
 
    # Specific branch
-   npm install github:dudanogueira/weaviate-add-collection#branch-name
+   npm install github:weaviate/weaviate-add-collection#branch-name
 
    # Specific tag
-   npm install github:dudanogueira/weaviate-add-collection#v1.0.0
+   npm install github:weaviate/weaviate-add-collection#v1.0.0
    ```
 
 3. **Rebuild the webview**
@@ -212,7 +212,7 @@ If you need to make changes to the `weaviate-add-collection` component itself:
 
    ```bash
    cd ..
-   git clone https://github.com/dudanogueira/weaviate-add-collection.git
+   git clone https://github.com/weaviate/weaviate-add-collection.git
    cd weaviate-add-collection
    npm install
    ```

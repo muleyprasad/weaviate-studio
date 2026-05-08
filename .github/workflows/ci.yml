@@ -82,6 +82,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Pull latest weaviate-add-collection
+        run: npm install github:weaviate/weaviate-add-collection
+
       - name: Install vsce
         run: npm install -g vsce
 
@@ -115,6 +118,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Pull latest weaviate-add-collection
+        run: npm install github:weaviate/weaviate-add-collection
 
       - name: Install vsce
         run: npm install -g vsce
@@ -156,6 +162,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Pull latest weaviate-add-collection
+        run: npm install github:weaviate/weaviate-add-collection
 
       - name: Install vsce
         run: npm install -g vsce

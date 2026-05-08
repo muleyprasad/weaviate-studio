@@ -244,7 +244,7 @@ Need a quick Weaviate instance for development or learning? Check out our [local
 
 Weaviate Studio uses a modular architecture with external React components for enhanced UI:
 
-- **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/dudanogueira/weaviate-add-collection) ([Live Demo](https://dudanogueira.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
+- **Add Collection UI**: Powered by [`weaviate-add-collection`](https://github.com/weaviate/weaviate-add-collection) ([Live Demo](https://weaviate.github.io/weaviate-add-collection/)) - a standalone React component for creating, cloning, and importing collections
 - **Extension Core**: TypeScript-based VS Code extension
 - **Generative Search**: Self-contained module (`src/rag-chat/`) for generative search with its own panel, API wrapper, and React webview
 - **Webviews**: React-based UIs with Monaco editor integration
