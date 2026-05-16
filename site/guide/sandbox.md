@@ -1,3 +1,8 @@
+---
+title: Quick Start Sandbox — Try Weaviate Studio Locally with Docker
+description: Spin up a local Weaviate instance with sample data in minutes using the Weaviate Studio sandbox — test collections, cross-references, generative search, and multi-vector queries locally.
+---
+
 # Quick Start Sandbox
 
 A local sandbox for testing Weaviate Studio features — including nested properties, cross-references, and multi-collection generative search.

@@ -1,3 +1,8 @@
+---
+title: Testing Guide — End-to-End Testing Weaviate Studio Before Release
+description: End-to-end testing checklist for Weaviate Studio — covers Muvera, RBAC, backups, CSP nonce, cross-platform verification, and pre-publish sign-off steps.
+---
+
 # Testing Guide
 
 This guide is the **single source of truth** for end-to-end testing the Weaviate Studio extension before publishing.

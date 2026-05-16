@@ -1,3 +1,8 @@
+---
+title: Install Weaviate Studio — VS Code, Cursor, Windsurf & VSCodium
+description: Install Weaviate Studio from the VS Code Marketplace, Open VSX (Cursor / Windsurf / VSCodium), or as a manual VSIX download. System requirements, troubleshooting, and first-time setup for the Weaviate management UI.
+---
+
 # Installation
 
 ## Quick Install

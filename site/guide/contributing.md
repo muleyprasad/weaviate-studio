@@ -1,3 +1,8 @@
+---
+title: Contributing to Weaviate Studio — Developer Setup & Workflow Guide
+description: Complete guide to contributing to Weaviate Studio — local development setup, extension architecture, code conventions, testing, and pull request workflow.
+---
+
 # Contributing
 
 We welcome contributions to Weaviate Studio! This guide is the **single source of truth** for contributor setup, conventions, and workflows.

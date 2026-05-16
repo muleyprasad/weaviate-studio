@@ -1,3 +1,8 @@
+---
+title: Weaviate Studio Features — Full-Featured Weaviate Management UI
+description: Explore every feature in Weaviate Studio — Data Explorer, Generative Search (RAG), GraphQL Editor, RBAC, Backup & Restore, Schema Management, Multi-Vector Search, and Cluster Monitoring for self-hosted Weaviate.
+---
+
 # Features Overview
 
 Weaviate Studio provides a comprehensive suite of tools for managing your Weaviate vector databases — all within VS Code.

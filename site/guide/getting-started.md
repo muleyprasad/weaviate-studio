@@ -1,3 +1,8 @@
+---
+title: Getting Started with Weaviate Studio for VS Code
+description: Install the Weaviate Studio VS Code extension and connect to your first self-hosted, on-prem, or cloud Weaviate vector database in under two minutes.
+---
+
 # Getting Started
 
 This guide will help you set up Weaviate Studio and connect to your first Weaviate instance.

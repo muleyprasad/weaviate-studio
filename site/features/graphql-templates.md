@@ -1,3 +1,8 @@
+---
+title: GraphQL Editor & Templates — Schema-Aware Queries for Weaviate
+description: Write and execute GraphQL queries against self-hosted Weaviate with Monaco-powered autocompletion, schema-aware templates, and one-click execution — inside VS Code.
+---
+
 # GraphQL Editor & Templates
 
 The Query Editor is a Monaco-powered GraphQL interface with intelligent, schema-aware templates that adapt to your collection's actual schema.

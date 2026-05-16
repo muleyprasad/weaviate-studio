@@ -1,3 +1,8 @@
+---
+title: Telemetry & Privacy — Weaviate Studio Anonymous Usage Data
+description: Learn what anonymous telemetry Weaviate Studio collects, how to opt out, and our privacy-first approach to improving the extension without storing personal data.
+---
+
 # Telemetry
 
 Weaviate Studio collects anonymous usage telemetry to help improve the extension. This page explains what's collected, how it works, and how to opt out.

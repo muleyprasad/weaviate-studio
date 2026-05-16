@@ -1,3 +1,8 @@
+---
+title: Weaviate Backup & Restore — S3, GCS, Azure & Filesystem Backends
+description: Create, monitor, and restore Weaviate backups across filesystem, S3, GCS, and Azure Blob Storage backends — backup management for self-hosted Weaviate in VS Code.
+---
+
 # Backup & Restore
 
 Create, monitor, and restore backups across multiple storage backends — all from within VS Code.

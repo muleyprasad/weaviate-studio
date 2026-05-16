@@ -1,3 +1,8 @@
+---
+title: RBAC & Security — Manage Weaviate Users, Roles & API Keys in VS Code
+description: Create users, assign roles, manage groups, and rotate API keys for self-hosted Weaviate — full RBAC management from the Weaviate Studio VS Code extension.
+---
+
 # RBAC & Security
 
 Weaviate Studio provides comprehensive Role-Based Access Control (RBAC) management and security features to protect your Weaviate instances.

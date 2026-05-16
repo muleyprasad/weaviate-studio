@@ -1,3 +1,8 @@
+---
+title: Weaviate Schema Management — Browse & Visualize Collections in VS Code
+description: Explore Weaviate collection schemas, inspect nested properties, view raw JSON schema, and generate API code — Schema Explorer in the Weaviate Studio VS Code extension.
+---
+
 # Schema Management
 
 Browse, visualize, and manage your Weaviate collection schemas with rich detail views and creation tools.

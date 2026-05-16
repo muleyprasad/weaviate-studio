@@ -1,3 +1,8 @@
+---
+title: Weaviate Studio Changelog — Version History & Release Notes
+description: Full version history and release notes for Weaviate Studio — new features, bug fixes, and improvements across every release of the VS Code extension.
+---
+
 # Changelog
 
 All notable changes to the Weaviate Studio extension.

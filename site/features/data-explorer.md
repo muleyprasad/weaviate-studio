@@ -1,3 +1,8 @@
+---
+title: Data Explorer — Browse & Filter Weaviate Collections in VS Code
+description: Visually browse Weaviate collections, apply advanced filters, run vector and hybrid searches, and export results as JSON or CSV — all from the Weaviate Studio VS Code extension.
+---
+
 # Data Explorer
 
 The Data Explorer is an interactive visual browser for your Weaviate collections. Browse objects, apply filters, run vector searches, and export data — all with a rich table interface.

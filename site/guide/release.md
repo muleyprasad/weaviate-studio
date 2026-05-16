@@ -1,3 +1,8 @@
+---
+title: Release Guide — Publishing Weaviate Studio to VS Code Marketplace & Open VSX
+description: Step-by-step guide for releasing Weaviate Studio — version bumping, PAT token setup, publishing to VS Code Marketplace and Open VSX Registry, and post-release checklist.
+---
+
 # Release Guide
 
 This guide is the **single source of truth** for releasing the Weaviate Studio extension to the VS Code Marketplace and Open VSX Registry.

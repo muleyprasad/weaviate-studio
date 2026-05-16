@@ -1,3 +1,8 @@
+---
+title: Generative Search (RAG) — Ask Questions Across Weaviate Collections
+description: Ask natural-language questions over self-hosted Weaviate data with RAG-powered answers and source attribution — Generative Search in Weaviate Studio for VS Code.
+---
+
 # Generative Search (RAG)
 
 Ask natural-language questions across one or more collections and get AI-generated answers grounded in your Weaviate data — all within VS Code.

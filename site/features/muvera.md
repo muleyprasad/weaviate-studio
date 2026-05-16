@@ -1,3 +1,8 @@
+---
+title: Multi-Vector Search (Muvera) — Named Vector Queries in Weaviate Studio
+description: Query across multiple Weaviate named vector spaces simultaneously with configurable fusion strategies — Muvera / multi-vector search support in the Weaviate Studio VS Code extension.
+---
+
 # Multi-Vector Search (Muvera)
 
 Weaviate Studio supports Weaviate's named-vector / Muvera search — query across multiple vector spaces simultaneously and combine results with configurable strategies.

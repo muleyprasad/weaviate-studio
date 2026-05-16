@@ -1,3 +1,8 @@
+---
+title: Weaviate Cluster Management — Health, Nodes & Shards Dashboard
+description: Monitor self-hosted Weaviate cluster health, node status, shard distribution, and run diagnostic checks in real time — Cluster Management panel in Weaviate Studio for VS Code.
+---
+
 # Cluster Management
 
 The Cluster Information Panel provides comprehensive real-time monitoring of your Weaviate cluster — health, nodes, shards, and more.

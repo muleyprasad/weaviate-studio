@@ -1,6 +1,8 @@
 ---
 # https://vitepress.dev/reference/default-theme-home-page
 layout: home
+title: Weaviate Studio — Self-Hosted Weaviate Management UI for VS Code
+description: Free, open-source VS Code extension to manage self-hosted, on-prem, and cloud Weaviate vector databases. Browse collections, run GraphQL & RAG queries, manage RBAC, backups, schemas, and multi-vector (Muvera) search — a full Weaviate dashboard inside your editor.
 
 hero:
   name: 'Weaviate Studio'
