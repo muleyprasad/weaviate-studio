@@ -2,6 +2,10 @@ out
 dist
 node_modules
 .vscode-test/
+
+# VitePress docs build output
+site/.vitepress/dist/
+site/.vitepress/cache/
 *.vsix
 coverage
 .DS_Store

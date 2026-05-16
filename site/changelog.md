@@ -1,0 +1,129 @@
+# Changelog
+
+All notable changes to the Weaviate Studio extension.
+
+## [1.7.1] - 2026-05-09
+
+### Changed
+
+- Updated `weaviate-add-collection` dependency to use the official Weaviate repository (`weaviate/weaviate-add-collection`)
+
+## [1.7.0] - 2026-04-30
+
+### ✨ Added — Multi-Vector Search (Muvera)
+
+- **Multi-Target Vector Search UI** — Full support for Weaviate's named-vector / Muvera search in Data Explorer
+  - Target Vector selector in Vector Options drawer
+  - Auto-selection of all named vectors on first open
+  - Join Strategy selector: Minimum, Sum, Average, Manual Weights, Relative Score
+  - Weight Editor with per-vector sliders and Normalize button
+  - Copy as Code includes `multiTargetVector` combination
+  - Requires Weaviate v1.26+ (near) / v1.27+ (hybrid)
+
+### ✨ Added — Backup Wildcard Support
+
+- Wildcard (`*`) option for full-instance backups
+- Improved backup creation UX
+
+### ✨ Added — Cluster Panel Improvements
+
+- 3 new collection health checks (Multi-Tenancy, Empty Shards, Replication Imbalance)
+- Parallel health checks
+- Multi-panel support
+- Open Checks from collection group header
+
+### 🐛 Fixed
+
+- Server version detection fixed on weaviate-client v4
+- Multi-target search payload now correctly includes selected vectors
+
+### 🎨 Changed
+
+- Max Distance default raised from 0.5 to 1.0 (no filter)
+- Distance slider with range labels: 0 (exact) · 1.0 (no filter) · 2 (distant)
+
+## [1.6.0] - 2026-03-21
+
+### 🔭 Added — Telemetry System
+
+- Azure Application Insights integration
+- Lifecycle events (activate, deactivate, errors)
+- Connection telemetry (type, transport, outcome)
+- Feature activation events (all major panels)
+- Operation completion events (queries, RAG, backups, collections)
+- Dual consent requirement (VS Code + extension settings)
+
+## [1.5.0] - 2026-03-14
+
+### Added — Generative Search
+
+- Chat-style RAG interface with multi-collection support
+- Top-K and timeout controls
+- Source attribution with context inspection
+- Markdown toggle and copy buttons
+- Right-click collection → Generative Search quick access
+
+### Added — RBAC & Security
+
+- Role, User, and Group management
+- API key rotation
+- User activation/deactivation
+- Read-Only mode with connection-level guards
+
+## [1.4.0] - 2026-02-18
+
+### Added — Data Explorer
+
+- Interactive table browser with sortable columns
+- Visual filter builder with 10+ operators and AND/OR logic
+- 4 vector search modes (Text, Object, Vector, Hybrid)
+- Export to JSON/CSV with flexible scopes
+- Virtual scrolling for large datasets
+- Filter presets (save, load, delete)
+- Keyboard shortcuts and preferences persistence
+
+## [1.3.0] - 2025-12-26
+
+### Added
+
+- Cluster Information Panel
+- Nested Object support with visual type icons
+- Docker Compose test sandbox
+- React-based Add Collection interface
+- Enhanced GraphQL templates with schema-aware generation
+- Support for 15+ embedding models
+
+## [1.2.0] - 2025-10-21
+
+### Added
+
+- GraphQL Monaco Editor with schema-aware IntelliSense
+- `.weaviate` connection files
+
+## [1.1.0] - 2025-09-28
+
+### Added
+
+- New connection model (Cloud + Custom endpoints)
+- Tree view enhancements (vector count, generative config, replication)
+- Create Collection: From scratch, Copy, Import from JSON
+
+### Changed
+
+- Migrated to `weaviate-client@^3` with Collections API
+
+## [1.0.0] - 2025-07-08
+
+### Initial Release
+
+- Connection management with multi-instance support
+- GraphQL query editor with Monaco integration
+- Data visualization (table + JSON views)
+- Schema management and tree explorer
+- 9 query templates
+- Vector, semantic, hybrid, BM25 search
+- Dark theme optimized UI
+
+---
+
+[Full Changelog on GitHub →](https://github.com/muleyprasad/weaviate-studio/blob/main/CHANGELOG.md)

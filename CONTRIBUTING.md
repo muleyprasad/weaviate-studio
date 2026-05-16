@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to Weaviate Studio! We welcome contributions from the community.
 
+> **📖 Companion website:** [https://muleyprasad.github.io/weaviate-studio/](https://muleyprasad.github.io/weaviate-studio/) — full documentation, feature guides, and release notes.
+
 ## Getting Started
 
 ### Prerequisites

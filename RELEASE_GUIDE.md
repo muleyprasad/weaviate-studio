@@ -15,6 +15,7 @@ This guide covers the complete process for releasing the Weaviate Studio extensi
 ### ✅ Documentation & Metadata
 
 - [ ] README.md updated with latest features, new gifs and any Breaking Changes.
+- [ ] [Companion website](https://muleyprasad.github.io/weaviate-studio/) updated with release highlights
 - [ ] CHANGELOG.md updated with release notes
 - [ ] package.json version bumped appropriately
 - [ ] LICENSE file present and up-to-date
@@ -136,13 +137,23 @@ ovsx publish weaviate-studio-<version>.vsix -p YOUR_ACCESS_TOKEN
 
 ## 📦 Release Automation
 
-### GitHub Actions Workflow
+Weaviate Studio uses **two GitHub Actions workflows**:
 
-Our CI/CD pipeline (`/.github/workflows/ci.yml`) handles:
+### 1. Extension CI/CD (`/.github/workflows/ci.yml`)
+
+Handles:
 
 - **Continuous Integration:** Tests and builds on every push
 - **Automated Releases:** Publishes to marketplaces on GitHub releases
 - **Artifact Management:** Stores built extensions as GitHub artifacts
+
+### 2. Docs Deploy (`/.github/workflows/deploy-docs.yml`)
+
+Handles:
+
+- **Auto-deployment:** Builds and deploys the companion website to GitHub Pages on push to `main` (when `site/**` files change)
+- **No manual steps:** Just push docs changes and the site updates automatically
+- **Live URL:** [https://muleyprasad.github.io/weaviate-studio/](https://muleyprasad.github.io/weaviate-studio/)
 
 ### Manual Release Process
 
@@ -214,6 +225,7 @@ code --install-extension weaviate-studio-<version>.vsix
 - **User ratings and reviews**
 - **Issue reports** and bug feedback
 - **Feature requests** from users
+- **Docs site traffic** (via GitHub Pages insights)
 
 ### Maintenance Tasks
 
@@ -221,6 +233,7 @@ code --install-extension weaviate-studio-<version>.vsix
 - **Bug fixes** from user reports
 - **Feature enhancements** based on feedback
 - **Security updates** for dependencies
+- **Docs site updates** — push changes to `site/` and they deploy automatically
 
 ## 🆘 Troubleshooting
 
@@ -350,6 +363,8 @@ when a Git tag that starts with `v` is pushed.
    ```
 
    • Edit `CHANGELOG.md` — add a section like:
+   • Update the [companion website](https://muleyprasad.github.io/weaviate-studio/) with release highlights in `site/`
+   • Update `README.md` if needed
 
    ```markdown
    ## [1.0.1] — 2025-07-08
