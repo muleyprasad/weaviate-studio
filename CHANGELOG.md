@@ -5,6 +5,12 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-05-09
+
+### Changed
+
+- Updated `weaviate-add-collection` dependency to use the official Weaviate repository (`weaviate/weaviate-add-collection`) instead of the personal repository (`dudanogueira/weaviate-add-collection`) (PR #75)
+
 ## [1.7.0] - 2026-04-30
 
 ### ✨ Added — Multi-Vector Search (Muvera) (PR #74)
