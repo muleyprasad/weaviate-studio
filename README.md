@@ -11,6 +11,8 @@
 **A powerful VS Code extension for managing [Weaviate](https://weaviate.io) vector databases with an intuitive GraphQL
 interface. Supports self-hosted and cloud Weaviate instances.**
 
+> 📖 **[Full Documentation →](https://muleyprasad.github.io/weaviate-studio/)** — Getting started, feature guides, sandbox setup, and release notes.
+
 ![Extension Demo](docs/images/extension-demo.gif)
 
 ### Data Explorer

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://muleyprasad.github.io/weaviate-studio/sitemap.xml

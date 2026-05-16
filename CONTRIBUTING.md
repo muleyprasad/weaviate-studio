@@ -1,290 +1,31 @@
 # Contributing to Weaviate Studio
 
-Thank you for your interest in contributing to Weaviate Studio! We welcome contributions from the community.
+Thank you for your interest in contributing! 🎉
 
-## Getting Started
+> **📖 The full contributing guide lives on the companion website:** > **[https://muleyprasad.github.io/weaviate-studio/guide/contributing](https://muleyprasad.github.io/weaviate-studio/guide/contributing)**
 
-### Prerequisites
+That page is the **single source of truth** and covers:
 
-- **Node.js** (v16 or later)
-- **npm** (v8 or later)
-- **VS Code** (v1.80.0 or later)
-- **Git**
+- Development setup (fork, clone, install, launch)
+- Project structure
+- Commit conventions ([Conventional Commits](https://www.conventionalcommits.org/))
+- Coding standards & testing
+- Running and contributing to the docs site
+- Telemetry development (env vars, naming convention, Azure dashboards)
+- Working with the `weaviate-add-collection` dependency
+- Bug reports & feature requests
 
-### Development Setup
+## Why is this file a stub?
 
-1. **Fork and Clone**
-   - Fork the repository on GitHub: https://github.com/muleyprasad/weaviate-studio
-   - Then clone your fork (replace `YOUR_GITHUB_USERNAME` with your GitHub username):
-   ```bash
-   git clone https://github.com/YOUR_GITHUB_USERNAME/weaviate-studio.git
-   cd weaviate-studio
-   ```
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-3. **Start Development**
-   ```bash
-   npm run dev
-   ```
-4. **Launch Extension**
-   - Press `F5` in VS Code
-   - Or use "Run Extension" from the Run and Debug panel
+To eliminate documentation drift. The full guide is maintained on the companion website (built from `site/guide/contributing.md`) so there is **one place** to update. This file stays in the repository root because GitHub's "Contribute" UI auto-detects `CONTRIBUTING.md` and links to it from issues and PRs.
 
-## Telemetry Debugging
-
-**Want to test telemetry locally?** Set the env var and rebuild:
-
-```bash
-export APPLICATION_INSIGHTS_CONN_STRING="your-connection-string"
-npm install && npm run compile && npm run build:webview && npm run build:add-collection
-```
-
-Then restart VS Code. Telemetry events will appear in your Application Insights resource.
-
-**Get your connection string from:** Azure Portal → Application Insights → Overview → Connection String
-
-> **Note:** Telemetry is automatically disabled if no connection string is available—no errors, no user impact.
-
-### Dashboards
-
-View pre-built dashboards for monitoring extension usage:
-
-```bash
-# Deploy to Azure Application Insights (requires az CLI login)
-cd scripts/telemetry
-export AZURE_SUBSCRIPTION_ID="your-subscription-id"
-
-# Interactive mode (prompts for cleanup choice)
-./deploy.sh
-
-# Or use command-line flags for CI/CD:
-./deploy.sh --cleanup        # Cleanup first, then deploy
-./deploy.sh --skip-cleanup   # Deploy without cleanup
-```
-
-See [docs/TELEMETRY_DASHBOARDS.md](docs/TELEMETRY_DASHBOARDS.md) for detailed dashboard documentation and Kusto queries.
+See the [Documentation Structure](https://muleyprasad.github.io/weaviate-studio/guide/contributing#documentation-structure) section on the companion site for the full strategy and the few exceptions (README and CHANGELOG).
 
 ---
 
-### How Telemetry Works
+**Quick links:**
 
-The extension uses Azure Application Insights for anonymous usage telemetry. In production builds, the connection string is injected at build time via CI/CD secrets. Telemetry is automatically disabled if no connection string is available.
-
-| Environment | Connection String     | Result                |
-| ----------- | --------------------- | --------------------- |
-| Local dev   | Not set               | ❌ Telemetry disabled |
-| Local debug | Set via env var       | ✅ Telemetry enabled  |
-| CI/CD       | Set via GitHub Secret | ✅ Telemetry enabled  |
-
-See `.github/workflows/ci.yml` for the CI/CD injection configuration.
-
-### Telemetry Event Naming Convention
-
-When adding new telemetry events, follow these patterns:
-
-- **Feature activation**: `{feature}.opened` — emitted when a user opens a feature panel (e.g., `queryEditor.opened`, `ragChat.opened`)
-- **Operation completion**: `{feature}.{action}Completed` — emitted when a user completes an action (e.g., `queryEditor.queryCompleted`, `backup.completed`)
-
-Events should be added to `src/telemetry/TelemetryTypes.ts` and tracked in the appropriate `createOrShow()` method for panels.
-
-### For CI/CD
-
-The GitHub Actions pipeline injects `APPLICATION_INSIGHTS_CONN_STRING` from the `APPLICATION_INSIGHTS_CONN_STRING` repository secret. See `.github/workflows/ci.yml` for details.
-
-## Development Workflow
-
-1. **Create a Feature Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-2. **Make Your Changes**
-   - Follow our coding standards (see below)
-   - Add tests for new functionality
-   - Update documentation as needed
-3. **Test Your Changes**
-   ```bash
-   npm test
-   npm run lint
-   ```
-4. **Build the Project**
-
-   ```bash
-   # Build everything
-   npm run compile
-
-   # Or build specific components
-   npm run build:extension      # Main extension code
-   npm run build:add-collection # Add Collection webview
-   ```
-
-5. **Commit Your Changes**
-   ```bash
-   git add .
-   git commit -m "feat: add your feature description"
-   ```
-6. **Push and Open a Pull Request**
-
-## Commit Message Convention
-
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` - New features
-- `fix:` - Bug fixes
-- `docs:` - Documentation changes
-- `style:` - Code style changes
-- `refactor:` - Code refactoring
-- `test:` - Adding or updating tests
-- `chore:` - Maintenance tasks
-
-## Project Structure
-
-```
-src/
-├── extension.ts                  # Main extension entry point
-├── WeaviateTreeDataProvider/     # Tree view provider and tests
-├── services/                     # Business logic
-├── types/                        # TypeScript definitions
-├── views/                        # Custom views (including AddCollectionPanel)
-├── query-editor/                 # GraphQL editor components
-├── data-explorer/                # Data Explorer panel, API, and React webview
-├── rag-chat/                     # Generative Search panel, API, and React webview
-│   ├── extension/                #   RagChatPanel.ts (sequential multi-collection queries), RagChatAPI.ts
-│   ├── webview/                  #   RagChat.tsx (CollectionSelector, RagOptions, ContextSection), RagChat.css, index.tsx
-│   └── types/                    #   TypeScript interfaces for messages, state, and context objects
-└── webview/                      # Shared React-based UI and components
-```
-
-## Working with Dependencies
-
-### Updating weaviate-add-collection
-
-The Add Collection UI is provided by an external React component package: [`weaviate-add-collection`](https://github.com/weaviate/weaviate-add-collection).
-
-**Live Demo:** [https://weaviate.github.io/weaviate-add-collection/](https://weaviate.github.io/weaviate-add-collection/)
-
-**To update to the latest version:**
-
-1. **Update the dependency**
-
-   ```bash
-   npm install github:weaviate/weaviate-add-collection
-   ```
-
-2. **Or to a specific commit/branch/tag:**
-
-   ```bash
-   # Specific commit
-   npm install github:weaviate/weaviate-add-collection#commit-hash
-
-   # Specific branch
-   npm install github:weaviate/weaviate-add-collection#branch-name
-
-   # Specific tag
-   npm install github:weaviate/weaviate-add-collection#v1.0.0
-   ```
-
-3. **Rebuild the webview**
-
-   ```bash
-   npm run build:add-collection
-   ```
-
-4. **Test the changes**
-
-   - Press `F5` to launch the extension
-   - Test the "Create New Collection" flow
-   - Verify clone and import flows work correctly
-
-5. **Update package-lock.json**
-   ```bash
-   npm install
-   ```
-
-**Note:** The package is installed from GitHub, so updates require network access. The version is locked in `package-lock.json`.
-
-### Developing weaviate-add-collection locally
-
-If you need to make changes to the `weaviate-add-collection` component itself:
-
-1. **Clone the component repository**
-
-   ```bash
-   cd ..
-   git clone https://github.com/weaviate/weaviate-add-collection.git
-   cd weaviate-add-collection
-   npm install
-   ```
-
-2. **Link the local package**
-
-   ```bash
-   # In weaviate-add-collection directory
-   npm link
-
-   # In weaviate-studio directory
-   cd ../weaviate-studio
-   npm link weaviate-add-collection
-   ```
-
-3. **Make your changes** in the `weaviate-add-collection` project
-
-4. **Rebuild in weaviate-studio**
-
-   ```bash
-   npm run build:add-collection
-   ```
-
-5. **Test the changes** by launching the extension (F5)
-
-6. **Unlink when done**
-
-   ```bash
-   npm unlink weaviate-add-collection
-   npm install
-   ```
-
-7. **Submit changes** to the weaviate-add-collection repository first, then update the dependency in weaviate-studio
-
-## Coding Standards
-
-- Use strict TypeScript configuration
-- Prefer interfaces over types for object shapes
-- Use meaningful variable and function names
-- Add JSDoc comments for public APIs
-- Use functional React components with hooks
-- Use Prettier and ESLint for formatting and linting
-
-## Testing
-
-- Write unit tests for utility functions
-- Write integration tests for components
-- Use descriptive test names
-- Run tests with `npm test` and check coverage with `npm run test:coverage`
-
-### Testing Add Collection UI
-
-When making changes that affect the Add Collection flow:
-
-1. **Run unit tests:**
-
-   ```bash
-   npm test -- src/WeaviateTreeDataProvider/__tests__/AddCollection.test.ts
-   ```
-
-2. **Manual testing checklist:**
-   - [ ] Create new collection from scratch
-   - [ ] Clone existing collection (verify schema is prefilled)
-   - [ ] Import collection from file (verify schema is loaded)
-   - [ ] Test with different vectorizers
-   - [ ] Test with multi-tenant collections
-   - [ ] Verify error handling (invalid schema, network errors)
-
-## Bug Reports & Feature Requests
-
-Please use [GitHub Issues](https://github.com/muleyprasad/weaviate-studio/issues) for bug reports and feature requests. Include clear steps to reproduce, environment details, and screenshots if applicable.
-
----
-
-Thank you for contributing to Weaviate Studio!
+- 🐛 [Report a bug](https://github.com/muleyprasad/weaviate-studio/issues)
+- 💡 [Request a feature](https://github.com/muleyprasad/weaviate-studio/issues)
+- 📖 [Full documentation](https://muleyprasad.github.io/weaviate-studio/)
+- 💬 [Weaviate Discord](https://discord.com/invite/weaviate)

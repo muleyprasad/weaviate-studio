@@ -822,7 +822,10 @@
     "test:coverage": "jest --coverage",
     "prepare": "husky",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "docs:dev": "vitepress dev site",
+    "docs:build": "vitepress build site",
+    "docs:preview": "vitepress preview site"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -869,6 +872,7 @@
     "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
+    "vitepress": "^1.6.4",
     "webpack": "^5.99.7",
     "webpack-cli": "^6.0.1"
   },
