@@ -35,14 +35,22 @@ export class TelemetryService {
       .getConfiguration('weaviate')
       .get<boolean>('telemetry.enabled', true);
 
-    if (!vscode.env.isTelemetryEnabled || !extensionEnabled) {
+    // Check VS Code telemetry level.
+    // Note: vscode.env.telemetryLevel is available in VS Code 1.81+
+    // For telemetry to work with @vscode/extension-telemetry, it MUST be "all"
+    const telemetryLevel = (vscode.env as any).telemetryLevel || 'all';
+    const isTelemetryLevel_All = telemetryLevel === 'all';
+
+    if (!isTelemetryLevel_All || !extensionEnabled) {
       console.log(
-        '[Telemetry] Initialization skipped — telemetry disabled (VS Code: %s, extension setting: %s)',
-        vscode.env.isTelemetryEnabled,
+        '[Telemetry] Initialization skipped — telemetry disabled (VS Code level: %s, extension enabled: %s). ' +
+          'Note: @vscode/extension-telemetry only sends events when VS Code telemetry level is "all".',
+        telemetryLevel,
         extensionEnabled
       );
       return;
     }
+
     const telemetryKey = process.env.APPLICATION_INSIGHTS_CONN_STRING || connectionString;
 
     if (!telemetryKey) {
@@ -57,7 +65,7 @@ export class TelemetryService {
     try {
       this.reporter = new TelemetryReporter(telemetryKey);
       this.isInitialized = true;
-      console.log('[Telemetry] Initialized successfully');
+      console.log('[Telemetry] Initialized successfully with connection string');
     } catch (error) {
       console.error('[Telemetry] Failed to initialize:', error);
     }
