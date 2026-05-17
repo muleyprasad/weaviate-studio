@@ -101,6 +101,20 @@ export default defineConfig({
         ],
       }),
     ],
+
+    // Google Analytics
+    [
+      "script",
+      { async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-JSGX5J1YP4" },
+    ],
+    [
+      "script",
+      {},
+      `window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-JSGX5J1YP4');`,
+    ],
   ],
 
   // Per-page canonical URL + per-page OG/Twitter overrides
