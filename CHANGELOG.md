@@ -5,6 +5,12 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] - 2026-05-17
+
+### 🐛 Fixed
+
+- **Telemetry events not reaching Azure Application Insights** — The `TelemetryService` was checking `vscode.env.isTelemetryEnabled` which returns `true` for all telemetry levels (`"error"`, `"crash"`, `"all"`). However, the `@vscode/extension-telemetry` library's internal `telemetryLogger.logUsage()` requires VS Code telemetry level to be **exactly `"all"`** to send usage events. This caused false positives: initialization appeared successful but events were silently dropped. Fixed by explicitly checking `vscode.env.telemetryLevel === 'all'` with a fallback for VS Code < 1.81. Users now receive a clear console message if telemetry is disabled due to an incorrect telemetry level.
+
 ## [1.7.1] - 2026-05-09
 
 ### Changed
