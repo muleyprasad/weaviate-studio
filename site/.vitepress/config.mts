@@ -1,6 +1,6 @@
 import { defineConfig, type HeadConfig } from "vitepress";
 
-const SITE_URL = "https://muleyprasad.github.io/weaviate-studio";
+const SITE_URL = "https://weaviatestudio.com";
 const SITE_TITLE = "Weaviate Studio — Self-Hosted Weaviate Management UI for VS Code";
 const SITE_DESCRIPTION =
   "Weaviate Studio is a free, open-source VS Code extension for managing self-hosted, on-prem, and cloud Weaviate vector databases. Browse collections, run GraphQL and generative (RAG) queries, manage RBAC, backups, schemas, and multi-vector search — a full Weaviate dashboard inside your editor.";
@@ -13,8 +13,8 @@ export default defineConfig({
   description: SITE_DESCRIPTION,
   lang: "en-US",
 
-  // GitHub Pages base path (repo name)
-  base: "/weaviate-studio/",
+  // Custom domain (root path)
+  base: "/",
 
   // Auto-generate sitemap.xml for crawlers
   sitemap: {
@@ -29,8 +29,8 @@ export default defineConfig({
 
   head: [
     // Branding
-    ["link", { rel: "icon", type: "image/png", href: "/weaviate-studio/weaviate-studio-color.png" }],
-    ["link", { rel: "apple-touch-icon", href: "/weaviate-studio/weaviate-studio-color.png" }],
+    ["link", { rel: "icon", type: "image/png", href: "/weaviate-studio-color.png" }],
+    ["link", { rel: "apple-touch-icon", href: "/weaviate-studio-color.png" }],
 
     // Crawl + indexing hints
     ["meta", { name: "robots", content: "index, follow, max-image-preview:large" }],
