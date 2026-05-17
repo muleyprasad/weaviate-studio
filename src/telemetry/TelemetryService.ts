@@ -30,23 +30,34 @@ export class TelemetryService {
     if (this.isInitialized) {
       return;
     }
-    this.isInitialized = true;
 
     const extensionEnabled = vscode.workspace
       .getConfiguration('weaviate')
       .get<boolean>('telemetry.enabled', true);
 
     if (!vscode.env.isTelemetryEnabled || !extensionEnabled) {
+      console.log(
+        '[Telemetry] Initialization skipped — telemetry disabled (VS Code: %s, extension setting: %s)',
+        vscode.env.isTelemetryEnabled,
+        extensionEnabled
+      );
       return;
     }
     const telemetryKey = process.env.APPLICATION_INSIGHTS_CONN_STRING || connectionString;
 
     if (!telemetryKey) {
+      console.log(
+        '[Telemetry] Initialization skipped — no connection string available (env var: %s, setting: %s)',
+        process.env.APPLICATION_INSIGHTS_CONN_STRING ? 'provided' : 'not provided',
+        connectionString ? 'provided' : 'not provided'
+      );
       return;
     }
 
     try {
       this.reporter = new TelemetryReporter(telemetryKey);
+      this.isInitialized = true;
+      console.log('[Telemetry] Initialized successfully');
     } catch (error) {
       console.error('[Telemetry] Failed to initialize:', error);
     }
@@ -126,6 +137,7 @@ export class TelemetryService {
       }
       this.reporter = undefined;
     }
+    this.isInitialized = false;
   }
 }
 

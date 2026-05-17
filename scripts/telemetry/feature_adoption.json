@@ -24,7 +24,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let steps = dynamic([\"connection.connectCompleted\",\"dataExplorer.opened\",\"queryEditor.opened\",\"queryEditor.queryCompleted\",\"ragChat.opened\",\"ragChat.requestCompleted\"]);\ncustomEvents\n| where name in (steps)\n| where tostring(customDimensions.result) == \"success\" or tostring(customDimensions.result) == \"\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Step = name\n| extend Order = array_index_of(steps, Step)\n| order by Order asc\n| project Step, Users\n| render columnchart",
+        "query": "let steps = dynamic([\"/connection.connectCompleted\",\"/dataExplorer.opened\",\"/queryEditor.opened\",\"/queryEditor.queryCompleted\",\"/ragChat.opened\",\"/ragChat.requestCompleted\"]);\ncustomEvents\n| where name has_any (steps)\n| where tostring(customDimensions.result) == \"success\" or tostring(customDimensions.result) == \"\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Step = name\n| extend Order = array_index_of(steps, Step)\n| order by Order asc\n| project Step, Users\n| render columnchart",
         "size": 0,
         "title": "User Journey Funnel",
         "timeContext": { "durationMs": 2592000000 },

@@ -10,7 +10,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize DAU = dcount(tostring(customDimensions.sessionId)) by bin(timestamp, 1d)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize DAU = dcount(tostring(customDimensions.sessionId)) by bin(timestamp, 1d)\n| render timechart",
         "size": 0,
         "title": "Daily Active Users (DAU)",
         "timeContext": { "durationMs": 2592000000 },
@@ -24,7 +24,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name in (\"extension.activated\", \"extension.deactivated\")\n| summarize startTime = min(timestamp), endTime = max(timestamp) by tostring(customDimensions.sessionId)\n| extend duration = datetime_diff('minute', endTime, startTime)\n| summarize avgDuration = avg(duration), p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/extension.activated\" or name endswith \"/extension.deactivated\"\n| summarize startTime = min(timestamp), endTime = max(timestamp) by tostring(customDimensions.sessionId)\n| extend duration = datetime_diff('minute', endTime, startTime)\n| summarize avgDuration = avg(duration), p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)\n| render timechart",
         "size": 0,
         "title": "Session Duration Distribution",
         "timeContext": { "durationMs": 2592000000 },
@@ -38,7 +38,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| extend isError = name == \"extension.unhandledError\" or tostring(customDimensions.result) == \"failure\"\n| summarize errorRate = 100.0 * countif(isError) / count() by bin(timestamp, 1h)\n| render timechart",
+        "query": "customEvents\n| extend isError = name endswith \"/extension.unhandledError\" or tostring(customDimensions.result) == \"failure\"\n| summarize errorRate = 100.0 * countif(isError) / count() by bin(timestamp, 1h)\n| render timechart",
         "size": 0,
         "title": "Error Rate Trend (%)",
         "timeContext": { "durationMs": 604800000 },
@@ -52,7 +52,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name == \"extension.unhandledError\"\n| summarize count() by tostring(customDimensions.errorCategory)\n| render piechart",
+        "query": "customEvents\n| where name endswith \"/extension.unhandledError\"\n| summarize count() by tostring(customDimensions.errorCategory)\n| render piechart",
         "size": 0,
         "title": "Errors by Category",
         "timeContext": { "durationMs": 604800000 },

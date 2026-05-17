@@ -10,7 +10,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize MAU = dcount(tostring(customDimensions.sessionId)) by Month = startofmonth(timestamp)\n| render columnchart",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize MAU = dcount(tostring(customDimensions.sessionId)) by Month = startofmonth(timestamp)\n| render columnchart",
         "size": 0,
         "title": "Monthly Active Users (MAU)",
         "timeContext": { "durationMs": 7776000000 },
@@ -24,7 +24,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name == \"extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Week = startofweek(timestamp)\n| order by Week asc\n| extend PrevWeek = prev(Users)\n| extend GrowthRate = iif(isnull(PrevWeek) or PrevWeek == 0, real(null), round(100.0 * (Users - PrevWeek) / PrevWeek, 2))\n| project Week, Users, GrowthRate",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Week = startofweek(timestamp)\n| order by Week asc\n| extend PrevWeek = prev(Users)\n| extend GrowthRate = iif(isnull(PrevWeek) or PrevWeek == 0, real(null), round(100.0 * (Users - PrevWeek) / PrevWeek, 2))\n| project Week, Users, GrowthRate",
         "size": 0,
         "title": "Week-over-Week Growth Rate",
         "timeContext": { "durationMs": 7776000000 },

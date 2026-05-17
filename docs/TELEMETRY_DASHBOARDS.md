@@ -57,7 +57,7 @@ The script will prompt you to:
 ```kusto
 // Daily Active Users (DAU)
 customEvents
-| where name == "extension.activated"
+| where name endswith "/extension.activated"
 | summarize DAU = dcount(tostring(customDimensions.sessionId)) by bin(timestamp, 1d)
 | render timechart
 ```
@@ -65,7 +65,7 @@ customEvents
 ```kusto
 // Session Duration Distribution
 customEvents
-| where name in ("extension.activated", "extension.deactivated")
+| where name endswith "/extension.activated" or name endswith "/extension.deactivated"
 | summarize startTime = min(timestamp), endTime = max(timestamp) by tostring(customDimensions.sessionId)
 | extend duration = datetime_diff('minute', endTime, startTime)
 | summarize avgDuration = avg(duration), p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)
@@ -75,7 +75,7 @@ customEvents
 ```kusto
 // Error Rate Trend
 customEvents
-| extend isError = name == "extension.unhandledError" or customDimensions.result == "failure"
+| extend isError = name endswith "/extension.unhandledError" or customDimensions.result == "failure"
 | summarize errorRate = 100.0 * countif(isError) / count() by bin(timestamp, 1h)
 | render timechart
 ```
@@ -83,7 +83,7 @@ customEvents
 ```kusto
 // Errors by Category (Pie Chart)
 customEvents
-| where name == "extension.unhandledError"
+| where name endswith "/extension.unhandledError"
 | summarize count() by tostring(customDimensions.errorCategory)
 | render piechart
 ```
@@ -116,15 +116,15 @@ customEvents
 ```kusto
 // User Journey Funnel
 let steps = dynamic([
-    "connection.connectCompleted",
-    "dataExplorer.opened",
-    "queryEditor.opened",
-    "queryEditor.queryCompleted",
-    "ragChat.opened",
-    "ragChat.requestCompleted"
+    "/connection.connectCompleted",
+    "/dataExplorer.opened",
+    "/queryEditor.opened",
+    "/queryEditor.queryCompleted",
+    "/ragChat.opened",
+    "/ragChat.requestCompleted"
 ]);
 customEvents
-| where name in (steps)
+| where name has_any (steps)
 | where customDimensions.result == "success" or customDimensions.result == ""
 | summarize Users = dcount(tostring(customDimensions.sessionId)) by Step = name
 | extend Order = array_index_of(steps, Step)
@@ -171,7 +171,7 @@ usersWhoOpened
 ```kusto
 // Query Performance Trends (P50, P95, P99)
 customEvents
-| where name == "queryEditor.queryCompleted"
+| where name endswith "/queryEditor.queryCompleted"
 | where customDimensions.result == "success"
 | extend duration = toint(customMeasurements.durationMs)
 | summarize P50 = percentile(duration, 50),
@@ -185,7 +185,7 @@ customEvents
 ```kusto
 // RAG Chat Latency Distribution
 customEvents
-| where name == "ragChat.requestCompleted"
+| where name endswith "/ragChat.requestCompleted"
 | where customDimensions.result == "success"
 | extend duration = toint(customMeasurements.durationMs)
 | summarize percentile(duration, 50), percentile(duration, 95), percentile(duration, 99), count() by bin(timestamp, 1d)
@@ -195,7 +195,7 @@ customEvents
 ```kusto
 // Connection Success Rate
 customEvents
-| where name == "connection.connectCompleted"
+| where name endswith "/connection.connectCompleted"
 | summarize Success = countif(customDimensions.result == "success"),
             Failure = countif(customDimensions.result == "failure"),
             Total = count() by bin(timestamp, 1h)
@@ -234,7 +234,7 @@ customEvents
 ```kusto
 // Top Failing Operations
 customEvents
-| where customDimensions.result == "failure" or name == "extension.unhandledError"
+| where customDimensions.result == "failure" or name endswith "/extension.unhandledError"
 | summarize ErrorCount = count(), AvgDuration = avg(toint(customMeasurements.durationMs)) by Operation = name, ErrorCategory = tostring(customDimensions.errorCategory)
 | order by ErrorCount desc
 | take 20
@@ -244,7 +244,7 @@ customEvents
 ```kusto
 // Error Heatmap (Hour of Day vs Day of Week)
 customEvents
-| where customDimensions.result == "failure" or name == "extension.unhandledError"
+| where customDimensions.result == "failure" or name endswith "/extension.unhandledError"
 | extend hour = datetime_part("hour", timestamp), day = datetime_part("dayofweek", timestamp)
 | summarize Errors = count() by hour, day
 | render heatmap
@@ -254,11 +254,11 @@ customEvents
 // New Error Types (Last 24h vs Previous 7d)
 let baseline = customEvents
     | where timestamp between (ago(8d) .. ago(1d))
-    | where name == "extension.unhandledError"
+    | where name endswith "/extension.unhandledError"
     | summarize by ErrorCategory = tostring(customDimensions.errorCategory);
 customEvents
 | where timestamp > ago(1d)
-| where name == "extension.unhandledError"
+| where name endswith "/extension.unhandledError"
 | summarize count() by ErrorCategory = tostring(customDimensions.errorCategory)
 | join kind=leftanti baseline on ErrorCategory
 | project Alert = "NEW ERROR TYPE", ErrorCategory, count_
@@ -267,7 +267,7 @@ customEvents
 ```kusto
 // Connection Failures by Type
 customEvents
-| where name == "connection.connectCompleted"
+| where name endswith "/connection.connectCompleted"
 | where customDimensions.result == "failure"
 | summarize count() by ErrorCategory = tostring(customDimensions.errorCategory), bin(timestamp, 1h)
 | render timechart
@@ -293,7 +293,7 @@ customEvents
 ```kusto
 // Monthly Active Users (MAU)
 customEvents
-| where name == "extension.activated"
+| where name endswith "/extension.activated"
 | summarize MAU = dcount(tostring(customDimensions.sessionId)) by Month = startofmonth(timestamp)
 | render columnchart
 ```
@@ -301,7 +301,7 @@ customEvents
 ```kusto
 // Week-over-Week Growth Rate
 customEvents
-| where name == "extension.activated"
+| where name endswith "/extension.activated"
 | summarize Users = dcount(tostring(customDimensions.sessionId)) by Week = startofweek(timestamp)
 | order by Week asc
 | extend PrevWeek = prev(Users), GrowthRate = round(100.0 * (Users - PrevWeek) / PrevWeek, 2)
@@ -372,13 +372,13 @@ Configure these alerts in Azure Monitor (Alerts → New alert rule):
 ```kusto
 // Error Rate > 5%
 customEvents
-| extend isError = name == "extension.unhandledError" or customDimensions.result == "failure"
+| extend isError = name endswith "/extension.unhandledError" or customDimensions.result == "failure"
 | summarize ErrorRate = 100.0 * countif(isError) / count() by bin(timestamp, 5m)
 | where ErrorRate > 5
 
 // Connection Failure Rate > 20%
 customEvents
-| where name == "connection.connectCompleted"
+| where name endswith "/connection.connectCompleted"
 | summarize FailureRate = 100.0 * countif(customDimensions.result == "failure") / count() by bin(timestamp, 5m)
 | where FailureRate > 20
 ```
@@ -438,7 +438,7 @@ Then check Output panel → "Weaviate Studio" channel for telemetry debug logs.
 ```bash
 curl "https://api.applicationinsights.io/v1/apps/$APP_ID/query" \
   -H "X-API-Key: $API_KEY" \
-  --data-urlencode "query=customEvents | where name == 'extension.activated' | take 1000"
+  --data-urlencode "query=customEvents | where name endswith '/extension.activated' | take 1000"
 ```
 
 ---
