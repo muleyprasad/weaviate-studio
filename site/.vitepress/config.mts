@@ -105,7 +105,7 @@ export default defineConfig({
     // Google Analytics
     [
       "script",
-      { async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-JSGX5J1YP4" },
+      { async: true, src: "https://www.googletagmanager.com/gtag/js?id=G-JSGX5J1YP4" },
     ],
     [
       "script",
