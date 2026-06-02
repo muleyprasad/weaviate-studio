@@ -7,7 +7,7 @@ description: Free, open-source VS Code extension to manage self-hosted, on-prem,
 hero:
   name: 'Weaviate Studio'
   text: 'Manage Weaviate from VS Code'
-  tagline: The go-to management UI for self-hosted and custom Weaviate installations — local, on-prem, or cloud. More features than the cloud dashboard.
+  tagline: The go-to management UI for self-hosted and custom Weaviate installations — local, on-prem, or cloud.
   image:
     src: /weaviate-studio-color.png
     alt: Weaviate Studio
@@ -77,7 +77,7 @@ Weaviate Studio is a [VS Code](https://code.visualstudio.com/) extension that gi
 **Why Weaviate Studio?**
 
 - **Works everywhere** — local Docker, on-prem servers, or Weaviate Cloud
-- **More features** than the cloud dashboard: Data Explorer, Generative Search, RBAC, Backup & Restore, Multi-Vector Search, and more
+- **Complete feature set**: Data Explorer, Generative Search, RBAC, Backup & Restore, Multi-Vector Search, and more
 - **No browser needed** — everything lives inside your editor
 
 ### Demo
