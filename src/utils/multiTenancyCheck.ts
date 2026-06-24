@@ -154,6 +154,21 @@ export interface ReplicationImbalanceCollection {
   expectedObjects: number;
   /** Actual object total summed across every shard/replica of this collection. */
   actualObjects: number;
+  /**
+   * Whether async replication is enabled for this collection (from its schema).
+   * `undefined` when the schema was unavailable. When `false`, replica drift will
+   * not self-heal — this is the likely cause of a persistent imbalance.
+   */
+  asyncReplicationEnabled?: boolean;
+}
+
+// ─── Async replication check ─────────────────────────────────────────────────
+
+/** A replicated collection that does not have async replication enabled. */
+export interface AsyncReplicationDisabledEntry {
+  collectionName: string;
+  /** Replication factor (always > 1 for flagged collections). */
+  replicationFactor: number;
 }
 
 // ─── Combined result ──────────────────────────────────────────────────────────
@@ -181,6 +196,10 @@ export interface ChecksResult {
   };
   replicationImbalance: {
     collections: ReplicationImbalanceCollection[];
+    hasIssues: boolean;
+  };
+  asyncReplicationDisabled: {
+    entries: AsyncReplicationDisabledEntry[];
     hasIssues: boolean;
   };
 }
@@ -454,7 +473,54 @@ export function findEmptyShardRatios(
  * Each flagged collection also carries a {@link ReplicationImbalanceCollection.replicationRatio}
  * quantifying how complete replication is across nodes.
  */
-export function findReplicationImbalances(nodes: NodeLike[]): ReplicationImbalanceCollection[] {
+/**
+ * Finds replicated collections (replication factor > 1) that do NOT have async
+ * replication enabled.
+ *
+ * Without async replication, replicas that drift apart (e.g. a write that lands
+ * on a subset of replicas) are never reconciled automatically, so imbalances
+ * become permanent. Non-replicated collections (factor ≤ 1) are ignored — async
+ * replication is meaningless there.
+ *
+ * @param collections All collections for a connection, with their schema.
+ */
+export function findCollectionsWithoutAsyncReplication(
+  collections: CollectionWithSchema[]
+): AsyncReplicationDisabledEntry[] {
+  const result: AsyncReplicationDisabledEntry[] = [];
+  for (const col of collections) {
+    const replication = (
+      col.schema as { replication?: { factor?: number; asyncEnabled?: boolean } }
+    )?.replication;
+    const factor = replication?.factor ?? 1;
+    if (factor > 1 && replication?.asyncEnabled !== true) {
+      result.push({ collectionName: col.label, replicationFactor: factor });
+    }
+  }
+  return result;
+}
+
+/**
+ * Builds a `collectionName → asyncReplicationEnabled` lookup from collection
+ * schemas, for annotating replication-imbalance entries.
+ */
+export function buildAsyncReplicationMap(
+  collections: CollectionWithSchema[]
+): Record<string, boolean> {
+  const map: Record<string, boolean> = {};
+  for (const col of collections) {
+    const replication = (col.schema as { replication?: { asyncEnabled?: boolean } })?.replication;
+    if (replication) {
+      map[col.label] = replication.asyncEnabled === true;
+    }
+  }
+  return map;
+}
+
+export function findReplicationImbalances(
+  nodes: NodeLike[],
+  asyncReplicationByCollection?: Record<string, boolean>
+): ReplicationImbalanceCollection[] {
   // collectionName → shardName → replicas
   const byCollection = new Map<string, Map<string, ShardReplica[]>>();
 
@@ -512,6 +578,7 @@ export function findReplicationImbalances(nodes: NodeLike[]): ReplicationImbalan
         replicationRatio,
         expectedObjects,
         actualObjects,
+        asyncReplicationEnabled: asyncReplicationByCollection?.[collectionName],
       });
     }
   }

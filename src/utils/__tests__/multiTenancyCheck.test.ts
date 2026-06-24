@@ -5,11 +5,27 @@ import {
   findEmptyShards,
   findEmptyShardRatios,
   findReplicationImbalances,
+  findCollectionsWithoutAsyncReplication,
+  buildAsyncReplicationMap,
   EMPTY_SHARD_RATIO_THRESHOLDS,
   MtCandidateGroup,
   NodeLike,
   PropertyLike,
 } from '../multiTenancyCheck';
+
+/** Builds a collection whose schema carries a replication config. */
+function makeReplicatedCollection(
+  name: string,
+  factor: number,
+  asyncEnabled: boolean
+): CollectionWithSchema {
+  return {
+    label: name,
+    collapsibleState: 0,
+    itemType: 'collection',
+    schema: { name, replication: { factor, asyncEnabled } } as any,
+  } as unknown as CollectionWithSchema;
+}
 import { CollectionWithSchema } from '../../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -797,5 +813,72 @@ describe('findReplicationImbalances', () => {
     expect(result[0].shards).toHaveLength(1); // only shard-a is imbalanced
     expect(result[0]).toMatchObject({ expectedObjects: 300, actualObjects: 290 });
     expect(result[0].replicationRatio).toBeCloseTo(290 / 300);
+  });
+
+  it('annotates each imbalanced collection with its async replication status', () => {
+    const nodes = [
+      makeNode('node-1', [{ class: 'Article', name: 'shard-1', objectCount: 100 }]),
+      makeNode('node-2', [{ class: 'Article', name: 'shard-1', objectCount: 90 }]),
+    ];
+    const asyncMap = { Article: false };
+    const result = findReplicationImbalances(nodes, asyncMap);
+    expect(result[0].asyncReplicationEnabled).toBe(false);
+  });
+
+  it('leaves asyncReplicationEnabled undefined when no map is provided', () => {
+    const nodes = [
+      makeNode('node-1', [{ class: 'Article', name: 'shard-1', objectCount: 100 }]),
+      makeNode('node-2', [{ class: 'Article', name: 'shard-1', objectCount: 90 }]),
+    ];
+    expect(findReplicationImbalances(nodes)[0].asyncReplicationEnabled).toBeUndefined();
+  });
+});
+
+// ─── findCollectionsWithoutAsyncReplication ───────────────────────────────────
+
+describe('findCollectionsWithoutAsyncReplication', () => {
+  it('returns empty array when there are no collections', () => {
+    expect(findCollectionsWithoutAsyncReplication([])).toHaveLength(0);
+  });
+
+  it('flags replicated collections with async replication disabled', () => {
+    const result = findCollectionsWithoutAsyncReplication([
+      makeReplicatedCollection('Replicated', 3, false),
+    ]);
+    expect(result).toEqual([{ collectionName: 'Replicated', replicationFactor: 3 }]);
+  });
+
+  it('does not flag replicated collections with async replication enabled', () => {
+    expect(
+      findCollectionsWithoutAsyncReplication([makeReplicatedCollection('Async', 3, true)])
+    ).toHaveLength(0);
+  });
+
+  it('ignores non-replicated collections (factor ≤ 1)', () => {
+    expect(
+      findCollectionsWithoutAsyncReplication([makeReplicatedCollection('Single', 1, false)])
+    ).toHaveLength(0);
+  });
+
+  it('treats a missing replication config as non-replicated', () => {
+    // makeCollection has no replication config at all → factor defaults to 1.
+    expect(findCollectionsWithoutAsyncReplication([makeCollection('NoRep')])).toHaveLength(0);
+  });
+});
+
+// ─── buildAsyncReplicationMap ─────────────────────────────────────────────────
+
+describe('buildAsyncReplicationMap', () => {
+  it('maps collection names to their async replication flag', () => {
+    const map = buildAsyncReplicationMap([
+      makeReplicatedCollection('A', 3, true),
+      makeReplicatedCollection('B', 3, false),
+    ]);
+    expect(map).toEqual({ A: true, B: false });
+  });
+
+  it('omits collections without a replication config', () => {
+    const map = buildAsyncReplicationMap([makeCollection('NoRep')]);
+    expect(map).toEqual({});
   });
 });

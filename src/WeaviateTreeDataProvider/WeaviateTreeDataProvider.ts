@@ -24,6 +24,8 @@ import {
   findEmptyShards,
   findEmptyShardRatios,
   findReplicationImbalances,
+  findCollectionsWithoutAsyncReplication,
+  buildAsyncReplicationMap,
   computeCandidatesDismissKey,
   MtCandidateGroup,
   ChecksResult,
@@ -3551,14 +3553,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const mtCollections = new Set(
       collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
     );
+    const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
     // All checks are independent — run them in parallel.
-    const [groups, emptyShardEntries, emptyShardRatios, replicationImbalances] = await Promise.all([
-      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-      Promise.resolve(findReplicationImbalances(nodes as any)),
-    ]);
+    const [groups, emptyShardEntries, emptyShardRatios, replicationImbalances, asyncDisabled] =
+      await Promise.all([
+        Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+        Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+        Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
+        Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
+        Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
+      ]);
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
@@ -3566,7 +3571,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         groups.length > 0 ||
         emptyShardEntries.length > 0 ||
         emptyShardRatios.length > 0 ||
-        replicationImbalances.length > 0,
+        replicationImbalances.length > 0 ||
+        asyncDisabled.length > 0,
       multiTenancy: { groups, hasIssues: groups.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
       emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
@@ -3574,6 +3580,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         collections: replicationImbalances,
         hasIssues: replicationImbalances.length > 0,
       },
+      asyncReplicationDisabled: { entries: asyncDisabled, hasIssues: asyncDisabled.length > 0 },
     };
 
     // Persist so the result survives panel close/reopen
@@ -3585,7 +3592,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       (groups.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
       (emptyShardRatios.length > 0 ? 1 : 0) +
-      (replicationImbalances.length > 0 ? 1 : 0);
+      (replicationImbalances.length > 0 ? 1 : 0) +
+      (asyncDisabled.length > 0 ? 1 : 0);
     this.refresh();
 
     return result;
@@ -4451,14 +4459,16 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const mtCollections = new Set(
       collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
     );
+    const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
     // All checks are independent — run them in parallel.
-    const [candidates, emptyShardEntries, emptyShardRatios, replicationImbalances] =
+    const [candidates, emptyShardEntries, emptyShardRatios, replicationImbalances, asyncDisabled] =
       await Promise.all([
         Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
         Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
         Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-        Promise.resolve(findReplicationImbalances(nodes as any)),
+        Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
+        Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
       ]);
     this.mtCandidates[connectionId] = candidates;
 
@@ -4468,7 +4478,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         candidates.length > 0 ||
         emptyShardEntries.length > 0 ||
         emptyShardRatios.length > 0 ||
-        replicationImbalances.length > 0,
+        replicationImbalances.length > 0 ||
+        asyncDisabled.length > 0,
       multiTenancy: { groups: candidates, hasIssues: candidates.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
       emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
@@ -4476,13 +4487,15 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
         collections: replicationImbalances,
         hasIssues: replicationImbalances.length > 0,
       },
+      asyncReplicationDisabled: { entries: asyncDisabled, hasIssues: asyncDisabled.length > 0 },
     };
 
     this.checksIssueSectionCount[connectionId] =
       (candidates.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
       (emptyShardRatios.length > 0 ? 1 : 0) +
-      (replicationImbalances.length > 0 ? 1 : 0);
+      (replicationImbalances.length > 0 ? 1 : 0) +
+      (asyncDisabled.length > 0 ? 1 : 0);
 
     await this.context.globalState.update(`checksResults.${connectionId}`, result);
     ClusterPanel.getPanel(connectionId)?.postMessage({ command: 'checksResult', result });

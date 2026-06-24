@@ -116,6 +116,13 @@ interface ReplicationImbalanceCollection {
   replicationRatio?: number;
   expectedObjects?: number;
   actualObjects?: number;
+  /** Whether async replication is enabled for this collection. */
+  asyncReplicationEnabled?: boolean;
+}
+
+interface AsyncReplicationDisabledEntry {
+  collectionName: string;
+  replicationFactor: number;
 }
 
 interface ChecksResult {
@@ -136,6 +143,10 @@ interface ChecksResult {
   };
   replicationImbalance?: {
     collections: ReplicationImbalanceCollection[];
+    hasIssues: boolean;
+  };
+  asyncReplicationDisabled?: {
+    entries: AsyncReplicationDisabledEntry[];
     hasIssues: boolean;
   };
 }
@@ -192,6 +203,7 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
   const emptyShardEntries = checksResult?.emptyShards?.entries ?? [];
   const emptyShardRatioEntries = checksResult?.emptyShardRatio?.entries ?? [];
   const replicationCollections = checksResult?.replicationImbalance?.collections ?? [];
+  const asyncDisabledEntries = checksResult?.asyncReplicationDisabled?.entries ?? [];
   const timestamp = checksResult?.timestamp
     ? new Date(checksResult.timestamp).toLocaleString()
     : null;
@@ -494,6 +506,17 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                             {formatReplicationPct(ratio)} replicated
                           </span>
                         )}
+                        {col.asyncReplicationEnabled === false && (
+                          <span
+                            className="checks-severity-badge checks-severity-warning"
+                            title="Async replication is disabled — replica drift will not self-heal"
+                          >
+                            Async replication off
+                          </span>
+                        )}
+                        {col.asyncReplicationEnabled === true && (
+                          <span className="checks-async-badge">Async replication on</span>
+                        )}
                         <span className="checks-group-count">
                           {col.shards.length} imbalanced shard{col.shards.length !== 1 ? 's' : ''}
                         </span>
@@ -539,6 +562,58 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                     </div>
                   );
                 })}
+              </>
+            )}
+          </div>
+
+          {/* ── Async Replication Disabled ────────────────────────────── */}
+          <div
+            className={`checks-section${asyncDisabledEntries.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {asyncDisabledEntries.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Async Replication Disabled
+            </h3>
+            {asyncDisabledEntries.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                All replicated collections have async replication enabled.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following replicated collections do not have async replication enabled.
+                  Without it, replicas that drift apart are never reconciled automatically, so
+                  imbalances become permanent.{' '}
+                  <a
+                    href="https://docs.weaviate.io/deploy/configuration/async-rep"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink('https://docs.weaviate.io/deploy/configuration/async-rep');
+                    }}
+                  >
+                    Enable async replication ↗
+                  </a>
+                </p>
+                <table className="checks-table">
+                  <thead>
+                    <tr>
+                      <th>Collection</th>
+                      <th>Replication factor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {asyncDisabledEntries.map((entry) => (
+                      <tr key={entry.collectionName}>
+                        <td className="checks-col-name">{entry.collectionName}</td>
+                        <td>{entry.replicationFactor}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </>
             )}
           </div>
