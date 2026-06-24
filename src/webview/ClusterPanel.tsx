@@ -84,6 +84,17 @@ interface EmptyShardEntry {
   shardName: string;
 }
 
+type EmptyShardRatioSeverity = 'warning' | 'critical';
+
+interface EmptyShardRatioEntry {
+  collectionName: string;
+  isMultiTenant: boolean;
+  totalShards: number;
+  emptyShards: number;
+  ratio: number;
+  severity: EmptyShardRatioSeverity;
+}
+
 interface ShardReplica {
   nodeName: string;
   objectCount: number;
@@ -109,6 +120,10 @@ interface ChecksResult {
   };
   emptyShards?: {
     entries: EmptyShardEntry[];
+    hasIssues: boolean;
+  };
+  emptyShardRatio?: {
+    entries: EmptyShardRatioEntry[];
     hasIssues: boolean;
   };
   replicationImbalance?: {
@@ -147,6 +162,7 @@ function openExternalLink(url: string) {
 function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
   const groups = checksResult?.multiTenancy.groups ?? [];
   const emptyShardEntries = checksResult?.emptyShards?.entries ?? [];
+  const emptyShardRatioEntries = checksResult?.emptyShardRatio?.entries ?? [];
   const replicationCollections = checksResult?.replicationImbalance?.collections ?? [];
   const timestamp = checksResult?.timestamp
     ? new Date(checksResult.timestamp).toLocaleString()
@@ -304,6 +320,82 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
               </>
             )}
           </div>
+
+          {/* ── Empty Shard Ratio ─────────────────────────────────────── */}
+          {(() => {
+            const hasCritical = emptyShardRatioEntries.some((e) => e.severity === 'critical');
+            const hasWarning = emptyShardRatioEntries.length > 0;
+            const sectionSeverityClass = hasCritical
+              ? ' checks-section--critical'
+              : hasWarning
+                ? ' checks-section--warning'
+                : '';
+            return (
+              <div className={`checks-section${sectionSeverityClass}`}>
+                <h3 className="checks-section-title">
+                  {hasCritical ? (
+                    <span className="checks-section-critical-icon">⛔</span>
+                  ) : hasWarning ? (
+                    <span className="checks-section-warning-icon">⚠</span>
+                  ) : null}
+                  Empty Shard Ratio
+                </h3>
+                {emptyShardRatioEntries.length === 0 ? (
+                  <div className="checks-ok">
+                    <span className="checks-ok-icon">✓</span>
+                    No collections exceed the empty-shard thresholds.
+                  </div>
+                ) : (
+                  <>
+                    <p className="checks-section-desc">
+                      The following collections have a high proportion of empty shards/tenants. A
+                      collection is flagged as <strong>warning</strong> when at least 10% of its
+                      shards are empty, and <strong>critical</strong> when at least 50% are empty.
+                      Many empty shards/tenants add overhead — consider removing unused tenants or
+                      collections.
+                    </p>
+                    <div className="checks-info-callout">
+                      <span className="checks-info-callout-icon">ℹ️</span>
+                      Object counts reported by node status are not immediately synchronized and may
+                      be slightly delayed — only act on shards that consistently show zero over
+                      time.
+                    </div>
+                    <table className="checks-table">
+                      <thead>
+                        <tr>
+                          <th>Collection</th>
+                          <th>Type</th>
+                          <th>Empty</th>
+                          <th>Ratio</th>
+                          <th>Severity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emptyShardRatioEntries.map((entry) => (
+                          <tr key={entry.collectionName}>
+                            <td className="checks-col-name">{entry.collectionName}</td>
+                            <td>{entry.isMultiTenant ? 'Multi-tenant' : 'Single-tenant'}</td>
+                            <td>
+                              {entry.emptyShards.toLocaleString()} /{' '}
+                              {entry.totalShards.toLocaleString()}
+                            </td>
+                            <td>{Math.round(entry.ratio * 100)}%</td>
+                            <td>
+                              <span
+                                className={`checks-severity-badge checks-severity-${entry.severity}`}
+                              >
+                                {entry.severity === 'critical' ? 'Critical' : 'Warning'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ── Replication Imbalance ─────────────────────────────────── */}
           <div

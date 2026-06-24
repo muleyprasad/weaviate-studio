@@ -687,8 +687,9 @@ describe('runChecks', () => {
 
     await provider.runChecks('c1');
 
-    // Empty shards issue detected → count should be 1
-    expect((provider as any).checksIssueSectionCount['c1']).toBe(1);
+    // The single shard is empty → trips both the empty-shards list and the
+    // empty-shard-ratio check (100% empty → critical) → 2 sections.
+    expect((provider as any).checksIssueSectionCount['c1']).toBe(2);
   });
 
   it('detects replication imbalance when same shard has different counts across nodes', async () => {
@@ -831,7 +832,9 @@ describe('_recomputeChecksAndSend', () => {
 
     await (provider as any)._recomputeChecksAndSend('c1');
 
-    expect((provider as any).checksIssueSectionCount['c1']).toBe(1);
+    // The single shard is empty → trips both the empty-shards list and the
+    // empty-shard-ratio check (100% empty → critical) → 2 sections.
+    expect((provider as any).checksIssueSectionCount['c1']).toBe(2);
   });
 
   it('persists result to globalState', async () => {

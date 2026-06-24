@@ -22,6 +22,7 @@ import { getTelemetryService, TELEMETRY_EVENTS } from '../telemetry';
 import {
   findMultiTenantCandidates,
   findEmptyShards,
+  findEmptyShardRatios,
   findReplicationImbalances,
   computeCandidatesDismissKey,
   MtCandidateGroup,
@@ -3544,19 +3545,24 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
     );
 
-    // All three checks are independent — run them in parallel.
-    const [groups, emptyShardEntries, replicationImbalances] = await Promise.all([
+    // All checks are independent — run them in parallel.
+    const [groups, emptyShardEntries, emptyShardRatios, replicationImbalances] = await Promise.all([
       Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
       Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
       Promise.resolve(findReplicationImbalances(nodes as any)),
     ]);
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
       hasIssues:
-        groups.length > 0 || emptyShardEntries.length > 0 || replicationImbalances.length > 0,
+        groups.length > 0 ||
+        emptyShardEntries.length > 0 ||
+        emptyShardRatios.length > 0 ||
+        replicationImbalances.length > 0,
       multiTenancy: { groups, hasIssues: groups.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
+      emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
       replicationImbalance: {
         collections: replicationImbalances,
         hasIssues: replicationImbalances.length > 0,
@@ -3571,6 +3577,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     this.checksIssueSectionCount[connectionId] =
       (groups.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
+      (emptyShardRatios.length > 0 ? 1 : 0) +
       (replicationImbalances.length > 0 ? 1 : 0);
     this.refresh();
 
@@ -4424,20 +4431,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       collections.filter((c) => c.schema?.multiTenancy?.enabled).map((c) => c.label)
     );
 
-    // All three checks are independent — run them in parallel.
-    const [candidates, emptyShardEntries, replicationImbalances] = await Promise.all([
-      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-      Promise.resolve(findReplicationImbalances(nodes as any)),
-    ]);
+    // All checks are independent — run them in parallel.
+    const [candidates, emptyShardEntries, emptyShardRatios, replicationImbalances] =
+      await Promise.all([
+        Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+        Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+        Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
+        Promise.resolve(findReplicationImbalances(nodes as any)),
+      ]);
     this.mtCandidates[connectionId] = candidates;
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
       hasIssues:
-        candidates.length > 0 || emptyShardEntries.length > 0 || replicationImbalances.length > 0,
+        candidates.length > 0 ||
+        emptyShardEntries.length > 0 ||
+        emptyShardRatios.length > 0 ||
+        replicationImbalances.length > 0,
       multiTenancy: { groups: candidates, hasIssues: candidates.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
+      emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
       replicationImbalance: {
         collections: replicationImbalances,
         hasIssues: replicationImbalances.length > 0,
@@ -4447,6 +4460,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     this.checksIssueSectionCount[connectionId] =
       (candidates.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
+      (emptyShardRatios.length > 0 ? 1 : 0) +
       (replicationImbalances.length > 0 ? 1 : 0);
 
     await this.context.globalState.update(`checksResults.${connectionId}`, result);

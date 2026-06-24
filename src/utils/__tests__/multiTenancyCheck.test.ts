@@ -3,7 +3,9 @@ import {
   computeCandidatesDismissKey,
   findMultiTenantCandidates,
   findEmptyShards,
+  findEmptyShardRatios,
   findReplicationImbalances,
+  EMPTY_SHARD_RATIO_THRESHOLDS,
   MtCandidateGroup,
   NodeLike,
   PropertyLike,
@@ -529,6 +531,137 @@ describe('findEmptyShards', () => {
     const nodes: NodeLike[] = [{ name: 'node-1', shards: null }];
     expect(() => findEmptyShards(nodes)).not.toThrow();
     expect(findEmptyShards(nodes)).toHaveLength(0);
+  });
+});
+
+// ─── findEmptyShardRatios ─────────────────────────────────────────────────────
+
+describe('findEmptyShardRatios', () => {
+  it('returns empty array when there are no nodes', () => {
+    expect(findEmptyShardRatios([])).toHaveLength(0);
+  });
+
+  it('does not flag a collection below the warning threshold', () => {
+    // 1 of 20 empty = 5% < 10%
+    const shards = Array.from({ length: 20 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i === 0 ? 0 : 100,
+    }));
+    expect(findEmptyShardRatios([makeNode('node-1', shards)])).toHaveLength(0);
+  });
+
+  it('flags a collection as warning at the 10% threshold', () => {
+    // 2 of 20 empty = 10%
+    const shards = Array.from({ length: 20 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 2 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      collectionName: 'Article',
+      isMultiTenant: false,
+      totalShards: 20,
+      emptyShards: 2,
+      severity: 'warning',
+    });
+    expect(result[0].ratio).toBeCloseTo(0.1);
+  });
+
+  it('escalates to critical at the 50% threshold', () => {
+    const shards = Array.from({ length: 10 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 5 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)]);
+    expect(result).toHaveLength(1);
+    expect(result[0].severity).toBe('critical');
+    expect(result[0].ratio).toBeCloseTo(0.5);
+  });
+
+  it('applies to multi-tenant collections and labels them', () => {
+    const shards = Array.from({ length: 4 }, (_, i) => ({
+      class: 'MTCollection',
+      name: `tenant-${i}`,
+      objectCount: i < 3 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)], new Set(['MTCollection']));
+    expect(result).toHaveLength(1);
+    expect(result[0].isMultiTenant).toBe(true);
+    expect(result[0].severity).toBe('critical'); // 75% empty
+  });
+
+  it('collapses replicas by shard name and treats a shard empty only when all replicas are empty', () => {
+    // Same shard "s1" on three nodes: empty on two, populated on one → NOT empty.
+    // "s2" empty on all three → empty. 1 of 2 distinct shards empty = 50% → critical.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 's1', objectCount: 0 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 's1', objectCount: 0 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+      makeNode('node-3', [
+        { class: 'Article', name: 's1', objectCount: 42 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+    ];
+    const result = findEmptyShardRatios(nodes);
+    expect(result).toHaveLength(1);
+    expect(result[0].totalShards).toBe(2);
+    expect(result[0].emptyShards).toBe(1);
+    expect(result[0].severity).toBe('critical');
+  });
+
+  it('sorts critical entries before warnings, then by ratio descending', () => {
+    const nodes = [
+      makeNode('node-1', [
+        // Warn: 2 of 10 = 20%
+        ...Array.from({ length: 10 }, (_, i) => ({
+          class: 'WarnCol',
+          name: `w-${i}`,
+          objectCount: i < 2 ? 0 : 5,
+        })),
+        // Critical: 9 of 10 = 90%
+        ...Array.from({ length: 10 }, (_, i) => ({
+          class: 'CritCol',
+          name: `c-${i}`,
+          objectCount: i < 9 ? 0 : 5,
+        })),
+      ]),
+    ];
+    const result = findEmptyShardRatios(nodes);
+    expect(result.map((r) => r.collectionName)).toEqual(['CritCol', 'WarnCol']);
+  });
+
+  it('honours custom thresholds', () => {
+    const shards = Array.from({ length: 10 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 3 ? 0 : 100,
+    }));
+    // 30% empty: below default critical(50%) → warning; with custom critical(25%) → critical
+    const result = findEmptyShardRatios([makeNode('node-1', shards)], undefined, {
+      warning: 0.1,
+      critical: 0.25,
+    });
+    expect(result[0].severity).toBe('critical');
+  });
+
+  it('exposes configurable default thresholds', () => {
+    expect(EMPTY_SHARD_RATIO_THRESHOLDS.warning).toBe(0.1);
+    expect(EMPTY_SHARD_RATIO_THRESHOLDS.critical).toBe(0.5);
+  });
+
+  it('handles nodes with null/undefined shards gracefully', () => {
+    const nodes: NodeLike[] = [{ name: 'node-1', shards: null }];
+    expect(() => findEmptyShardRatios(nodes)).not.toThrow();
+    expect(findEmptyShardRatios(nodes)).toHaveLength(0);
   });
 });
 

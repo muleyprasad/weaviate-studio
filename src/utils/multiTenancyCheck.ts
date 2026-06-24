@@ -63,6 +63,43 @@ export interface EmptyShardEntry {
   shardName: string;
 }
 
+// ─── Empty shard ratio check ─────────────────────────────────────────────────
+
+/**
+ * Severity assigned to a collection based on the fraction of its shards/tenants
+ * that are empty (zero objects).
+ */
+export type EmptyShardRatioSeverity = 'warning' | 'critical';
+
+/**
+ * Configurable thresholds for the empty-shard-ratio check, expressed as a
+ * fraction (0–1) of a collection's shards/tenants that report zero objects.
+ *
+ * - At or above `warning`  → severity "warning".
+ * - At or above `critical` → severity "critical" (takes precedence).
+ *
+ * These are intentionally defined as code-level constants so they can be tuned
+ * in one place without a settings UI. The `critical` value must be ≥ `warning`.
+ */
+export const EMPTY_SHARD_RATIO_THRESHOLDS: { warning: number; critical: number } = {
+  warning: 0.1, // 10% of shards/tenants empty
+  critical: 0.5, // 50% of shards/tenants empty
+};
+
+/** A collection flagged because a significant fraction of its shards are empty. */
+export interface EmptyShardRatioEntry {
+  collectionName: string;
+  /** True when the collection has multi-tenancy enabled (shards are tenants). */
+  isMultiTenant: boolean;
+  /** Number of distinct shards/tenants (replicas collapsed by shard name). */
+  totalShards: number;
+  /** Number of distinct shards/tenants that are empty on every replica. */
+  emptyShards: number;
+  /** emptyShards / totalShards, in the range 0–1. */
+  ratio: number;
+  severity: EmptyShardRatioSeverity;
+}
+
 // ─── Replication imbalance check ─────────────────────────────────────────────
 
 /** Object-count breakdown for one replica of a shard. */
@@ -100,6 +137,10 @@ export interface ChecksResult {
   };
   emptyShards: {
     entries: EmptyShardEntry[];
+    hasIssues: boolean;
+  };
+  emptyShardRatio: {
+    entries: EmptyShardRatioEntry[];
     hasIssues: boolean;
   };
   replicationImbalance: {
@@ -271,6 +312,96 @@ export function findEmptyShards(
       }
     }
   }
+  return result;
+}
+
+/**
+ * Flags collections in which a significant fraction of shards/tenants are empty.
+ *
+ * Unlike {@link findEmptyShards}, this check applies to BOTH single-tenant and
+ * multi-tenant collections — for multi-tenant collections each shard is a tenant,
+ * so this surfaces "mostly-empty" collections (e.g. many provisioned-but-unused
+ * tenants) that the per-shard check intentionally suppresses.
+ *
+ * Replicas are collapsed by shard name: a shard counts as empty only when every
+ * replica reports zero objects (max object count across replicas === 0), so a
+ * replica that is merely lagging is not mistaken for an empty shard — that case
+ * is handled by {@link findReplicationImbalances}.
+ *
+ * A collection is flagged when its empty ratio reaches `thresholds.warning`,
+ * and escalated to "critical" at `thresholds.critical`.
+ *
+ * @param nodes         Verbose cluster node data.
+ * @param mtCollections Names of multi-tenant collections (used only to label
+ *                      each entry's `isMultiTenant` flag — nothing is skipped).
+ * @param thresholds    Warning/critical fractions; defaults to
+ *                      {@link EMPTY_SHARD_RATIO_THRESHOLDS}.
+ * @returns Flagged collections, sorted critical-first then by ratio descending.
+ */
+export function findEmptyShardRatios(
+  nodes: NodeLike[],
+  mtCollections?: Set<string>,
+  thresholds: { warning: number; critical: number } = EMPTY_SHARD_RATIO_THRESHOLDS
+): EmptyShardRatioEntry[] {
+  // collectionName → shardName → max objectCount seen across replicas
+  const byCollection = new Map<string, Map<string, number>>();
+
+  for (const node of nodes) {
+    for (const shard of node.shards ?? []) {
+      let byShardName = byCollection.get(shard.class);
+      if (!byShardName) {
+        byShardName = new Map();
+        byCollection.set(shard.class, byShardName);
+      }
+      const prev = byShardName.get(shard.name) ?? 0;
+      byShardName.set(shard.name, Math.max(prev, shard.objectCount ?? 0));
+    }
+  }
+
+  const result: EmptyShardRatioEntry[] = [];
+
+  for (const [collectionName, byShardName] of byCollection) {
+    const totalShards = byShardName.size;
+    if (totalShards === 0) {
+      continue;
+    }
+    let emptyShards = 0;
+    for (const maxObjects of byShardName.values()) {
+      if (maxObjects === 0) {
+        emptyShards++;
+      }
+    }
+    const ratio = emptyShards / totalShards;
+
+    let severity: EmptyShardRatioSeverity | null = null;
+    if (ratio >= thresholds.critical) {
+      severity = 'critical';
+    } else if (ratio >= thresholds.warning) {
+      severity = 'warning';
+    }
+    if (!severity) {
+      continue;
+    }
+
+    result.push({
+      collectionName,
+      isMultiTenant: mtCollections?.has(collectionName) ?? false,
+      totalShards,
+      emptyShards,
+      ratio,
+      severity,
+    });
+  }
+
+  // Critical entries first; within the same severity, higher ratio first.
+  const severityRank: Record<EmptyShardRatioSeverity, number> = { critical: 0, warning: 1 };
+  result.sort((a, b) => {
+    if (a.severity !== b.severity) {
+      return severityRank[a.severity] - severityRank[b.severity];
+    }
+    return b.ratio - a.ratio;
+  });
+
   return result;
 }
 
