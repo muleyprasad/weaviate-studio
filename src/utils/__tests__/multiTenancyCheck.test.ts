@@ -739,4 +739,63 @@ describe('findReplicationImbalances', () => {
     expect(() => findReplicationImbalances(nodes)).not.toThrow();
     expect(findReplicationImbalances(nodes)).toHaveLength(0);
   });
+
+  it('computes the replication ratio per shard from the most complete replica × replica count', () => {
+    // One shard replicated 12 / 12 / 10 → expected = 12 × 3 = 36, actual = 34.
+    const nodes = [
+      makeNode('node-1', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 12 }]),
+      makeNode('node-2', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 12 }]),
+      makeNode('node-3', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 10 }]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ expectedObjects: 36, actualObjects: 34 });
+    expect(result[0].replicationRatio).toBeCloseTo(34 / 36);
+    // Per-shard breakdown is also exposed on the imbalanced shard itself.
+    expect(result[0].shards[0]).toMatchObject({
+      shardName: 'Bhagwan',
+      expectedObjects: 36,
+      actualObjects: 34,
+    });
+    expect(result[0].shards[0].replicationRatio).toBeCloseTo(34 / 36);
+  });
+
+  it('is computed per shard, not from per-node totals (regression)', () => {
+    // Each node holds 100 objects total, so per-node totals are all equal (would
+    // wrongly report 100% replicated). But each shard's complete replica lives on a
+    // different node, so each shard is only half replicated → 50% overall.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 'shard-a', objectCount: 100 },
+        { class: 'Article', name: 'shard-b', objectCount: 0 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 'shard-a', objectCount: 0 },
+        { class: 'Article', name: 'shard-b', objectCount: 100 },
+      ]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    // shard-a: max 100 × 2 = 200 expected, 100 actual; shard-b: same → 400 / 200.
+    expect(result[0]).toMatchObject({ expectedObjects: 400, actualObjects: 200 });
+    expect(result[0].replicationRatio).toBeCloseTo(0.5);
+  });
+
+  it('counts balanced shards as fully replicated in the collection ratio', () => {
+    // shard-a imbalanced (100/90), shard-b perfectly replicated (50/50).
+    // expected = 100×2 + 50×2 = 300, actual = 190 + 100 = 290.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 'shard-a', objectCount: 100 },
+        { class: 'Article', name: 'shard-b', objectCount: 50 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 'shard-a', objectCount: 90 },
+        { class: 'Article', name: 'shard-b', objectCount: 50 },
+      ]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    expect(result[0].shards).toHaveLength(1); // only shard-a is imbalanced
+    expect(result[0]).toMatchObject({ expectedObjects: 300, actualObjects: 290 });
+    expect(result[0].replicationRatio).toBeCloseTo(290 / 300);
+  });
 });

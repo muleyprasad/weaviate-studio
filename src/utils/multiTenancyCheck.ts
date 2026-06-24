@@ -112,12 +112,48 @@ export interface ShardReplica {
 export interface ImbalancedShard {
   shardName: string;
   replicas: ShardReplica[];
+  /**
+   * Per-shard replication completeness in the range 0–1:
+   * `sum(replicas) / (maxReplica × replicaCount)`.
+   *
+   * Example — replicas 12 / 12 / 10 → `34 / (12 × 3)` ≈ 0.94.
+   */
+  replicationRatio: number;
+  /** Fully-replicated expectation for this shard: `maxReplica × replicaCount`. */
+  expectedObjects: number;
+  /** Actual objects stored across this shard's replicas: `sum(replicas)`. */
+  actualObjects: number;
 }
 
 /** A collection that contains at least one imbalanced shard. */
 export interface ReplicationImbalanceCollection {
   collectionName: string;
   shards: ImbalancedShard[];
+  /**
+   * Replication completeness ratio in the range 0–1, computed **per shard**.
+   *
+   * For each shard the most complete replica (the max object count across its
+   * replicas) is taken as the shard's true object count, and the fully-replicated
+   * expectation is `max × replicaCount`. These are summed across every shard of
+   * the collection to give `expectedObjects`, and the actual stored objects across
+   * all replicas are summed to give `actualObjects`. The ratio is
+   * `actualObjects / expectedObjects`.
+   *
+   * Example — a shard with replicas 12 / 12 / 10 contributes `expected = 12 × 3 = 36`
+   * and `actual = 34`, so it is 34/36 ≈ 94% replicated.
+   *
+   * `1` means every replica of every shard is complete; a value below `1` means
+   * some replicas are missing or lagging behind. Computing per shard (rather than
+   * from per-node totals) is essential: a shard whose most complete replica lives
+   * on a different node than another shard's would otherwise be masked.
+   */
+  replicationRatio: number;
+  /**
+   * Fully-replicated expectation: `Σ over shards (maxReplica × replicaCount)`.
+   */
+  expectedObjects: number;
+  /** Actual object total summed across every shard/replica of this collection. */
+  actualObjects: number;
 }
 
 // ─── Combined result ──────────────────────────────────────────────────────────
@@ -414,6 +450,9 @@ export function findEmptyShardRatios(
  *
  * Note: object counts in node status are not immediately synchronised and may
  * be slightly delayed, so small short-lived discrepancies are expected.
+ *
+ * Each flagged collection also carries a {@link ReplicationImbalanceCollection.replicationRatio}
+ * quantifying how complete replication is across nodes.
  */
 export function findReplicationImbalances(nodes: NodeLike[]): ReplicationImbalanceCollection[] {
   // collectionName → shardName → replicas
@@ -436,17 +475,44 @@ export function findReplicationImbalances(nodes: NodeLike[]): ReplicationImbalan
 
   for (const [collectionName, byShardName] of byCollection) {
     const imbalanced: ImbalancedShard[] = [];
+    // Per-shard replication accounting (see ReplicationImbalanceCollection.replicationRatio).
+    let expectedObjects = 0;
+    let actualObjects = 0;
+
     for (const [shardName, replicas] of byShardName) {
+      const counts = replicas.map((r) => r.objectCount ?? 0);
+      const maxReplica = Math.max(...counts);
+      const sumReplicas = counts.reduce((sum, c) => sum + c, 0);
+      // The most complete replica is the shard's true size; every replica should
+      // match it, so a fully-replicated shard holds maxReplica × replicaCount.
+      expectedObjects += maxReplica * replicas.length;
+      actualObjects += sumReplicas;
+
       if (replicas.length < 2) {
-        continue; // single replica — nothing to compare
+        continue; // single replica — nothing to compare for imbalance
       }
-      const first = replicas[0].objectCount;
-      if (replicas.some((r) => r.objectCount !== first)) {
-        imbalanced.push({ shardName, replicas });
+      const first = counts[0];
+      if (counts.some((c) => c !== first)) {
+        const shardExpected = maxReplica * replicas.length;
+        imbalanced.push({
+          shardName,
+          replicas,
+          replicationRatio: shardExpected > 0 ? sumReplicas / shardExpected : 1,
+          expectedObjects: shardExpected,
+          actualObjects: sumReplicas,
+        });
       }
     }
+
     if (imbalanced.length > 0) {
-      result.push({ collectionName, shards: imbalanced });
+      const replicationRatio = expectedObjects > 0 ? actualObjects / expectedObjects : 1;
+      result.push({
+        collectionName,
+        shards: imbalanced,
+        replicationRatio,
+        expectedObjects,
+        actualObjects,
+      });
     }
   }
 

@@ -363,6 +363,27 @@ describe('fetchNodes', () => {
     expect((provider as any).clusterNodesCache['c1']).toEqual(nodes);
   });
 
+  it('recomputes checks once node shards arrive (fixes slow-cluster race)', async () => {
+    // Collections already loaded, but node data lands later (large-cluster case).
+    // fetchNodes must trigger a recompute so the checks reflect the shard data.
+    mockGetClient.mockReturnValue(mockClient);
+    (provider as any).collections['c1'] = [
+      { label: 'Article', collectionName: 'Article', schema: { multiTenancy: { enabled: false } } },
+    ];
+    mockClusterNodes.mockResolvedValue([
+      { name: 'node-1', shards: [{ class: 'Article', name: 'shard-1', objectCount: 0 }] },
+    ]);
+
+    await provider.fetchNodes('c1');
+
+    const saved = (mockCtx.globalState.update as jest.Mock).mock.calls.find(
+      (call: any[]) => call[0] === 'checksResults.c1'
+    );
+    expect(saved).toBeDefined();
+    expect(saved[1].emptyShards.hasIssues).toBe(true);
+    expect(saved[1].emptyShards.entries[0].collectionName).toBe('Article');
+  });
+
   it('shows error when client not found', async () => {
     mockGetClient.mockReturnValue(null);
 

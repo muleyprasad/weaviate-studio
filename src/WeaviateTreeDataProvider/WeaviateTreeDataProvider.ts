@@ -3400,6 +3400,13 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const clusterNodes = await client.cluster.nodes({ output: 'verbose' });
       this.clusterNodesCache[connectionId] = clusterNodes;
 
+      // Node data drives the empty-shard, empty-shard-ratio, and replication-imbalance
+      // checks. On a large cluster this fetch can complete well after the parallel
+      // collections fetch (which also triggers a recompute) — that earlier recompute
+      // ran with no node data, so re-run now that the shard data has arrived. The
+      // recompute is serialized so this late run wins over the earlier partial one.
+      await this._recomputeChecksAndSend(connectionId);
+
       // Refresh the tree view
       this.refresh();
     } catch (error: unknown) {
@@ -3968,12 +3975,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Refresh the tree view
       this.refresh();
 
-      // Refresh node cache first, then update the panel and recompute checks in parallel.
+      // Refresh node cache (which recomputes the checks once shards are loaded),
+      // then update the panel.
       await this.fetchNodes(connectionId);
-      await Promise.all([
-        this.updateClusterPanelIfOpen(connectionId),
-        this._recomputeChecksAndSend(connectionId),
-      ]);
+      await this.updateClusterPanelIfOpen(connectionId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteCollection:', error);
@@ -4013,12 +4018,10 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       // Refresh the tree view
       this.refresh();
 
-      // Refresh node cache first, then update the panel and recompute checks in parallel.
+      // Refresh node cache (which recomputes the checks once shards are loaded),
+      // then update the panel.
       await this.fetchNodes(connectionId);
-      await Promise.all([
-        this.updateClusterPanelIfOpen(connectionId),
-        this._recomputeChecksAndSend(connectionId),
-      ]);
+      await this.updateClusterPanelIfOpen(connectionId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error in deleteAllCollections:', error);
@@ -4414,8 +4417,26 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
    *
    * Call this whenever collections or node shards change (fetch, delete, etc.) so the
    * Checks tab and tree badges stay in sync without requiring a manual "Run Checks".
+   *
+   * Recomputes are serialized per connection: collections and nodes are fetched in
+   * parallel (see {@link fetchData}) and each triggers a recompute, but on a large
+   * cluster the verbose node fetch can finish long after collections. Serializing
+   * guarantees the recompute triggered by the slower fetch runs last — with BOTH
+   * caches populated — so its result wins instead of being clobbered by an earlier,
+   * partial recompute that ran before node data had arrived.
    */
-  private async _recomputeChecksAndSend(connectionId: string): Promise<void> {
+  private _recomputeChecksChain: Record<string, Promise<void>> = {};
+
+  private _recomputeChecksAndSend(connectionId: string): Promise<void> {
+    const prev = this._recomputeChecksChain[connectionId] ?? Promise.resolve();
+    const next = prev
+      .catch(() => undefined)
+      .then(() => this._recomputeChecksAndSendInner(connectionId));
+    this._recomputeChecksChain[connectionId] = next;
+    return next;
+  }
+
+  private async _recomputeChecksAndSendInner(connectionId: string): Promise<void> {
     const collections = this.collections[connectionId] ?? [];
     const objectCounts = this._getObjectCountsFromNodes(connectionId);
 

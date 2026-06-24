@@ -958,6 +958,18 @@
   background: color-mix(in srgb, var(--vscode-editorError-foreground, #f14c4c) 15%, transparent);
 }
 
+.checks-ratio-detail {
+  margin: 4px 0 8px 0;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.checks-imbalance-shard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .checks-section-desc {
   margin: 0 0 12px 0;
   font-size: 13px;
