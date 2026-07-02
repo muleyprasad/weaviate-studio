@@ -2614,6 +2614,67 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
 
+    // Cancel an in-progress backup
+    vscode.commands.registerCommand('weaviate.cancelBackup', async (item) => {
+      if (!item?.connectionId || !item?.itemId) {
+        vscode.window.showErrorMessage('Missing connection or backup information');
+        return;
+      }
+      {
+        const conn = weaviateTreeDataProvider
+          .getConnectionManager()
+          .getConnection(item.connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showErrorMessage(`Connection "${conn.name}" is in read-only mode`);
+          return;
+        }
+      }
+
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(item.connectionId);
+
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+
+        // Get backup details from cache to resolve the backend
+        const backupDetails = weaviateTreeDataProvider.getBackupDetails(
+          item.connectionId,
+          item.itemId
+        );
+
+        if (!backupDetails) {
+          vscode.window.showErrorMessage('Backup details not found');
+          return;
+        }
+
+        const confirm = await vscode.window.showWarningMessage(
+          `Cancel backup "${item.itemId}"?`,
+          { modal: true },
+          'Cancel Backup'
+        );
+        if (confirm !== 'Cancel Backup') {
+          return;
+        }
+
+        await client.backup.cancel({
+          backupId: item.itemId,
+          backend: backupDetails.backend,
+        });
+
+        vscode.window.showInformationMessage(`Backup "${item.itemId}" cancellation requested.`);
+
+        // Refresh the tree view backups
+        await weaviateTreeDataProvider.refreshBackups(item.connectionId);
+      } catch (error) {
+        vscode.window.showErrorMessage(
+          `Failed to cancel backup: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }),
+
     // Refresh collections command
     vscode.commands.registerCommand('weaviate.refreshCollections', async (item) => {
       if (!item?.connectionId) {

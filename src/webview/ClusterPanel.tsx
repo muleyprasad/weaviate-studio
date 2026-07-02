@@ -84,6 +84,17 @@ interface EmptyShardEntry {
   shardName: string;
 }
 
+type EmptyShardRatioSeverity = 'warning' | 'critical';
+
+interface EmptyShardRatioEntry {
+  collectionName: string;
+  isMultiTenant: boolean;
+  totalShards: number;
+  emptyShards: number;
+  ratio: number;
+  severity: EmptyShardRatioSeverity;
+}
+
 interface ShardReplica {
   nodeName: string;
   objectCount: number;
@@ -92,11 +103,26 @@ interface ShardReplica {
 interface ImbalancedShard {
   shardName: string;
   replicas: ShardReplica[];
+  /** Per-shard replication ratio (0–1). Optional for backward compat. */
+  replicationRatio?: number;
+  expectedObjects?: number;
+  actualObjects?: number;
 }
 
 interface ReplicationImbalanceCollection {
   collectionName: string;
   shards: ImbalancedShard[];
+  /** Replication completeness ratio (0–1). Optional for backward compat. */
+  replicationRatio?: number;
+  expectedObjects?: number;
+  actualObjects?: number;
+  /** Whether async replication is enabled for this collection. */
+  asyncReplicationEnabled?: boolean;
+}
+
+interface AsyncReplicationDisabledEntry {
+  collectionName: string;
+  replicationFactor: number;
 }
 
 interface ChecksResult {
@@ -111,8 +137,16 @@ interface ChecksResult {
     entries: EmptyShardEntry[];
     hasIssues: boolean;
   };
+  emptyShardRatio?: {
+    entries: EmptyShardRatioEntry[];
+    hasIssues: boolean;
+  };
   replicationImbalance?: {
     collections: ReplicationImbalanceCollection[];
+    hasIssues: boolean;
+  };
+  asyncReplicationDisabled?: {
+    entries: AsyncReplicationDisabledEntry[];
     hasIssues: boolean;
   };
 }
@@ -144,10 +178,32 @@ function openExternalLink(url: string) {
   vscode.postMessage({ command: 'openExternal', url });
 }
 
+/**
+ * Formats a replication ratio (0–1) as a percentage string.
+ *
+ * A ratio that is not exactly 1 is never rounded up to "100%" — that would
+ * contradict the imbalanced shards listed alongside it. Values above 99% show
+ * one floored decimal (e.g. 99.7%) so a barely-incomplete collection never
+ * reads as fully replicated.
+ */
+function formatReplicationPct(ratio: number): string {
+  if (ratio >= 1) {
+    return '100%';
+  }
+  const pct = ratio * 100;
+  if (pct > 99) {
+    // Floor to one decimal so e.g. 99.96% shows 99.9%, never 100%.
+    return `${(Math.floor(pct * 10) / 10).toFixed(1)}%`;
+  }
+  return `${Math.floor(pct)}%`;
+}
+
 function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
   const groups = checksResult?.multiTenancy.groups ?? [];
   const emptyShardEntries = checksResult?.emptyShards?.entries ?? [];
+  const emptyShardRatioEntries = checksResult?.emptyShardRatio?.entries ?? [];
   const replicationCollections = checksResult?.replicationImbalance?.collections ?? [];
+  const asyncDisabledEntries = checksResult?.asyncReplicationDisabled?.entries ?? [];
   const timestamp = checksResult?.timestamp
     ? new Date(checksResult.timestamp).toLocaleString()
     : null;
@@ -250,19 +306,22 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
               {emptyShardEntries.length > 0 && (
                 <span className="checks-section-warning-icon">⚠</span>
               )}
-              Empty Shards
+              Empty Shards (Single-Tenant Collections)
             </h3>
             {emptyShardEntries.length === 0 ? (
               <div className="checks-ok">
                 <span className="checks-ok-icon">✓</span>
-                No empty shards detected across the cluster.
+                No empty shards detected in single-tenant collections.
               </div>
             ) : (
               <>
                 <p className="checks-section-desc">
-                  The following shards contain zero objects. Empty shards may indicate incomplete
-                  data ingestion or collections that are no longer in use. Even without any objects,
-                  an empty collection adds overhead to your cluster — consider deleting collections
+                  This check runs only against <strong>single-tenant collections</strong> —
+                  multi-tenant collections are evaluated by the <em>Empty Shard Ratio</em> check
+                  below, since individual tenant shards start empty by design. The following
+                  single-tenant shards contain zero objects, which may indicate incomplete data
+                  ingestion or collections that are no longer in use. Even without any objects, an
+                  empty collection adds overhead to your cluster — consider deleting collections
                   that are no longer needed.
                 </p>
                 <div className="checks-info-callout">
@@ -305,6 +364,82 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
             )}
           </div>
 
+          {/* ── Empty Shard Ratio ─────────────────────────────────────── */}
+          {(() => {
+            const hasCritical = emptyShardRatioEntries.some((e) => e.severity === 'critical');
+            const hasWarning = emptyShardRatioEntries.length > 0;
+            const sectionSeverityClass = hasCritical
+              ? ' checks-section--critical'
+              : hasWarning
+                ? ' checks-section--warning'
+                : '';
+            return (
+              <div className={`checks-section${sectionSeverityClass}`}>
+                <h3 className="checks-section-title">
+                  {hasCritical ? (
+                    <span className="checks-section-critical-icon">⛔</span>
+                  ) : hasWarning ? (
+                    <span className="checks-section-warning-icon">⚠</span>
+                  ) : null}
+                  Empty Shard Ratio
+                </h3>
+                {emptyShardRatioEntries.length === 0 ? (
+                  <div className="checks-ok">
+                    <span className="checks-ok-icon">✓</span>
+                    No collections exceed the empty-shard thresholds.
+                  </div>
+                ) : (
+                  <>
+                    <p className="checks-section-desc">
+                      The following collections have a high proportion of empty shards/tenants. A
+                      collection is flagged as <strong>warning</strong> when at least 10% of its
+                      shards are empty, and <strong>critical</strong> when at least 50% are empty.
+                      Many empty shards/tenants add overhead — consider removing unused tenants or
+                      collections.
+                    </p>
+                    <div className="checks-info-callout">
+                      <span className="checks-info-callout-icon">ℹ️</span>
+                      Object counts reported by node status are not immediately synchronized and may
+                      be slightly delayed — only act on shards that consistently show zero over
+                      time.
+                    </div>
+                    <table className="checks-table">
+                      <thead>
+                        <tr>
+                          <th>Collection</th>
+                          <th>Type</th>
+                          <th>Empty</th>
+                          <th>Ratio</th>
+                          <th>Severity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {emptyShardRatioEntries.map((entry) => (
+                          <tr key={entry.collectionName}>
+                            <td className="checks-col-name">{entry.collectionName}</td>
+                            <td>{entry.isMultiTenant ? 'Multi-tenant' : 'Single-tenant'}</td>
+                            <td>
+                              {entry.emptyShards.toLocaleString()} /{' '}
+                              {entry.totalShards.toLocaleString()}
+                            </td>
+                            <td>{Math.round(entry.ratio * 100)}%</td>
+                            <td>
+                              <span
+                                className={`checks-severity-badge checks-severity-${entry.severity}`}
+                              >
+                                {entry.severity === 'critical' ? 'Critical' : 'Warning'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── Replication Imbalance ─────────────────────────────────── */}
           <div
             className={`checks-section${replicationCollections.length > 0 ? ' checks-section--warning' : ''}`}
@@ -337,6 +472,14 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                     Enable async replication ↗
                   </a>
                 </p>
+                <p className="checks-section-desc">
+                  The <strong>replication ratio</strong> estimates how complete replication is,
+                  computed per shard: each shard's most complete replica is taken as its true size,
+                  so a fully-replicated shard should hold that size × the replica count (e.g. 12 × 3
+                  = 36). These are summed across the collection and compared to the objects actually
+                  stored. <strong>100%</strong> means every replica of every shard is complete;
+                  lower values mean some replicas are missing or lagging.
+                </p>
                 <div className="checks-info-callout">
                   <span className="checks-info-callout-icon">ℹ️</span>
                   If you are actively ingesting data, this is normal — replicas sync asynchronously
@@ -347,31 +490,130 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                   Object counts reported by node status are not immediately synchronized and may be
                   slightly delayed — only act on imbalances that persist over time.
                 </div>
-                {replicationCollections.map((col) => (
-                  <div key={col.collectionName} className="checks-group">
-                    <div className="checks-group-header">
-                      <span className="checks-group-label">{col.collectionName}</span>
-                      <span className="checks-group-count">
-                        {col.shards.length} imbalanced shard{col.shards.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    {col.shards.map((shard) => (
-                      <div key={shard.shardName} className="checks-imbalance-shard">
-                        <span className="checks-shard-name">{shard.shardName}</span>
-                        <ul className="checks-replica-list">
-                          {shard.replicas.map((replica) => (
-                            <li key={replica.nodeName} className="checks-replica-item">
-                              <span className="checks-replica-node">{replica.nodeName}</span>
-                              <span className="checks-replica-count">
-                                {replica.objectCount.toLocaleString()} objects
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                {replicationCollections.map((col) => {
+                  const ratio = col.replicationRatio;
+                  // Below 50% replicated → critical, otherwise warning.
+                  const ratioSeverity =
+                    typeof ratio === 'number' && ratio < 0.5 ? 'critical' : 'warning';
+                  return (
+                    <div key={col.collectionName} className="checks-group">
+                      <div className="checks-group-header">
+                        <span className="checks-group-label">{col.collectionName}</span>
+                        {typeof ratio === 'number' && (
+                          <span
+                            className={`checks-severity-badge checks-severity-${ratioSeverity}`}
+                          >
+                            {formatReplicationPct(ratio)} replicated
+                          </span>
+                        )}
+                        {col.asyncReplicationEnabled === false && (
+                          <span
+                            className="checks-severity-badge checks-severity-warning"
+                            title="Async replication is disabled — replica drift will not self-heal"
+                          >
+                            Async replication off
+                          </span>
+                        )}
+                        {col.asyncReplicationEnabled === true && (
+                          <span className="checks-async-badge">Async replication on</span>
+                        )}
+                        <span className="checks-group-count">
+                          {col.shards.length} imbalanced shard{col.shards.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
+                      {typeof ratio === 'number' && (
+                        <p className="checks-ratio-detail">
+                          Actual {(col.actualObjects ?? 0).toLocaleString()} objects vs{' '}
+                          {(col.expectedObjects ?? 0).toLocaleString()} expected if every replica of
+                          every shard were complete.
+                        </p>
+                      )}
+                      {col.shards.map((shard) => {
+                        const shardRatio = shard.replicationRatio;
+                        const shardSeverity =
+                          typeof shardRatio === 'number' && shardRatio < 0.5
+                            ? 'critical'
+                            : 'warning';
+                        return (
+                          <div key={shard.shardName} className="checks-imbalance-shard">
+                            <div className="checks-imbalance-shard-header">
+                              <span className="checks-shard-name">{shard.shardName}</span>
+                              {typeof shardRatio === 'number' && (
+                                <span
+                                  className={`checks-severity-badge checks-severity-${shardSeverity}`}
+                                >
+                                  {formatReplicationPct(shardRatio as number)} replicated
+                                </span>
+                              )}
+                            </div>
+                            <ul className="checks-replica-list">
+                              {shard.replicas.map((replica) => (
+                                <li key={replica.nodeName} className="checks-replica-item">
+                                  <span className="checks-replica-node">{replica.nodeName}</span>
+                                  <span className="checks-replica-count">
+                                    {replica.objectCount.toLocaleString()} objects
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+
+          {/* ── Async Replication Disabled ────────────────────────────── */}
+          <div
+            className={`checks-section${asyncDisabledEntries.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {asyncDisabledEntries.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Async Replication Disabled
+            </h3>
+            {asyncDisabledEntries.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                All replicated collections have async replication enabled.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following replicated collections do not have async replication enabled.
+                  Without it, replicas that drift apart are never reconciled automatically, so
+                  imbalances become permanent.{' '}
+                  <a
+                    href="https://docs.weaviate.io/deploy/configuration/async-rep"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink('https://docs.weaviate.io/deploy/configuration/async-rep');
+                    }}
+                  >
+                    Enable async replication ↗
+                  </a>
+                </p>
+                <table className="checks-table">
+                  <thead>
+                    <tr>
+                      <th>Collection</th>
+                      <th>Replication factor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {asyncDisabledEntries.map((entry) => (
+                      <tr key={entry.collectionName}>
+                        <td className="checks-col-name">{entry.collectionName}</td>
+                        <td>{entry.replicationFactor}</td>
+                      </tr>
                     ))}
-                  </div>
-                ))}
+                  </tbody>
+                </table>
               </>
             )}
           </div>

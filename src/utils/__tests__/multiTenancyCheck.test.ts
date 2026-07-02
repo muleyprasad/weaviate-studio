@@ -3,7 +3,11 @@ import {
   computeCandidatesDismissKey,
   findMultiTenantCandidates,
   findEmptyShards,
+  findEmptyShardRatios,
   findReplicationImbalances,
+  findCollectionsWithoutAsyncReplication,
+  buildAsyncReplicationMap,
+  EMPTY_SHARD_RATIO_THRESHOLDS,
   MtCandidateGroup,
   NodeLike,
   PropertyLike,
@@ -11,6 +15,20 @@ import {
 import { CollectionWithSchema } from '../../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Builds a collection whose schema carries a replication config. */
+function makeReplicatedCollection(
+  name: string,
+  factor: number,
+  asyncEnabled: boolean
+): CollectionWithSchema {
+  return {
+    label: name,
+    collapsibleState: 0,
+    itemType: 'collection',
+    schema: { name, replication: { factor, asyncEnabled } } as any,
+  } as unknown as CollectionWithSchema;
+}
 
 function makeCollection(
   name: string,
@@ -532,6 +550,137 @@ describe('findEmptyShards', () => {
   });
 });
 
+// ─── findEmptyShardRatios ─────────────────────────────────────────────────────
+
+describe('findEmptyShardRatios', () => {
+  it('returns empty array when there are no nodes', () => {
+    expect(findEmptyShardRatios([])).toHaveLength(0);
+  });
+
+  it('does not flag a collection below the warning threshold', () => {
+    // 1 of 20 empty = 5% < 10%
+    const shards = Array.from({ length: 20 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i === 0 ? 0 : 100,
+    }));
+    expect(findEmptyShardRatios([makeNode('node-1', shards)])).toHaveLength(0);
+  });
+
+  it('flags a collection as warning at the 10% threshold', () => {
+    // 2 of 20 empty = 10%
+    const shards = Array.from({ length: 20 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 2 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      collectionName: 'Article',
+      isMultiTenant: false,
+      totalShards: 20,
+      emptyShards: 2,
+      severity: 'warning',
+    });
+    expect(result[0].ratio).toBeCloseTo(0.1);
+  });
+
+  it('escalates to critical at the 50% threshold', () => {
+    const shards = Array.from({ length: 10 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 5 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)]);
+    expect(result).toHaveLength(1);
+    expect(result[0].severity).toBe('critical');
+    expect(result[0].ratio).toBeCloseTo(0.5);
+  });
+
+  it('applies to multi-tenant collections and labels them', () => {
+    const shards = Array.from({ length: 4 }, (_, i) => ({
+      class: 'MTCollection',
+      name: `tenant-${i}`,
+      objectCount: i < 3 ? 0 : 100,
+    }));
+    const result = findEmptyShardRatios([makeNode('node-1', shards)], new Set(['MTCollection']));
+    expect(result).toHaveLength(1);
+    expect(result[0].isMultiTenant).toBe(true);
+    expect(result[0].severity).toBe('critical'); // 75% empty
+  });
+
+  it('collapses replicas by shard name and treats a shard empty only when all replicas are empty', () => {
+    // Same shard "s1" on three nodes: empty on two, populated on one → NOT empty.
+    // "s2" empty on all three → empty. 1 of 2 distinct shards empty = 50% → critical.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 's1', objectCount: 0 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 's1', objectCount: 0 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+      makeNode('node-3', [
+        { class: 'Article', name: 's1', objectCount: 42 },
+        { class: 'Article', name: 's2', objectCount: 0 },
+      ]),
+    ];
+    const result = findEmptyShardRatios(nodes);
+    expect(result).toHaveLength(1);
+    expect(result[0].totalShards).toBe(2);
+    expect(result[0].emptyShards).toBe(1);
+    expect(result[0].severity).toBe('critical');
+  });
+
+  it('sorts critical entries before warnings, then by ratio descending', () => {
+    const nodes = [
+      makeNode('node-1', [
+        // Warn: 2 of 10 = 20%
+        ...Array.from({ length: 10 }, (_, i) => ({
+          class: 'WarnCol',
+          name: `w-${i}`,
+          objectCount: i < 2 ? 0 : 5,
+        })),
+        // Critical: 9 of 10 = 90%
+        ...Array.from({ length: 10 }, (_, i) => ({
+          class: 'CritCol',
+          name: `c-${i}`,
+          objectCount: i < 9 ? 0 : 5,
+        })),
+      ]),
+    ];
+    const result = findEmptyShardRatios(nodes);
+    expect(result.map((r) => r.collectionName)).toEqual(['CritCol', 'WarnCol']);
+  });
+
+  it('honours custom thresholds', () => {
+    const shards = Array.from({ length: 10 }, (_, i) => ({
+      class: 'Article',
+      name: `shard-${i}`,
+      objectCount: i < 3 ? 0 : 100,
+    }));
+    // 30% empty: below default critical(50%) → warning; with custom critical(25%) → critical
+    const result = findEmptyShardRatios([makeNode('node-1', shards)], undefined, {
+      warning: 0.1,
+      critical: 0.25,
+    });
+    expect(result[0].severity).toBe('critical');
+  });
+
+  it('exposes configurable default thresholds', () => {
+    expect(EMPTY_SHARD_RATIO_THRESHOLDS.warning).toBe(0.1);
+    expect(EMPTY_SHARD_RATIO_THRESHOLDS.critical).toBe(0.5);
+  });
+
+  it('handles nodes with null/undefined shards gracefully', () => {
+    const nodes: NodeLike[] = [{ name: 'node-1', shards: null }];
+    expect(() => findEmptyShardRatios(nodes)).not.toThrow();
+    expect(findEmptyShardRatios(nodes)).toHaveLength(0);
+  });
+});
+
 // ─── findReplicationImbalances ────────────────────────────────────────────────
 
 describe('findReplicationImbalances', () => {
@@ -605,5 +754,131 @@ describe('findReplicationImbalances', () => {
     const nodes: NodeLike[] = [{ name: 'node-1', shards: undefined }];
     expect(() => findReplicationImbalances(nodes)).not.toThrow();
     expect(findReplicationImbalances(nodes)).toHaveLength(0);
+  });
+
+  it('computes the replication ratio per shard from the most complete replica × replica count', () => {
+    // One shard replicated 12 / 12 / 10 → expected = 12 × 3 = 36, actual = 34.
+    const nodes = [
+      makeNode('node-1', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 12 }]),
+      makeNode('node-2', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 12 }]),
+      makeNode('node-3', [{ class: 'SemanticConversation', name: 'Bhagwan', objectCount: 10 }]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ expectedObjects: 36, actualObjects: 34 });
+    expect(result[0].replicationRatio).toBeCloseTo(34 / 36);
+    // Per-shard breakdown is also exposed on the imbalanced shard itself.
+    expect(result[0].shards[0]).toMatchObject({
+      shardName: 'Bhagwan',
+      expectedObjects: 36,
+      actualObjects: 34,
+    });
+    expect(result[0].shards[0].replicationRatio).toBeCloseTo(34 / 36);
+  });
+
+  it('is computed per shard, not from per-node totals (regression)', () => {
+    // Each node holds 100 objects total, so per-node totals are all equal (would
+    // wrongly report 100% replicated). But each shard's complete replica lives on a
+    // different node, so each shard is only half replicated → 50% overall.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 'shard-a', objectCount: 100 },
+        { class: 'Article', name: 'shard-b', objectCount: 0 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 'shard-a', objectCount: 0 },
+        { class: 'Article', name: 'shard-b', objectCount: 100 },
+      ]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    // shard-a: max 100 × 2 = 200 expected, 100 actual; shard-b: same → 400 / 200.
+    expect(result[0]).toMatchObject({ expectedObjects: 400, actualObjects: 200 });
+    expect(result[0].replicationRatio).toBeCloseTo(0.5);
+  });
+
+  it('counts balanced shards as fully replicated in the collection ratio', () => {
+    // shard-a imbalanced (100/90), shard-b perfectly replicated (50/50).
+    // expected = 100×2 + 50×2 = 300, actual = 190 + 100 = 290.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Article', name: 'shard-a', objectCount: 100 },
+        { class: 'Article', name: 'shard-b', objectCount: 50 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Article', name: 'shard-a', objectCount: 90 },
+        { class: 'Article', name: 'shard-b', objectCount: 50 },
+      ]),
+    ];
+    const result = findReplicationImbalances(nodes);
+    expect(result[0].shards).toHaveLength(1); // only shard-a is imbalanced
+    expect(result[0]).toMatchObject({ expectedObjects: 300, actualObjects: 290 });
+    expect(result[0].replicationRatio).toBeCloseTo(290 / 300);
+  });
+
+  it('annotates each imbalanced collection with its async replication status', () => {
+    const nodes = [
+      makeNode('node-1', [{ class: 'Article', name: 'shard-1', objectCount: 100 }]),
+      makeNode('node-2', [{ class: 'Article', name: 'shard-1', objectCount: 90 }]),
+    ];
+    const asyncMap = { Article: false };
+    const result = findReplicationImbalances(nodes, asyncMap);
+    expect(result[0].asyncReplicationEnabled).toBe(false);
+  });
+
+  it('leaves asyncReplicationEnabled undefined when no map is provided', () => {
+    const nodes = [
+      makeNode('node-1', [{ class: 'Article', name: 'shard-1', objectCount: 100 }]),
+      makeNode('node-2', [{ class: 'Article', name: 'shard-1', objectCount: 90 }]),
+    ];
+    expect(findReplicationImbalances(nodes)[0].asyncReplicationEnabled).toBeUndefined();
+  });
+});
+
+// ─── findCollectionsWithoutAsyncReplication ───────────────────────────────────
+
+describe('findCollectionsWithoutAsyncReplication', () => {
+  it('returns empty array when there are no collections', () => {
+    expect(findCollectionsWithoutAsyncReplication([])).toHaveLength(0);
+  });
+
+  it('flags replicated collections with async replication disabled', () => {
+    const result = findCollectionsWithoutAsyncReplication([
+      makeReplicatedCollection('Replicated', 3, false),
+    ]);
+    expect(result).toEqual([{ collectionName: 'Replicated', replicationFactor: 3 }]);
+  });
+
+  it('does not flag replicated collections with async replication enabled', () => {
+    expect(
+      findCollectionsWithoutAsyncReplication([makeReplicatedCollection('Async', 3, true)])
+    ).toHaveLength(0);
+  });
+
+  it('ignores non-replicated collections (factor ≤ 1)', () => {
+    expect(
+      findCollectionsWithoutAsyncReplication([makeReplicatedCollection('Single', 1, false)])
+    ).toHaveLength(0);
+  });
+
+  it('treats a missing replication config as non-replicated', () => {
+    // makeCollection has no replication config at all → factor defaults to 1.
+    expect(findCollectionsWithoutAsyncReplication([makeCollection('NoRep')])).toHaveLength(0);
+  });
+});
+
+// ─── buildAsyncReplicationMap ─────────────────────────────────────────────────
+
+describe('buildAsyncReplicationMap', () => {
+  it('maps collection names to their async replication flag', () => {
+    const map = buildAsyncReplicationMap([
+      makeReplicatedCollection('A', 3, true),
+      makeReplicatedCollection('B', 3, false),
+    ]);
+    expect(map).toEqual({ A: true, B: false });
+  });
+
+  it('omits collections without a replication config', () => {
+    const map = buildAsyncReplicationMap([makeCollection('NoRep')]);
+    expect(map).toEqual({});
   });
 });
