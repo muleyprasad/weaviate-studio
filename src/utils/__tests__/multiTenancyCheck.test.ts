@@ -12,6 +12,9 @@ import {
   NodeLike,
   PropertyLike,
 } from '../multiTenancyCheck';
+import { CollectionWithSchema } from '../../types';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Builds a collection whose schema carries a replication config. */
 function makeReplicatedCollection(
@@ -26,9 +29,6 @@ function makeReplicatedCollection(
     schema: { name, replication: { factor, asyncEnabled } } as any,
   } as unknown as CollectionWithSchema;
 }
-import { CollectionWithSchema } from '../../types';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeCollection(
   name: string,

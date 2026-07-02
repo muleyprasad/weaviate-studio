@@ -461,19 +461,6 @@ export function findEmptyShardRatios(
 }
 
 /**
- * Finds collections whose shards have inconsistent object counts across replicas.
- *
- * When the same shard name appears on multiple nodes (replication factor > 1)
- * with different object counts, it may indicate async replication is disabled
- * or lagging behind.
- *
- * Note: object counts in node status are not immediately synchronised and may
- * be slightly delayed, so small short-lived discrepancies are expected.
- *
- * Each flagged collection also carries a {@link ReplicationImbalanceCollection.replicationRatio}
- * quantifying how complete replication is across nodes.
- */
-/**
  * Finds replicated collections (replication factor > 1) that do NOT have async
  * replication enabled.
  *
@@ -517,6 +504,19 @@ export function buildAsyncReplicationMap(
   return map;
 }
 
+/**
+ * Finds collections whose shards have inconsistent object counts across replicas.
+ *
+ * When the same shard name appears on multiple nodes (replication factor > 1)
+ * with different object counts, it may indicate async replication is disabled
+ * or lagging behind.
+ *
+ * Note: object counts in node status are not immediately synchronised and may
+ * be slightly delayed, so small short-lived discrepancies are expected.
+ *
+ * Each flagged collection also carries a {@link ReplicationImbalanceCollection.replicationRatio}
+ * quantifying how complete replication is across nodes.
+ */
 export function findReplicationImbalances(
   nodes: NodeLike[],
   asyncReplicationByCollection?: Record<string, boolean>
