@@ -97,10 +97,13 @@ describe('readonly guard — RBAC write operations', () => {
 // ---------------------------------------------------------------------------
 
 describe('readonly guard — backup write operations', () => {
-  describe.each([['weaviate.createBackup'], ['weaviate.restoreBackup']])('%s', (_command) => {
-    itBlocksWhenReadOnly('ProductionCluster');
-    itAllowsWhenNotReadOnly();
-  });
+  describe.each([['weaviate.createBackup'], ['weaviate.restoreBackup'], ['weaviate.cancelBackup']])(
+    '%s',
+    (_command) => {
+      itBlocksWhenReadOnly('ProductionCluster');
+      itAllowsWhenNotReadOnly();
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------
