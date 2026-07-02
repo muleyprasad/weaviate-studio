@@ -45,7 +45,7 @@ Backup status is shown in real-time:
 ### Actions
 
 - **Retry** failed backups
-- **Cancel** in-progress backups
+- **Cancel** in-progress backups — right-click an in-progress backup in the tree view and choose **Cancel Backup**; a confirmation dialog is shown before the cancellation is sent
 - **Restore** from any completed backup
 
 ## Restoring Backups

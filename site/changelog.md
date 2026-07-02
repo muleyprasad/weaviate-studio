@@ -7,6 +7,19 @@ description: Full version history and release notes for Weaviate Studio — new 
 
 All notable changes to the Weaviate Studio extension.
 
+## [1.8.0] - 2026-07-01
+
+### ✨ Added
+
+- **Empty Shard Ratio check** — flags collections (single- and multi-tenant) where ≥10% of shards/tenants are empty (Warning) or ≥50% (Critical). Replicas are collapsed by shard name so a lagging replica is not mistaken for an empty shard. (PR #78)
+- **Async Replication Disabled check** — lists replicated collections (replication factor > 1) that do not have async replication enabled; without it, replica drift is never automatically reconciled. (PR #78)
+- **Replication ratio metrics** — the Replication Imbalance section now shows a per-collection and per-shard replication completeness percentage (e.g. `94% replicated`), computed per shard to avoid per-node-total masking. Imbalanced collections also show their async replication status. (PR #78)
+- **Race-condition fix for large clusters** — on large clusters the verbose node fetch could complete after the collections fetch, causing health checks to run against empty node data. Node fetch now triggers a serialized check recompute so results always reflect complete shard data. (PR #78)
+
+### 🐛 Fixed
+
+- **`weaviate.cancelBackup` command not found** — the command was declared in `package.json` and wired into the in-progress backup context menu but never registered via `vscode.commands.registerCommand`. Right-clicking an in-progress backup and choosing Cancel Backup now works correctly. (PR #79)
+
 ## [1.7.1] - 2026-05-09
 
 ### Changed
