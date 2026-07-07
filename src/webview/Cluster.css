@@ -1258,8 +1258,13 @@
   cursor: default;
 }
 
-.checks-action-button--danger {
+.checks-group-actions {
   margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.checks-action-button--danger {
   background-color: var(--vscode-button-secondaryBackground, transparent);
   color: var(--vscode-errorForeground);
   border: 1px solid var(--vscode-errorForeground);

@@ -222,6 +222,11 @@
         "icon": "$(arrow-swap)"
       },
       {
+        "command": "weaviate.manageTenants",
+        "title": "Manage Tenants",
+        "icon": "$(list-selection)"
+      },
+      {
         "command": "weaviate.refreshBackups",
         "title": "Refresh Backups",
         "icon": "$(refresh)"
@@ -635,6 +640,16 @@
           "command": "weaviate.editMultiTenancy",
           "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
           "group": "1_modification@1"
+        },
+        {
+          "command": "weaviate.manageTenants",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "inline@2"
+        },
+        {
+          "command": "weaviate.manageTenants",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "1_modification@2"
         },
         {
           "command": "weaviate.toggleAutoTenantFlag",

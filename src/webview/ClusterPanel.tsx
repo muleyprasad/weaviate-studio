@@ -207,6 +207,11 @@ function deleteEmptyTenants(collectionName: string) {
   vscode.postMessage({ command: 'deleteEmptyTenants', collectionName });
 }
 
+/** Asks the extension to set the empty ACTIVE tenants of a collection to INACTIVE. */
+function deactivateEmptyTenants(collectionName: string) {
+  vscode.postMessage({ command: 'deactivateEmptyTenants', collectionName });
+}
+
 /**
  * Formats a replication ratio (0–1) as a percentage string.
  *
@@ -458,13 +463,22 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                       <span className="checks-group-count">
                         {col.tenants.length} empty tenant{col.tenants.length !== 1 ? 's' : ''}
                       </span>
-                      <button
-                        className="checks-action-button checks-action-button--danger"
-                        onClick={() => deleteEmptyTenants(col.collectionName)}
-                        title={`Delete the ${col.tenants.length} empty tenants of ${col.collectionName}`}
-                      >
-                        Delete empty tenants
-                      </button>
+                      <div className="checks-group-actions">
+                        <button
+                          className="checks-action-button"
+                          onClick={() => deactivateEmptyTenants(col.collectionName)}
+                          title={`Set the ${col.tenants.length} empty tenants of ${col.collectionName} to INACTIVE (offload to disk, keeps the tenant)`}
+                        >
+                          Inactivate empty tenants
+                        </button>
+                        <button
+                          className="checks-action-button checks-action-button--danger"
+                          onClick={() => deleteEmptyTenants(col.collectionName)}
+                          title={`Delete the ${col.tenants.length} empty tenants of ${col.collectionName}`}
+                        >
+                          Delete empty tenants
+                        </button>
+                      </div>
                     </div>
                     <div className="checks-tenant-chips">
                       {col.tenants.slice(0, 50).map((name) => (

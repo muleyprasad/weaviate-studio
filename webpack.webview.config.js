@@ -49,6 +49,7 @@ module.exports = {
     'rbac-group': './src/webview/RbacGroup.tsx',
     connection: './src/webview/ConnectionForm.tsx',
     'edit-multi-tenancy': './src/webview/EditMultiTenancy.tsx',
+    'manage-tenants': './src/webview/ManageTenants.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist', 'webview'),
@@ -202,6 +203,14 @@ module.exports = {
       template: './src/webview/editMultiTenancy.html',
       filename: 'editMultiTenancy.html',
       chunks: ['edit-multi-tenancy'],
+      inject: 'body',
+      scriptLoading: 'defer',
+      minify: isProduction,
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/webview/manageTenants.html',
+      filename: 'manageTenants.html',
+      chunks: ['manage-tenants'],
       inject: 'body',
       scriptLoading: 'defer',
       minify: isProduction,
