@@ -100,6 +100,41 @@ export interface EmptyShardRatioEntry {
   severity: EmptyShardRatioSeverity;
 }
 
+// ─── Auto-tenant config check ─────────────────────────────────────────────────
+
+/**
+ * A multi-tenant collection whose auto-tenant flags are not both enabled.
+ *
+ * `autoTenantCreation` lets a collection create a tenant on first write, and
+ * `autoTenantActivation` loads a tenant into memory on access. When either is
+ * off, clients must manage tenant lifecycle manually, which is a common source
+ * of "tenant not found" / "tenant is inactive" errors.
+ */
+export interface AutoTenantConfigIssue {
+  collectionName: string;
+  /** Current value of the collection's `autoTenantCreation` flag. */
+  autoTenantCreation: boolean;
+  /** Current value of the collection's `autoTenantActivation` flag. */
+  autoTenantActivation: boolean;
+}
+
+// ─── Empty tenants check ──────────────────────────────────────────────────────
+
+/**
+ * A multi-tenant collection that has one or more empty ACTIVE tenants.
+ *
+ * Only ACTIVE (loaded-into-memory) tenants are considered, because those are the
+ * ones consuming RAM. INACTIVE/OFFLOADED tenants live on disk/cloud and do not
+ * appear as loaded shards in node status, so they are never flagged here —
+ * deleting them would free no memory. This makes the check a safe, targeted
+ * "reclaim memory from empty loaded tenants" signal.
+ */
+export interface EmptyTenantCollection {
+  collectionName: string;
+  /** Names of ACTIVE tenants holding zero objects, sorted for stable output. */
+  tenants: string[];
+}
+
 // ─── Replication imbalance check ─────────────────────────────────────────────
 
 /** Object-count breakdown for one replica of a shard. */
@@ -184,6 +219,14 @@ export interface ChecksResult {
   hasIssues: boolean;
   multiTenancy: {
     groups: MtCandidateGroup[];
+    hasIssues: boolean;
+  };
+  autoTenantConfig: {
+    issues: AutoTenantConfigIssue[];
+    hasIssues: boolean;
+  };
+  emptyTenants: {
+    collections: EmptyTenantCollection[];
     hasIssues: boolean;
   };
   emptyShards: {
@@ -337,6 +380,91 @@ export function findMultiTenantCandidates(
   groups.sort((a, b) => b.totalObjects - a.totalObjects);
 
   return groups;
+}
+
+/**
+ * Finds multi-tenant collections whose auto-tenant flags are not both enabled.
+ *
+ * A collection is flagged when `autoTenantCreation` OR `autoTenantActivation` is
+ * false. Non-multi-tenant collections are ignored — the flags are meaningless
+ * there. A missing flag is treated as `false` (the safe assumption: if the
+ * schema doesn't report it as enabled, surface it so the user can confirm).
+ *
+ * @param collections All collections for a connection, with their schema.
+ */
+export function findAutoTenantConfigIssues(
+  collections: CollectionWithSchema[]
+): AutoTenantConfigIssue[] {
+  const issues: AutoTenantConfigIssue[] = [];
+  for (const col of collections) {
+    const mt = col.schema?.multiTenancy;
+    if (!mt?.enabled) {
+      continue;
+    }
+    const autoTenantCreation = mt.autoTenantCreation === true;
+    const autoTenantActivation = mt.autoTenantActivation === true;
+    if (!autoTenantCreation || !autoTenantActivation) {
+      issues.push({ collectionName: col.label, autoTenantCreation, autoTenantActivation });
+    }
+  }
+  return issues;
+}
+
+/**
+ * Finds empty ACTIVE tenants in multi-tenant collections.
+ *
+ * A tenant is ACTIVE precisely when it is loaded into memory, which is exactly
+ * when it appears as a shard in verbose node status. An ACTIVE tenant that holds
+ * zero objects is wasting memory and is a safe deletion candidate. INACTIVE and
+ * OFFLOADED tenants never appear here, so they are correctly never flagged.
+ *
+ * Replicas are collapsed by tenant (shard) name: a tenant counts as empty only
+ * when every replica reports zero objects (max object count across replicas
+ * === 0). This avoids mistaking a lagging replica for an empty tenant — that
+ * case is handled by {@link findReplicationImbalances}.
+ *
+ * @param nodes         Verbose cluster node data.
+ * @param mtCollections Names of multi-tenant collections; only these are scanned
+ *                      so that regular single-tenant shards are never reported.
+ * @returns Flagged collections, sorted by empty-tenant count descending.
+ */
+export function findEmptyTenants(
+  nodes: NodeLike[],
+  mtCollections: Set<string>
+): EmptyTenantCollection[] {
+  // collectionName → tenant(shard)Name → max objectCount seen across replicas
+  const byCollection = new Map<string, Map<string, number>>();
+
+  for (const node of nodes) {
+    for (const shard of node.shards ?? []) {
+      if (!mtCollections.has(shard.class)) {
+        continue;
+      }
+      let byTenant = byCollection.get(shard.class);
+      if (!byTenant) {
+        byTenant = new Map();
+        byCollection.set(shard.class, byTenant);
+      }
+      const prev = byTenant.get(shard.name) ?? 0;
+      byTenant.set(shard.name, Math.max(prev, shard.objectCount ?? 0));
+    }
+  }
+
+  const result: EmptyTenantCollection[] = [];
+  for (const [collectionName, byTenant] of byCollection) {
+    const empties = [...byTenant.entries()]
+      .filter(([, maxObjects]) => maxObjects === 0)
+      .map(([name]) => name)
+      .sort();
+    if (empties.length > 0) {
+      result.push({ collectionName, tenants: empties });
+    }
+  }
+
+  // Highest-impact first: collections with the most empty tenants lead.
+  result.sort((a, b) => b.tenants.length - a.tenants.length);
+
+  return result;
 }
 
 /**

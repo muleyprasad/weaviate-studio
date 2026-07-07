@@ -25,6 +25,8 @@ import {
   findEmptyShardRatios,
   findReplicationImbalances,
   findCollectionsWithoutAsyncReplication,
+  findAutoTenantConfigIssues,
+  findEmptyTenants,
   buildAsyncReplicationMap,
   computeCandidatesDismissKey,
   MtCandidateGroup,
@@ -1514,6 +1516,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const vectorizers = collection.vectorizers;
       let configured_vectors_count = vectorizers ? Object.keys(vectorizers).length : 0;
       const multi_tenancy_enabled = collection?.multiTenancy.enabled;
+      // Warn when auto-tenant creation/activation are not both enabled — these are
+      // a common source of "tenant not found"/"tenant inactive" errors.
+      const autoTenantFlagsOff =
+        multi_tenancy_enabled === true &&
+        (collection?.multiTenancy?.autoTenantCreation !== true ||
+          collection?.multiTenancy?.autoTenantActivation !== true);
+      const multiTenancyContextValue = multi_tenancy_enabled
+        ? autoTenantFlagsOff
+          ? 'weaviateMultiTenancyWarning'
+          : 'weaviateMultiTenancy'
+        : 'weaviateMultiTenancyDisabled';
       const items = [
         new WeaviateTreeItem(
           `Properties (${property_count})`,
@@ -1600,7 +1613,12 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
           element.connectionId,
           element.label,
           'multiTenancy',
-          new vscode.ThemeIcon('organization')
+          new vscode.ThemeIcon(
+            'organization',
+            autoTenantFlagsOff ? new vscode.ThemeColor('list.warningForeground') : undefined
+          ),
+          multiTenancyContextValue,
+          autoTenantFlagsOff ? 'auto-tenant off' : undefined
         ),
         new WeaviateTreeItem(
           'Statistics',
@@ -2654,7 +2672,22 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       const schema = collection?.schema;
       // Multi-tenancy
       if (schema?.multiTenancy) {
+        const toggleableFlags = new Set(['autoTenantCreation', 'autoTenantActivation']);
         for (const [key, value] of Object.entries(schema.multiTenancy)) {
+          // The two auto-tenant flags get a distinct context value so a right-click
+          // "Toggle" action can flip them directly from the tree.
+          const isToggleable = toggleableFlags.has(key);
+          const contextValue = isToggleable
+            ? value === true
+              ? 'weaviateAutoTenantFlagOn'
+              : 'weaviateAutoTenantFlagOff'
+            : 'MultiTenancy';
+          const icon = isToggleable
+            ? new vscode.ThemeIcon(
+                value === true ? 'check' : 'circle-slash',
+                value === true ? undefined : new vscode.ThemeColor('list.warningForeground')
+              )
+            : new vscode.ThemeIcon('organization');
           MultiTenancyItems.push(
             new WeaviateTreeItem(
               `${key}: ${value}`,
@@ -2663,8 +2696,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
               element.connectionId,
               element.collectionName,
               key,
-              new vscode.ThemeIcon('organization'),
-              'MultiTenancy'
+              icon,
+              contextValue
             )
           );
         }
@@ -3556,24 +3589,37 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
     // All checks are independent — run them in parallel.
-    const [groups, emptyShardEntries, emptyShardRatios, replicationImbalances, asyncDisabled] =
-      await Promise.all([
-        Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-        Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-        Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-        Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
-        Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
-      ]);
+    const [
+      groups,
+      autoTenantIssues,
+      emptyTenants,
+      emptyShardEntries,
+      emptyShardRatios,
+      replicationImbalances,
+      asyncDisabled,
+    ] = await Promise.all([
+      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+      Promise.resolve(findAutoTenantConfigIssues(collections)),
+      Promise.resolve(findEmptyTenants(nodes as any, mtCollections)),
+      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
+      Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
+      Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
+    ]);
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
       hasIssues:
         groups.length > 0 ||
+        autoTenantIssues.length > 0 ||
+        emptyTenants.length > 0 ||
         emptyShardEntries.length > 0 ||
         emptyShardRatios.length > 0 ||
         replicationImbalances.length > 0 ||
         asyncDisabled.length > 0,
       multiTenancy: { groups, hasIssues: groups.length > 0 },
+      autoTenantConfig: { issues: autoTenantIssues, hasIssues: autoTenantIssues.length > 0 },
+      emptyTenants: { collections: emptyTenants, hasIssues: emptyTenants.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
       emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
       replicationImbalance: {
@@ -3590,6 +3636,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     this.mtCandidates[connectionId] = groups;
     this.checksIssueSectionCount[connectionId] =
       (groups.length > 0 ? 1 : 0) +
+      (autoTenantIssues.length > 0 ? 1 : 0) +
+      (emptyTenants.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
       (emptyShardRatios.length > 0 ? 1 : 0) +
       (replicationImbalances.length > 0 ? 1 : 0) +
@@ -4462,25 +4510,38 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
     // All checks are independent — run them in parallel.
-    const [candidates, emptyShardEntries, emptyShardRatios, replicationImbalances, asyncDisabled] =
-      await Promise.all([
-        Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-        Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-        Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-        Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
-        Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
-      ]);
+    const [
+      candidates,
+      autoTenantIssues,
+      emptyTenants,
+      emptyShardEntries,
+      emptyShardRatios,
+      replicationImbalances,
+      asyncDisabled,
+    ] = await Promise.all([
+      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
+      Promise.resolve(findAutoTenantConfigIssues(collections)),
+      Promise.resolve(findEmptyTenants(nodes as any, mtCollections)),
+      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
+      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
+      Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
+      Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
+    ]);
     this.mtCandidates[connectionId] = candidates;
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
       hasIssues:
         candidates.length > 0 ||
+        autoTenantIssues.length > 0 ||
+        emptyTenants.length > 0 ||
         emptyShardEntries.length > 0 ||
         emptyShardRatios.length > 0 ||
         replicationImbalances.length > 0 ||
         asyncDisabled.length > 0,
       multiTenancy: { groups: candidates, hasIssues: candidates.length > 0 },
+      autoTenantConfig: { issues: autoTenantIssues, hasIssues: autoTenantIssues.length > 0 },
+      emptyTenants: { collections: emptyTenants, hasIssues: emptyTenants.length > 0 },
       emptyShards: { entries: emptyShardEntries, hasIssues: emptyShardEntries.length > 0 },
       emptyShardRatio: { entries: emptyShardRatios, hasIssues: emptyShardRatios.length > 0 },
       replicationImbalance: {
@@ -4492,6 +4553,8 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
 
     this.checksIssueSectionCount[connectionId] =
       (candidates.length > 0 ? 1 : 0) +
+      (autoTenantIssues.length > 0 ? 1 : 0) +
+      (emptyTenants.length > 0 ? 1 : 0) +
       (emptyShardEntries.length > 0 ? 1 : 0) +
       (emptyShardRatios.length > 0 ? 1 : 0) +
       (replicationImbalances.length > 0 ? 1 : 0) +

@@ -1,0 +1,115 @@
+body {
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  padding: 0;
+  margin: 0;
+}
+
+.mt-form {
+  max-width: 640px;
+  padding: 20px 24px;
+}
+
+.mt-form h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.mt-collection-name {
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  margin: 0 0 20px;
+}
+
+.mt-collection-name code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-foreground);
+}
+
+.mt-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background-color: var(--vscode-editor-background);
+}
+
+.mt-option input[type='checkbox'] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--vscode-checkbox-selectBackground, var(--vscode-button-background));
+}
+
+.mt-option-text {
+  flex: 1;
+}
+
+.mt-option-label {
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mt-option-desc {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.mt-disabled-note {
+  padding: 14px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-panel-border));
+  background-color: var(--vscode-inputValidation-warningBackground, transparent);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.mt-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.mt-button {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--vscode-font-family);
+}
+
+.mt-button--primary {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.mt-button--primary:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.mt-button--secondary {
+  background-color: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.mt-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.mt-error {
+  color: var(--vscode-errorForeground);
+  font-size: 13px;
+  margin-top: 12px;
+}
