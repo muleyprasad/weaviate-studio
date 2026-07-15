@@ -3588,24 +3588,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     );
     const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
-    // All checks are independent — run them in parallel.
-    const [
-      groups,
-      autoTenantIssues,
-      emptyTenants,
-      emptyShardEntries,
-      emptyShardRatios,
-      replicationImbalances,
-      asyncDisabled,
-    ] = await Promise.all([
-      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-      Promise.resolve(findAutoTenantConfigIssues(collections)),
-      Promise.resolve(findEmptyTenants(nodes as any, mtCollections)),
-      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-      Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
-      Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
-    ]);
+    // All checks are independent and synchronous — compute them directly.
+    const groups = findMultiTenantCandidates(collections, objectCounts);
+    const autoTenantIssues = findAutoTenantConfigIssues(collections);
+    const emptyTenants = findEmptyTenants(nodes as any, mtCollections);
+    const emptyShardEntries = findEmptyShards(nodes as any, mtCollections);
+    const emptyShardRatios = findEmptyShardRatios(nodes as any, mtCollections);
+    const replicationImbalances = findReplicationImbalances(
+      nodes as any,
+      asyncReplicationByCollection
+    );
+    const asyncDisabled = findCollectionsWithoutAsyncReplication(collections);
 
     const result: ChecksResult = {
       timestamp: new Date().toISOString(),
@@ -4509,24 +4502,17 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
     );
     const asyncReplicationByCollection = buildAsyncReplicationMap(collections);
 
-    // All checks are independent — run them in parallel.
-    const [
-      candidates,
-      autoTenantIssues,
-      emptyTenants,
-      emptyShardEntries,
-      emptyShardRatios,
-      replicationImbalances,
-      asyncDisabled,
-    ] = await Promise.all([
-      Promise.resolve(findMultiTenantCandidates(collections, objectCounts)),
-      Promise.resolve(findAutoTenantConfigIssues(collections)),
-      Promise.resolve(findEmptyTenants(nodes as any, mtCollections)),
-      Promise.resolve(findEmptyShards(nodes as any, mtCollections)),
-      Promise.resolve(findEmptyShardRatios(nodes as any, mtCollections)),
-      Promise.resolve(findReplicationImbalances(nodes as any, asyncReplicationByCollection)),
-      Promise.resolve(findCollectionsWithoutAsyncReplication(collections)),
-    ]);
+    // All checks are independent and synchronous — compute them directly.
+    const candidates = findMultiTenantCandidates(collections, objectCounts);
+    const autoTenantIssues = findAutoTenantConfigIssues(collections);
+    const emptyTenants = findEmptyTenants(nodes as any, mtCollections);
+    const emptyShardEntries = findEmptyShards(nodes as any, mtCollections);
+    const emptyShardRatios = findEmptyShardRatios(nodes as any, mtCollections);
+    const replicationImbalances = findReplicationImbalances(
+      nodes as any,
+      asyncReplicationByCollection
+    );
+    const asyncDisabled = findCollectionsWithoutAsyncReplication(collections);
     this.mtCandidates[connectionId] = candidates;
 
     const result: ChecksResult = {

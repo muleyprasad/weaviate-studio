@@ -1,4 +1,9 @@
-import { matchTenantNames, wildcardToRegExp, buildTenantMatcher } from '../tenantMatch';
+import {
+  matchTenantNames,
+  wildcardToRegExp,
+  buildTenantMatcher,
+  MAX_PATTERN_LENGTH,
+} from '../tenantMatch';
 
 describe('wildcardToRegExp', () => {
   it('anchors the pattern (full-name match)', () => {
@@ -24,6 +29,12 @@ describe('wildcardToRegExp', () => {
     const re = wildcardToRegExp('a.b+c');
     expect(re.test('a.b+c')).toBe(true);
     expect(re.test('axbxc')).toBe(false);
+  });
+
+  it('collapses runs of * so matching behaviour is unchanged', () => {
+    const re = wildcardToRegExp('**acme**');
+    expect(re.source).toBe('^.*acme.*$');
+    expect(re.test('the-acme-corp')).toBe(true);
   });
 });
 
@@ -75,5 +86,16 @@ describe('buildTenantMatcher', () => {
   });
   it('builds a regex matcher', () => {
     expect(buildTenantMatcher('ten', 'regex').test('tenant')).toBe(true);
+  });
+
+  it('throws RangeError when the pattern exceeds the length cap', () => {
+    const tooLong = 'a'.repeat(MAX_PATTERN_LENGTH + 1);
+    expect(() => buildTenantMatcher(tooLong, 'regex')).toThrow(RangeError);
+    expect(() => buildTenantMatcher(tooLong, 'wildcard')).toThrow(RangeError);
+  });
+
+  it('accepts a pattern exactly at the length cap', () => {
+    const atLimit = 'a'.repeat(MAX_PATTERN_LENGTH);
+    expect(() => buildTenantMatcher(atLimit, 'regex')).not.toThrow();
   });
 });
