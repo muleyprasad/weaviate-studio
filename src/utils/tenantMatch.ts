@@ -13,15 +13,31 @@
 export type TenantMatchMode = 'wildcard' | 'regex';
 
 /**
+ * Upper bound on pattern length. Matching runs synchronously on the webview
+ * thread against every tenant name, so an over-long user-authored `regex`
+ * pattern (e.g. a nested-quantifier ReDoS like `(a+)+$`) could otherwise stall
+ * the UI. Tenant names are short and server-bounded, so a modest cap on the
+ * pattern side keeps worst-case backtracking well contained without needing a
+ * linear-time engine.
+ */
+export const MAX_PATTERN_LENGTH = 200;
+
+/**
  * Converts a glob-style wildcard pattern into an anchored RegExp.
  *
  * All regex metacharacters are escaped except `*` and `?`, which are translated
  * to `.*` and `.` respectively. The result is anchored with `^…$` so the whole
  * tenant name must match.
+ *
+ * Consecutive `*` are collapsed to a single `*` first: `**acme**` and `*acme*`
+ * are equivalent globs, but the naive translation would emit adjacent `.*.*`
+ * groups that multiply backtracking work for no added matching power.
  */
 export function wildcardToRegExp(pattern: string): RegExp {
+  // Collapse runs of `*` — `.*.*` matches exactly what `.*` does, only slower.
+  const collapsed = pattern.replace(/\*+/g, '*');
   // Escape every regex special char except * and ? (handled below).
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const escaped = collapsed.replace(/[.+^${}()|[\]\\]/g, '\\$&');
   const converted = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp(`^${converted}$`);
 }
@@ -29,9 +45,13 @@ export function wildcardToRegExp(pattern: string): RegExp {
 /**
  * Builds the matcher RegExp for a pattern + mode.
  *
- * @throws SyntaxError if `mode` is `regex` and the pattern is not a valid regex.
+ * @throws {RangeError} if the pattern exceeds {@link MAX_PATTERN_LENGTH}.
+ * @throws {SyntaxError} if `mode` is `regex` and the pattern is not a valid regex.
  */
 export function buildTenantMatcher(pattern: string, mode: TenantMatchMode): RegExp {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    throw new RangeError(`Pattern is too long (max ${MAX_PATTERN_LENGTH} characters).`);
+  }
   return mode === 'wildcard' ? wildcardToRegExp(pattern) : new RegExp(pattern);
 }
 
@@ -41,8 +61,9 @@ export function buildTenantMatcher(pattern: string, mode: TenantMatchMode): RegE
  * An empty/blank pattern matches nothing (returns `[]`) so an empty input never
  * accidentally selects every tenant. Order of the input is preserved.
  *
- * @throws SyntaxError if `mode` is `regex` and the pattern is invalid — callers
- *         should catch this to surface a friendly "invalid pattern" message.
+ * @throws {RangeError} if the pattern exceeds {@link MAX_PATTERN_LENGTH}.
+ * @throws {SyntaxError} if `mode` is `regex` and the pattern is invalid — callers
+ *         should catch these to surface a friendly message.
  */
 export function matchTenantNames(
   names: string[],

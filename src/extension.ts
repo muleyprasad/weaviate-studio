@@ -57,6 +57,23 @@ interface RagChatCommandArgs {
 }
 
 /**
+ * The multi-tenancy slice of a collection config. The weaviate-client config
+ * type does not surface the auto-tenant flags, so this narrows the shape we read
+ * in one place instead of casting to `any` at each call site.
+ */
+interface MultiTenancyConfig {
+  enabled?: boolean;
+  autoTenantCreation?: boolean;
+  autoTenantActivation?: boolean;
+}
+
+/** Reads the multi-tenancy slice from a collection config, defaulting to `{}`. */
+function getMultiTenancyConfig(config: unknown): MultiTenancyConfig {
+  return ((config as { multiTenancy?: MultiTenancyConfig })?.multiTenancy ??
+    {}) as MultiTenancyConfig;
+}
+
+/**
  * Handles opening of .weaviate files
  */
 async function handleWeaviateFile(
@@ -2107,7 +2124,7 @@ export function activate(context: vscode.ExtensionContext) {
         const conn = connectionManager.getConnection(connectionId);
         // Read fresh config so the form shows current values.
         const config = await client.collections.get(collectionName).config.get();
-        const mt = (config as any)?.multiTenancy ?? {};
+        const mt = getMultiTenancyConfig(config);
         EditMultiTenancyPanel.createOrShow(
           context.extensionUri,
           connectionId,
@@ -2168,7 +2185,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
         const config = await client.collections.get(collectionName).config.get();
-        const current = (config as any)?.multiTenancy?.[flag] === true;
+        const current = getMultiTenancyConfig(config)[flag] === true;
         const newValue = !current;
         await client.collections.get(collectionName).config.update({
           multiTenancy: { [flag]: newValue },
