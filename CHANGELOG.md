@@ -5,6 +5,17 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-14
+
+### ✨ Added
+
+- **Auto-Tenant Configuration check** — flags multi-tenant collections where `autoTenantCreation` and/or `autoTenantActivation` is off (a common source of "tenant not found" / "tenant is inactive" errors), with a one-click **Enable on all** action from the Checks tab.
+- **Empty Tenants (Active) check** — finds ACTIVE (in-memory) tenants holding zero objects — the ones wasting RAM. INACTIVE/OFFLOADED tenants are correctly excluded. Per-collection actions: **Inactivate empty tenants** (offload to disk, keep the tenant) and **Delete empty tenants**.
+- **Edit Multi-Tenancy panel** — toggle the two auto-tenant flags from a webview form opened from the Multi Tenancy tree node. The tree shows a warning badge (icon + "auto-tenant off") when flags are off, and individual flag rows get a right-click **Toggle** action.
+- **Manage Tenants panel** — bulk set tenants to ACTIVE / INACTIVE / OFFLOADED or delete them: selection by checkbox list or wildcard/regex pattern (`*acme*`, `^tenant-\d+$`) with live match preview, filters by name/status and object count (`count=0`, `10<count<50`), natural sort order, and a virtualized list that stays smooth with thousands of tenants. OFFLOADED is gated on Weaviate ≥ 1.26.0 + the `offload-s3` module, re-checked server-side so the UI gate can't be bypassed. Patterns are capped at 200 characters so a pathological regex cannot stall the panel.
+- **Run Checks tree action** next to Refresh Connection Info on active connections.
+- **Read-only gating** on every mutating action — controls disabled in the UI and re-guarded in the extension host.
+
 ## [1.8.0] - 2026-07-01
 
 ### ✨ Added

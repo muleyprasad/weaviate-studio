@@ -9,16 +9,17 @@ Weaviate Studio provides a comprehensive suite of tools for managing your Weavia
 
 ## Core Features
 
-| Feature                                                | Description                                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------- |
-| [**Data Explorer**](/features/data-explorer)           | Interactive table browser with filtering, vector search, and export |
-| [**Generative Search**](/features/generative-search)   | RAG-powered natural language queries across collections             |
-| [**GraphQL Editor**](/features/graphql-templates)      | Monaco editor with schema-aware templates and autocomplete          |
-| [**RBAC & Security**](/features/rbac-security)         | Manage users, roles, and groups with API key rotation               |
-| [**Backup & Restore**](/features/backup-restore)       | Create and restore backups across multiple backends                 |
-| [**Cluster Management**](/features/cluster-management) | Health monitoring and real-time node statistics                     |
-| [**Schema Management**](/features/schema)              | Visualize collections, properties, and relationships                |
-| [**Multi-Vector Search**](/features/muvera)            | Named-vector / Muvera search with join strategies                   |
+| Feature                                                 | Description                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| [**Data Explorer**](/features/data-explorer)            | Interactive table browser with filtering, vector search, and export |
+| [**Generative Search**](/features/generative-search)    | RAG-powered natural language queries across collections             |
+| [**GraphQL Editor**](/features/graphql-templates)       | Monaco editor with schema-aware templates and autocomplete          |
+| [**RBAC & Security**](/features/rbac-security)          | Manage users, roles, and groups with API key rotation               |
+| [**Backup & Restore**](/features/backup-restore)        | Create and restore backups across multiple backends                 |
+| [**Cluster Management**](/features/cluster-management)  | Health monitoring and real-time node statistics                     |
+| [**Multi-Tenancy Management**](/features/multi-tenancy) | Auto-tenant flags, bulk tenant states, and empty-tenant cleanup     |
+| [**Schema Management**](/features/schema)               | Visualize collections, properties, and relationships                |
+| [**Multi-Vector Search**](/features/muvera)             | Named-vector / Muvera search with join strategies                   |
 
 ## Connection Management
 

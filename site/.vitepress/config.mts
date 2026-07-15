@@ -203,6 +203,10 @@ export default defineConfig({
               text: "Cluster Management",
               link: "/features/cluster-management",
             },
+            {
+              text: "Multi-Tenancy Management",
+              link: "/features/multi-tenancy",
+            },
             { text: "Schema Management", link: "/features/schema" },
             { text: "Multi-Vector Search", link: "/features/muvera" },
           ],

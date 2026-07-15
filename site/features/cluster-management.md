@@ -46,6 +46,26 @@ The Cluster Panel runs **parallel health checks** for comprehensive analysis:
 
 Detects collections that would benefit from enabling multi-tenancy. Surfaces actionable suggestions for collections that are good candidates.
 
+### Auto-Tenant Configuration Check
+
+Flags multi-tenant collections where `autoTenantCreation` and/or `autoTenantActivation` is disabled:
+
+- **`autoTenantCreation` off** — clients must create tenants manually before writing, a common source of "tenant not found" errors
+- **`autoTenantActivation` off** — inactive tenants must be reactivated manually before use, a common source of "tenant is inactive" errors
+
+A one-click **Enable on all** action turns both flags on for every flagged collection. See [Multi-Tenancy Management](/features/multi-tenancy) for editing flags per collection.
+
+### Empty Tenants (Active) Check
+
+Finds **ACTIVE** (loaded-into-memory) tenants that hold zero objects — these consume RAM without storing anything. INACTIVE and OFFLOADED tenants live on disk/cloud and are intentionally excluded, since removing them would free no memory.
+
+Per-collection actions:
+
+- **Inactivate empty tenants** — offload to disk, keeping the tenant
+- **Delete empty tenants** — remove them entirely
+
+A tenant counts as empty only when **every** replica reports zero objects, so a lagging replica is never mistaken for an empty tenant.
+
 ### Empty Shards Check (Single-Tenant Collections)
 
 Flags shards with zero objects in **single-tenant collections** — may indicate misconfiguration or stale state. Multi-tenant collections are evaluated separately by the Empty Shard Ratio check below, since individual tenant shards start empty by design.
@@ -77,11 +97,12 @@ Collections also show whether async replication is on or off, since disabled asy
 
 ## Access Points
 
-| Entry Point      | How to Access                        |
-| ---------------- | ------------------------------------ |
-| Sidebar          | Click 📊 icon on server info item    |
-| Command Palette  | `Weaviate: View Cluster Information` |
-| Collection Group | Click "Open Checks" button           |
+| Entry Point       | How to Access                                                                 |
+| ----------------- | ----------------------------------------------------------------------------- |
+| Sidebar           | Click 📊 icon on server info item                                             |
+| Command Palette   | `Weaviate: View Cluster Information`                                          |
+| Collection Group  | Click "Open Checks" button                                                    |
+| Active Connection | Click "Run Checks" next to Refresh — runs all checks and opens the Checks tab |
 
 ## Multi-Panel Support
 
