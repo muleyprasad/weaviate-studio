@@ -207,6 +207,26 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "weaviate.runChecks",
+        "title": "Run Checks",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "weaviate.editMultiTenancy",
+        "title": "Edit Multi-Tenancy",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "weaviate.toggleAutoTenantFlag",
+        "title": "Toggle",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "weaviate.manageTenants",
+        "title": "Manage Tenants",
+        "icon": "$(list-selection)"
+      },
+      {
         "command": "weaviate.refreshBackups",
         "title": "Refresh Backups",
         "icon": "$(refresh)"
@@ -597,9 +617,49 @@
           "group": "inline@1"
         },
         {
+          "command": "weaviate.runChecks",
+          "when": "view == weaviateConnectionsView && viewItem == weaviateConnectionActive",
+          "group": "inline@2"
+        },
+        {
           "command": "weaviate.refreshConnection",
           "when": "view == weaviateConnectionsView && (viewItem == weaviateConnectionActive || viewItem == weaviateServerInfo || viewItem == weaviateClusterHealth)",
           "group": "navigation@1"
+        },
+        {
+          "command": "weaviate.runChecks",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateConnectionActive || viewItem == weaviateServerInfo || viewItem == weaviateClusterHealth)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "weaviate.editMultiTenancy",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.editMultiTenancy",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "weaviate.manageTenants",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "inline@2"
+        },
+        {
+          "command": "weaviate.manageTenants",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateMultiTenancy || viewItem == weaviateMultiTenancyWarning)",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "weaviate.toggleAutoTenantFlag",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateAutoTenantFlagOn || viewItem == weaviateAutoTenantFlagOff)",
+          "group": "inline@1"
+        },
+        {
+          "command": "weaviate.toggleAutoTenantFlag",
+          "when": "view == weaviateConnectionsView && (viewItem == weaviateAutoTenantFlagOn || viewItem == weaviateAutoTenantFlagOff)",
+          "group": "1_modification@1"
         },
         {
           "command": "weaviate.refreshStatistics",

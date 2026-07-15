@@ -1230,3 +1230,80 @@
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
 }
+
+/* ── Check action buttons (Enable on all, Delete empty tenants) ────────────── */
+.checks-section-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.checks-action-button {
+  padding: 5px 12px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--vscode-font-family);
+}
+
+.checks-action-button:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.checks-action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.checks-group-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.checks-action-button--danger {
+  background-color: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-errorForeground);
+  border: 1px solid var(--vscode-errorForeground);
+}
+
+.checks-action-button--danger:hover:not(:disabled) {
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+}
+
+/* ── Auto-tenant flag cells ────────────────────────────────────────────────── */
+.checks-flag-on {
+  color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #3fb950));
+  font-weight: 600;
+}
+
+.checks-flag-off {
+  color: var(--vscode-errorForeground);
+  font-weight: 600;
+}
+
+/* ── Empty-tenant chips ────────────────────────────────────────────────────── */
+.checks-tenant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.checks-tenant-chip {
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-badge-background);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.checks-tenant-chip--more {
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}

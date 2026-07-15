@@ -6,6 +6,8 @@ import {
   findEmptyShardRatios,
   findReplicationImbalances,
   findCollectionsWithoutAsyncReplication,
+  findAutoTenantConfigIssues,
+  findEmptyTenants,
   buildAsyncReplicationMap,
   EMPTY_SHARD_RATIO_THRESHOLDS,
   MtCandidateGroup,
@@ -49,6 +51,26 @@ function makeCollection(
 
 function groupNames(group: MtCandidateGroup): string[] {
   return group.collections.map((c) => c.name);
+}
+
+/** Builds a multi-tenant collection with explicit auto-tenant flags. */
+function makeMtCollection(
+  name: string,
+  opts: { enabled?: boolean; creation?: boolean; activation?: boolean } = {}
+): CollectionWithSchema {
+  return {
+    label: name,
+    collapsibleState: 0,
+    itemType: 'collection',
+    schema: {
+      name,
+      multiTenancy: {
+        enabled: opts.enabled ?? true,
+        autoTenantCreation: opts.creation ?? false,
+        autoTenantActivation: opts.activation ?? false,
+      },
+    } as any,
+  } as unknown as CollectionWithSchema;
 }
 
 // ─── computeCollectionHash ────────────────────────────────────────────────────
@@ -880,5 +902,156 @@ describe('buildAsyncReplicationMap', () => {
   it('omits collections without a replication config', () => {
     const map = buildAsyncReplicationMap([makeCollection('NoRep')]);
     expect(map).toEqual({});
+  });
+});
+
+// ─── findAutoTenantConfigIssues ────────────────────────────────────────────────
+
+describe('findAutoTenantConfigIssues', () => {
+  it('returns empty array when there are no collections', () => {
+    expect(findAutoTenantConfigIssues([])).toHaveLength(0);
+  });
+
+  it('ignores non-multi-tenant collections', () => {
+    const cols = [makeCollection('Article', [], false)];
+    expect(findAutoTenantConfigIssues(cols)).toHaveLength(0);
+  });
+
+  it('does not flag a collection with both flags enabled', () => {
+    const cols = [makeMtCollection('Docs', { creation: true, activation: true })];
+    expect(findAutoTenantConfigIssues(cols)).toHaveLength(0);
+  });
+
+  it('flags a collection with autoTenantCreation off', () => {
+    const cols = [makeMtCollection('Docs', { creation: false, activation: true })];
+    const result = findAutoTenantConfigIssues(cols);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      collectionName: 'Docs',
+      autoTenantCreation: false,
+      autoTenantActivation: true,
+    });
+  });
+
+  it('flags a collection with autoTenantActivation off', () => {
+    const cols = [makeMtCollection('Docs', { creation: true, activation: false })];
+    const result = findAutoTenantConfigIssues(cols);
+    expect(result).toHaveLength(1);
+    expect(result[0].autoTenantActivation).toBe(false);
+    expect(result[0].autoTenantCreation).toBe(true);
+  });
+
+  it('flags a collection with both flags off', () => {
+    const cols = [makeMtCollection('Docs', { creation: false, activation: false })];
+    const result = findAutoTenantConfigIssues(cols);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      collectionName: 'Docs',
+      autoTenantCreation: false,
+      autoTenantActivation: false,
+    });
+  });
+
+  it('treats missing flags as false (disabled)', () => {
+    const cols = [
+      {
+        label: 'Docs',
+        collapsibleState: 0,
+        itemType: 'collection',
+        schema: { name: 'Docs', multiTenancy: { enabled: true } },
+      } as unknown as CollectionWithSchema,
+    ];
+    const result = findAutoTenantConfigIssues(cols);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      collectionName: 'Docs',
+      autoTenantCreation: false,
+      autoTenantActivation: false,
+    });
+  });
+
+  it('reports only the collections that have an issue', () => {
+    const cols = [
+      makeMtCollection('Good', { creation: true, activation: true }),
+      makeMtCollection('Bad', { creation: false, activation: true }),
+      makeCollection('SingleTenant', [], false),
+    ];
+    const result = findAutoTenantConfigIssues(cols);
+    expect(result).toHaveLength(1);
+    expect(result[0].collectionName).toBe('Bad');
+  });
+});
+
+// ─── findEmptyTenants ──────────────────────────────────────────────────────────
+
+describe('findEmptyTenants', () => {
+  it('returns empty array when there are no nodes', () => {
+    expect(findEmptyTenants([], new Set(['Docs']))).toHaveLength(0);
+  });
+
+  it('only scans collections in the multi-tenant set', () => {
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Docs', name: 'tenant-a', objectCount: 0 },
+        { class: 'Article', name: 'shard-1', objectCount: 0 },
+      ]),
+    ];
+    const result = findEmptyTenants(nodes, new Set(['Docs']));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ collectionName: 'Docs', tenants: ['tenant-a'] });
+  });
+
+  it('does not flag tenants that have objects', () => {
+    const nodes = [makeNode('node-1', [{ class: 'Docs', name: 'tenant-a', objectCount: 100 }])];
+    expect(findEmptyTenants(nodes, new Set(['Docs']))).toHaveLength(0);
+  });
+
+  it('reports multiple empty tenants sorted by name', () => {
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Docs', name: 'tenant-c', objectCount: 0 },
+        { class: 'Docs', name: 'tenant-a', objectCount: 0 },
+        { class: 'Docs', name: 'tenant-b', objectCount: 5 },
+      ]),
+    ];
+    const result = findEmptyTenants(nodes, new Set(['Docs']));
+    expect(result).toHaveLength(1);
+    expect(result[0].tenants).toEqual(['tenant-a', 'tenant-c']);
+  });
+
+  it('treats a tenant as empty only when every replica is empty', () => {
+    // tenant-a has objects on one replica → not empty; tenant-b empty on all.
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Docs', name: 'tenant-a', objectCount: 0 },
+        { class: 'Docs', name: 'tenant-b', objectCount: 0 },
+      ]),
+      makeNode('node-2', [
+        { class: 'Docs', name: 'tenant-a', objectCount: 50 },
+        { class: 'Docs', name: 'tenant-b', objectCount: 0 },
+      ]),
+    ];
+    const result = findEmptyTenants(nodes, new Set(['Docs']));
+    expect(result).toHaveLength(1);
+    expect(result[0].tenants).toEqual(['tenant-b']);
+  });
+
+  it('sorts collections by empty-tenant count descending', () => {
+    const nodes = [
+      makeNode('node-1', [
+        { class: 'Few', name: 't1', objectCount: 0 },
+        { class: 'Many', name: 't1', objectCount: 0 },
+        { class: 'Many', name: 't2', objectCount: 0 },
+        { class: 'Many', name: 't3', objectCount: 0 },
+      ]),
+    ];
+    const result = findEmptyTenants(nodes, new Set(['Few', 'Many']));
+    expect(result.map((r) => r.collectionName)).toEqual(['Many', 'Few']);
+  });
+
+  it('tolerates null shards on a node', () => {
+    const nodes: NodeLike[] = [{ name: 'node-1', shards: null }];
+    expect(() => findEmptyTenants(nodes, new Set(['Docs']))).not.toThrow();
+    expect(findEmptyTenants(nodes, new Set(['Docs']))).toHaveLength(0);
   });
 });

@@ -125,12 +125,31 @@ interface AsyncReplicationDisabledEntry {
   replicationFactor: number;
 }
 
+interface AutoTenantConfigIssue {
+  collectionName: string;
+  autoTenantCreation: boolean;
+  autoTenantActivation: boolean;
+}
+
+interface EmptyTenantCollection {
+  collectionName: string;
+  tenants: string[];
+}
+
 interface ChecksResult {
   timestamp: string;
   /** True when any individual check has issues. Present in newer results. */
   hasIssues?: boolean;
   multiTenancy: {
     groups: MtCandidateGroup[];
+    hasIssues: boolean;
+  };
+  autoTenantConfig?: {
+    issues: AutoTenantConfigIssue[];
+    hasIssues: boolean;
+  };
+  emptyTenants?: {
+    collections: EmptyTenantCollection[];
     hasIssues: boolean;
   };
   emptyShards?: {
@@ -178,6 +197,21 @@ function openExternalLink(url: string) {
   vscode.postMessage({ command: 'openExternal', url });
 }
 
+/** Asks the extension to enable auto-tenant creation + activation on all flagged collections. */
+function enableAutoTenantAll() {
+  vscode.postMessage({ command: 'enableAutoTenantAll' });
+}
+
+/** Asks the extension to delete the empty ACTIVE tenants of a collection. */
+function deleteEmptyTenants(collectionName: string) {
+  vscode.postMessage({ command: 'deleteEmptyTenants', collectionName });
+}
+
+/** Asks the extension to set the empty ACTIVE tenants of a collection to INACTIVE. */
+function deactivateEmptyTenants(collectionName: string) {
+  vscode.postMessage({ command: 'deactivateEmptyTenants', collectionName });
+}
+
 /**
  * Formats a replication ratio (0–1) as a percentage string.
  *
@@ -200,6 +234,8 @@ function formatReplicationPct(ratio: number): string {
 
 function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
   const groups = checksResult?.multiTenancy.groups ?? [];
+  const autoTenantIssues = checksResult?.autoTenantConfig?.issues ?? [];
+  const emptyTenantCollections = checksResult?.emptyTenants?.collections ?? [];
   const emptyShardEntries = checksResult?.emptyShards?.entries ?? [];
   const emptyShardRatioEntries = checksResult?.emptyShardRatio?.entries ?? [];
   const replicationCollections = checksResult?.replicationImbalance?.collections ?? [];
@@ -292,6 +328,170 @@ function ChecksView({ checksResult, isRunning, onRunChecks }: ChecksViewProps) {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* ── Auto-Tenant Configuration ─────────────────────────────── */}
+          <div
+            className={`checks-section${autoTenantIssues.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {autoTenantIssues.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Auto-Tenant Configuration
+            </h3>
+            {autoTenantIssues.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                All multi-tenant collections have auto-tenant creation and activation enabled.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following multi-tenant collections have <code>autoTenantCreation</code> and/or{' '}
+                  <code>autoTenantActivation</code> disabled. When <code>autoTenantCreation</code>{' '}
+                  is off, clients must create tenants manually before writing (a common source of
+                  "tenant not found" errors); when <code>autoTenantActivation</code> is off,
+                  inactive tenants must be reactivated manually before use (a common source of
+                  "tenant is inactive" errors).{' '}
+                  <a
+                    href="https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy#automatically-add-new-tenants"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink(
+                        'https://docs.weaviate.io/weaviate/manage-collections/multi-tenancy#automatically-add-new-tenants'
+                      );
+                    }}
+                  >
+                    Learn more ↗
+                  </a>
+                </p>
+                <div className="checks-section-actions">
+                  <button
+                    className="checks-action-button"
+                    onClick={enableAutoTenantAll}
+                    title="Enable autoTenantCreation and autoTenantActivation on all listed collections"
+                  >
+                    Enable on all ({autoTenantIssues.length})
+                  </button>
+                </div>
+                <table className="checks-table">
+                  <thead>
+                    <tr>
+                      <th>Collection</th>
+                      <th>autoTenantCreation</th>
+                      <th>autoTenantActivation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {autoTenantIssues.map((issue) => (
+                      <tr key={issue.collectionName}>
+                        <td>
+                          <span className="checks-col-name">{issue.collectionName}</span>
+                        </td>
+                        <td
+                          className={
+                            issue.autoTenantCreation ? 'checks-flag-on' : 'checks-flag-off'
+                          }
+                        >
+                          {issue.autoTenantCreation ? 'on' : 'off'}
+                        </td>
+                        <td
+                          className={
+                            issue.autoTenantActivation ? 'checks-flag-on' : 'checks-flag-off'
+                          }
+                        >
+                          {issue.autoTenantActivation ? 'on' : 'off'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+
+          {/* ── Empty Tenants (Active) ────────────────────────────────── */}
+          <div
+            className={`checks-section${emptyTenantCollections.length > 0 ? ' checks-section--warning' : ''}`}
+          >
+            <h3 className="checks-section-title">
+              {emptyTenantCollections.length > 0 && (
+                <span className="checks-section-warning-icon">⚠</span>
+              )}
+              Empty Tenants (Active)
+            </h3>
+            {emptyTenantCollections.length === 0 ? (
+              <div className="checks-ok">
+                <span className="checks-ok-icon">✓</span>
+                No empty active tenants detected.
+              </div>
+            ) : (
+              <>
+                <p className="checks-section-desc">
+                  The following multi-tenant collections have <strong>ACTIVE</strong> tenants that
+                  are loaded into memory but hold zero objects. These waste RAM. Consider deleting
+                  them, or deactivating them to offload to disk.{' '}
+                  <a
+                    href="https://docs.weaviate.io/weaviate/manage-collections/tenant-states"
+                    className="checks-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openExternalLink(
+                        'https://docs.weaviate.io/weaviate/manage-collections/tenant-states'
+                      );
+                    }}
+                  >
+                    Learn more ↗
+                  </a>
+                </p>
+                <div className="checks-info-callout">
+                  <span className="checks-info-callout-icon">ℹ️</span>
+                  Only ACTIVE (in-memory) tenants are shown — INACTIVE/OFFLOADED tenants live on
+                  disk/cloud and are not counted here. Object counts from node status may lag
+                  slightly, so only delete tenants that consistently show zero objects.
+                </div>
+                {emptyTenantCollections.map((col) => (
+                  <div key={col.collectionName} className="checks-group">
+                    <div className="checks-group-header">
+                      <span className="checks-group-label">{col.collectionName}</span>
+                      <span className="checks-group-count">
+                        {col.tenants.length} empty tenant{col.tenants.length !== 1 ? 's' : ''}
+                      </span>
+                      <div className="checks-group-actions">
+                        <button
+                          className="checks-action-button"
+                          onClick={() => deactivateEmptyTenants(col.collectionName)}
+                          title={`Set the ${col.tenants.length} empty tenants of ${col.collectionName} to INACTIVE (offload to disk, keeps the tenant)`}
+                        >
+                          Inactivate empty tenants
+                        </button>
+                        <button
+                          className="checks-action-button checks-action-button--danger"
+                          onClick={() => deleteEmptyTenants(col.collectionName)}
+                          title={`Delete the ${col.tenants.length} empty tenants of ${col.collectionName}`}
+                        >
+                          Delete empty tenants
+                        </button>
+                      </div>
+                    </div>
+                    <div className="checks-tenant-chips">
+                      {col.tenants.slice(0, 50).map((name) => (
+                        <span key={name} className="checks-tenant-chip">
+                          {name}
+                        </span>
+                      ))}
+                      {col.tenants.length > 50 && (
+                        <span className="checks-tenant-chip checks-tenant-chip--more">
+                          +{col.tenants.length - 50} more
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </>
@@ -1635,8 +1835,12 @@ function ClusterPanelWebview() {
                 if (!checksResult) return '';
                 const issueCount = [
                   checksResult.multiTenancy?.hasIssues,
+                  checksResult.autoTenantConfig?.hasIssues,
+                  checksResult.emptyTenants?.hasIssues,
                   checksResult.emptyShards?.hasIssues,
+                  checksResult.emptyShardRatio?.hasIssues,
                   checksResult.replicationImbalance?.hasIssues,
+                  checksResult.asyncReplicationDisabled?.hasIssues,
                 ].filter(Boolean).length;
                 return issueCount > 0 ? ` (${issueCount})` : '';
               })()}

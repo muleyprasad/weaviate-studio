@@ -22,6 +22,9 @@ import { DataExplorerPanel } from './data-explorer/extension/DataExplorerPanel';
 import { RagChatPanel } from './rag-chat/extension/RagChatPanel';
 import type { FilterCondition, FilterMatchMode } from './data-explorer/types';
 import { AliasPanel } from './views/AliasPanel';
+import { EditMultiTenancyPanel } from './views/EditMultiTenancyPanel';
+import { ManageTenantsPanel, TenantEntry } from './views/ManageTenantsPanel';
+import { isVersionAtLeast } from './data-explorer/webview/utils/versionCheck';
 import { RbacRolePanel } from './views/RbacRolePanel';
 import { RbacUserPanel } from './views/RbacUserPanel';
 import { RbacGroupPanel } from './views/RbacGroupPanel';
@@ -1870,6 +1873,155 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Failed to run checks: ${errorMessage}`);
                 postMessage({ command: 'checksResult', result: null });
               }
+            } else if (message.command === 'enableAutoTenantAll') {
+              // Enable autoTenantCreation + autoTenantActivation on every collection
+              // flagged by the Auto-Tenant Configuration check.
+              try {
+                const conn = connectionManager.getConnection(item.connectionId);
+                if (conn?.readOnly === true) {
+                  vscode.window.showWarningMessage(
+                    'This connection is read-only. Enable write access to modify multi-tenancy settings.'
+                  );
+                  return;
+                }
+                const lastChecks = weaviateTreeDataProvider.getLastChecksResult(item.connectionId);
+                const issues = lastChecks?.autoTenantConfig?.issues ?? [];
+                if (issues.length === 0) {
+                  vscode.window.showInformationMessage('No collections need auto-tenant changes.');
+                  return;
+                }
+                const confirm = await vscode.window.showWarningMessage(
+                  `Enable autoTenantCreation and autoTenantActivation on ${issues.length} collection(s)?`,
+                  { modal: true },
+                  'Enable'
+                );
+                if (confirm !== 'Enable') {
+                  return;
+                }
+                const failures: string[] = [];
+                for (const issue of issues) {
+                  try {
+                    await client.collections.get(issue.collectionName).config.update({
+                      multiTenancy: { autoTenantCreation: true, autoTenantActivation: true },
+                    });
+                  } catch (err) {
+                    failures.push(
+                      `${issue.collectionName}: ${err instanceof Error ? err.message : 'error'}`
+                    );
+                  }
+                }
+                // Refresh collection schemas so the new flag values are picked up.
+                await weaviateTreeDataProvider.refreshCollections(item.connectionId);
+                if (failures.length > 0) {
+                  vscode.window.showErrorMessage(
+                    `Enabled auto-tenant on ${issues.length - failures.length}/${issues.length} collection(s). Failed: ${failures.join('; ')}`
+                  );
+                } else {
+                  vscode.window.showInformationMessage(
+                    `Enabled auto-tenant on ${issues.length} collection(s).`
+                  );
+                }
+                const result = await weaviateTreeDataProvider.runChecks(item.connectionId);
+                postMessage({ command: 'checksResult', result });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to enable auto-tenant: ${errorMessage}`);
+              }
+            } else if (message.command === 'deleteEmptyTenants') {
+              // Delete the empty ACTIVE tenants of a single collection.
+              try {
+                const conn = connectionManager.getConnection(item.connectionId);
+                if (conn?.readOnly === true) {
+                  vscode.window.showWarningMessage(
+                    'This connection is read-only. Enable write access to delete tenants.'
+                  );
+                  return;
+                }
+                const lastChecks = weaviateTreeDataProvider.getLastChecksResult(item.connectionId);
+                const entry = lastChecks?.emptyTenants?.collections.find(
+                  (c) => c.collectionName === message.collectionName
+                );
+                const tenantNames = entry?.tenants ?? [];
+                if (tenantNames.length === 0) {
+                  vscode.window.showInformationMessage(
+                    `No empty tenants to delete in ${message.collectionName}.`
+                  );
+                  return;
+                }
+                const confirm = await vscode.window.showWarningMessage(
+                  `Delete ${tenantNames.length} empty tenant(s) from "${message.collectionName}"? This cannot be undone.`,
+                  { modal: true },
+                  'Delete'
+                );
+                if (confirm !== 'Delete') {
+                  return;
+                }
+                await client.collections.get(message.collectionName).tenants.remove(tenantNames);
+                vscode.window.showInformationMessage(
+                  `Deleted ${tenantNames.length} empty tenant(s) from "${message.collectionName}".`
+                );
+                // Refresh node status so the tenants no longer appear, then re-run checks.
+                await weaviateTreeDataProvider.fetchNodes(item.connectionId);
+                const freshNodes =
+                  weaviateTreeDataProvider.getCachedClusterNodes(item.connectionId) ?? [];
+                postMessage({ command: 'updateData', nodeStatusData: freshNodes });
+                const result = await weaviateTreeDataProvider.runChecks(item.connectionId);
+                postMessage({ command: 'checksResult', result });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(`Failed to delete empty tenants: ${errorMessage}`);
+              }
+            } else if (message.command === 'deactivateEmptyTenants') {
+              // Set the empty ACTIVE tenants of a collection to INACTIVE — frees
+              // memory (offloads to disk) without deleting the tenant.
+              try {
+                const conn = connectionManager.getConnection(item.connectionId);
+                if (conn?.readOnly === true) {
+                  vscode.window.showWarningMessage(
+                    'This connection is read-only. Enable write access to deactivate tenants.'
+                  );
+                  return;
+                }
+                const lastChecks = weaviateTreeDataProvider.getLastChecksResult(item.connectionId);
+                const entry = lastChecks?.emptyTenants?.collections.find(
+                  (c) => c.collectionName === message.collectionName
+                );
+                const tenantNames = entry?.tenants ?? [];
+                if (tenantNames.length === 0) {
+                  vscode.window.showInformationMessage(
+                    `No empty tenants to deactivate in ${message.collectionName}.`
+                  );
+                  return;
+                }
+                const confirm = await vscode.window.showWarningMessage(
+                  `Set ${tenantNames.length} empty tenant(s) in "${message.collectionName}" to INACTIVE?`,
+                  { modal: true },
+                  'Inactivate'
+                );
+                if (confirm !== 'Inactivate') {
+                  return;
+                }
+                await client.collections
+                  .get(message.collectionName)
+                  .tenants.update(
+                    tenantNames.map((name) => ({ name, activityStatus: 'INACTIVE' as const }))
+                  );
+                vscode.window.showInformationMessage(
+                  `Set ${tenantNames.length} empty tenant(s) to INACTIVE in "${message.collectionName}".`
+                );
+                // Refresh node status so the now-inactive tenants no longer count, then re-run checks.
+                await weaviateTreeDataProvider.fetchNodes(item.connectionId);
+                const freshNodes =
+                  weaviateTreeDataProvider.getCachedClusterNodes(item.connectionId) ?? [];
+                postMessage({ command: 'updateData', nodeStatusData: freshNodes });
+                const result = await weaviateTreeDataProvider.runChecks(item.connectionId);
+                postMessage({ command: 'checksResult', result });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                vscode.window.showErrorMessage(
+                  `Failed to deactivate empty tenants: ${errorMessage}`
+                );
+              }
             } else if (message.command === 'openExternal') {
               vscode.env.openExternal(vscode.Uri.parse(message.url));
             }
@@ -1896,6 +2048,271 @@ export function activate(context: vscode.ExtensionContext) {
           connectionId,
           openTab: 'checks',
         });
+      }
+    }),
+
+    // Run all cluster checks and open the Cluster panel on the Checks tab.
+    vscode.commands.registerCommand('weaviate.runChecks', async (item) => {
+      const connectionId = item?.connectionId;
+      if (!connectionId) {
+        vscode.window.showErrorMessage('Missing connection information');
+        return;
+      }
+      try {
+        const result = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Running cluster checks…',
+          },
+          async () => {
+            // Refresh node status first so checks use up-to-date data.
+            await weaviateTreeDataProvider.fetchNodes(connectionId);
+            return weaviateTreeDataProvider.runChecks(connectionId);
+          }
+        );
+        // Open (or focus) the Cluster panel on the Checks tab. The init payload
+        // carries the freshly-persisted result for a not-yet-open panel.
+        await vscode.commands.executeCommand('weaviate.viewClusterInfo', {
+          connectionId,
+          openTab: 'checks',
+        });
+        // If the panel was already open, push the fresh nodes + result to it.
+        const panel = ClusterPanel.getPanel(connectionId);
+        if (panel) {
+          const freshNodes = weaviateTreeDataProvider.getCachedClusterNodes(connectionId) ?? [];
+          panel.postMessage({ command: 'updateData', nodeStatusData: freshNodes });
+          panel.postMessage({ command: 'checksResult', result });
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to run checks: ${errorMessage}`);
+      }
+    }),
+
+    // Open the "Edit Multi-Tenancy" form for a collection.
+    vscode.commands.registerCommand('weaviate.editMultiTenancy', async (item) => {
+      const connectionId = item?.connectionId;
+      const collectionName = item?.collectionName;
+      if (!connectionId || !collectionName) {
+        vscode.window.showErrorMessage('Missing collection information');
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+        const conn = connectionManager.getConnection(connectionId);
+        // Read fresh config so the form shows current values.
+        const config = await client.collections.get(collectionName).config.get();
+        const mt = (config as any)?.multiTenancy ?? {};
+        EditMultiTenancyPanel.createOrShow(
+          context.extensionUri,
+          connectionId,
+          collectionName,
+          {
+            enabled: mt.enabled === true,
+            autoTenantCreation: mt.autoTenantCreation === true,
+            autoTenantActivation: mt.autoTenantActivation === true,
+            readOnly: conn?.readOnly === true,
+          },
+          async (data) => {
+            if (conn?.readOnly === true) {
+              throw new Error('This connection is read-only.');
+            }
+            await client.collections.get(collectionName).config.update({
+              multiTenancy: {
+                autoTenantCreation: data.autoTenantCreation,
+                autoTenantActivation: data.autoTenantActivation,
+              },
+            });
+            vscode.window.showInformationMessage(
+              `Updated multi-tenancy settings for "${collectionName}".`
+            );
+            await weaviateTreeDataProvider.refreshCollections(connectionId);
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to open multi-tenancy editor: ${errorMessage}`);
+      }
+    }),
+
+    // Toggle a single auto-tenant flag (autoTenantCreation / autoTenantActivation)
+    // directly from its tree row.
+    vscode.commands.registerCommand('weaviate.toggleAutoTenantFlag', async (item) => {
+      const connectionId = item?.connectionId;
+      const collectionName = item?.collectionName;
+      const flag = item?.itemId as string | undefined;
+      if (!connectionId || !collectionName || !flag) {
+        vscode.window.showErrorMessage('Missing multi-tenancy information');
+        return;
+      }
+      if (flag !== 'autoTenantCreation' && flag !== 'autoTenantActivation') {
+        return;
+      }
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const conn = connectionManager.getConnection(connectionId);
+        if (conn?.readOnly === true) {
+          vscode.window.showWarningMessage(
+            'This connection is read-only. Enable write access to modify multi-tenancy settings.'
+          );
+          return;
+        }
+        const client = await connectionManager.getClient(connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+        const config = await client.collections.get(collectionName).config.get();
+        const current = (config as any)?.multiTenancy?.[flag] === true;
+        const newValue = !current;
+        await client.collections.get(collectionName).config.update({
+          multiTenancy: { [flag]: newValue },
+        });
+        vscode.window.showInformationMessage(
+          `${flag} ${newValue ? 'enabled' : 'disabled'} for "${collectionName}".`
+        );
+        await weaviateTreeDataProvider.refreshCollections(connectionId);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to toggle ${flag}: ${errorMessage}`);
+      }
+    }),
+
+    // Open the "Manage Tenants" panel to activate/deactivate/offload tenants.
+    vscode.commands.registerCommand('weaviate.manageTenants', async (item) => {
+      const connectionId = item?.connectionId;
+      const collectionName = item?.collectionName;
+      if (!connectionId || !collectionName) {
+        vscode.window.showErrorMessage('Missing collection information');
+        return;
+      }
+      const OFFLOAD_MIN_VERSION = '1.26.0';
+      try {
+        const connectionManager = weaviateTreeDataProvider.getConnectionManager();
+        const client = await connectionManager.getClient(connectionId);
+        if (!client) {
+          vscode.window.showErrorMessage('Failed to get Weaviate client');
+          return;
+        }
+        const conn = connectionManager.getConnection(connectionId);
+
+        const fetchTenants = async (): Promise<TenantEntry[]> => {
+          const map = await client.collections.get(collectionName).tenants.get();
+          // Per-tenant object counts come from verbose node status: for a
+          // multi-tenant collection each loaded shard's name is the tenant name.
+          // Only ACTIVE (loaded) tenants appear, so INACTIVE/OFFLOADED tenants
+          // have an unknown (null) count.
+          await weaviateTreeDataProvider.fetchNodes(connectionId).catch(() => {});
+          const nodes = weaviateTreeDataProvider.getCachedClusterNodes(connectionId) ?? [];
+          const countByTenant = new Map<string, number>();
+          for (const node of nodes) {
+            for (const shard of (node as any).shards ?? []) {
+              if (shard.class !== collectionName) {
+                continue;
+              }
+              const prev = countByTenant.get(shard.name) ?? 0;
+              countByTenant.set(shard.name, Math.max(prev, shard.objectCount ?? 0));
+            }
+          }
+          return (
+            Object.values(map)
+              .map((t: any) => ({
+                name: t.name,
+                activityStatus: t.activityStatus,
+                objectCount: countByTenant.has(t.name) ? countByTenant.get(t.name)! : null,
+              }))
+              // Natural, deterministic ordering (tenant-2 before tenant-10).
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+          );
+        };
+
+        const tenants = await fetchTenants();
+
+        // Offload gating: requires Weaviate >= 1.26.0 AND the offload-s3 module.
+        let serverVersion = '';
+        let offloadModuleAvailable = false;
+        try {
+          const meta: any = await client.getMeta();
+          serverVersion = meta?.version ?? '';
+          offloadModuleAvailable = !!meta?.modules?.['offload-s3'];
+        } catch {
+          // Meta is best-effort; if unavailable, offload stays disabled.
+        }
+        const offloadSupported =
+          offloadModuleAvailable && isVersionAtLeast(serverVersion, 1, 26, 0);
+
+        ManageTenantsPanel.createOrShow(
+          context.extensionUri,
+          connectionId,
+          collectionName,
+          {
+            readOnly: conn?.readOnly === true,
+            serverVersion,
+            offloadModuleAvailable,
+            offloadSupported,
+            offloadMinVersion: OFFLOAD_MIN_VERSION,
+            tenants,
+          },
+          async ({ status, names }) => {
+            if (conn?.readOnly === true) {
+              throw new Error('This connection is read-only.');
+            }
+            if (status === 'OFFLOADED' && !offloadSupported) {
+              throw new Error(
+                `Offloading requires Weaviate >= ${OFFLOAD_MIN_VERSION} and the offload-s3 module to be enabled.`
+              );
+            }
+            if (names.length === 0) {
+              return fetchTenants();
+            }
+            const confirm = await vscode.window.showWarningMessage(
+              `Set ${names.length} tenant(s) in "${collectionName}" to ${status}?`,
+              { modal: true },
+              'Apply'
+            );
+            if (confirm !== 'Apply') {
+              return fetchTenants();
+            }
+            await client.collections
+              .get(collectionName)
+              .tenants.update(names.map((name) => ({ name, activityStatus: status })));
+            vscode.window.showInformationMessage(
+              `Set ${names.length} tenant(s) to ${status} in "${collectionName}".`
+            );
+            await weaviateTreeDataProvider.refreshCollections(connectionId);
+            return fetchTenants();
+          },
+          async (names) => {
+            if (conn?.readOnly === true) {
+              throw new Error('This connection is read-only.');
+            }
+            if (names.length === 0) {
+              return fetchTenants();
+            }
+            const confirm = await vscode.window.showWarningMessage(
+              `Delete ${names.length} tenant(s) from "${collectionName}"? This permanently removes their data and cannot be undone.`,
+              { modal: true },
+              'Delete'
+            );
+            if (confirm !== 'Delete') {
+              return fetchTenants();
+            }
+            await client.collections.get(collectionName).tenants.remove(names);
+            vscode.window.showInformationMessage(
+              `Deleted ${names.length} tenant(s) from "${collectionName}".`
+            );
+            await weaviateTreeDataProvider.refreshCollections(connectionId);
+            return fetchTenants();
+          }
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to open tenant manager: ${errorMessage}`);
       }
     }),
 
