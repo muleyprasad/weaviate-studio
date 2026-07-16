@@ -400,7 +400,7 @@ customEvents
 
 ### No Data Appearing
 
-1. Verify `APPLICATION_INSIGHTS_CONN_STRING` is set in CI/CD
+1. Verify the `APPLICATION_INSIGHTS_CONN_STRING` secret is set in CI/CD (exposed to the build as `APPLICATION_INSIGHTS_CONNECTION_STRING`)
 2. Check VS Code telemetry is enabled (`telemetry.enableTelemetry`)
 3. Check extension setting `weaviate.telemetry.enabled` is true
 4. Wait 2-5 minutes for ingestion delay

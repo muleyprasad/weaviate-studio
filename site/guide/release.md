@@ -67,11 +67,11 @@ No manual steps needed — just push documentation changes to `main`.
 
 ## Required GitHub Secrets
 
-| Secret                             | Purpose                              |
-| ---------------------------------- | ------------------------------------ |
-| `VSCE_PAT`                         | VS Code Marketplace publishing token |
-| `OVSX_PAT`                         | Open VSX Registry publishing token   |
-| `APPLICATION_INSIGHTS_CONN_STRING` | Telemetry connection string          |
+| Secret                             | Purpose                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `VSCE_PAT`                         | VS Code Marketplace publishing token                                                           |
+| `OVSX_PAT`                         | Open VSX Registry publishing token                                                             |
+| `APPLICATION_INSIGHTS_CONN_STRING` | Telemetry connection string (exposed to the build as `APPLICATION_INSIGHTS_CONNECTION_STRING`) |
 
 ## Marketplace Platforms
 
