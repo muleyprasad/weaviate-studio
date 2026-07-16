@@ -193,6 +193,15 @@ export class QueryEditorPanel {
         description?: string;
         nestedProperties?: any[];
       }>;
+      vectorizer?: string;
+      vectorizers?: Record<string, any>;
+      vectorNames?: string[];
+      multiTenancy?: {
+        enabled?: boolean;
+        autoTenantCreation?: boolean;
+        autoTenantActivation?: boolean;
+      };
+      moduleConfig?: Record<string, any>;
     }>;
   }> {
     // Check if connection is still active (state is maintained by the listener)
@@ -208,13 +217,53 @@ export class QueryEditorPanel {
     // Use Weaviate v3 collections API and adapt to legacy schema shape expected by webview
     const collections: CollectionConfig[] = await this._weaviateClient.collections.listAll();
     return {
-      classes: (collections || []).map((collection: CollectionConfig) => ({
-        class: collection.name || '',
-        description: (collection as any).description,
-        properties: (collection.properties || []).map((prop: PropertyConfig) =>
-          this._mapPropertySchema(prop)
-        ),
-      })),
+      classes: await Promise.all(
+        (collections || []).map(async (collection: CollectionConfig) => {
+          const base: any = collection as any;
+          let vectorizers = base.vectorizers ?? base.vectorizerConfig;
+          let multiTenancy = base.multiTenancy;
+          let moduleConfig = base.moduleConfig;
+          let vectorizer = base.vectorizer;
+
+          // Lazy-fetch full config only when listAll() omitted MT / named-vector details
+          // (avoids N+1 config.get() round-trips on large clusters).
+          const needsEnrichment = vectorizers === undefined || multiTenancy === undefined;
+          if (needsEnrichment) {
+            try {
+              const name = collection.name || base.class;
+              if (name && this._weaviateClient?.collections?.get) {
+                const coll = this._weaviateClient.collections.get(name);
+                if (coll?.config?.get) {
+                  const cfg = await coll.config.get();
+                  vectorizers =
+                    (cfg as any).vectorizers ?? (cfg as any).vectorizerConfig ?? vectorizers;
+                  multiTenancy = (cfg as any).multiTenancy ?? multiTenancy;
+                  moduleConfig = (cfg as any).moduleConfig ?? moduleConfig;
+                  vectorizer = (cfg as any).vectorizer ?? vectorizer;
+                }
+              }
+            } catch {
+              // Proceed with listAll() data
+            }
+          }
+
+          const vectorNames =
+            vectorizers && typeof vectorizers === 'object' ? Object.keys(vectorizers) : undefined;
+
+          return {
+            class: collection.name || '',
+            description: base.description,
+            properties: (collection.properties || []).map((prop: PropertyConfig) =>
+              this._mapPropertySchema(prop)
+            ),
+            vectorizer,
+            vectorizers,
+            vectorNames,
+            multiTenancy,
+            moduleConfig,
+          };
+        })
+      ),
     };
   }
 
@@ -279,10 +328,60 @@ export class QueryEditorPanel {
       return `${base}/v1/graphql`;
     }
 
-    const protocol = conn.httpSecure ? 'https' : 'http';
-    const host = conn.httpHost || 'localhost';
-    const port = conn.httpPort || (conn.httpSecure ? 443 : 8080);
-    return `${protocol}://${host}:${port}/v1/graphql`;
+    // Start from connection flags; a fully-qualified URL in httpHost may override scheme.
+    let secure = Boolean(conn.httpSecure);
+    let host = conn.httpHost || 'localhost';
+    let port = conn.httpPort;
+
+    // Strip leading protocol if user accidentally included it in host field
+    if (/^https?:\/\//i.test(host)) {
+      try {
+        const parsed = new URL(host);
+        // URL.hostname is unbracketed for IPv6 (e.g. "::1")
+        host = parsed.hostname;
+        if (parsed.port) {
+          port = parseInt(parsed.port, 10);
+        }
+        // Prefer scheme from the pasted URL when present
+        if (parsed.protocol === 'https:') {
+          secure = true;
+        } else if (parsed.protocol === 'http:') {
+          secure = false;
+        }
+      } catch {
+        host = host.replace(/^https?:\/\//i, '');
+      }
+    }
+
+    // Port suffix handling:
+    // - "localhost:8080" / "127.0.0.1:8080" → extract port
+    // - "[2001:db8::1]:8080" → extract IPv6 + port
+    // - bare IPv6 ("2001:db8::1") → leave host alone (do not split on ':')
+    if (host.startsWith('[')) {
+      const m = host.match(/^\[([^\]]+)\](?::(\d+))?$/);
+      if (m) {
+        host = m[1];
+        if (m[2] && (port === undefined || port === null)) {
+          port = parseInt(m[2], 10);
+        }
+      }
+    } else if (!host.includes('::') && (host.match(/:/g) || []).length === 1) {
+      // Exactly one colon → hostname/IPv4 with optional port (not multi-colon IPv6)
+      const lastColon = host.lastIndexOf(':');
+      const maybePort = host.slice(lastColon + 1);
+      if (/^\d+$/.test(maybePort)) {
+        if (port === undefined || port === null) {
+          port = parseInt(maybePort, 10);
+        }
+        host = host.slice(0, lastColon);
+      }
+    }
+
+    const finalPort = port || (secure ? 443 : 8080);
+    const protocol = secure ? 'https' : 'http';
+    // Bracket IPv6 hostnames for a valid URL
+    const hostForUrl = host.includes(':') ? `[${host}]` : host;
+    return `${protocol}://${hostForUrl}:${finalPort}/v1/graphql`;
   }
 
   private async _performGraphQLHttp(query: string, signal?: AbortSignal): Promise<any> {

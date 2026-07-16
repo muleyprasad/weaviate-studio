@@ -612,8 +612,10 @@ export function validateAndSanitizeQuery(query: string): {
   valid: boolean;
   sanitizedQuery: string;
   errors: string[];
+  warnings: string[];
 } {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Basic validation - check for balanced braces
   const openBraces = (query.match(/{/g) || []).length;
@@ -639,12 +641,29 @@ export function validateAndSanitizeQuery(query: string): {
       );
     } else if (
       PRIMITIVE_BASE_TYPES.has(typeName.toLowerCase()) ||
-      typeName.toLowerCase() === 'geocoordinates'
+      typeName.toLowerCase() === 'geocoordinates' ||
+      typeName.toLowerCase() === 'phonenumber' ||
+      typeName.toLowerCase() === 'blob'
     ) {
       errors.push(
-        `Invalid inline fragment type "${typeName}" — scalar Weaviate types are selected as plain fields, not fragments`
+        `Invalid inline fragment type "${typeName}" - scalar Weaviate types are selected as plain fields, not fragments`
       );
     }
+  }
+
+  // Empty selection sets (e.g. `prop { }`) are invalid GraphQL
+  if (/\{\s*\}/.test(query.replace(/#[^\n]*/g, ''))) {
+    errors.push('Empty selection set `{ }` found - nested fields require at least one selection');
+  }
+
+  // Soft guidance - do not block the editor from loading the sample
+  if (/tenant:\s*"YOUR_TENANT_ID"/.test(query)) {
+    warnings.push(
+      'Placeholder tenant "YOUR_TENANT_ID" present - replace with a real tenant name before running'
+    );
+  }
+  if (/vector:\s*\[0\.1,\s*0\.2,\s*0\.3\]/.test(query)) {
+    warnings.push('Placeholder vector [0.1, 0.2, 0.3] present - replace with a real embedding');
   }
 
   // Sanitize by removing potential harmful content (basic implementation)
@@ -656,6 +675,7 @@ export function validateAndSanitizeQuery(query: string): {
     valid: errors.length === 0,
     sanitizedQuery,
     errors,
+    warnings,
   };
 }
 
@@ -669,9 +689,11 @@ export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryCo
     return {};
   }
 
-  const hasVector = classSchema.vectorizer !== undefined;
+  const hasVector =
+    classSchema.vectorizer !== undefined || getNamedVectorNames(classSchema).length > 0;
   const hasTextProperties = classSchema.properties.some((p) => isTextDataType(p.dataType));
   const hasGeoProperties = classSchema.properties.some((p) => isGeoDataType(p.dataType));
+  const namedVectors = getNamedVectorNames(classSchema);
 
   return {
     includeVectors: hasVector,
@@ -681,6 +703,8 @@ export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryCo
     certainty: 0.7,
     distance: 0.6,
     limit: 10,
+    includeBlobs: false,
+    includeHeaderComments: true,
     // Prefer text fields (including text[]) for BM25 / hybrid when available
     searchProperties: hasTextProperties
       ? classSchema.properties
@@ -688,6 +712,11 @@ export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryCo
           .map((p) => p.name)
           .slice(0, 5)
       : undefined,
+    targetVectors:
+      namedVectors.length > 1 || (namedVectors.length === 1 && namedVectors[0] !== 'default')
+        ? namedVectors
+        : undefined,
+    tenantName: isMultiTenantCollection(classSchema) ? 'YOUR_TENANT_ID' : undefined,
   };
 }
 
@@ -766,12 +795,21 @@ export interface ClassSchema {
   properties: PropertySchema[];
   vectorizer?: string;
   moduleConfig?: Record<string, any>;
+  /** Named-vector map (v3/v4 client shape), e.g. { title: {...}, content: {...} } */
   vectorizers?: Record<string, any>;
+  /** Explicit list of named vector keys when known */
+  vectorNames?: string[];
+  multiTenancy?: {
+    enabled?: boolean;
+    autoTenantCreation?: boolean;
+    autoTenantActivation?: boolean;
+  };
 }
 
 /**
  * Scalar Weaviate property types (array forms like text[] share the same base).
  * Cross-references use collection/class names and are NOT listed here.
+ * phoneNumber and blob are compound/special and classified separately.
  */
 export const PRIMITIVE_BASE_TYPES = new Set([
   'text',
@@ -780,12 +818,17 @@ export const PRIMITIVE_BASE_TYPES = new Set([
   'number',
   'boolean',
   'date',
-  'phonenumber',
   'uuid',
-  'blob',
 ]);
 
-export type PropertyKind = 'primitive' | 'geo' | 'object' | 'reference' | 'unknown';
+export type PropertyKind =
+  | 'primitive'
+  | 'geo'
+  | 'phone'
+  | 'blob'
+  | 'object'
+  | 'reference'
+  | 'unknown';
 
 /** Coerce Weaviate dataType (string | string[]) to a non-empty string array. */
 export function coerceDataType(dataType: string | string[] | undefined | null): string[] {
@@ -827,6 +870,14 @@ export function isGeoDataType(dataType: string | string[] | undefined | null): b
   return getBaseDataType(dataType) === 'geocoordinates';
 }
 
+export function isPhoneNumberDataType(dataType: string | string[] | undefined | null): boolean {
+  return getBaseDataType(dataType) === 'phonenumber';
+}
+
+export function isBlobDataType(dataType: string | string[] | undefined | null): boolean {
+  return getBaseDataType(dataType) === 'blob';
+}
+
 export function isObjectDataType(dataType: string | string[] | undefined | null): boolean {
   return getBaseDataType(dataType) === 'object';
 }
@@ -834,6 +885,93 @@ export function isObjectDataType(dataType: string | string[] | undefined | null)
 export function isTextDataType(dataType: string | string[] | undefined | null): boolean {
   const base = getBaseDataType(dataType);
   return base === 'text' || base === 'string';
+}
+
+/** Named vector names from class schema (vectorNames, vectorizers keys). */
+export function getNamedVectorNames(classSchema?: ClassSchema): string[] {
+  if (!classSchema) {
+    return [];
+  }
+  if (Array.isArray(classSchema.vectorNames) && classSchema.vectorNames.length > 0) {
+    return classSchema.vectorNames.filter((n) => typeof n === 'string' && n.length > 0);
+  }
+  if (classSchema.vectorizers && typeof classSchema.vectorizers === 'object') {
+    return Object.keys(classSchema.vectorizers);
+  }
+  return [];
+}
+
+export function isMultiTenantCollection(classSchema?: ClassSchema): boolean {
+  return Boolean(classSchema?.multiTenancy?.enabled);
+}
+
+/**
+ * Build GraphQL argument lines for Get { Collection(…) }.
+ * Includes tenant when multi-tenancy is enabled or a tenant is configured.
+ */
+export function buildCollectionArgs(
+  classSchema: ClassSchema | undefined,
+  limit: number,
+  config?: QueryConfig
+): string {
+  const lines: string[] = [];
+  const tenantRequired = isMultiTenantCollection(classSchema) || Boolean(config?.tenantName);
+  if (tenantRequired) {
+    const tenant = config?.tenantName?.trim() || 'YOUR_TENANT_ID';
+    lines.push(`tenant: "${tenant}"`);
+  }
+  if (typeof config?.offset === 'number' && config.offset > 0) {
+    lines.push(`offset: ${config.offset}`);
+  }
+  lines.push(`limit: ${limit}`);
+  return lines.join('\n      ');
+}
+
+/** Optional targetVectors line for nearVector / nearText / hybrid when named vectors exist. */
+export function formatTargetVectorsArg(classSchema?: ClassSchema, config?: QueryConfig): string {
+  let names: string[] = [];
+  if (Array.isArray(config?.targetVectors) && config.targetVectors.length > 0) {
+    names = config.targetVectors;
+  } else if (config?.targetVector) {
+    names = [config.targetVector];
+  } else {
+    names = getNamedVectorNames(classSchema);
+  }
+  if (names.length === 0) {
+    return '';
+  }
+  // Single anonymous/default vector — omit targetVectors to stay compatible
+  if (names.length === 1 && (names[0] === 'default' || names[0] === 'Default')) {
+    return '';
+  }
+  return `targetVectors: [${names.map((n) => `"${n}"`).join(', ')}]`;
+}
+
+/** Header comments describing schema-aware choices. */
+export function buildQueryHeaderComments(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  options?: { kind?: string; excludedBlobs?: string[]; indent?: string }
+): string {
+  const indent = options?.indent ?? '  ';
+  const lines: string[] = [];
+  lines.push(`# Schema-aware ${options?.kind || 'query'} for ${collectionName}`);
+  if (isMultiTenantCollection(classSchema)) {
+    lines.push('# Multi-tenancy is enabled - set tenant to a real tenant name before running');
+  }
+  const vectors = getNamedVectorNames(classSchema);
+  if (vectors.length > 1 || (vectors.length === 1 && vectors[0] !== 'default')) {
+    lines.push(`# Named vectors: ${vectors.join(', ')} - templates may set targetVectors`);
+  }
+  if (options?.excludedBlobs?.length) {
+    lines.push(
+      `# Excluded blob fields (large payloads): ${options.excludedBlobs.join(', ')} - add manually if needed`
+    );
+  }
+  if (!hasTextVectorizerModule(classSchema) && options?.kind === 'nearText') {
+    lines.push('# No text vectorizer detected - nearText may fail; prefer nearVector if so');
+  }
+  return lines.map((l) => `${indent}${l}`).join('\n') + '\n';
 }
 
 /**
@@ -855,7 +993,12 @@ export function isReferenceDataType(dataType: string | string[] | undefined | nu
     if (PRIMITIVE_BASE_TYPES.has(lower)) {
       return false;
     }
-    if (lower === 'object' || lower === 'geocoordinates') {
+    if (
+      lower === 'object' ||
+      lower === 'geocoordinates' ||
+      lower === 'phonenumber' ||
+      lower === 'blob'
+    ) {
       return false;
     }
     return true;
@@ -874,6 +1017,12 @@ export function classifyProperty(prop: PropertySchema): PropertyKind {
   if (isGeoDataType(dataType)) {
     return 'geo';
   }
+  if (isPhoneNumberDataType(dataType)) {
+    return 'phone';
+  }
+  if (isBlobDataType(dataType)) {
+    return 'blob';
+  }
   if (isPrimitiveDataType(dataType)) {
     return 'primitive';
   }
@@ -890,8 +1039,10 @@ export function classifyProperty(prop: PropertySchema): PropertyKind {
 
 /**
  * Format a property for a GraphQL selection set.
- * - primitives / unknown: bare field name (works for text, text[], int[], …)
+ * - primitives / unknown: bare field name (works for text, text[], int[], uuid, …)
  * - geo: latitude/longitude subselection
+ * - phoneNumber: nested phone fields
+ * - blob: plain field with optional size warning
  * - nested object/object[]: `... on Collection_prop_object { nested fields }`
  * - cross-references: `... on TargetClass { … }` (multi-target: one fragment each)
  */
@@ -923,29 +1074,46 @@ ${indent}  longitude
 ${indent}}`;
   }
 
+  if (kind === 'phone') {
+    return `${indent}${prop.name} {
+${indent}  input
+${indent}  internationalFormatted
+${indent}  nationalFormatted
+${indent}  national
+${indent}  countryCode
+${indent}  defaultCountry
+${indent}  valid
+${indent}}`;
+  }
+
+  if (kind === 'blob') {
+    const warn = includeWarning
+      ? `${indent}# WARNING: ${prop.name} is a blob and may return large base64 data\n`
+      : '';
+    return `${warn}${indent}${prop.name}`;
+  }
+
   if (kind === 'object') {
     const nestedTypeName = `${collectionName}_${prop.name}_object`;
     if (!isValidGraphQLTypeName(nestedTypeName)) {
-      // The generated inline-fragment type name contains characters that are not allowed
-      // in GraphQL identifiers (e.g. hyphens in the collection or property name).  Fall
-      // back to a bare field selection so the query remains valid — the user can add a
-      // manual sub-selection if needed.
-      return `${indent}${prop.name}`;
+      return `${indent}# ${prop.name}: nested object type name is not GraphQL-safe; add a manual sub-selection`;
     }
     const nested = (prop.nestedProperties || []).slice(0, maxNestedProps);
     if (nested.length === 0) {
-      // Schema did not expose nested fields — still select the object safely.
-      return `${indent}${prop.name} {
-${indent}  # Nested fields unavailable in schema; add them manually if needed.
-${indent}  __typename
-${indent}}`;
+      // Do not emit bare object or __typename — Weaviate nested types need real fields.
+      return `${indent}# ${prop.name}: nested fields unavailable in schema - add a sub-selection manually`;
     }
     const nestedPropsStr = nested
       .map((np) => {
-        // Nested props may themselves be nested objects or geo; keep first level simple.
         const npKind = classifyProperty(np);
         if (npKind === 'geo') {
           return `${indent}  ${np.name} {\n${indent}    latitude\n${indent}    longitude\n${indent}  }`;
+        }
+        if (npKind === 'phone') {
+          return `${indent}  ${np.name} {\n${indent}    input\n${indent}    internationalFormatted\n${indent}  }`;
+        }
+        if (npKind === 'blob') {
+          return `${indent}  # skip nested blob ${np.name}`;
         }
         if (npKind === 'object' && np.nestedProperties?.length) {
           const deeper = np.nestedProperties
@@ -978,17 +1146,24 @@ ${indent}}`;
       : '';
     const fragments = classNames
       .map((className) => {
-        const referencedClass = schema?.classes?.find((c) => c.class === className);
+        const referencedClass = schema?.classes?.find(
+          (c) => c.class === className || c.class?.toLowerCase() === className.toLowerCase()
+        );
         let body: string;
         if (referencedClass?.properties?.length) {
           const refPrimitiveProps = referencedClass.properties
             .filter((p) => {
               const k = classifyProperty(p);
-              return k === 'primitive' || k === 'unknown';
+              return k === 'primitive' || k === 'unknown' || k === 'phone';
             })
             .slice(0, maxNestedProps);
           if (refPrimitiveProps.length > 0) {
-            const lines = refPrimitiveProps.map((p) => `${indent}    ${p.name}`);
+            const lines = refPrimitiveProps.map((p) => {
+              if (classifyProperty(p) === 'phone') {
+                return `${indent}    ${p.name} {\n${indent}      input\n${indent}      internationalFormatted\n${indent}    }`;
+              }
+              return `${indent}    ${p.name}`;
+            });
             if (includeRefAdditional) {
               lines.push(`${indent}    _additional {`, `${indent}      id`, `${indent}    }`);
             }
@@ -996,12 +1171,12 @@ ${indent}}`;
           } else if (includeRefAdditional) {
             body = `${indent}    _additional {\n${indent}      id\n${indent}    }`;
           } else {
-            body = `${indent}    __typename`;
+            body = `${indent}    # no scalar fields available on ${className}`;
           }
         } else if (includeRefAdditional) {
           body = `${indent}    _additional {\n${indent}      id\n${indent}    }`;
         } else {
-          body = `${indent}    __typename`;
+          body = `${indent}    # referenced class ${className} not in schema`;
         }
         return `${indent}  ... on ${className} {\n${body}\n${indent}  }`;
       })
@@ -1015,19 +1190,28 @@ ${indent}}`;
   return `${indent}${prop.name}`;
 }
 
+export interface PropertySelectionOptions {
+  maxCount?: number;
+  schema?: { classes?: ClassSchema[] };
+  /** Include every non-blob property (sample "full" mode). Blobs still require includeBlobs. */
+  includeAll?: boolean;
+  maxNestedProps?: number;
+  includeWarning?: boolean;
+  indent?: string;
+  /** Default false — blobs can return huge base64 payloads. */
+  includeBlobs?: boolean;
+  maxReferences?: number;
+  maxObjects?: number;
+  maxGeo?: number;
+  maxPhones?: number;
+}
+
 /**
  * Build a selection list for display/query generators from a class schema.
  */
 export function buildPropertySelections(
   classSchema: ClassSchema | undefined,
-  options: {
-    maxCount?: number;
-    schema?: { classes?: ClassSchema[] };
-    includeAll?: boolean;
-    maxNestedProps?: number;
-    includeWarning?: boolean;
-    indent?: string;
-  } = {}
+  options: PropertySelectionOptions = {}
 ): string[] {
   if (!classSchema?.properties?.length) {
     return [];
@@ -1040,10 +1224,17 @@ export function buildPropertySelections(
     maxNestedProps = 5,
     includeWarning = true,
     indent = '      ',
+    includeBlobs = false,
+    maxReferences = 1,
+    maxObjects = 2,
+    maxGeo = 1,
+    maxPhones = 1,
   } = options;
 
   const primitives: PropertySchema[] = [];
   const geo: PropertySchema[] = [];
+  const phones: PropertySchema[] = [];
+  const blobs: PropertySchema[] = [];
   const objects: PropertySchema[] = [];
   const references: PropertySchema[] = [];
 
@@ -1051,6 +1242,12 @@ export function buildPropertySelections(
     switch (classifyProperty(prop)) {
       case 'geo':
         geo.push(prop);
+        break;
+      case 'phone':
+        phones.push(prop);
+        break;
+      case 'blob':
+        blobs.push(prop);
         break;
       case 'object':
         objects.push(prop);
@@ -1078,13 +1275,15 @@ export function buildPropertySelections(
   if (includeAll) {
     return [
       ...primitives.map(format),
+      ...phones.map(format),
       ...geo.map(format),
       ...objects.map(format),
       ...references.map(format),
+      ...(includeBlobs ? blobs.map(format) : []),
     ];
   }
 
-  // Prefer scalars, then geo, nested objects, then a small number of refs.
+  // Prefer scalars, then phones, geo, nested objects, then a small number of refs.
   const result: string[] = [];
   const take = (items: PropertySchema[], n: number) => {
     for (const prop of items) {
@@ -1099,11 +1298,23 @@ export function buildPropertySelections(
   };
 
   take(primitives, maxCount);
-  take(geo, Math.max(0, maxCount - result.length));
-  take(objects, Math.min(2, Math.max(0, maxCount - result.length)));
-  take(references, Math.min(2, Math.max(0, maxCount - result.length)));
+  take(phones, maxPhones);
+  take(geo, maxGeo);
+  take(objects, maxObjects);
+  take(references, maxReferences);
+  if (includeBlobs) {
+    take(blobs, 1);
+  }
 
   return result;
+}
+
+/** Blob property names excluded from a selection pass (for header comments). */
+export function getExcludedBlobNames(classSchema?: ClassSchema, includeBlobs?: boolean): string[] {
+  if (includeBlobs || !classSchema?.properties) {
+    return [];
+  }
+  return classSchema.properties.filter((p) => classifyProperty(p) === 'blob').map((p) => p.name);
 }
 
 /**
@@ -1134,44 +1345,66 @@ export interface QueryConfig {
   vector?: number[];
   sortBy?: { path: string; order?: 'asc' | 'desc' };
   returnProperties?: string[];
+  /** Include blob fields in generated selections (default false). */
+  includeBlobs?: boolean;
+  /** Include every non-blob property instead of the capped safe default. */
+  includeAllProperties?: boolean;
+  /** Prefixed # comments explaining schema-aware choices (default true for samples). */
+  includeHeaderComments?: boolean;
+  /** Single named vector target. */
+  targetVector?: string;
+  /** Multi-target named vectors. */
+  targetVectors?: string[];
+  /** Full schema for expanding cross-reference selections. */
+  fullSchema?: { classes?: ClassSchema[] };
 }
 
 /**
  * Generate a sample GraphQL Get query for a collection.
  *
- * @param collectionName - The Weaviate collection/class name.
- * @param properties     - Explicit list of property names to select. When empty, the full
- *                         schema is used (all properties are auto-classified and formatted).
- * @param limit          - Result limit (default 10).
- * @param schema         - Full schema used to resolve cross-reference targets and nested fields.
- * @returns A GraphQL query string ready to paste into the editor.
+ * Defaults favour safe, runnable queries:
+ * - capped property set (not every field)
+ * - blobs excluded
+ * - at most one cross-reference
+ * - tenant arg when multi-tenancy is enabled
  *
- * **Indentation contract**: each entry in `propertyStrings` is already indented by six
- * spaces (the depth of a property inside `Get { Collection { … } }`).  Callers that
- * post-process the returned string should account for this.
+ * Pass `config.includeAllProperties` to expand to all non-blob fields.
+ *
+ * **Indentation contract**: each property line is already indented by six spaces.
  */
-
 export function generateSampleQuery(
   collectionName: string,
   properties: string[] = [],
   limit: number = 10,
-  schema?: { classes?: ClassSchema[] }
+  schema?: { classes?: ClassSchema[] },
+  config?: QueryConfig
 ): string {
   // Find the class definition from schema if available (case-insensitive)
   const classSchema =
     schema?.classes?.find((c) => c.class === collectionName) ||
     schema?.classes?.find((c) => c.class?.toLowerCase() === collectionName.toLowerCase());
 
+  const fullSchema = config?.fullSchema || schema;
+  const includeBlobs = config?.includeBlobs === true;
+  const includeAll = config?.includeAllProperties === true;
+  const maxProps = config?.maxProperties ?? (includeAll ? 50 : 12);
+  const includeComments = config?.includeHeaderComments !== false;
+
   let propertyStrings: string[] = [];
 
   if (properties.length === 0 && classSchema?.properties?.length) {
-    // Include all schema properties, classified correctly (text[] is scalar, not a ref).
     propertyStrings = buildPropertySelections(classSchema, {
-      includeAll: true,
-      schema,
+      includeAll,
+      maxCount: maxProps,
+      schema: fullSchema,
       indent: '      ',
       maxNestedProps: 5,
       includeWarning: true,
+      includeBlobs,
+      maxReferences: includeAll ? 10 : 1,
+      maxObjects: includeAll ? 10 : 2,
+      maxGeo: includeAll ? 10 : 1,
+      maxPhones: includeAll ? 10 : 1,
     });
   } else if (properties.length > 0) {
     propertyStrings = properties.map((propName) => {
@@ -1179,28 +1412,37 @@ export function generateSampleQuery(
       if (propSchema && classSchema) {
         return formatPropertySelection(propSchema, {
           collectionName: classSchema.class,
-          schema,
+          schema: fullSchema,
           indent: '      ',
           maxNestedProps: 5,
           includeWarning: true,
         });
       }
-      // Unknown property name — emit as a plain field (never invent invalid fragments).
       return `      ${propName}`;
     });
   } else {
     propertyStrings = ['      # Add your properties here'];
   }
 
-  // Always include _additional.id for object identification
   if (!propertyStrings.some((p) => p.includes('_additional'))) {
     propertyStrings.unshift('      _additional {\n        id\n      }');
   }
 
-  // formatPropertySelection already indents; join without extra leading indent.
+  const args = buildCollectionArgs(classSchema, limit, config);
+  const excludedBlobs = getExcludedBlobNames(classSchema, includeBlobs);
+  const header =
+    includeComments && classSchema
+      ? buildQueryHeaderComments(collectionName, classSchema, {
+          kind: 'sample Get',
+          excludedBlobs,
+        })
+      : '';
+
   return `{
-  Get {
-    ${collectionName} (limit: ${limit}) {
+${header}  Get {
+    ${collectionName} (
+      ${args}
+    ) {
 ${propertyStrings.join('\n')}
     }
   }
@@ -1354,17 +1596,36 @@ export function processTemplate(
         : undefined,
     });
 
+    const extractVectorNames = (input: any): string[] | undefined => {
+      if (Array.isArray(input?.vectorNames)) {
+        return input.vectorNames;
+      }
+      const fromVectorizers =
+        input?.vectorizers && typeof input.vectorizers === 'object'
+          ? Object.keys(input.vectorizers)
+          : [];
+      const fromConfig =
+        input?.vectorizerConfig && typeof input.vectorizerConfig === 'object'
+          ? Object.keys(input.vectorizerConfig)
+          : [];
+      const names = fromVectorizers.length > 0 ? fromVectorizers : fromConfig;
+      return names.length > 0 ? names : undefined;
+    };
+
     const normalizeClassSchema = (input: any): ClassSchema | undefined => {
       if (!input) {
         return undefined;
       }
+      const vectorizers = input.vectorizers ?? input.vectorizerConfig;
       const normalized: ClassSchema = {
         class: input.class ?? input.name,
         description: input.description,
         properties: Array.isArray(input.properties) ? input.properties.map(normalizeProperty) : [],
         vectorizer: input.vectorizer,
         moduleConfig: input.moduleConfig,
-        vectorizers: input.vectorizers,
+        vectorizers,
+        vectorNames: extractVectorNames(input),
+        multiTenancy: input.multiTenancy,
       };
       return normalized;
     };
@@ -1373,7 +1634,11 @@ export function processTemplate(
     let classSchema: ClassSchema | undefined = undefined;
     const classesAny = (schema as any)?.classes || (schema as any)?.collections;
     const lc = (s: any) => (typeof s === 'string' ? s.toLowerCase() : '');
+    let allClasses: ClassSchema[] = [];
     if (Array.isArray(classesAny)) {
+      allClasses = classesAny
+        .map((c: any) => normalizeClassSchema(c))
+        .filter((c: ClassSchema | undefined): c is ClassSchema => Boolean(c));
       let raw = classesAny.find(
         (c: any) => lc(c.class) === lc(collectionName) || lc(c.name) === lc(collectionName)
       );
@@ -1386,6 +1651,9 @@ export function processTemplate(
       lc((schema as any)?.class) === lc(collectionName)
     ) {
       classSchema = normalizeClassSchema(schema);
+      if (classSchema) {
+        allClasses = [classSchema];
+      }
     }
 
     // Check if the template is a predefined template name (queries only)
@@ -1396,13 +1664,22 @@ export function processTemplate(
 
     // Determine effective limit (config overrides param)
     const effectiveLimit = config?.limit ?? limit;
+    const effectiveConfig: QueryConfig = {
+      ...config,
+      fullSchema: config?.fullSchema || (allClasses.length ? { classes: allClasses } : schema),
+    };
 
     // Replace placeholders with actual values using dynamic generation when possible
     let query = template
       .replace(
         '{nearVectorQuery}',
         classSchema
-          ? generateDynamicNearVectorQuery(collectionName, classSchema, effectiveLimit, config)
+          ? generateDynamicNearVectorQuery(
+              collectionName,
+              classSchema,
+              effectiveLimit,
+              effectiveConfig
+            )
           : generateNearVectorQuery(collectionName, effectiveLimit, config?.returnProperties)
       )
       .replace(
@@ -1412,19 +1689,24 @@ export function processTemplate(
       .replace(
         '{nearTextQuery}',
         classSchema
-          ? generateDynamicNearTextQuery(collectionName, classSchema, effectiveLimit, config)
+          ? generateDynamicNearTextQuery(
+              collectionName,
+              classSchema,
+              effectiveLimit,
+              effectiveConfig
+            )
           : generateNearTextQuery(collectionName, effectiveLimit, config?.returnProperties)
       )
       .replace(
         '{hybridQuery}',
         classSchema
-          ? generateDynamicHybridQuery(collectionName, classSchema, effectiveLimit, config)
+          ? generateDynamicHybridQuery(collectionName, classSchema, effectiveLimit, effectiveConfig)
           : generateHybridQuery(collectionName, effectiveLimit, config?.returnProperties)
       )
       .replace(
         '{bm25Query}',
         classSchema
-          ? generateDynamicBM25Query(collectionName, classSchema, effectiveLimit, config)
+          ? generateDynamicBM25Query(collectionName, classSchema, effectiveLimit, effectiveConfig)
           : generateBM25Query(collectionName, effectiveLimit, config?.returnProperties)
       )
       .replace(
@@ -1434,31 +1716,43 @@ export function processTemplate(
               collectionName,
               classSchema,
               effectiveLimit,
-              config
+              effectiveConfig
             )
           : generateGenerativeSearchQuery(collectionName, effectiveLimit, config?.returnProperties)
       )
       .replace(
         '{groupByQuery}',
         classSchema
-          ? generateDynamicGroupByQuery(collectionName, classSchema)
+          ? generateDynamicGroupByQuery(collectionName, classSchema, effectiveConfig)
           : generateGroupByQuery(collectionName)
       )
       .replace(
         '{filterQuery}',
         classSchema
-          ? generateDynamicFilterQuery(collectionName, classSchema, effectiveLimit, config)
+          ? generateDynamicFilterQuery(collectionName, classSchema, effectiveLimit, effectiveConfig)
           : generateFilterQuery(collectionName, effectiveLimit)
       )
       .replace(
         '{aggregationQuery}',
         classSchema
-          ? generateDynamicAggregationQuery(collectionName, classSchema)
+          ? generateDynamicAggregationQuery(collectionName, classSchema, effectiveConfig)
           : generateAggregationQuery(collectionName)
       )
       .replace(
         '{tenantQuery}',
-        generateTenantQuery(collectionName, config?.tenantName ?? 'tenant-name', effectiveLimit)
+        classSchema
+          ? generateDynamicTenantQuery(
+              collectionName,
+              classSchema,
+              effectiveConfig?.tenantName ?? 'YOUR_TENANT_ID',
+              effectiveLimit,
+              effectiveConfig
+            )
+          : generateTenantQuery(
+              collectionName,
+              config?.tenantName ?? 'YOUR_TENANT_ID',
+              effectiveLimit
+            )
       )
       .replace('{exploreQuery}', generateExploreQuery(collectionName, effectiveLimit));
 
@@ -1484,50 +1778,30 @@ export function processTemplate(
 export function generateDynamicSampleQuery(
   collectionName: string,
   classSchema?: ClassSchema,
-  limit: number = 10
+  limit: number = 10,
+  config?: QueryConfig
 ): string {
-  if (!classSchema || !classSchema.properties) {
-    return `{
-  Get {
-    ${collectionName} (limit: ${limit}) {
-      # Add your properties here - replace with actual properties from your schema
-      _additional {
-        id
-        creationTimeUnix
-        lastUpdateTimeUnix
-      }
-    }
-  }
-}`;
-  }
+  // Delegate to the shared sample generator for consistent safe defaults.
+  // Always build a new schema object — never mutate config.fullSchema.
+  const existingClasses = config?.fullSchema?.classes ?? [];
+  const hasClass =
+    !!classSchema &&
+    existingClasses.some(
+      (c) =>
+        c.class === classSchema.class || c.class?.toLowerCase() === classSchema.class?.toLowerCase()
+    );
+  const schema =
+    classSchema || existingClasses.length
+      ? {
+          classes: [...existingClasses, ...(classSchema && !hasClass ? [classSchema] : [])],
+        }
+      : undefined;
 
-  // Ensure class name is set for nested type names
-  const schemaForBuild: ClassSchema = {
-    ...classSchema,
-    class: classSchema.class || collectionName,
-  };
-
-  const propertyLines = buildPropertySelections(schemaForBuild, {
-    maxCount: 8,
-    includeAll: false,
-    maxNestedProps: 3,
-    includeWarning: true,
-    indent: '      ',
+  return generateSampleQuery(collectionName, [], limit, schema, {
+    ...config,
+    maxProperties: config?.maxProperties ?? 8,
+    includeHeaderComments: config?.includeHeaderComments !== false,
   });
-
-  propertyLines.unshift(`      _additional {
-        id
-        creationTimeUnix
-        lastUpdateTimeUnix
-      }`);
-
-  return `{
-  Get {
-    ${collectionName}(limit: ${limit}) {
-${propertyLines.join('\n')}
-    }
-  }
-}`;
 }
 
 /**
@@ -1543,7 +1817,7 @@ export function generateDynamicNearVectorQuery(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
   const vec = Array.isArray(config?.vector) ? config!.vector : [0.1, 0.2, 0.3];
   const vectorStr = `[${vec.join(', ')}]`;
   const distanceVal = typeof config?.distance === 'number' ? config!.distance : undefined;
@@ -1563,14 +1837,22 @@ export function generateDynamicNearVectorQuery(
     ? `${dimsLabel} dimensions`
     : 'match your vectorizer dimensions';
 
+  const targetVectorsLine = formatTargetVectorsArg(classSchema, config);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
+  const header =
+    config?.includeHeaderComments === false
+      ? ''
+      : buildQueryHeaderComments(collectionName, classSchema, { kind: 'nearVector' });
+
   return `{
-  Get {
+${header}  Get {
     ${collectionName}(
       nearVector: {
         vector: ${vectorStr} # Replace with your actual vector (${dimsText})
         ${thresholdLine}
+${targetVectorsLine ? `        ${targetVectorsLine}` : ''}
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1594,7 +1876,7 @@ export function generateDynamicNearTextQuery(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
 
   const conceptsArr =
     Array.isArray(config?.concepts) && config!.concepts.length > 0
@@ -1631,12 +1913,17 @@ export function generateDynamicNearTextQuery(
 
   const includeExplain = config?.includeExplainScore === false ? '' : '        explainScore';
   const hasTextVec = hasTextVectorizerModule(classSchema);
-  const headerComment = hasTextVec
-    ? ''
-    : `  # NOTE: nearText requires a text vectorizer module (text2vec-openai, text2vec-cohere, etc.)
-  # If you get an "Unknown argument nearText" error, use nearVector instead or configure a text vectorizer
-
-`;
+  const targetVectorsLine = formatTargetVectorsArg(classSchema, config);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
+  const headerComment =
+    config?.includeHeaderComments === false
+      ? hasTextVec
+        ? ''
+        : `  # NOTE: nearText requires a text vectorizer module\n`
+      : buildQueryHeaderComments(collectionName, classSchema, { kind: 'nearText' }) +
+        (hasTextVec
+          ? ''
+          : `  # NOTE: nearText requires a text vectorizer module (text2vec-openai, text2vec-cohere, etc.)\n  # If you get an "Unknown argument nearText" error, use nearVector instead\n`);
 
   return `{
 ${headerComment}  Get {
@@ -1646,8 +1933,9 @@ ${headerComment}  Get {
         ${thresholdLine}
 ${moveAwayBlock}
 ${moveToBlock}
+${targetVectorsLine ? `        ${targetVectorsLine}` : ''}
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1674,9 +1962,10 @@ export function generateDynamicFilterQuery(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
   const filterExamples = generateFilterExamples(classSchema);
   const operator = config?.filterOperator ?? 'And';
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
 
   return `{
   Get {
@@ -1687,7 +1976,7 @@ export function generateDynamicFilterQuery(
 ${filterExamples.join(',\n')}
         ]
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1706,17 +1995,22 @@ ${properties.join('\n')}
  */
 export function generateDynamicAggregationQuery(
   collectionName: string,
-  classSchema?: ClassSchema
+  classSchema?: ClassSchema,
+  config?: QueryConfig
 ): string {
   if (!classSchema?.properties) {
     return generateAggregationQuery(collectionName);
   }
 
   const aggregationFields = generateAggregationFields(classSchema);
+  const tenantRequired = isMultiTenantCollection(classSchema) || Boolean(config?.tenantName);
+  const aggregateArgs = tenantRequired
+    ? `(\n      tenant: "${config?.tenantName?.trim() || 'YOUR_TENANT_ID'}"\n    )`
+    : '';
 
   return `{
   Aggregate {
-    ${collectionName} {
+    ${collectionName}${aggregateArgs} {
       meta {
         count
       }
@@ -1739,7 +2033,7 @@ export function generateDynamicHybridQuery(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
   const queryText =
     typeof config?.searchQuery === 'string' && config!.searchQuery.length > 0
       ? config!.searchQuery.replace(/"/g, '\\"')
@@ -1749,9 +2043,13 @@ export function generateDynamicHybridQuery(
   const propsOverride =
     Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
       ? config!.propertiesOverride
-      : getTextProperties(classSchema).slice(0, 3);
+      : Array.isArray(config?.searchProperties) && config!.searchProperties!.length > 0
+        ? config!.searchProperties!
+        : getTextProperties(classSchema).slice(0, 3);
 
   const vec = Array.isArray(config?.vector) ? `[${config!.vector.join(', ')}]` : `[0.1, 0.2, 0.3]`;
+  const targetVectorsLine = formatTargetVectorsArg(classSchema, config);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
 
   return `{
   Get {
@@ -1761,8 +2059,9 @@ export function generateDynamicHybridQuery(
         alpha: ${alphaVal} # Balance: 0=pure vector, 1=pure keyword search
         vector: ${vec} # Optional: provide custom vector (ensure its length matches your embedding model's dimension)
         properties: [${propsOverride.map((p) => `"${p}"`).join(', ')}] # Optional: limit search to specific properties
+${targetVectorsLine ? `        ${targetVectorsLine}` : ''}
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1788,7 +2087,7 @@ export function generateDynamicBM25Query(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
   const defaultTextProps = getTextProperties(classSchema);
   const queryText =
     typeof config?.searchQuery === 'string' && config!.searchQuery.length > 0
@@ -1797,7 +2096,10 @@ export function generateDynamicBM25Query(
   const propsOverride =
     Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
       ? config!.propertiesOverride
-      : defaultTextProps.slice(0, 3);
+      : Array.isArray(config?.searchProperties) && config!.searchProperties!.length > 0
+        ? config!.searchProperties!
+        : defaultTextProps.slice(0, 3);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
 
   return `{
   Get {
@@ -1806,7 +2108,7 @@ export function generateDynamicBM25Query(
         query: "${queryText}"
         properties: [${propsOverride.map((p) => `"${p}"`).join(', ')}] # Optional: limit search to specific properties
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1831,7 +2133,7 @@ export function generateDynamicGenerativeSearchQuery(
   limit: number = 5,
   config?: QueryConfig
 ): string {
-  const properties = getTopPropertiesForDisplay(classSchema, 3);
+  const properties = getTopPropertiesForDisplay(classSchema, 3, config);
   const conceptsArr =
     Array.isArray(config?.concepts) && config!.concepts.length > 0
       ? `[${config!.concepts.map((c) => `"${String(c).replace(/"/g, '\\"')}"`).join(', ')}]`
@@ -1850,6 +2152,8 @@ export function generateDynamicGenerativeSearchQuery(
     Array.isArray(config?.propertiesOverride) && config!.propertiesOverride.length > 0
       ? config!.propertiesOverride.slice(0, 2)
       : getTextProperties(classSchema).slice(0, 2);
+  const targetVectorsLine = formatTargetVectorsArg(classSchema, config);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, config);
 
   return `{
   Get {
@@ -1857,8 +2161,9 @@ export function generateDynamicGenerativeSearchQuery(
       nearText: {
         concepts: ${conceptsArr}
         ${thresholdLine}
+${targetVectorsLine ? `        ${targetVectorsLine}` : ''}
       }
-      limit: ${limit}
+      ${collectionArgs}
     ) {
 ${properties.join('\n')}
       _additional {
@@ -1879,6 +2184,39 @@ ${properties.join('\n')}
 }
 
 /**
+ * Schema-aware multi-tenant Get query with property selection.
+ */
+export function generateDynamicTenantQuery(
+  collectionName: string,
+  classSchema?: ClassSchema,
+  tenantName: string = 'YOUR_TENANT_ID',
+  limit: number = 10,
+  config?: QueryConfig
+): string {
+  const cfg: QueryConfig = { ...config, tenantName };
+  const properties = getTopPropertiesForDisplay(classSchema, 5, cfg);
+  const collectionArgs = buildCollectionArgs(classSchema, limit, cfg);
+  const header =
+    config?.includeHeaderComments === false
+      ? ''
+      : buildQueryHeaderComments(collectionName, classSchema, { kind: 'tenant Get' });
+
+  return `{
+${header}  Get {
+    ${collectionName} (
+      ${collectionArgs}
+    ) {
+${properties.join('\n')}
+      _additional {
+        id
+        tenant
+      }
+    }
+  }
+}`;
+}
+
+/**
  * Generate a dynamic groupBy query based on schema
  * @param collectionName The name of the collection
  * @param classSchema The class schema definition
@@ -1886,16 +2224,26 @@ ${properties.join('\n')}
  */
 export function generateDynamicGroupByQuery(
   collectionName: string,
-  classSchema?: ClassSchema
+  classSchema?: ClassSchema,
+  config?: QueryConfig
 ): string {
   const groupByPath =
-    classSchema?.properties?.find((p) => isTextDataType(p.dataType))?.name || 'category';
+    config?.groupByPath ||
+    classSchema?.properties?.find((p) => isTextDataType(p.dataType))?.name ||
+    'category';
+  // tenant → groupBy → limit (readable order; GraphQL arg order is not semantic)
+  const tenantRequired = isMultiTenantCollection(classSchema) || Boolean(config?.tenantName);
+  const argLines: string[] = [];
+  if (tenantRequired) {
+    argLines.push(`tenant: "${config?.tenantName?.trim() || 'YOUR_TENANT_ID'}"`);
+  }
+  argLines.push(`groupBy: ["${groupByPath}"]`);
+  argLines.push('limit: 10');
 
   return `{
   Aggregate {
     ${collectionName} (
-      groupBy: ["${groupByPath}"]
-      limit: 10
+      ${argLines.join('\n      ')}
     ) {
       groupedBy {
         value
@@ -1942,21 +2290,32 @@ export function generateDynamicGroupByQuery(
 /**
  * Helper function to get top properties for display
  */
-function getTopPropertiesForDisplay(classSchema?: ClassSchema, maxCount: number = 5): string[] {
+function getTopPropertiesForDisplay(
+  classSchema?: ClassSchema,
+  maxCount: number = 5,
+  config?: QueryConfig
+): string[] {
   if (!classSchema?.properties) {
     return ['      # Add your properties here'];
   }
 
   const result = buildPropertySelections(classSchema, {
     maxCount,
+    schema: config?.fullSchema,
     includeWarning: true,
     maxNestedProps: 3,
     indent: '      ',
+    includeBlobs: config?.includeBlobs === true,
+    maxReferences: 1,
+    maxObjects: 1,
   });
 
-  // Fallback: if classification produced nothing, include bare field names
+  // Fallback: if classification produced nothing, include bare field names (skip blobs)
   if (result.length === 0 && classSchema.properties.length > 0) {
-    return classSchema.properties.slice(0, maxCount).map((prop) => `      ${prop.name}`);
+    return classSchema.properties
+      .filter((p) => classifyProperty(p) !== 'blob')
+      .slice(0, maxCount)
+      .map((prop) => `      ${prop.name}`);
   }
 
   return result.length > 0 ? result : ['      # No properties found in schema'];
