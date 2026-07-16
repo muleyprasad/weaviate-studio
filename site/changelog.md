@@ -7,6 +7,19 @@ description: Full version history and release notes for Weaviate Studio — new 
 
 All notable changes to the Weaviate Studio extension.
 
+## [1.9.1] - 2026-07-16
+
+### 🐛 Fixed
+
+- **Target vector selection in RAG search** — Fixed target vector selection and multi-target combination in the Generative Search panel for multi-vector collections. (PR #86, fixes #77)
+- **Array scalars treated as cross-references** — Fixed query generation treating array scalar types (`text[]`, `int[]`) as GraphQL cross-references, producing broken queries. (PR #84)
+- **Telemetry dashboard metrics** — Fixed user counting, error detection, and feature matching in dashboards. Fixed CI env var mismatch (`APPLICATION_INSIGHTS_CONN_STRING` vs `APPLICATION_INSIGHTS_CONNECTION_STRING`) for telemetry injection. (PR #83)
+
+### 🔧 Improved
+
+- **Schema-aware GraphQL query generation** — N+1 fetch prevention, immutability polish, hostname sanitization, ASCII-only validation messages, and endpoint builder polish. (PR #85)
+- **Multi-tenancy hardening** — Hardened tenant pattern matching and cleaned up edge cases. (PR #82)
+
 ## [1.9.0] - 2026-07-14
 
 ### ✨ Added

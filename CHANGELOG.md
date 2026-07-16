@@ -5,6 +5,19 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-07-16
+
+### 🐛 Fixed
+
+- **Target vector selection in RAG search** — Fixed an issue where target vector selection and multi-target combination weren't properly supported in the Generative Search panel, causing errors when querying multi-vector collections. (PR #86, fixes #77)
+- **Array scalars treated as GraphQL cross-references** — Fixed query generation incorrectly treating array scalar data types (e.g. `text[]`, `int[]`) as cross-references, which produced broken generated queries with invalid syntax. (PR #84)
+- **Telemetry dashboard metrics** — Fixed user counting, error detection, and feature matching in telemetry dashboards. Also fixed an environment variable mismatch (`APPLICATION_INSIGHTS_CONN_STRING` vs `APPLICATION_INSIGHTS_CONNECTION_STRING`) in the CI pipeline that prevented telemetry connection string injection at build time. (PR #83)
+
+### 🔧 Improved
+
+- **Schema-aware GraphQL query generation hardened** — Additional polish for the schema-aware query generation system: N+1 fetch prevention, immutability improvements, hostname sanitization, ASCII-only validation messages, and endpoint builder polish. (PR #85)
+- **Multi-tenancy follow-ups** — Hardened tenant pattern matching and cleaned up edge cases in the multi-tenancy management workflows. (PR #82)
+
 ## [1.9.0] - 2026-07-14
 
 ### ✨ Added
