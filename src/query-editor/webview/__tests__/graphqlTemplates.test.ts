@@ -94,6 +94,248 @@ describe('graphqlTemplates helpers', () => {
       expect(q).toContain('_additional');
       expect(q).toContain('id');
     });
+
+    it('treats text[] aliases as a plain field, not an invalid ... on text[] fragment', () => {
+      // Regression: DiscoveryTopic.aliases (text[]) was misclassified as a cross-reference
+      // producing `... on text[] {` which is invalid GraphQL.
+      const { generateSampleQuery, validateAndSanitizeQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'DiscoveryTopic',
+            properties: [
+              { name: 'display_name', dataType: ['text'] },
+              { name: 'normalized_name', dataType: ['text'] },
+              { name: 'topic_id', dataType: ['text'] },
+              { name: 'aliases', dataType: ['text[]'] },
+            ],
+          },
+        ],
+      };
+
+      const q: string = generateSampleQuery('DiscoveryTopic', [], 10, schema);
+
+      expect(q).toContain('aliases');
+      expect(q).not.toMatch(/\.\.\.\s*on\s+text\[\]/);
+      expect(q).not.toMatch(/\.\.\.\s*on\s+text\b/);
+      // aliases should appear as a bare field selection
+      expect(q).toMatch(/^\s*aliases\s*$/m);
+
+      const validation = validateAndSanitizeQuery(q);
+      expect(validation.valid).toBe(true);
+    });
+
+    it('handles all common array scalar types as plain fields', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'ArrayTypes',
+            properties: [
+              { name: 'tags', dataType: ['text[]'] },
+              { name: 'scores', dataType: ['number[]'] },
+              { name: 'counts', dataType: ['int[]'] },
+              { name: 'flags', dataType: ['boolean[]'] },
+              { name: 'dates', dataType: ['date[]'] },
+              { name: 'ids', dataType: ['uuid[]'] },
+            ],
+          },
+        ],
+      };
+
+      const q: string = generateSampleQuery('ArrayTypes', [], 10, schema);
+
+      for (const name of ['tags', 'scores', 'counts', 'flags', 'dates', 'ids']) {
+        expect(q).toContain(name);
+      }
+      expect(q).not.toMatch(/\.\.\.\s*on\s+\w+\[\]/);
+    });
+
+    it('handles nested object and object[] properties with valid GraphQL type names', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Product',
+            properties: [
+              { name: 'name', dataType: ['text'] },
+              {
+                name: 'meta',
+                dataType: ['object'],
+                nestedProperties: [
+                  { name: 'sku', dataType: ['text'] },
+                  { name: 'weight', dataType: ['number'] },
+                ],
+              },
+              {
+                name: 'variants',
+                dataType: ['object[]'],
+                nestedProperties: [
+                  { name: 'color', dataType: ['text'] },
+                  { name: 'size', dataType: ['text'] },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const q: string = generateSampleQuery('Product', [], 10, schema);
+
+      expect(q).toContain('... on Product_meta_object');
+      expect(q).toContain('sku');
+      expect(q).toContain('... on Product_variants_object');
+      expect(q).toContain('color');
+      expect(q).not.toMatch(/\.\.\.\s*on\s+object/);
+    });
+
+    it('supports multi-target cross-references with one fragment per class', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Post',
+            properties: [
+              { name: 'title', dataType: ['text'] },
+              { name: 'related', dataType: ['Author', 'Publisher'] },
+            ],
+          },
+          {
+            class: 'Author',
+            properties: [{ name: 'name', dataType: ['text'] }],
+          },
+          {
+            class: 'Publisher',
+            properties: [{ name: 'org', dataType: ['text'] }],
+          },
+        ],
+      };
+
+      const q: string = generateSampleQuery('Post', [], 10, schema);
+
+      expect(q).toContain('... on Author');
+      expect(q).toContain('... on Publisher');
+      expect(q).toContain('name');
+      expect(q).toContain('org');
+    });
+
+    it('accepts dataType as a plain string (import / REST shape)', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Imported',
+            properties: [
+              { name: 'title', dataType: 'text' as any },
+              { name: 'tags', dataType: 'text[]' as any },
+              { name: 'author', dataType: 'Person' as any },
+            ],
+          },
+          {
+            class: 'Person',
+            properties: [{ name: 'name', dataType: 'text' as any }],
+          },
+        ],
+      };
+
+      // coerce via format path — properties may arrive as string dataType
+      const {
+        classifyProperty,
+        isPrimitiveDataType,
+        isReferenceDataType,
+      } = require('../graphqlTemplates');
+
+      expect(isPrimitiveDataType('text[]')).toBe(true);
+      expect(isPrimitiveDataType(['text[]'])).toBe(true);
+      expect(isReferenceDataType('Person')).toBe(true);
+      expect(classifyProperty({ name: 'tags', dataType: ['text[]'] })).toBe('primitive');
+
+      const q: string = generateSampleQuery('Imported', [], 10, {
+        classes: schema.classes.map((c: any) => ({
+          ...c,
+          properties: c.properties.map((p: any) => ({
+            ...p,
+            dataType: Array.isArray(p.dataType) ? p.dataType : [p.dataType],
+          })),
+        })),
+      });
+      expect(q).toContain('tags');
+      expect(q).not.toMatch(/\.\.\.\s*on\s+text/);
+      expect(q).toContain('... on Person');
+    });
+  });
+
+  describe('property type classification helpers', () => {
+    const {
+      isPrimitiveDataType,
+      isGeoDataType,
+      isObjectDataType,
+      isReferenceDataType,
+      isTextDataType,
+      getBaseDataType,
+      classifyProperty,
+      isValidGraphQLTypeName,
+      validateAndSanitizeQuery,
+    } = require('../graphqlTemplates');
+
+    it('classifies scalars and array scalars as primitive', () => {
+      expect(isPrimitiveDataType(['text'])).toBe(true);
+      expect(isPrimitiveDataType(['text[]'])).toBe(true);
+      expect(isPrimitiveDataType(['int[]'])).toBe(true);
+      expect(isPrimitiveDataType('uuid')).toBe(true);
+      expect(getBaseDataType(['text[]'])).toBe('text');
+      expect(isTextDataType(['text[]'])).toBe(true);
+    });
+
+    it('classifies geo and object types', () => {
+      expect(isGeoDataType(['geoCoordinates'])).toBe(true);
+      expect(isObjectDataType(['object'])).toBe(true);
+      expect(isObjectDataType(['object[]'])).toBe(true);
+      expect(classifyProperty({ name: 'loc', dataType: ['geoCoordinates'] })).toBe('geo');
+      expect(
+        classifyProperty({
+          name: 'meta',
+          dataType: ['object'],
+          nestedProperties: [{ name: 'a', dataType: ['text'] }],
+        })
+      ).toBe('object');
+    });
+
+    it('classifies cross-references and rejects invalid type names', () => {
+      expect(isReferenceDataType(['Person'])).toBe(true);
+      expect(isReferenceDataType(['Author', 'Publisher'])).toBe(true);
+      expect(isReferenceDataType(['text[]'])).toBe(false);
+      expect(isReferenceDataType(['object'])).toBe(false);
+      expect(isValidGraphQLTypeName('text[]')).toBe(false);
+      expect(isValidGraphQLTypeName('Person')).toBe(true);
+    });
+
+    it('flags invalid ... on text[] fragments in validation', () => {
+      const bad = `{ Get { X { aliases { ... on text[] { id } } } } }`;
+      const result = validateAndSanitizeQuery(bad);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e: string) => e.includes('text[]'))).toBe(true);
+    });
+  });
+
+  describe('generateDynamicSampleQuery with array types', () => {
+    it('does not emit invalid fragments for text[] properties', () => {
+      const { generateDynamicSampleQuery } = require('../graphqlTemplates');
+      const classSchema = {
+        class: 'DiscoveryTopic',
+        properties: [
+          { name: 'display_name', dataType: ['text'] },
+          { name: 'aliases', dataType: ['text[]'] },
+          { name: 'related', dataType: ['Topic'] },
+        ],
+      };
+
+      const q: string = generateDynamicSampleQuery('DiscoveryTopic', classSchema, 10);
+      expect(q).toContain('display_name');
+      expect(q).toContain('aliases');
+      expect(q).not.toMatch(/\.\.\.\s*on\s+text\[\]/);
+      expect(q).toContain('... on Topic');
+    });
   });
 });
 

@@ -516,41 +516,16 @@ ${additionalFields.length > 0 ? `      _additional {\n${additionalFields.map((f)
  * Generate properties for advanced queries based on schema and config
  */
 function generateAdvancedProperties(classSchema?: ClassSchema, config: QueryConfig = {}): string[] {
-  const { maxProperties = 5, includeVectors = false } = config;
+  const { maxProperties = 5 } = config;
 
-  if (!classSchema?.properties) {
-    return ['      # Add your properties here'];
-  }
-
-  const properties = classSchema.properties;
-  const primitiveTypes = ['text', 'string', 'int', 'number', 'boolean', 'date'];
-
-  // Get primitive properties first
-  const primitives = properties
-    .filter((p) => primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || ''))
-    .slice(0, maxProperties);
-
-  const result: string[] = [];
-
-  primitives.forEach((prop) => {
-    result.push(`      ${prop.name}`);
+  const selections = buildPropertySelections(classSchema, {
+    maxCount: maxProperties,
+    includeWarning: false,
+    maxNestedProps: 3,
+    indent: '      ',
   });
 
-  // Add geo coordinates if available and space allows
-  if (result.length < maxProperties) {
-    const geoProps = properties
-      .filter((p) => p.dataType?.[0]?.toLowerCase() === 'geocoordinates')
-      .slice(0, 1);
-
-    geoProps.forEach((prop) => {
-      result.push(`      ${prop.name} {
-        latitude
-        longitude
-      }`);
-    });
-  }
-
-  return result.length > 0 ? result : ['      # No properties found in schema'];
+  return selections.length > 0 ? selections : ['      # No properties found in schema'];
 }
 
 /**
@@ -653,8 +628,27 @@ export function validateAndSanitizeQuery(query: string): {
     errors.push('Query must start with "{" or "mutation"');
   }
 
+  // Catch invalid inline fragments on Weaviate array/scalar types (e.g. `... on text[]`)
+  const fragmentTypeRegex = /\.\.\.\s*on\s+([^\s{]+)/g;
+  let fragmentMatch: RegExpExecArray | null;
+  while ((fragmentMatch = fragmentTypeRegex.exec(query)) !== null) {
+    const typeName = fragmentMatch[1];
+    if (!isValidGraphQLTypeName(typeName)) {
+      errors.push(
+        `Invalid inline fragment type "${typeName}" (GraphQL type names cannot contain "[]" or other special characters)`
+      );
+    } else if (
+      PRIMITIVE_BASE_TYPES.has(typeName.toLowerCase()) ||
+      typeName.toLowerCase() === 'geocoordinates'
+    ) {
+      errors.push(
+        `Invalid inline fragment type "${typeName}" — scalar Weaviate types are selected as plain fields, not fragments`
+      );
+    }
+  }
+
   // Sanitize by removing potential harmful content (basic implementation)
-  let sanitizedQuery = query
+  const sanitizedQuery = query
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
     .trim();
 
@@ -676,12 +670,8 @@ export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryCo
   }
 
   const hasVector = classSchema.vectorizer !== undefined;
-  const hasTextProperties = classSchema.properties.some((p) =>
-    ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || '')
-  );
-  const hasGeoProperties = classSchema.properties.some(
-    (p) => p.dataType?.[0]?.toLowerCase() === 'geocoordinates'
-  );
+  const hasTextProperties = classSchema.properties.some((p) => isTextDataType(p.dataType));
+  const hasGeoProperties = classSchema.properties.some((p) => isGeoDataType(p.dataType));
 
   return {
     includeVectors: hasVector,
@@ -691,6 +681,13 @@ export function getRecommendedConfig(classSchema?: ClassSchema): Partial<QueryCo
     certainty: 0.7,
     distance: 0.6,
     limit: 10,
+    // Prefer text fields (including text[]) for BM25 / hybrid when available
+    searchProperties: hasTextProperties
+      ? classSchema.properties
+          .filter((p) => isTextDataType(p.dataType))
+          .map((p) => p.name)
+          .slice(0, 5)
+      : undefined,
   };
 }
 
@@ -773,6 +770,336 @@ export interface ClassSchema {
 }
 
 /**
+ * Scalar Weaviate property types (array forms like text[] share the same base).
+ * Cross-references use collection/class names and are NOT listed here.
+ */
+export const PRIMITIVE_BASE_TYPES = new Set([
+  'text',
+  'string',
+  'int',
+  'number',
+  'boolean',
+  'date',
+  'phonenumber',
+  'uuid',
+  'blob',
+]);
+
+export type PropertyKind = 'primitive' | 'geo' | 'object' | 'reference' | 'unknown';
+
+/** Coerce Weaviate dataType (string | string[]) to a non-empty string array. */
+export function coerceDataType(dataType: string | string[] | undefined | null): string[] {
+  if (Array.isArray(dataType)) {
+    return dataType.filter((dt): dt is string => typeof dt === 'string' && dt.length > 0);
+  }
+  if (typeof dataType === 'string' && dataType.length > 0) {
+    return [dataType];
+  }
+  return [];
+}
+
+/** First declared dataType entry, preserving original casing (e.g. Person, text[]). */
+export function getPrimaryDataType(dataType: string | string[] | undefined | null): string {
+  return coerceDataType(dataType)[0] || '';
+}
+
+/** Base type without [] suffix, lowercased (text[] → text, Person → person). */
+export function getBaseDataType(dataType: string | string[] | undefined | null): string {
+  return getPrimaryDataType(dataType)
+    .replace(/\[\]\s*$/, '')
+    .toLowerCase();
+}
+
+export function isArrayDataType(dataType: string | string[] | undefined | null): boolean {
+  return /\[\]\s*$/.test(getPrimaryDataType(dataType));
+}
+
+/** Valid GraphQL type / collection name (no brackets or other special chars). */
+export function isValidGraphQLTypeName(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+export function isPrimitiveDataType(dataType: string | string[] | undefined | null): boolean {
+  return PRIMITIVE_BASE_TYPES.has(getBaseDataType(dataType));
+}
+
+export function isGeoDataType(dataType: string | string[] | undefined | null): boolean {
+  return getBaseDataType(dataType) === 'geocoordinates';
+}
+
+export function isObjectDataType(dataType: string | string[] | undefined | null): boolean {
+  return getBaseDataType(dataType) === 'object';
+}
+
+export function isTextDataType(dataType: string | string[] | undefined | null): boolean {
+  const base = getBaseDataType(dataType);
+  return base === 'text' || base === 'string';
+}
+
+/**
+ * True when dataType points at one or more other collections (cross-reference).
+ * Multi-target refs declare multiple class names in dataType.
+ */
+export function isReferenceDataType(dataType: string | string[] | undefined | null): boolean {
+  const types = coerceDataType(dataType);
+  if (types.length === 0) {
+    return false;
+  }
+  // All entries must look like collection names (not primitives/object/geo, and GraphQL-safe).
+  return types.every((dt) => {
+    const base = dt.replace(/\[\]\s*$/, '');
+    if (!isValidGraphQLTypeName(base)) {
+      return false;
+    }
+    const lower = base.toLowerCase();
+    if (PRIMITIVE_BASE_TYPES.has(lower)) {
+      return false;
+    }
+    if (lower === 'object' || lower === 'geocoordinates') {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** Referenced collection names for a cross-ref property (strips [] if present). */
+export function getReferencedClassNames(dataType: string | string[] | undefined | null): string[] {
+  return coerceDataType(dataType)
+    .map((dt) => dt.replace(/\[\]\s*$/, ''))
+    .filter((name) => isValidGraphQLTypeName(name) && isReferenceDataType([name]));
+}
+
+export function classifyProperty(prop: PropertySchema): PropertyKind {
+  const dataType = prop.dataType;
+  if (isGeoDataType(dataType)) {
+    return 'geo';
+  }
+  if (isPrimitiveDataType(dataType)) {
+    return 'primitive';
+  }
+  if (isObjectDataType(dataType)) {
+    return 'object';
+  }
+  if (isReferenceDataType(dataType)) {
+    return 'reference';
+  }
+  // Unknown / malformed types: treat as plain scalar fields so we never emit
+  // invalid inline fragments like `... on text[]`.
+  return 'unknown';
+}
+
+/**
+ * Format a property for a GraphQL selection set.
+ * - primitives / unknown: bare field name (works for text, text[], int[], …)
+ * - geo: latitude/longitude subselection
+ * - nested object/object[]: `... on Collection_prop_object { nested fields }`
+ * - cross-references: `... on TargetClass { … }` (multi-target: one fragment each)
+ */
+export function formatPropertySelection(
+  prop: PropertySchema,
+  options: {
+    collectionName: string;
+    schema?: { classes?: ClassSchema[] };
+    indent?: string;
+    maxNestedProps?: number;
+    includeWarning?: boolean;
+    includeRefAdditional?: boolean;
+  }
+): string {
+  const {
+    collectionName,
+    schema,
+    indent = '',
+    maxNestedProps = 5,
+    includeWarning = true,
+    includeRefAdditional = true,
+  } = options;
+  const kind = classifyProperty(prop);
+
+  if (kind === 'geo') {
+    return `${indent}${prop.name} {
+${indent}  latitude
+${indent}  longitude
+${indent}}`;
+  }
+
+  if (kind === 'object') {
+    const nestedTypeName = `${collectionName}_${prop.name}_object`;
+    if (!isValidGraphQLTypeName(nestedTypeName)) {
+      return `${indent}${prop.name}`;
+    }
+    const nested = (prop.nestedProperties || []).slice(0, maxNestedProps);
+    if (nested.length === 0) {
+      // Schema did not expose nested fields — still select the object safely.
+      return `${indent}${prop.name} {
+${indent}  # Nested fields unavailable in schema; add them manually if needed.
+${indent}  __typename
+${indent}}`;
+    }
+    const nestedPropsStr = nested
+      .map((np) => {
+        // Nested props may themselves be nested objects or geo; keep first level simple.
+        const npKind = classifyProperty(np);
+        if (npKind === 'geo') {
+          return `${indent}  ${np.name} {\n${indent}    latitude\n${indent}    longitude\n${indent}  }`;
+        }
+        if (npKind === 'object' && np.nestedProperties?.length) {
+          const deeper = np.nestedProperties
+            .slice(0, 3)
+            .map((d) => `${indent}    ${d.name}`)
+            .join('\n');
+          const deeperType = `${nestedTypeName}_${np.name}_object`;
+          if (isValidGraphQLTypeName(deeperType)) {
+            return `${indent}  ${np.name} {\n${indent}    ... on ${deeperType} {\n${deeper}\n${indent}    }\n${indent}  }`;
+          }
+        }
+        return `${indent}  ${np.name}`;
+      })
+      .join('\n');
+    const warning = includeWarning ? `${indent}  # Nested object field (object / object[]).\n` : '';
+    return `${indent}${prop.name} {
+${warning}${indent}  ... on ${nestedTypeName} {
+${nestedPropsStr}
+${indent}  }
+${indent}}`;
+  }
+
+  if (kind === 'reference') {
+    const classNames = getReferencedClassNames(prop.dataType);
+    if (classNames.length === 0) {
+      return `${indent}${prop.name}`;
+    }
+    const warning = includeWarning
+      ? `${indent}  # WARNING: This may return many linked objects. Consider using a separate query.\n`
+      : '';
+    const fragments = classNames
+      .map((className) => {
+        const referencedClass = schema?.classes?.find((c) => c.class === className);
+        let body: string;
+        if (referencedClass?.properties?.length) {
+          const refPrimitiveProps = referencedClass.properties
+            .filter((p) => classifyProperty(p) === 'primitive' || classifyProperty(p) === 'unknown')
+            .slice(0, maxNestedProps);
+          if (refPrimitiveProps.length > 0) {
+            const lines = refPrimitiveProps.map((p) => `${indent}    ${p.name}`);
+            if (includeRefAdditional) {
+              lines.push(`${indent}    _additional {`, `${indent}      id`, `${indent}    }`);
+            }
+            body = lines.join('\n');
+          } else if (includeRefAdditional) {
+            body = `${indent}    _additional {\n${indent}      id\n${indent}    }`;
+          } else {
+            body = `${indent}    __typename`;
+          }
+        } else if (includeRefAdditional) {
+          body = `${indent}    _additional {\n${indent}      id\n${indent}    }`;
+        } else {
+          body = `${indent}    __typename`;
+        }
+        return `${indent}  ... on ${className} {\n${body}\n${indent}  }`;
+      })
+      .join('\n');
+    return `${indent}${prop.name} {
+${warning}${fragments}
+${indent}}`;
+  }
+
+  // primitive or unknown — always a plain field (covers text, text[], int[], uuid, …)
+  return `${indent}${prop.name}`;
+}
+
+/**
+ * Build a selection list for display/query generators from a class schema.
+ */
+export function buildPropertySelections(
+  classSchema: ClassSchema | undefined,
+  options: {
+    maxCount?: number;
+    schema?: { classes?: ClassSchema[] };
+    includeAll?: boolean;
+    maxNestedProps?: number;
+    includeWarning?: boolean;
+    indent?: string;
+  } = {}
+): string[] {
+  if (!classSchema?.properties?.length) {
+    return [];
+  }
+
+  const {
+    maxCount = 5,
+    schema,
+    includeAll = false,
+    maxNestedProps = 5,
+    includeWarning = true,
+    indent = '      ',
+  } = options;
+
+  const primitives: PropertySchema[] = [];
+  const geo: PropertySchema[] = [];
+  const objects: PropertySchema[] = [];
+  const references: PropertySchema[] = [];
+
+  for (const prop of classSchema.properties) {
+    switch (classifyProperty(prop)) {
+      case 'geo':
+        geo.push(prop);
+        break;
+      case 'object':
+        objects.push(prop);
+        break;
+      case 'reference':
+        references.push(prop);
+        break;
+      case 'primitive':
+      case 'unknown':
+      default:
+        primitives.push(prop);
+        break;
+    }
+  }
+
+  const format = (prop: PropertySchema) =>
+    formatPropertySelection(prop, {
+      collectionName: classSchema.class,
+      schema,
+      indent,
+      maxNestedProps,
+      includeWarning,
+    });
+
+  if (includeAll) {
+    return [
+      ...primitives.map(format),
+      ...geo.map(format),
+      ...objects.map(format),
+      ...references.map(format),
+    ];
+  }
+
+  // Prefer scalars, then geo, nested objects, then a small number of refs.
+  const result: string[] = [];
+  const take = (items: PropertySchema[], n: number) => {
+    for (const prop of items) {
+      if (result.length >= maxCount) {
+        break;
+      }
+      if (n-- <= 0) {
+        break;
+      }
+      result.push(format(prop));
+    }
+  };
+
+  take(primitives, maxCount);
+  take(geo, Math.max(0, maxCount - result.length));
+  take(objects, Math.min(2, Math.max(0, maxCount - result.length)));
+  take(references, Math.min(2, Math.max(0, maxCount - result.length)));
+
+  return result;
+}
+
+/**
  * Configuration options for query generation
  */
 export interface QueryConfig {
@@ -816,288 +1143,51 @@ export function generateSampleQuery(
   limit: number = 10,
   schema?: { classes?: ClassSchema[] }
 ): string {
-  // Find the class definition from schema if available
-  const classSchema = schema?.classes?.find((c) => c.class === collectionName);
+  // Find the class definition from schema if available (case-insensitive)
+  const classSchema =
+    schema?.classes?.find((c) => c.class === collectionName) ||
+    schema?.classes?.find((c) => c.class?.toLowerCase() === collectionName.toLowerCase());
 
   let propertyStrings: string[] = [];
 
-  // If no specific properties provided, generate from schema
-  if (properties.length === 0 && classSchema?.properties) {
-    // Get all properties from schema, prioritizing simple types first
-    const primitiveTypes = [
-      'text',
-      'string',
-      'int',
-      'number',
-      'boolean',
-      'date',
-      'phoneNumber',
-      'uuid',
-      'blob',
-    ];
-
-    // Separate primitive, nested object, and reference properties
-    const primitiveProps = classSchema.properties.filter((p) =>
-      p.dataType.some(
-        (dt) => primitiveTypes.includes(dt.toLowerCase()) || dt.toLowerCase() === 'geocoordinates'
-      )
-    );
-    const nestedObjectProps = classSchema.properties.filter(
-      (p) =>
-        p.dataType.some((dt) => dt.toLowerCase() === 'object') &&
-        p.nestedProperties &&
-        p.nestedProperties.length > 0
-    );
-    const referenceProps = classSchema.properties.filter(
-      (p) =>
-        !p.dataType.some(
-          (dt) =>
-            primitiveTypes.includes(dt.toLowerCase()) ||
-            dt.toLowerCase() === 'geocoordinates' ||
-            dt.toLowerCase() === 'object'
-        )
-    );
-
-    // Add all primitive and geoCoordinate properties
-    primitiveProps.forEach((prop) => {
-      // Special handling for geoCoordinates - they need latitude and longitude sub-fields
-      if (prop.dataType.some((dt) => dt.toLowerCase() === 'geocoordinates')) {
-        propertyStrings.push(`${prop.name} {
-        latitude
-        longitude
-      }`);
-      } else {
-        propertyStrings.push(prop.name);
-      }
+  if (properties.length === 0 && classSchema?.properties?.length) {
+    // Include all schema properties, classified correctly (text[] is scalar, not a ref).
+    propertyStrings = buildPropertySelections(classSchema, {
+      includeAll: true,
+      schema,
+      indent: '      ',
+      maxNestedProps: 5,
+      includeWarning: true,
     });
-
-    // Add all nested object properties
-    nestedObjectProps.forEach((prop) => {
-      if (prop.nestedProperties && prop.nestedProperties.length > 0) {
-        const nestedTypeName = `${classSchema.class}_${prop.name}_object`;
-        const nestedPropsStr = prop.nestedProperties
-          .slice(0, 5) // Limit to 5 nested properties
-          .map((np) => `          ${np.name}`)
-          .join('\n');
-        propertyStrings.push(`${prop.name} {
-        # WARNING: This may return many linked objects. Consider using a separate query.
-        ... on ${nestedTypeName} {
-${nestedPropsStr}
-        }
-      }`);
+  } else if (properties.length > 0) {
+    propertyStrings = properties.map((propName) => {
+      const propSchema = classSchema?.properties?.find((p) => p.name === propName);
+      if (propSchema && classSchema) {
+        return formatPropertySelection(propSchema, {
+          collectionName: classSchema.class,
+          schema,
+          indent: '      ',
+          maxNestedProps: 5,
+          includeWarning: true,
+        });
       }
-    });
-
-    // Add all reference properties with proper nested structure
-    referenceProps.forEach((prop) => {
-      const referencedClassName = prop.dataType[0];
-      const referencedClass = schema?.classes?.find((c) => c.class === referencedClassName);
-
-      if (referencedClass && referencedClass.properties) {
-        // Get all primitive properties from the referenced class
-        const refPrimitiveProps = referencedClass.properties.filter((p) =>
-          p.dataType.some((dt) => primitiveTypes.includes(dt.toLowerCase()))
-        );
-
-        if (refPrimitiveProps.length > 0) {
-          const nestedProps = refPrimitiveProps.map((p) => `          ${p.name}`).join('\n');
-          propertyStrings.push(`${prop.name} {
-        # WARNING: This may return many linked objects. Consider using a separate query 
-        # or adjust the main query limit to control total results.
-        ... on ${referencedClassName} {
-${nestedProps}
-          _additional {
-            id
-          }
-        }
-      }`);
-        } else {
-          // No suitable properties found, use a basic structure
-          propertyStrings.push(`${prop.name} {
-        # WARNING: This may return many linked objects. Consider using a separate query.
-        ... on ${referencedClassName} {
-          _additional {
-            id
-          }
-        }
-      }`);
-        }
-      } else {
-        // We couldn't find schema info for the referenced class
-        // Use a generic structure with _additional.id
-        propertyStrings.push(`${prop.name} {
-        # WARNING: This may return many linked objects. Consider using a separate query.
-        ... on ${referencedClassName} {
-          _additional {
-            id
-          }
-        }
-      }`);
-      }
+      // Unknown property name — emit as a plain field (never invent invalid fragments).
+      return `      ${propName}`;
     });
   } else {
-    // Use provided properties or generate property strings with schema info
-    const propsToUse = properties.length > 0 ? properties : ['# Add your properties here'];
-
-    propertyStrings = propsToUse.map((propName) => {
-      // If we have schema information, check if this is a relationship field
-      if (classSchema?.properties) {
-        const propSchema = classSchema.properties.find((p) => p.name === propName);
-
-        // Check if this is a reference/cross-reference property
-        if (propSchema && propSchema.dataType && propSchema.dataType.length > 0) {
-          // Cross-references in Weaviate have dataType starting with the class name
-          const referencedClassName = propSchema.dataType[0];
-
-          // If it's not a primitive type, it's likely a reference or nested object
-          const primitiveTypes = [
-            'text',
-            'string',
-            'int',
-            'number',
-            'boolean',
-            'date',
-            'phoneNumber',
-            'uuid',
-            'blob',
-          ];
-
-          // Check if it's a nested object property with nestedProperties
-          if (
-            referencedClassName.toLowerCase() === 'object' &&
-            propSchema.nestedProperties &&
-            propSchema.nestedProperties.length > 0
-          ) {
-            const nestedTypeName = `${classSchema.class}_${propName}_object`;
-            const nestedProps = propSchema.nestedProperties
-              .slice(0, 5) // Limit to 5 properties
-              .map((np) => `          ${np.name}`)
-              .join('\n');
-            return `${propName} {
-        # WARNING: This may return many linked objects. Consider using a separate query.
-        ... on ${nestedTypeName} {
-${nestedProps}
-        }
-      }`;
-          }
-
-          if (!primitiveTypes.includes(referencedClassName.toLowerCase())) {
-            // Find the referenced class's schema
-            const referencedClass = schema?.classes?.find((c) => c.class === referencedClassName);
-
-            // If we found the referenced class, include a few of its properties
-            if (referencedClass && referencedClass.properties) {
-              // Get all non-reference primitive properties from the referenced class
-              const refProperties = referencedClass.properties
-                .filter((p) => primitiveTypes.includes(p.dataType[0].toLowerCase()))
-                .map((p) => p.name);
-
-              // If we have properties to include
-              if (refProperties.length > 0) {
-                const nestedProps = refProperties.map((p) => `          ${p}`).join('\n');
-                return `${propName} {
-        ... on ${referencedClassName} {
-${nestedProps}
-          _additional {
-            id
-          }
-        }
-      }`;
-              } else {
-                // No suitable properties found, use a placeholder
-                return `${propName} {
-        ... on ${referencedClassName} {
-          _additional {
-            id
-          }
-        }
-      }`;
-              }
-            } else {
-              // We couldn't find schema info for the referenced class, but we know it's a reference
-              // Use a generic structure with _additional.id
-              return `${propName} {
-        ... on ${referencedClassName} {
-          _additional {
-            id
-          }
-        }
-      }`;
-            }
-          } else {
-            // This is a primitive type - check if it's geoCoordinates which needs special handling
-            if (referencedClassName.toLowerCase() === 'geocoordinates') {
-              return `${propName} {
-        latitude
-        longitude
-      }`;
-            }
-          }
-        } else if (propSchema) {
-          // We found the property in schema but it has no dataType or it's a primitive
-          // Check if it's geoCoordinates
-          if (
-            propSchema.dataType &&
-            propSchema.dataType.some((dt) => dt.toLowerCase() === 'geocoordinates')
-          ) {
-            return `${propName} {
-        latitude
-        longitude
-      }`;
-          }
-          return propName;
-        } else {
-          // Property not found in schema - could be a reference field with naming convention
-          // Check if it looks like a reference field (camelCase ending with class name or common patterns)
-          const referencePatterns = [
-            /^[a-z]+[A-Z][a-zA-Z]*$/, // camelCase pattern
-            /^(wrote|writes|has|belongs|contains|references)[A-Z]/i, // common relationship verbs
-            /[A-Z][a-z]*$/, // ends with capitalized word (likely class name)
-          ];
-
-          const looksLikeReference = referencePatterns.some((pattern) => pattern.test(propName));
-
-          if (looksLikeReference) {
-            // Try to infer the referenced class name from the property name
-            // Common patterns: wroteArticles -> Article, writesFor -> Publication, etc.
-            let inferredClassName = '';
-
-            if (propName.includes('Articles')) {
-              inferredClassName = 'Article';
-            } else if (propName.includes('For')) {
-              inferredClassName = 'Publication'; // or Organization, etc.
-            } else {
-              // Extract the capitalized part at the end
-              const match = propName.match(/[A-Z][a-z]*$/);
-              inferredClassName = match ? match[0] : 'Unknown';
-            }
-
-            return `${propName} {
-        ... on ${inferredClassName} {
-          _additional {
-            id
-          }
-        }
-      }`;
-          }
-        }
-      }
-
-      // If we couldn't determine it's a relationship or don't have schema info,
-      // just return the property name
-      return propName;
-    });
+    propertyStrings = ['      # Add your properties here'];
   }
 
   // Always include _additional.id for object identification
   if (!propertyStrings.some((p) => p.includes('_additional'))) {
-    propertyStrings.unshift('_additional {\n        id\n      }');
+    propertyStrings.unshift('      _additional {\n        id\n      }');
   }
 
+  // formatPropertySelection already indents; join without extra leading indent.
   return `{
   Get {
     ${collectionName} (limit: ${limit}) {
-      ${propertyStrings.join('\n      ')}
+${propertyStrings.join('\n')}
     }
   }
 }`;
@@ -1236,8 +1326,19 @@ export function processTemplate(
     validateQueryConfig(config);
 
     // Helpers to normalize various schema shapes (v1/v2)
-    const coerceToArray = (v: any): string[] =>
-      Array.isArray(v) ? v : typeof v === 'string' ? [v] : [];
+    const normalizeProperty = (p: any): PropertySchema => ({
+      name: p.name,
+      dataType: coerceDataType(p.dataType),
+      description: p.description,
+      tokenization: p.tokenization,
+      indexSearchable: p.indexSearchable,
+      indexFilterable: p.indexFilterable,
+      moduleConfig: p.moduleConfig,
+      vectorizerConfig: p.vectorizerConfig,
+      nestedProperties: Array.isArray(p.nestedProperties)
+        ? p.nestedProperties.map(normalizeProperty)
+        : undefined,
+    });
 
     const normalizeClassSchema = (input: any): ClassSchema | undefined => {
       if (!input) {
@@ -1246,18 +1347,7 @@ export function processTemplate(
       const normalized: ClassSchema = {
         class: input.class ?? input.name,
         description: input.description,
-        properties: Array.isArray(input.properties)
-          ? input.properties.map((p: any) => ({
-              name: p.name,
-              dataType: coerceToArray(p.dataType),
-              description: p.description,
-              tokenization: p.tokenization,
-              indexSearchable: p.indexSearchable,
-              indexFilterable: p.indexFilterable,
-              moduleConfig: p.moduleConfig,
-              vectorizerConfig: p.vectorizerConfig,
-            }))
-          : [],
+        properties: Array.isArray(input.properties) ? input.properties.map(normalizeProperty) : [],
         vectorizer: input.vectorizer,
         moduleConfig: input.moduleConfig,
         vectorizers: input.vectorizers,
@@ -1397,93 +1487,20 @@ export function generateDynamicSampleQuery(
 }`;
   }
 
-  const properties = classSchema.properties;
+  // Ensure class name is set for nested type names
+  const schemaForBuild: ClassSchema = {
+    ...classSchema,
+    class: classSchema.class || collectionName,
+  };
 
-  // Categorize properties
-  const primitiveProps: PropertySchema[] = [];
-  const referenceProps: PropertySchema[] = [];
-  const geoProps: PropertySchema[] = [];
-  const nestedObjectProps: PropertySchema[] = [];
-
-  properties.forEach((prop) => {
-    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
-
-    if (dataType === 'geocoordinates') {
-      geoProps.push(prop);
-    } else if (
-      [
-        'text',
-        'string',
-        'int',
-        'number',
-        'boolean',
-        'date',
-        'phonenumber',
-        'uuid',
-        'blob',
-      ].includes(dataType)
-    ) {
-      primitiveProps.push(prop);
-    } else if (dataType === 'object' && prop.nestedProperties && prop.nestedProperties.length > 0) {
-      // It's a nested object property with nested properties defined
-      nestedObjectProps.push(prop);
-    } else {
-      // It's likely a reference to another class
-      referenceProps.push(prop);
-    }
+  const propertyLines = buildPropertySelections(schemaForBuild, {
+    maxCount: 8,
+    includeAll: false,
+    maxNestedProps: 3,
+    includeWarning: true,
+    indent: '      ',
   });
 
-  let propertyLines: string[] = [];
-
-  // Add up to 5 primitive properties
-  const selectedPrimitives = primitiveProps.slice(0, 5);
-  selectedPrimitives.forEach((prop) => {
-    propertyLines.push(`      ${prop.name}`);
-  });
-
-  // Add up to 2 geo coordinate properties
-  const selectedGeoProps = geoProps.slice(0, 2);
-  selectedGeoProps.forEach((prop) => {
-    propertyLines.push(`      ${prop.name} {
-        latitude
-        longitude
-      }`);
-  });
-
-  // Add nested object properties
-  const selectedNestedProps = nestedObjectProps.slice(0, 2);
-  selectedNestedProps.forEach((prop) => {
-    if (prop.nestedProperties && prop.nestedProperties.length > 0) {
-      // Generate inline fragment with the nested object type name
-      const nestedTypeName = `${collectionName}_${prop.name}_object`;
-      const nestedPropsStr = prop.nestedProperties
-        .slice(0, 3) // Limit to 3 nested properties for readability
-        .map((np) => `          ${np.name}`)
-        .join('\n');
-      propertyLines.push(`      ${prop.name} {
-        # WARNING: This may return many linked objects. Consider using a separate query.
-        ... on ${nestedTypeName} {
-${nestedPropsStr}
-        }
-      }`);
-    }
-  });
-
-  // Add up to 2 reference properties with nested selection
-  const selectedReferenceProps = referenceProps.slice(0, 2 - selectedNestedProps.length);
-  selectedReferenceProps.forEach((prop) => {
-    const referencedClassName = prop.dataType?.[0] || 'Unknown';
-    propertyLines.push(`      ${prop.name} {
-        # WARNING: May return many linked objects. Consider separate queries if needed.
-        ... on ${referencedClassName} {
-          _additional {
-            id
-          }
-        }
-      }`);
-  });
-
-  // Always include _additional for metadata
   propertyLines.unshift(`      _additional {
         id
         creationTimeUnix
@@ -1858,9 +1875,7 @@ export function generateDynamicGroupByQuery(
   classSchema?: ClassSchema
 ): string {
   const groupByPath =
-    classSchema?.properties?.find((p) =>
-      ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || '')
-    )?.name || 'category';
+    classSchema?.properties?.find((p) => isTextDataType(p.dataType))?.name || 'category';
 
   return `{
   Aggregate {
@@ -1918,64 +1933,16 @@ function getTopPropertiesForDisplay(classSchema?: ClassSchema, maxCount: number 
     return ['      # Add your properties here'];
   }
 
-  const properties = classSchema.properties;
-  const primitiveTypes = [
-    'text',
-    'string',
-    'int',
-    'number',
-    'boolean',
-    'date',
-    'phonenumber',
-    'uuid',
-  ];
-
-  // Prioritize primitive types, then geo coordinates, then references
-  const primitives = properties
-    .filter((p) => primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || ''))
-    .slice(0, Math.min(maxCount, 3));
-
-  const geoProps = properties
-    .filter((p) => p.dataType?.[0]?.toLowerCase() === 'geocoordinates')
-    .slice(0, 1);
-
-  const remainingSlots = maxCount - primitives.length - geoProps.length;
-  const references = properties
-    .filter(
-      (p) =>
-        !primitiveTypes.includes(p.dataType?.[0]?.toLowerCase() || '') &&
-        p.dataType?.[0]?.toLowerCase() !== 'geocoordinates'
-    )
-    .slice(0, Math.max(0, remainingSlots));
-
-  const result: string[] = [];
-
-  primitives.forEach((prop) => {
-    result.push(`      ${prop.name}`);
+  const result = buildPropertySelections(classSchema, {
+    maxCount,
+    includeWarning: true,
+    maxNestedProps: 3,
+    indent: '      ',
   });
 
-  geoProps.forEach((prop) => {
-    result.push(`      ${prop.name} {
-        latitude
-        longitude
-      }`);
-  });
-
-  references.forEach((prop) => {
-    const refClassName = prop.dataType?.[0] || 'Unknown';
-    result.push(`      ${prop.name} {
-        # WARNING: May return many objects. Consider separate queries if needed.
-        ... on ${refClassName} {
-          _additional { id }
-        }
-      }`);
-  });
-
-  // Fallback: if no properties were classified, include the first N properties as plain fields
-  if (result.length === 0 && Array.isArray(properties) && properties.length > 0) {
-    properties.slice(0, maxCount).forEach((prop) => {
-      result.push(`      ${prop.name}`);
-    });
+  // Fallback: if classification produced nothing, include bare field names
+  if (result.length === 0 && classSchema.properties.length > 0) {
+    return classSchema.properties.slice(0, maxCount).map((prop) => `      ${prop.name}`);
   }
 
   return result.length > 0 ? result : ['      # No properties found in schema'];
@@ -1990,7 +1957,7 @@ function getTextProperties(classSchema?: ClassSchema): string[] {
   }
 
   return classSchema.properties
-    .filter((p) => ['text', 'string'].includes(p.dataType?.[0]?.toLowerCase() || ''))
+    .filter((p) => isTextDataType(p.dataType))
     .map((p) => p.name)
     .slice(0, 3);
 }
@@ -2196,7 +2163,8 @@ function generateFilterExamples(classSchema?: ClassSchema): string[] {
   const properties = classSchema.properties.slice(0, 3); // Limit to 3 examples
 
   properties.forEach((prop) => {
-    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    // Use base type so text[] / int[] produce the correct filter operators
+    const dataType = getBaseDataType(prop.dataType);
     let example = '';
 
     switch (dataType) {
@@ -2231,6 +2199,10 @@ function generateFilterExamples(classSchema?: ClassSchema): string[] {
           }`;
         break;
       default:
+        // Skip cross-refs / nested objects for simple filter examples
+        if (classifyProperty(prop) !== 'primitive' && classifyProperty(prop) !== 'unknown') {
+          return;
+        }
         example = `          {
             path: ["${prop.name}"]
             operator: Equal
@@ -2261,7 +2233,8 @@ function generateAggregationFields(classSchema: ClassSchema): string[] {
   const fields: string[] = [];
 
   classSchema.properties.slice(0, 5).forEach((prop) => {
-    const dataType = prop.dataType?.[0]?.toLowerCase() || '';
+    // Base type so text[] / number[] get the correct aggregation metrics
+    const dataType = getBaseDataType(prop.dataType);
 
     switch (dataType) {
       case 'text':
