@@ -193,6 +193,15 @@ export class QueryEditorPanel {
         description?: string;
         nestedProperties?: any[];
       }>;
+      vectorizer?: string;
+      vectorizers?: Record<string, any>;
+      vectorNames?: string[];
+      multiTenancy?: {
+        enabled?: boolean;
+        autoTenantCreation?: boolean;
+        autoTenantActivation?: boolean;
+      };
+      moduleConfig?: Record<string, any>;
     }>;
   }> {
     // Check if connection is still active (state is maintained by the listener)
@@ -208,13 +217,49 @@ export class QueryEditorPanel {
     // Use Weaviate v3 collections API and adapt to legacy schema shape expected by webview
     const collections: CollectionConfig[] = await this._weaviateClient.collections.listAll();
     return {
-      classes: (collections || []).map((collection: CollectionConfig) => ({
-        class: collection.name || '',
-        description: (collection as any).description,
-        properties: (collection.properties || []).map((prop: PropertyConfig) =>
-          this._mapPropertySchema(prop)
-        ),
-      })),
+      classes: await Promise.all(
+        (collections || []).map(async (collection: CollectionConfig) => {
+          const base: any = collection as any;
+          let vectorizers = base.vectorizers ?? base.vectorizerConfig;
+          let multiTenancy = base.multiTenancy;
+          let moduleConfig = base.moduleConfig;
+          let vectorizer = base.vectorizer;
+
+          // Enrich from full config when listAll() omits MT / named-vector details
+          try {
+            const name = collection.name || base.class;
+            if (name && this._weaviateClient?.collections?.get) {
+              const coll = this._weaviateClient.collections.get(name);
+              if (coll?.config?.get) {
+                const cfg = await coll.config.get();
+                vectorizers =
+                  (cfg as any).vectorizers ?? (cfg as any).vectorizerConfig ?? vectorizers;
+                multiTenancy = (cfg as any).multiTenancy ?? multiTenancy;
+                moduleConfig = (cfg as any).moduleConfig ?? moduleConfig;
+                vectorizer = (cfg as any).vectorizer ?? vectorizer;
+              }
+            }
+          } catch {
+            // Proceed with listAll() data
+          }
+
+          const vectorNames =
+            vectorizers && typeof vectorizers === 'object' ? Object.keys(vectorizers) : undefined;
+
+          return {
+            class: collection.name || '',
+            description: base.description,
+            properties: (collection.properties || []).map((prop: PropertyConfig) =>
+              this._mapPropertySchema(prop)
+            ),
+            vectorizer,
+            vectorizers,
+            vectorNames,
+            multiTenancy,
+            moduleConfig,
+          };
+        })
+      ),
     };
   }
 

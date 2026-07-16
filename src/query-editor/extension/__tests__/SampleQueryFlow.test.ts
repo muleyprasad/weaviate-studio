@@ -32,7 +32,7 @@ describe('Sample query flow', () => {
     jest.clearAllMocks();
   });
 
-  it('posts sampleQuery message to webview', async () => {
+  function createPanelWithClient(client: any) {
     const vscode = require('vscode');
     const webviewPost = jest.fn();
     vscode.window.createWebviewPanel.mockImplementation(() => ({
@@ -47,52 +47,101 @@ describe('Sample query flow', () => {
     QueryEditorPanel.createOrShow(dummyContext, { connectionId: 'c1', collectionName: 'ColA' });
     const panelInstance: any = Array.from((QueryEditorPanel as any).panels.values())[0];
 
-    // Mock the ConnectionManager to return a connected status
     panelInstance._connectionManager = {
       getConnections: jest.fn().mockReturnValue([{ id: 'c1', status: 'connected', name: 'test' }]),
+      getConnection: jest.fn().mockReturnValue({ id: 'c1', status: 'connected', name: 'test' }),
       onConnectionsChanged: {
         subscribe: jest.fn().mockReturnValue({ dispose: jest.fn() }),
       },
     };
-
-    // Stub weaviate client with minimal schema getter
-    panelInstance._weaviateClient = {
-      schema: {
-        // @ts-ignore
-        getter: (): any => ({
-          // @ts-expect-error - Jest mock type incompatibility
-          do: jest.fn().mockResolvedValue({
-            classes: [
-              {
-                class: 'ColA',
-                properties: [{ name: 'name', dataType: ['string'] }],
-              },
-            ],
-          }),
-        }),
-      },
-    } as any;
-
-    // Mark connection as active since _sendSampleQuery now checks connection state
+    panelInstance._weaviateClient = client;
     panelInstance._isConnectionActive = true;
+
+    return { panelInstance, webviewPost };
+  }
+
+  it('posts a schema-aware sampleQuery using collections.listAll()', async () => {
+    const listAll = jest.fn().mockResolvedValue([
+      {
+        name: 'ColA',
+        properties: [
+          { name: 'name', dataType: ['text'] },
+          { name: 'aliases', dataType: ['text[]'] },
+          { name: 'image', dataType: ['blob'] },
+        ],
+        multiTenancy: { enabled: false },
+      },
+    ]);
+
+    const { panelInstance, webviewPost } = createPanelWithClient({
+      collections: { listAll },
+    });
 
     await panelInstance._sendSampleQuery('ColA');
 
-    expect(webviewPost).toHaveBeenCalled();
-    // _updateConnectionState() sends connectionStatusChanged first, then sampleQuery
-    const calls = webviewPost.mock.calls;
-    const sampleQueryMsg = calls.find((call: any[]) => call[0].type === 'sampleQuery');
+    expect(listAll).toHaveBeenCalled();
+    const sampleQueryMsg = webviewPost.mock.calls.find(
+      (call: any[]) => call[0].type === 'sampleQuery'
+    );
+    expect(sampleQueryMsg).toBeDefined();
+    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    expect(q).toContain('ColA');
+    expect(q).toContain('name');
+    expect(q).toContain('aliases');
+    expect(q).not.toMatch(/\.\.\.\s*on\s+text\[\]/);
+    // blobs excluded by default
+    expect(q).not.toMatch(/^\s*image\s*$/m);
+  });
 
-    // If sampleQuery not found, the first message should be it or one of the early ones
-    if (sampleQueryMsg) {
-      const msg: any = sampleQueryMsg[0];
-      expect(msg.type).toBe('sampleQuery');
-      expect(msg.data.sampleQuery).toContain('ColA');
-    } else {
-      // Check if _sendSampleQuery sent anything at all
-      expect(calls.length).toBeGreaterThan(0);
-      // For now, just verify it was called
-      expect(webviewPost).toHaveBeenCalled();
-    }
+  it('includes tenant placeholder when multi-tenancy is enabled', async () => {
+    const listAll = jest.fn().mockResolvedValue([
+      {
+        name: 'TenantCol',
+        properties: [{ name: 'title', dataType: ['text'] }],
+        multiTenancy: { enabled: true },
+      },
+    ]);
+
+    const { panelInstance, webviewPost } = createPanelWithClient({
+      collections: {
+        listAll,
+        get: jest.fn().mockReturnValue({
+          config: {
+            get: jest.fn().mockResolvedValue({
+              multiTenancy: { enabled: true },
+              properties: [{ name: 'title', dataType: ['text'] }],
+            }),
+          },
+        }),
+      },
+    });
+
+    await panelInstance._sendSampleQuery('TenantCol');
+
+    const sampleQueryMsg = webviewPost.mock.calls.find(
+      (call: any[]) => call[0].type === 'sampleQuery'
+    );
+    expect(sampleQueryMsg).toBeDefined();
+    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    expect(q).toContain('tenant:');
+    expect(q).toContain('YOUR_TENANT_ID');
+  });
+
+  it('falls back to a minimal query when schema fetch fails', async () => {
+    const listAll = jest.fn().mockRejectedValue(new Error('network down'));
+
+    const { panelInstance, webviewPost } = createPanelWithClient({
+      collections: { listAll },
+    });
+
+    await panelInstance._sendSampleQuery('ColA');
+
+    const sampleQueryMsg = webviewPost.mock.calls.find(
+      (call: any[]) => call[0].type === 'sampleQuery'
+    );
+    expect(sampleQueryMsg).toBeDefined();
+    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    expect(q).toContain('ColA');
+    expect(q).toContain('_additional');
   });
 });

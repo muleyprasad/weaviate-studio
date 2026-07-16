@@ -11,6 +11,7 @@ export interface WeaviateSchemaProperty {
   indexFilterable?: boolean;
   moduleConfig?: Record<string, any>;
   vectorizerConfig?: Record<string, any>;
+  nestedProperties?: WeaviateSchemaProperty[];
 }
 
 export interface WeaviateSchemaClass {
@@ -20,6 +21,12 @@ export interface WeaviateSchemaClass {
   vectorizer?: string;
   moduleConfig?: Record<string, any>;
   vectorizers?: Record<string, any>;
+  vectorNames?: string[];
+  multiTenancy?: {
+    enabled?: boolean;
+    autoTenantCreation?: boolean;
+    autoTenantActivation?: boolean;
+  };
 }
 
 export interface WeaviateSchema {
@@ -131,7 +138,8 @@ export class SchemaProvider {
           let rawProps: any[] = ((collection as any).properties || []) as any[];
           let vectorizer = (collection as any).vectorizer as any;
           let moduleConfig = (collection as any).moduleConfig as any;
-          let vectorizers = (collection as any).vectorizers as any;
+          let vectorizers = (collection as any).vectorizers ?? (collection as any).vectorizerConfig;
+          let multiTenancy = (collection as any).multiTenancy;
 
           // If vectorizer details are missing, attempt to fetch full config for this collection
           try {
@@ -144,7 +152,9 @@ export class SchemaProvider {
                 ? await collHandle.config()
                 : collHandle && typeof collHandle.getConfig === 'function'
                   ? await collHandle.getConfig()
-                  : undefined;
+                  : collHandle?.config && typeof collHandle.config.get === 'function'
+                    ? await collHandle.config.get()
+                    : undefined;
 
             if (cfg && typeof cfg === 'object') {
               // Prefer values from cfg when available
@@ -152,7 +162,8 @@ export class SchemaProvider {
               rawProps = Array.isArray(cfg.properties) ? cfg.properties : rawProps;
               vectorizer = cfg.vectorizer ?? vectorizer;
               moduleConfig = cfg.moduleConfig ?? moduleConfig;
-              vectorizers = cfg.vectorizers ?? vectorizers;
+              vectorizers = cfg.vectorizers ?? cfg.vectorizerConfig ?? vectorizers;
+              multiTenancy = cfg.multiTenancy ?? multiTenancy;
             }
           } catch (e) {
             console.warn(
@@ -183,6 +194,8 @@ export class SchemaProvider {
           };
 
           const properties = (rawProps || []).map(mapProperty);
+          const vectorNames =
+            vectorizers && typeof vectorizers === 'object' ? Object.keys(vectorizers) : undefined;
 
           return {
             class: (collection as any).name || (collection as any).class || '',
@@ -192,6 +205,8 @@ export class SchemaProvider {
             vectorizer,
             moduleConfig,
             vectorizers,
+            vectorNames,
+            multiTenancy,
           } as WeaviateSchemaClass;
         })
       );

@@ -332,6 +332,172 @@ describe('graphqlTemplates helpers', () => {
       expect(result.valid).toBe(false);
       expect(result.errors.some((e: string) => e.includes('text[]'))).toBe(true);
     });
+
+    it('classifies phoneNumber and blob specially', () => {
+      const {
+        isPhoneNumberDataType,
+        isBlobDataType,
+        classifyProperty,
+      } = require('../graphqlTemplates');
+      expect(isPhoneNumberDataType(['phoneNumber'])).toBe(true);
+      expect(isBlobDataType(['blob'])).toBe(true);
+      expect(classifyProperty({ name: 'phone', dataType: ['phoneNumber'] })).toBe('phone');
+      expect(classifyProperty({ name: 'image', dataType: ['blob'] })).toBe('blob');
+      expect(isReferenceDataType(['phoneNumber'])).toBe(false);
+      expect(isReferenceDataType(['blob'])).toBe(false);
+    });
+
+    it('warns on placeholder tenant without invalidating the query', () => {
+      const q = `{ Get { X (tenant: "YOUR_TENANT_ID" limit: 1) { title } } }`;
+      const result = validateAndSanitizeQuery(q);
+      expect(result.valid).toBe(true);
+      expect(result.warnings.some((w: string) => w.includes('YOUR_TENANT_ID'))).toBe(true);
+    });
+  });
+
+  describe('safe sample defaults and special types', () => {
+    it('expands phoneNumber with nested fields', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Contact',
+            properties: [
+              { name: 'name', dataType: ['text'] },
+              { name: 'phone', dataType: ['phoneNumber'] },
+            ],
+          },
+        ],
+      };
+      const q = generateSampleQuery('Contact', [], 10, schema, { includeHeaderComments: false });
+      expect(q).toContain('phone');
+      expect(q).toContain('internationalFormatted');
+      expect(q).toContain('input');
+    });
+
+    it('excludes blob fields by default and documents them in comments', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Doc',
+            properties: [
+              { name: 'title', dataType: ['text'] },
+              { name: 'image', dataType: ['blob'] },
+            ],
+          },
+        ],
+      };
+      const q = generateSampleQuery('Doc', [], 10, schema);
+      expect(q).toContain('title');
+      expect(q).toMatch(/Excluded blob fields[\s\S]*image/);
+      // bare field selection for image should not appear as a property line
+      expect(q).not.toMatch(/^\s*image\s*$/m);
+    });
+
+    it('includes blobs when includeBlobs is true', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Doc',
+            properties: [
+              { name: 'title', dataType: ['text'] },
+              { name: 'image', dataType: ['blob'] },
+            ],
+          },
+        ],
+      };
+      const q = generateSampleQuery('Doc', [], 10, schema, {
+        includeBlobs: true,
+        includeHeaderComments: false,
+      });
+      expect(q).toMatch(/image/);
+    });
+
+    it('does not emit __typename for empty nested objects', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Item',
+            properties: [
+              { name: 'title', dataType: ['text'] },
+              { name: 'meta', dataType: ['object'] },
+            ],
+          },
+        ],
+      };
+      const q = generateSampleQuery('Item', [], 10, schema, { includeHeaderComments: false });
+      expect(q).not.toContain('__typename');
+      expect(q).toMatch(/meta: nested fields unavailable/);
+    });
+
+    it('injects tenant when multi-tenancy is enabled', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'Tenanted',
+            multiTenancy: { enabled: true },
+            properties: [{ name: 'title', dataType: ['text'] }],
+          },
+        ],
+      };
+      const q = generateSampleQuery('Tenanted', [], 10, schema);
+      expect(q).toContain('tenant:');
+      expect(q).toContain('YOUR_TENANT_ID');
+      expect(q).toMatch(/Multi-tenancy is enabled/);
+    });
+
+    it('emits targetVectors for named multi-vector collections', () => {
+      const { processTemplate } = require('../graphqlTemplates');
+      const schema = {
+        classes: [
+          {
+            class: 'MultiVec',
+            vectorizers: {
+              title: { vectorizer: { name: 'text2vec-openai' } },
+              content: { vectorizer: { name: 'text2vec-openai' } },
+            },
+            properties: [{ name: 'title', dataType: ['text'] }],
+          },
+        ],
+      };
+      const q = processTemplate('Vector Search (nearVector)', 'MultiVec', 5, schema);
+      expect(q).toContain('targetVectors');
+      expect(q).toContain('title');
+      expect(q).toContain('content');
+    });
+
+    it('caps default sample properties instead of dumping the full schema', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const props = Array.from({ length: 30 }, (_, i) => ({
+        name: `field_${i}`,
+        dataType: ['text'] as string[],
+      }));
+      const schema = { classes: [{ class: 'Wide', properties: props }] };
+      const q = generateSampleQuery('Wide', [], 10, schema, { includeHeaderComments: false });
+      const fieldCount = (q.match(/field_\d+/g) || []).length;
+      expect(fieldCount).toBeLessThanOrEqual(12);
+      expect(fieldCount).toBeGreaterThan(0);
+    });
+
+    it('includeAllProperties selects the full non-blob set', () => {
+      const { generateSampleQuery } = require('../graphqlTemplates');
+      const props = Array.from({ length: 15 }, (_, i) => ({
+        name: `field_${i}`,
+        dataType: ['text'] as string[],
+      }));
+      const schema = { classes: [{ class: 'Wide', properties: props }] };
+      const q = generateSampleQuery('Wide', [], 10, schema, {
+        includeAllProperties: true,
+        includeHeaderComments: false,
+      });
+      for (let i = 0; i < 15; i++) {
+        expect(q).toContain(`field_${i}`);
+      }
+    });
   });
 
   describe('generateDynamicSampleQuery with array types', () => {

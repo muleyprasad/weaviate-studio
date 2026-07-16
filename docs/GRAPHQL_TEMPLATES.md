@@ -342,12 +342,55 @@ The selector surfaces non-mutating templates that are stable across Weaviate ver
 
 ## Dynamic generation and schema awareness
 
-When schema is provided, dynamic templates:
+When schema is provided, sample queries and dynamic templates share the same property classification and selection helpers.
 
-- Prefer primitive properties (text/string/int/number/boolean/date).
-- Include geocoordinates with latitude/longitude sub-selection.
-- Keep cross-reference selections minimal (inline fragment with \_additional.id) to avoid overwhelming results.
-- Tailor generative prompts to an available text property if generativePrompt isn’t provided.
+### Property classification
+
+| Kind                     | Weaviate `dataType` examples                | GraphQL selection                                                  |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------ |
+| Primitive (incl. arrays) | `text`, `text[]`, `int[]`, `uuid`           | bare field                                                         |
+| Geo                      | `geoCoordinates`                            | `latitude` / `longitude`                                           |
+| Phone                    | `phoneNumber`                               | nested phone fields (`input`, `internationalFormatted`, …)         |
+| Blob                     | `blob`                                      | **excluded by default** (large base64); opt-in via `includeBlobs`  |
+| Nested object            | `object`, `object[]`                        | `... on Collection_prop_object { … }` when nested fields are known |
+| Cross-reference          | `Person`, multi-target `Author`+`Publisher` | `... on Class { … }` (capped by default)                           |
+
+**Important:** Array scalars such as `text[]` are **not** cross-references. Emitting `... on text[]` is invalid GraphQL and is rejected by validation.
+
+### Safe sample defaults
+
+Schema-based samples (Query Editor → Templates → Schema-based Sample):
+
+- Cap properties (~12) instead of dumping every field
+- Exclude `blob` fields (comment lists what was omitted)
+- At most one cross-reference by default
+- Header `#` comments explain multi-tenancy, named vectors, and exclusions
+- `includeAllProperties: true` expands to the full non-blob set when needed
+
+### Multi-tenancy
+
+If the collection has `multiTenancy.enabled`, generated Get/Aggregate queries include:
+
+```
+tenant: "YOUR_TENANT_ID"
+```
+
+Replace the placeholder before running. Validation reports this as a **warning** (not a hard error) so samples still load.
+
+### Named / multi-vector collections
+
+When the schema exposes multiple named vectors (or a non-`default` vector name), nearVector / nearText / hybrid templates may include:
+
+```
+targetVectors: ["title", "content"]
+```
+
+### Other schema-aware behavior
+
+- Prefer primitive properties, then phone/geo, nested objects, then minimal references
+- BM25 / hybrid default `properties` from text fields (including `text[]`)
+- Generative prompts use available text properties when `generativePrompt` is omitted
+- Empty nested objects without `nestedProperties` become comments (no invalid `__typename` selection)
 
 ## Configuration (QueryConfig)
 
@@ -375,6 +418,11 @@ You can customize dynamic generation via QueryConfig. Notable fields:
 - vector: number[] — explicit query vector for nearVector/hybrid.
 - sortBy: { path: string; order?: 'asc' | 'desc' } — sort clause.
 - returnProperties: string[] — explicit GraphQL selection fields.
+- includeBlobs: boolean — include blob fields in selections (default false).
+- includeAllProperties: boolean — select all non-blob fields in sample generation.
+- includeHeaderComments: boolean — schema-aware `#` comments at the top of generated queries.
+- targetVector / targetVectors: named vector targeting for multi-vector collections.
+- fullSchema: full `{ classes }` map so cross-references can expand target class fields.
 
 ## Template placeholders and processing
 
