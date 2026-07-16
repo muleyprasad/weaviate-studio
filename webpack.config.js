@@ -57,14 +57,14 @@ const extensionConfig = {
       ]
     }),
     new webpack.DefinePlugin({
-      'process.env.APPLICATION_INSIGHTS_CONN_STRING': JSON.stringify(
-        process.env.APPLICATION_INSIGHTS_CONN_STRING ||
+      'process.env.APPLICATION_INSIGHTS_CONNECTION_STRING': JSON.stringify(
+        process.env.APPLICATION_INSIGHTS_CONNECTION_STRING ||
         (() => {
           try {
             const envPath = path.resolve(__dirname, '.env');
             if (fs.existsSync(envPath)) {
               const content = fs.readFileSync(envPath, 'utf-8');
-              const match = content.match(/^APPLICATION_INSIGHTS_CONN_STRING=["']?([^\r\n]+?)["']?$/m);
+              const match = content.match(/^APPLICATION_INSIGHTS_CONNECTION_STRING=["']?([^\r\n]+?)["']?$/m);
               if (match) return match[1].trim();
             }
           } catch { /* .env is optional */ }

@@ -237,7 +237,7 @@ The extension uses **Azure Application Insights** for anonymous usage telemetry.
 ### Testing Telemetry Locally
 
 ```bash
-export APPLICATION_INSIGHTS_CONN_STRING="your-connection-string"
+export APPLICATION_INSIGHTS_CONNECTION_STRING="your-connection-string"
 npm install && npm run compile && npm run build:webview && npm run build:add-collection
 ```
 
@@ -272,7 +272,7 @@ See [docs/TELEMETRY_DASHBOARDS.md](https://github.com/muleyprasad/weaviate-studi
 
 ### CI/CD Telemetry Injection
 
-The GitHub Actions pipeline injects `APPLICATION_INSIGHTS_CONN_STRING` from the repository secret of the same name. See `.github/workflows/ci.yml` for details.
+The GitHub Actions pipeline reads the repository secret `APPLICATION_INSIGHTS_CONN_STRING` and exposes it to the build as the `APPLICATION_INSIGHTS_CONNECTION_STRING` environment variable (the name webpack injects into the bundle). See `.github/workflows/ci.yml` for details.
 
 ## Documentation Structure
 

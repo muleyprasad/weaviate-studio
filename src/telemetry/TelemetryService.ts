@@ -51,12 +51,13 @@ export class TelemetryService {
       return;
     }
 
-    const telemetryKey = process.env.APPLICATION_INSIGHTS_CONN_STRING || connectionString;
+    // Priority: explicit VS Code setting > build-time env var (injected by webpack) > .env in dev
+    const telemetryKey = connectionString || process.env.APPLICATION_INSIGHTS_CONNECTION_STRING;
 
     if (!telemetryKey) {
       console.log(
         '[Telemetry] Initialization skipped — no connection string available (env var: %s, setting: %s)',
-        process.env.APPLICATION_INSIGHTS_CONN_STRING ? 'provided' : 'not provided',
+        process.env.APPLICATION_INSIGHTS_CONNECTION_STRING ? 'provided' : 'not provided',
         connectionString ? 'provided' : 'not provided'
       );
       return;

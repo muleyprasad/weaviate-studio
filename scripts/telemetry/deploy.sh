@@ -75,7 +75,7 @@ echo ""
 if [[ -z "$SUBSCRIPTION_ID" ]]; then
     log_error "Azure subscription ID required. Set AZURE_SUBSCRIPTION_ID environment variable."
     echo ""
-    log_info "Example: AZURE_SUBSCRIPTION_ID=48547513-8fc4-420b-a6da-d81e8930e03d $0"
+    log_info "Example: AZURE_SUBSCRIPTION_ID=43c74fb0-6334-4e77-9ed3-e87af40d31b7 $0"
     echo ""
     log_info "Or use command-line flags:"
     echo "  $0 --cleanup        # Cleanup and deploy"

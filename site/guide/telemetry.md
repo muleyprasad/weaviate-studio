@@ -64,7 +64,7 @@ To disable Weaviate Studio telemetry:
 To test telemetry locally during development:
 
 ```bash
-export APPLICATION_INSIGHTS_CONN_STRING="your-connection-string"
+export APPLICATION_INSIGHTS_CONNECTION_STRING="your-connection-string"
 npm install && npm run compile && npm run build:webview && npm run build:add-collection
 ```
 

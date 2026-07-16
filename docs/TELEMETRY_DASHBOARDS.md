@@ -17,6 +17,20 @@ This guide covers the recommended Azure Application Insights dashboards for moni
 
 ---
 
+## Data model conventions
+
+All dashboard queries follow these rules. Use them when writing new queries so counts stay accurate:
+
+- **Counting users:** use `dcount(user_Id)`. `user_Id` is stable per install/machine (backed by the VS Code machine id). Do **not** count `customDimensions.sessionId` — it is regenerated on every launch, so it counts sessions, not people, and inflates user numbers.
+- **Detecting errors:** an event is an error when `customDimensions.errorCategory` is non-empty. `trackError` sets this on every failure; success paths never do. Do **not** rely on `name endswith "/extension.unhandledError"` — no global handler emits that event today.
+- **Matching "opened" events:** use `name matches regex "[Oo]pened$"`. A plain `endswith ".opened"` misses `collection.createOpened`, `backup.restoreOpened`, and the `rbac.*Opened` events.
+- **Durations:** read from `customMeasurements.durationMs` (numeric measurement), not `customDimensions`.
+- **Short operation name:** `tostring(split(name, "/")[-1])` strips the `publisher.extension/` prefix.
+
+The JSON workbook definitions in `scripts/telemetry/*.json` are the source of truth; the queries below are illustrative excerpts.
+
+---
+
 ## Quick Deploy
 
 Deploy all dashboards using the script (requires Azure CLI):
@@ -58,32 +72,34 @@ The script will prompt you to:
 // Daily Active Users (DAU)
 customEvents
 | where name endswith "/extension.activated"
-| summarize DAU = dcount(tostring(customDimensions.sessionId)) by bin(timestamp, 1d)
+| summarize DAU = dcount(user_Id) by bin(timestamp, 1d)
 | render timechart
 ```
 
 ```kusto
-// Session Duration Distribution
+// Session Duration Distribution (needs both activate + deactivate)
 customEvents
 | where name endswith "/extension.activated" or name endswith "/extension.deactivated"
-| summarize startTime = min(timestamp), endTime = max(timestamp) by tostring(customDimensions.sessionId)
+| summarize startTime = minif(timestamp, name endswith "/extension.activated"), endTime = maxif(timestamp, name endswith "/extension.deactivated") by tostring(customDimensions.sessionId)
+| where isnotempty(startTime) and isnotempty(endTime) and endTime > startTime
 | extend duration = datetime_diff('minute', endTime, startTime)
-| summarize avgDuration = avg(duration), p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)
+| summarize p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)
 | render timechart
 ```
 
 ```kusto
-// Error Rate Trend
+// Error Rate Trend (% of completed operations that failed)
 customEvents
-| extend isError = name endswith "/extension.unhandledError" or customDimensions.result == "failure"
-| summarize errorRate = 100.0 * countif(isError) / count() by bin(timestamp, 1h)
+| where name endswith "Completed" or name endswith ".completed"
+| extend isError = isnotempty(tostring(customDimensions.errorCategory))
+| summarize errorRate = round(100.0 * countif(isError) / count(), 2) by bin(timestamp, 1d)
 | render timechart
 ```
 
 ```kusto
 // Errors by Category (Pie Chart)
 customEvents
-| where name endswith "/extension.unhandledError"
+| where isnotempty(tostring(customDimensions.errorCategory))
 | summarize count() by tostring(customDimensions.errorCategory)
 | render piechart
 ```
@@ -400,7 +416,7 @@ customEvents
 
 ### No Data Appearing
 
-1. Verify `APPLICATION_INSIGHTS_CONN_STRING` is set in CI/CD
+1. Verify the `APPLICATION_INSIGHTS_CONN_STRING` secret is set in CI/CD (exposed to the build as `APPLICATION_INSIGHTS_CONNECTION_STRING`)
 2. Check VS Code telemetry is enabled (`telemetry.enableTelemetry`)
 3. Check extension setting `weaviate.telemetry.enabled` is true
 4. Wait 2-5 minutes for ingestion delay
