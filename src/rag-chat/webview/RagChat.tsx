@@ -417,20 +417,106 @@ function ChatEntry({
   );
 }
 
+/** Inline popover selector to select multiple target vectors */
+function MultiTargetVectorSelector({
+  vectorNames,
+  selectedVectors,
+  onChange,
+}: {
+  vectorNames: string[];
+  selectedVectors: string[];
+  onChange: (vectors: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggle = useCallback(
+    (name: string) => {
+      if (selectedVectors.includes(name)) {
+        // Don't allow deselecting all vectors
+        if (selectedVectors.length > 1) {
+          onChange(selectedVectors.filter((v) => v !== name));
+        }
+      } else {
+        onChange([...selectedVectors, name]);
+      }
+    },
+    [selectedVectors, onChange]
+  );
+
+  const displayText = useMemo(() => {
+    if (selectedVectors.length === 0) {
+      return 'Select vectors…';
+    }
+    if (selectedVectors.length === 1) {
+      return selectedVectors[0];
+    }
+    return `${selectedVectors.length} vectors`;
+  }, [selectedVectors]);
+
+  return (
+    <div className="rag-multi-vector-select-container" ref={containerRef}>
+      <button
+        type="button"
+        className="rag-multi-vector-select-trigger"
+        onClick={() => setIsOpen(!isOpen)}
+        title="Select target vectors"
+        aria-expanded={isOpen}
+      >
+        <span>{displayText}</span>
+        <span className="rag-dropdown-chevron">▼</span>
+      </button>
+      {isOpen && (
+        <div className="rag-multi-vector-dropdown" role="menu">
+          {vectorNames.map((name) => {
+            const isChecked = selectedVectors.includes(name);
+            return (
+              <label key={name} className="rag-multi-vector-option" role="menuitem">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => handleToggle(name)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="rag-multi-vector-option-text">{name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Multi-collection selector: dropdown to add + pill list of selected */
 function CollectionSelector({
   allCollections,
   collectionInfos,
   selectedCollections,
+  collectionTargetVectors,
   onAdd,
   onRemove,
+  onTargetVectorChange,
   loading,
 }: {
   allCollections: string[];
   collectionInfos: CollectionInfo[];
   selectedCollections: string[];
+  collectionTargetVectors: Record<string, string[]>;
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
+  onTargetVectorChange: (collectionName: string, vectorNames: string[]) => void;
   loading: boolean;
 }) {
   // Collections available for adding (not yet selected)
@@ -472,6 +558,7 @@ function CollectionSelector({
           {selectedCollections.map((name) => {
             const info = infoMap.get(name);
             const showBm25Hint = info && !info.hasVectorizer;
+            const hasMultipleVectors = info && info.vectorNames && info.vectorNames.length > 1;
             return (
               <span key={name} className="rag-collection-pill" role="listitem">
                 {name}
@@ -482,6 +569,13 @@ function CollectionSelector({
                   >
                     ⚡ BM25
                   </span>
+                )}
+                {hasMultipleVectors && (
+                  <MultiTargetVectorSelector
+                    vectorNames={info.vectorNames!}
+                    selectedVectors={collectionTargetVectors[name] || [...info.vectorNames!]}
+                    onChange={(vectors) => onTargetVectorChange(name, vectors)}
+                  />
                 )}
                 <button
                   type="button"
@@ -763,6 +857,9 @@ export function RagChat() {
     const initial = initialData?.initialCollectionName;
     return initial ? [initial] : [];
   });
+  const [collectionTargetVectors, setCollectionTargetVectors] = useState<Record<string, string[]>>(
+    {}
+  );
   const [question, setQuestion] = useState('');
   const [history, setHistory] = useState<RagChatHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -817,16 +914,27 @@ export function RagChat() {
           // If we had a pre-selected collection from initialData and it
           // exists in the list, keep it. Otherwise keep whatever is valid.
           setSelectedCollections((prev) => {
-            const valid = prev.filter((c) => names.includes(c));
-            if (valid.length > 0) {
-              return valid;
+            let active = prev.filter((c) => names.includes(c));
+            if (active.length === 0) {
+              const initial = initialData?.initialCollectionName;
+              if (initial && names.includes(initial)) {
+                active = [initial];
+              }
             }
-            // Pre-select initialCollectionName if it's in the list
-            const initial = initialData?.initialCollectionName;
-            if (initial && names.includes(initial)) {
-              return [initial];
-            }
-            return [];
+            // Auto-initialize target vectors for newly selected collections
+            setCollectionTargetVectors((prevVecs) => {
+              const updated = { ...prevVecs };
+              for (const name of active) {
+                if (!updated[name]) {
+                  const info = infos.find((c) => c.name === name);
+                  if (info && info.vectorNames && info.vectorNames.length > 1) {
+                    updated[name] = [...info.vectorNames];
+                  }
+                }
+              }
+              return updated;
+            });
+            return active;
           });
           setCollectionsLoading(false);
           break;
@@ -842,6 +950,19 @@ export function RagChat() {
                 merged.push(name);
               }
             }
+            // Auto-initialize target vectors for added collections
+            setCollectionTargetVectors((prevVecs) => {
+              const updated = { ...prevVecs };
+              for (const name of toAdd) {
+                if (!updated[name]) {
+                  const info = collectionInfos.find((c) => c.name === name);
+                  if (info && info.vectorNames && info.vectorNames.length > 1) {
+                    updated[name] = [...info.vectorNames];
+                  }
+                }
+              }
+              return updated;
+            });
             return merged;
           });
           break;
@@ -903,12 +1024,40 @@ export function RagChat() {
   }, []);
 
   // Collection add/remove handlers
-  const handleAddCollection = useCallback((name: string) => {
-    setSelectedCollections((prev) => (prev.includes(name) ? prev : [...prev, name]));
-  }, []);
+  const handleAddCollection = useCallback(
+    (name: string) => {
+      setSelectedCollections((prev) => {
+        if (prev.includes(name)) {
+          return prev;
+        }
+        // Set default target vectors (select all) if this collection has multiple vectors
+        const info = collectionInfos.find((c) => c.name === name);
+        if (info && info.vectorNames && info.vectorNames.length > 1) {
+          setCollectionTargetVectors((prevVecs) => ({
+            ...prevVecs,
+            [name]: [...info.vectorNames!],
+          }));
+        }
+        return [...prev, name];
+      });
+    },
+    [collectionInfos]
+  );
 
   const handleRemoveCollection = useCallback((name: string) => {
     setSelectedCollections((prev) => prev.filter((c) => c !== name));
+    setCollectionTargetVectors((prevVecs) => {
+      const updated = { ...prevVecs };
+      delete updated[name];
+      return updated;
+    });
+  }, []);
+
+  const handleTargetVectorChange = useCallback((collectionName: string, vectorNames: string[]) => {
+    setCollectionTargetVectors((prev) => ({
+      ...prev,
+      [collectionName]: vectorNames,
+    }));
   }, []);
 
   const [settingsSavedFlash, setSettingsSavedFlash] = useState(false);
@@ -950,9 +1099,18 @@ export function RagChat() {
     setLoading(true);
     setQuestion('');
 
+    const resolvedTargetVectors: Record<string, string[]> = {};
+    for (const name of selectedCollections) {
+      const info = collectionInfos.find((c) => c.name === name);
+      if (info && info.vectorNames && info.vectorNames.length > 1) {
+        resolvedTargetVectors[name] = collectionTargetVectors[name] || [...info.vectorNames];
+      }
+    }
+
     vscodeApi.postMessage({
       command: 'executeRagQuery',
       collectionNames: [...selectedCollections],
+      collectionTargetVectors: resolvedTargetVectors,
       question: trimmed,
       limit: topK,
       timeout: queryTimeout,
@@ -963,6 +1121,8 @@ export function RagChat() {
   }, [
     question,
     selectedCollections,
+    collectionInfos,
+    collectionTargetVectors,
     topK,
     queryTimeout,
     loading,
@@ -992,9 +1152,18 @@ export function RagChat() {
       );
       setLoading(true);
 
+      const resolvedTargetVectors: Record<string, string[]> = {};
+      for (const name of entry.query.collectionNames) {
+        const info = collectionInfos.find((c) => c.name === name);
+        if (info && info.vectorNames && info.vectorNames.length > 1) {
+          resolvedTargetVectors[name] = collectionTargetVectors[name] || [...info.vectorNames];
+        }
+      }
+
       vscodeApi.postMessage({
         command: 'executeRagQuery',
         collectionNames: [...entry.query.collectionNames],
+        collectionTargetVectors: resolvedTargetVectors,
         question: entry.query.question,
         limit: entry.query.limit,
         timeout: queryTimeout, // Use current UI timeout, not the original failed one
@@ -1003,7 +1172,7 @@ export function RagChat() {
         advancedSettings: selectedProvider.kind === 'custom' ? advancedSettings : undefined,
       } satisfies RagChatWebviewMessage);
     },
-    [queryTimeout, selectedProvider, advancedSettings]
+    [queryTimeout, selectedProvider, advancedSettings, collectionInfos, collectionTargetVectors]
   );
 
   const handleKeyDown = useCallback(
@@ -1083,8 +1252,10 @@ export function RagChat() {
             allCollections={allCollections}
             collectionInfos={collectionInfos}
             selectedCollections={selectedCollections}
+            collectionTargetVectors={collectionTargetVectors}
             onAdd={handleAddCollection}
             onRemove={handleRemoveCollection}
+            onTargetVectorChange={handleTargetVectorChange}
             loading={collectionsLoading}
           />
           <ProviderSelector
