@@ -3,16 +3,16 @@
   "items": [
     {
       "type": 1,
-      "content": { "json": "## Feature Adoption Dashboard\nUnderstand which features users love and user journeys." },
+      "content": { "json": "## Feature Adoption Dashboard\nWhich features users reach, and whether they come back. Open events match `[Oo]pened$` to include `createOpened`, `restoreOpened`, `rbac.*Opened`." },
       "name": "title"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \".opened\"\n| summarize Count = count() by Feature = name\n| top 10 by Count desc\n| render barchart",
+        "query": "customEvents\n| where name matches regex \"[Oo]pened$\"\n| summarize Users = dcount(user_Id), Opens = count() by Feature = tostring(split(name, \"/\")[-1])\n| order by Users desc\n| take 15\n| render barchart",
         "size": 0,
-        "title": "Feature Popularity (Top 10)",
+        "title": "Feature Popularity (distinct users)",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -24,9 +24,9 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let steps = dynamic([\"/connection.connectCompleted\",\"/dataExplorer.opened\",\"/queryEditor.opened\",\"/queryEditor.queryCompleted\",\"/ragChat.opened\",\"/ragChat.requestCompleted\"]);\ncustomEvents\n| where name has_any (steps)\n| where tostring(customDimensions.result) == \"success\" or tostring(customDimensions.result) == \"\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Step = name\n| extend Order = array_index_of(steps, Step)\n| order by Order asc\n| project Step, Users\n| render columnchart",
+        "query": "let steps = dynamic([\"connection.connectCompleted\",\"dataExplorer.opened\",\"queryEditor.opened\",\"queryEditor.queryCompleted\",\"ragChat.opened\",\"ragChat.requestCompleted\"]);\ncustomEvents\n| extend shortName = tostring(split(name, \"/\")[-1])\n| where shortName in (steps)\n| where isempty(tostring(customDimensions.errorCategory))\n| summarize Users = dcount(user_Id) by Step = shortName\n| extend Order = array_index_of(steps, Step)\n| order by Order asc\n| project Step, Users\n| render barchart",
         "size": 0,
-        "title": "User Journey Funnel",
+        "title": "User Journey Funnel (distinct users reaching each step)",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -38,15 +38,29 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let usersWhoOpened = customEvents\n    | where name endswith \".opened\"\n    | summarize firstSeen = min(timestamp) by sessionId = tostring(customDimensions.sessionId), feature = name;\nlet usersWhoReturned = customEvents\n    | where name endswith \".opened\"\n    | extend sessionId = tostring(customDimensions.sessionId)\n    | join kind=inner usersWhoOpened on sessionId, $left.name == $right.feature\n    | where timestamp > firstSeen + 7d\n    | summarize returnedUsers = dcount(tostring(sessionId)) by feature;\nusersWhoOpened\n| summarize totalUsers = dcount(tostring(sessionId)) by feature\n| join kind=leftouter usersWhoReturned on feature\n| extend retentionRate = round(100.0 * todouble(returnedUsers) / totalUsers, 2)\n| project feature, totalUsers, returnedUsers, retentionRate\n| order by retentionRate desc",
+        "query": "let firstUse = customEvents\n    | where name matches regex \"[Oo]pened$\"\n    | extend feature = tostring(split(name, \"/\")[-1])\n    | summarize firstDay = min(bin(timestamp, 1d)) by user_Id, feature;\nlet laterUse = customEvents\n    | where name matches regex \"[Oo]pened$\"\n    | extend feature = tostring(split(name, \"/\")[-1]), day = bin(timestamp, 1d)\n    | join kind=inner firstUse on user_Id, feature\n    | where day >= firstDay + 7d\n    | summarize returned = dcount(user_Id) by feature;\nfirstUse\n| summarize adopters = dcount(user_Id) by feature\n| join kind=leftouter laterUse on feature\n| extend RetentionPct = round(100.0 * todouble(coalesce(returned, 0)) / adopters, 1)\n| project feature, adopters, returned = coalesce(returned, 0), RetentionPct\n| order by RetentionPct desc",
         "size": 0,
-        "title": "Feature Retention (7-day)",
+        "title": "Feature Retention (7-day, by user_Id)",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
         "visualization": "table"
       },
       "name": "retention"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name matches regex \"[Oo]pened$\"\n| extend feature = tostring(split(name, \"/\")[-1])\n| summarize Users = dcount(user_Id) by feature, Week = startofweek(timestamp)\n| order by Week asc\n| render timechart",
+        "size": 0,
+        "title": "Feature Usage Over Time (weekly active users per feature)",
+        "timeContext": { "durationMs": 7776000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "feature_trend"
     }
   ],
   "styleSettings": {},

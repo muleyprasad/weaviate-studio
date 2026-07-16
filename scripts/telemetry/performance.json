@@ -3,16 +3,16 @@
   "items": [
     {
       "type": 1,
-      "content": { "json": "## Performance Dashboard\nTrack operation speed and reliability SLAs." },
+      "content": { "json": "## Performance Dashboard\nOperation speed and reliability. Latency uses `customMeasurements.durationMs`; only successful ops are timed." },
       "name": "title"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/queryEditor.queryCompleted\"\n| where tostring(customDimensions.result) == \"success\"\n| extend duration = toint(customMeasurements.durationMs)\n| summarize P50 = percentile(duration, 50), P95 = percentile(duration, 95), P99 = percentile(duration, 99), Avg = avg(duration), Count = count() by bin(timestamp, 1h)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/queryEditor.queryCompleted\"\n| where isempty(tostring(customDimensions.errorCategory))\n| extend duration = toreal(customMeasurements.durationMs)\n| where isnotnull(duration)\n| summarize P50 = percentile(duration, 50), P95 = percentile(duration, 95), P99 = percentile(duration, 99), Count = count() by bin(timestamp, 1d)\n| order by timestamp asc\n| render timechart",
         "size": 0,
-        "title": "Query Performance Trends (P50/P95/P99)",
+        "title": "Query Latency (P50/P95/P99, ms)",
         "timeContext": { "durationMs": 604800000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -24,9 +24,9 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/ragChat.requestCompleted\"\n| where tostring(customDimensions.result) == \"success\"\n| extend duration = toint(customMeasurements.durationMs)\n| summarize percentile(duration, 50), percentile(duration, 95), percentile(duration, 99), count() by bin(timestamp, 1d)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/ragChat.requestCompleted\"\n| where isempty(tostring(customDimensions.errorCategory))\n| extend duration = toreal(customMeasurements.durationMs)\n| where isnotnull(duration)\n| summarize P50 = percentile(duration, 50), P95 = percentile(duration, 95), P99 = percentile(duration, 99) by bin(timestamp, 1d)\n| order by timestamp asc\n| render timechart",
         "size": 0,
-        "title": "RAG Chat Latency Distribution",
+        "title": "RAG Chat Latency (P50/P95/P99, ms)",
         "timeContext": { "durationMs": 604800000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -38,9 +38,23 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/connection.connectCompleted\"\n| summarize Success = countif(tostring(customDimensions.result) == \"success\"), Failure = countif(tostring(customDimensions.result) == \"failure\"), Total = count() by bin(timestamp, 1h)\n| extend SuccessRate = round(100.0 * Success / Total, 2)\n| project timestamp, SuccessRate, Failure\n| render timechart",
+        "query": "customEvents\n| where name endswith \"Completed\" or name endswith \".completed\"\n| extend IsError = isnotempty(tostring(customDimensions.errorCategory))\n| summarize SuccessRatePct = round(100.0 * countif(not(IsError)) / count(), 2) by Operation = tostring(split(name, \"/\")[-1])\n| order by SuccessRatePct asc\n| render barchart",
         "size": 0,
-        "title": "Connection Success Rate",
+        "title": "Success Rate by Operation (%)",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "success_rate"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \"/connection.connectCompleted\"\n| extend IsError = isnotempty(tostring(customDimensions.errorCategory))\n| summarize Total = count(), Failures = countif(IsError) by bin(timestamp, 1d)\n| extend SuccessRatePct = round(100.0 * (Total - Failures) / Total, 2)\n| project timestamp, SuccessRatePct, Failures\n| order by timestamp asc\n| render timechart",
+        "size": 0,
+        "title": "Connection Success Rate Over Time",
         "timeContext": { "durationMs": 604800000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -52,7 +66,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where toint(customMeasurements.durationMs) > 10000\n| extend duration = toint(customMeasurements.durationMs)\n| project timestamp, name, duration, result = tostring(customDimensions.result)\n| order by duration desc\n| take 100",
+        "query": "customEvents\n| extend duration = toreal(customMeasurements.durationMs)\n| where duration > 10000\n| project timestamp, Operation = tostring(split(name, \"/\")[-1]), durationMs = duration, result = tostring(customDimensions.result)\n| order by durationMs desc\n| take 100",
         "size": 0,
         "title": "Slow Operations (>10s)",
         "timeContext": { "durationMs": 604800000 },

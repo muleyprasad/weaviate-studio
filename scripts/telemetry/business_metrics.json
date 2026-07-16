@@ -3,14 +3,28 @@
   "items": [
     {
       "type": 1,
-      "content": { "json": "## Business Metrics Dashboard\nHigh-level product health for executives." },
+      "content": { "json": "## Business Metrics Dashboard\nHigh-level product health. **User** = distinct `user_Id` (stable per install/machine), not per-session." },
       "name": "title"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize MAU = dcount(tostring(customDimensions.sessionId)) by Month = startofmonth(timestamp)\n| render columnchart",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize DAU = dcount(user_Id) by Day = bin(timestamp, 1d)\n| order by Day asc\n| render timechart",
+        "size": 0,
+        "title": "Daily Active Users (DAU)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "dau"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize MAU = dcount(user_Id) by Month = startofmonth(timestamp)\n| order by Month asc\n| render columnchart",
         "size": 0,
         "title": "Monthly Active Users (MAU)",
         "timeContext": { "durationMs": 7776000000 },
@@ -24,9 +38,23 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize Users = dcount(tostring(customDimensions.sessionId)) by Week = startofweek(timestamp)\n| order by Week asc\n| extend PrevWeek = prev(Users)\n| extend GrowthRate = iif(isnull(PrevWeek) or PrevWeek == 0, real(null), round(100.0 * (Users - PrevWeek) / PrevWeek, 2))\n| project Week, Users, GrowthRate",
+        "query": "let activity = customEvents\n    | where name endswith \"/extension.activated\"\n    | summarize by user_Id, day = bin(timestamp, 1d);\nlet dau = activity | summarize DAU = dcount(user_Id) by day;\nlet mau = activity\n    | mv-expand offset = range(0, 27, 1) to typeof(long)\n    | extend windowDay = day + offset * 1d\n    | summarize MAU = dcount(user_Id) by day = windowDay;\ndau\n| join kind=inner mau on day\n| project day, DAU, MAU, StickinessPct = round(100.0 * DAU / MAU, 1)\n| order by day asc\n| render timechart",
         "size": 0,
-        "title": "Week-over-Week Growth Rate",
+        "title": "Stickiness (DAU / trailing-28d MAU %) — higher means users return more often",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "stickiness_ratio"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize Users = dcount(user_Id) by Week = startofweek(timestamp)\n| order by Week asc\n| extend PrevWeek = prev(Users)\n| extend GrowthPct = iif(isnull(PrevWeek) or PrevWeek == 0, real(null), round(100.0 * (Users - PrevWeek) / PrevWeek, 1))\n| project Week, Users, GrowthPct",
+        "size": 0,
+        "title": "Week-over-Week User Growth",
         "timeContext": { "durationMs": 7776000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -38,29 +66,29 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \".opened\"\n| summarize FeaturesUsed = dcount(name) by Session = tostring(customDimensions.sessionId), Day = bin(timestamp, 1d)\n| summarize AvgFeatures = avg(FeaturesUsed), P50 = percentile(FeaturesUsed, 50), P90 = percentile(FeaturesUsed, 90) by Day\n| render timechart",
+        "query": "let firstSeen = customEvents\n    | where name endswith \"/extension.activated\"\n    | summarize firstDay = min(bin(timestamp, 1d)) by user_Id;\ncustomEvents\n| where name endswith \"/extension.activated\"\n| project user_Id, day = bin(timestamp, 1d)\n| join kind=inner firstSeen on user_Id\n| extend Cohort = iif(day == firstDay, \"New\", \"Returning\")\n| summarize Users = dcount(user_Id) by day, Cohort\n| order by day asc\n| render columnchart",
         "size": 0,
-        "title": "Feature Stickiness (Avg features per session)",
+        "title": "New vs Returning Users",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
-        "visualization": "timechart"
+        "visualization": "barchart"
       },
-      "name": "stickiness"
+      "name": "new_vs_returning"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \".opened\"\n| summarize Features = dcount(name) by Session = tostring(customDimensions.sessionId), Day = bin(timestamp, 1d)\n| extend IsPowerUser = Features >= 3\n| summarize PowerUserPct = 100.0 * countif(IsPowerUser) / count() by Day\n| render timechart",
+        "query": "customEvents\n| where name matches regex \"[Oo]pened$\"\n| summarize FeaturesUsed = dcount(name) by Session = tostring(customDimensions.sessionId), Day = bin(timestamp, 1d)\n| summarize AvgFeatures = round(avg(FeaturesUsed), 2), P50 = percentile(FeaturesUsed, 50), P90 = percentile(FeaturesUsed, 90) by Day\n| order by Day asc\n| render timechart",
         "size": 0,
-        "title": "Power Users (3+ features per session)",
+        "title": "Feature Breadth (distinct features opened per session)",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
         "visualization": "timechart"
       },
-      "name": "power_users"
+      "name": "breadth"
     }
   ],
   "styleSettings": {},

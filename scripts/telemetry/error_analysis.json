@@ -3,14 +3,14 @@
   "items": [
     {
       "type": 1,
-      "content": { "json": "## Error Analysis Dashboard\nProactive issue detection and debugging." },
+      "content": { "json": "## Error Analysis Dashboard\nProactive issue detection. Errors are identified by a non-empty `errorCategory` dimension (set by `trackError`)." },
       "name": "title"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where tostring(customDimensions.result) == \"failure\" or name endswith \"/extension.unhandledError\"\n| summarize ErrorCount = count(), AvgDuration = avg(toint(customMeasurements.durationMs)) by Operation = name, ErrorCategory = tostring(customDimensions.errorCategory)\n| order by ErrorCount desc\n| take 20\n| render barchart",
+        "query": "customEvents\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize Errors = count(), UsersAffected = dcount(user_Id) by Operation = tostring(split(name, \"/\")[-1]), Category = tostring(customDimensions.errorCategory)\n| order by Errors desc\n| take 20\n| render barchart",
         "size": 0,
         "title": "Top Failing Operations",
         "timeContext": { "durationMs": 604800000 },
@@ -24,23 +24,23 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where tostring(customDimensions.result) == \"failure\" or name endswith \"/extension.unhandledError\"\n| extend hour = datetime_part(\"hour\", timestamp), day = datetime_part(\"dayofweek\", timestamp)\n| summarize Errors = count() by hour, day",
+        "query": "customEvents\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize Errors = count() by Category = tostring(customDimensions.errorCategory), Day = bin(timestamp, 1d)\n| order by Day asc\n| render timechart",
         "size": 0,
-        "title": "Error Heatmap (Hour vs Day of Week)",
+        "title": "Error Volume by Category Over Time",
         "timeContext": { "durationMs": 2592000000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
-        "visualization": "heatmap"
+        "visualization": "timechart"
       },
-      "name": "error_heatmap"
+      "name": "error_trend"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let baseline = customEvents\n    | where timestamp between (ago(8d) .. ago(1d))\n    | where name endswith \"/extension.unhandledError\"\n    | summarize by ErrorCategory = tostring(customDimensions.errorCategory);\ncustomEvents\n| where timestamp > ago(1d)\n| where name endswith \"/extension.unhandledError\"\n| summarize count() by ErrorCategory = tostring(customDimensions.errorCategory)\n| join kind=leftanti baseline on ErrorCategory\n| project Alert = \"NEW ERROR TYPE\", ErrorCategory, count_",
+        "query": "let baseline = customEvents\n    | where timestamp between (ago(8d) .. ago(1d))\n    | where isnotempty(tostring(customDimensions.errorCategory))\n    | summarize by Operation = tostring(split(name, \"/\")[-1]), Category = tostring(customDimensions.errorCategory);\ncustomEvents\n| where timestamp > ago(1d)\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize Count = count() by Operation = tostring(split(name, \"/\")[-1]), Category = tostring(customDimensions.errorCategory)\n| join kind=leftanti baseline on Operation, Category\n| extend Alert = \"NEW ERROR (last 24h)\"\n| project Alert, Operation, Category, Count\n| order by Count desc",
         "size": 0,
-        "title": "New Error Types (Last 24h)",
+        "title": "New Error Types (Last 24h vs prior week)",
         "timeContext": { "durationMs": 86400000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
@@ -52,15 +52,29 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/connection.connectCompleted\"\n| where tostring(customDimensions.result) == \"failure\"\n| summarize count() by ErrorCategory = tostring(customDimensions.errorCategory), bin(timestamp, 1h)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/connection.connectCompleted\"\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize Failures = count() by Category = tostring(customDimensions.errorCategory), bin(timestamp, 1d)\n| order by timestamp asc\n| render timechart",
         "size": 0,
-        "title": "Connection Failures by Type",
+        "title": "Connection Failures by Category",
         "timeContext": { "durationMs": 604800000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
         "visualization": "timechart"
       },
       "name": "conn_failures"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where isnotempty(tostring(customDimensions.errorCategory))\n| project timestamp, Operation = tostring(split(name, \"/\")[-1]), Category = tostring(customDimensions.errorCategory), Version = tostring(customDimensions.extensionVersion), Host = tostring(customDimensions.hostName)\n| order by timestamp desc\n| take 100",
+        "size": 0,
+        "title": "Recent Errors (raw)",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "recent_errors"
     }
   ],
   "styleSettings": {},

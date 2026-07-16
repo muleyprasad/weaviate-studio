@@ -3,14 +3,14 @@
   "items": [
     {
       "type": 1,
-      "content": { "json": "## Extension Health Dashboard\nMonitor extension stability and user retention." },
+      "content": { "json": "## Extension Health Dashboard\nStability and reliability. **Error** = any event carrying `errorCategory` (set by `trackError`). Success paths never set it." },
       "name": "title"
     },
     {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize DAU = dcount(tostring(customDimensions.sessionId)) by bin(timestamp, 1d)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"/extension.activated\"\n| summarize DAU = dcount(user_Id) by Day = bin(timestamp, 1d)\n| order by Day asc\n| render timechart",
         "size": 0,
         "title": "Daily Active Users (DAU)",
         "timeContext": { "durationMs": 2592000000 },
@@ -24,24 +24,10 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/extension.activated\" or name endswith \"/extension.deactivated\"\n| summarize startTime = min(timestamp), endTime = max(timestamp) by tostring(customDimensions.sessionId)\n| extend duration = datetime_diff('minute', endTime, startTime)\n| summarize avgDuration = avg(duration), p50 = percentile(duration, 50), p95 = percentile(duration, 95) by bin(startTime, 1d)\n| render timechart",
+        "query": "customEvents\n| where name endswith \"Completed\" or name endswith \".completed\"\n| extend IsError = isnotempty(tostring(customDimensions.errorCategory))\n| summarize Total = count(), Errors = countif(IsError) by bin(timestamp, 1d)\n| extend ErrorRatePct = round(100.0 * Errors / Total, 2)\n| project timestamp, ErrorRatePct\n| order by timestamp asc\n| render timechart",
         "size": 0,
-        "title": "Session Duration Distribution",
+        "title": "Error Rate Trend (% of completed operations that failed)",
         "timeContext": { "durationMs": 2592000000 },
-        "queryType": 0,
-        "resourceType": "microsoft.insights/components",
-        "visualization": "timechart"
-      },
-      "name": "session_duration"
-    },
-    {
-      "type": 3,
-      "content": {
-        "version": "KqlItem/1.0",
-        "query": "customEvents\n| extend isError = name endswith \"/extension.unhandledError\" or tostring(customDimensions.result) == \"failure\"\n| summarize errorRate = 100.0 * countif(isError) / count() by bin(timestamp, 1h)\n| render timechart",
-        "size": 0,
-        "title": "Error Rate Trend (%)",
-        "timeContext": { "durationMs": 604800000 },
         "queryType": 0,
         "resourceType": "microsoft.insights/components",
         "visualization": "timechart"
@@ -52,7 +38,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "customEvents\n| where name endswith \"/extension.unhandledError\"\n| summarize count() by tostring(customDimensions.errorCategory)\n| render piechart",
+        "query": "customEvents\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize Errors = count() by ErrorCategory = tostring(customDimensions.errorCategory)\n| order by Errors desc\n| render piechart",
         "size": 0,
         "title": "Errors by Category",
         "timeContext": { "durationMs": 604800000 },
@@ -61,6 +47,34 @@
         "visualization": "piechart"
       },
       "name": "error_category"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where isnotempty(tostring(customDimensions.errorCategory))\n| summarize AffectedUsers = dcount(user_Id), Errors = count() by Operation = tostring(split(name, \"/\")[-1])\n| order by AffectedUsers desc\n| take 15\n| render barchart",
+        "size": 0,
+        "title": "Errors by Operation (users affected)",
+        "timeContext": { "durationMs": 604800000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "name": "errors_by_op"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customEvents\n| where name endswith \"/extension.activated\" or name endswith \"/extension.deactivated\"\n| summarize startTime = minif(timestamp, name endswith \"/extension.activated\"), endTime = maxif(timestamp, name endswith \"/extension.deactivated\") by tostring(customDimensions.sessionId)\n| where isnotempty(startTime) and isnotempty(endTime) and endTime > startTime\n| extend durationMin = datetime_diff('minute', endTime, startTime)\n| summarize P50 = percentile(durationMin, 50), P95 = percentile(durationMin, 95) by bin(startTime, 1d)\n| order by startTime asc\n| render timechart",
+        "size": 0,
+        "title": "Session Duration (minutes, P50/P95)",
+        "timeContext": { "durationMs": 2592000000 },
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "session_duration"
     }
   ],
   "styleSettings": {},
