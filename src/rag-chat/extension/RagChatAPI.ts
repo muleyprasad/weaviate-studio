@@ -76,6 +76,10 @@ export class RagChatAPI {
     provider?: GenerativeProviderSelection;
     /** Advanced settings for custom providers */
     advancedSettings?: AdvancedRagSettings;
+    /** Optional target vector name or multi-target combination for multi-vector collections */
+    targetVector?:
+      | string
+      | { combination: string; targetVectors: string[]; weights?: Record<string, number> };
   }): Promise<{
     answer: string;
     contextObjects: Array<{
@@ -149,6 +153,41 @@ export class RagChatAPI {
       };
       if (builtFilter) {
         queryOptions.filters = builtFilter;
+      }
+      if (params.targetVector) {
+        if (typeof params.targetVector === 'string') {
+          queryOptions.targetVector = params.targetVector;
+        } else if (typeof params.targetVector === 'object') {
+          const { combination, targetVectors, weights } = params.targetVector;
+          if (targetVectors && targetVectors.length > 0) {
+            try {
+              let joinStrategy: any;
+              switch (combination) {
+                case 'sum':
+                  joinStrategy = collection.multiTargetVector.sum(targetVectors);
+                  break;
+                case 'average':
+                  joinStrategy = collection.multiTargetVector.average(targetVectors);
+                  break;
+                case 'manual-weights':
+                  joinStrategy = collection.multiTargetVector.manualWeights(weights || {});
+                  break;
+                case 'relative-score':
+                  joinStrategy = collection.multiTargetVector.relativeScore(weights || {});
+                  break;
+                case 'minimum':
+                default:
+                  joinStrategy = collection.multiTargetVector.minimum(targetVectors);
+                  break;
+              }
+              queryOptions.targetVector = joinStrategy;
+            } catch (err) {
+              console.warn(
+                `RagChatAPI: Failed to build multi-target vector configuration: ${err instanceof Error ? err.message : String(err)}`
+              );
+            }
+          }
+        }
       }
 
       // Build generative config if provider is specified
@@ -276,16 +315,36 @@ export class RagChatAPI {
         this.REQUEST_TIMEOUT
       );
 
-      const infos: CollectionInfo[] = collections.map((col) => {
-        // v3 client uses vectorizers, if not present or explicitly 'none', it has no vectorizer
-        const hasVec = col.vectorizers !== undefined && Object.keys(col.vectorizers).length > 0;
-        return {
-          name: col.name,
-          hasVectorizer: hasVec,
-          generativeModule:
-            col.generative?.name && col.generative.name !== 'none' ? col.generative.name : null,
-        };
-      });
+      const infos: CollectionInfo[] = await Promise.all(
+        collections.map(async (col) => {
+          const base = col as any;
+          let vectorizers = base.vectorizers ?? base.vectorizerConfig;
+
+          // Lazy-fetch full config only when listAll() omitted vectorizers/named-vector details
+          if (vectorizers === undefined) {
+            try {
+              const coll = this.client.collections.get(col.name);
+              const cfg = await coll.config.get();
+              vectorizers = (cfg as any).vectorizers ?? (cfg as any).vectorizerConfig;
+            } catch {
+              // Proceed with listAll() data
+            }
+          }
+
+          const vectorNames =
+            vectorizers && typeof vectorizers === 'object' ? Object.keys(vectorizers) : [];
+          // v3 client uses vectorizers, if not present or explicitly 'none', it has no vectorizer
+          const hasVec = vectorNames.length > 0;
+
+          return {
+            name: col.name,
+            hasVectorizer: hasVec,
+            generativeModule:
+              col.generative?.name && col.generative.name !== 'none' ? col.generative.name : null,
+            vectorNames,
+          };
+        })
+      );
 
       return infos.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {

@@ -36,6 +36,8 @@ export interface CollectionInfo {
   name: string;
   hasVectorizer: boolean;
   generativeModule: string | null; // e.g. "generative-openai" or null
+  /** The names of the vectors configured for this collection */
+  vectorNames?: string[];
 }
 
 /** Advanced RAG settings for custom LLM endpoint */
@@ -169,6 +171,8 @@ export interface RagChatWebviewMessage {
   command: RagChatWebviewMessageCommand;
   /** Collection names to query */
   collectionNames?: string[];
+  /** Mapping of collection name to selected target vectors */
+  collectionTargetVectors?: Record<string, string[]>;
   /** The natural language question */
   question?: string;
   /** How many objects to retrieve for context */

@@ -362,6 +362,16 @@ export class RagChatPanel {
         collectionNames.map(async (name) => {
           const info = this._collectionInfosCache.find((c) => c.name === name);
           const hasVectorizer = info ? info.hasVectorizer : true;
+          const selectedVectors = message.collectionTargetVectors?.[name] || [];
+          let targetVector: any = undefined;
+          if (selectedVectors.length === 1) {
+            targetVector = selectedVectors[0];
+          } else if (selectedVectors.length > 1) {
+            targetVector = {
+              combination: 'minimum',
+              targetVectors: selectedVectors,
+            };
+          }
 
           const result = await this._api!.executeRagQuery({
             collectionName: name,
@@ -373,6 +383,7 @@ export class RagChatPanel {
             provider: message.provider,
             advancedSettings: message.advancedSettings,
             hasVectorizer,
+            targetVector,
           });
           return { collectionName: name, ...result };
         })

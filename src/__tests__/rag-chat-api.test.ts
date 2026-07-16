@@ -142,6 +142,81 @@ describe('RagChatAPI', () => {
       );
     });
 
+    it('passes targetVector to hybrid queryOptions when specified', async () => {
+      const mockResult = {
+        generated: 'Test answer',
+        objects: [],
+      };
+
+      const mockCollection = {
+        generate: {
+          hybrid: jest.fn().mockResolvedValue(mockResult),
+        },
+      };
+
+      mockClient.collections.get.mockReturnValue(mockCollection);
+
+      await api.executeRagQuery({
+        collectionName: 'TestCollection',
+        question: 'What is this?',
+        targetVector: 'my_vector',
+      });
+
+      expect(mockCollection.generate.hybrid).toHaveBeenCalledWith(
+        'What is this?',
+        { groupedTask: 'What is this?' },
+        {
+          limit: 5,
+          returnMetadata: ['distance', 'certainty', 'score'],
+          targetVector: 'my_vector',
+        }
+      );
+    });
+
+    it('passes combined targetVector object to hybrid queryOptions when multiple target vectors are specified', async () => {
+      const mockResult = {
+        generated: 'Test answer',
+        objects: [],
+      };
+
+      const mockJoinStrategy = { _built: 'multiTargetMinimum' };
+
+      const mockCollection = {
+        generate: {
+          hybrid: jest.fn().mockResolvedValue(mockResult),
+        },
+        multiTargetVector: {
+          minimum: jest.fn().mockReturnValue(mockJoinStrategy),
+        },
+      };
+
+      mockClient.collections.get.mockReturnValue(mockCollection);
+
+      await api.executeRagQuery({
+        collectionName: 'TestCollection',
+        question: 'What is this?',
+        targetVector: {
+          combination: 'minimum',
+          targetVectors: ['vector_a', 'vector_b'],
+        },
+      });
+
+      expect(mockCollection.multiTargetVector.minimum).toHaveBeenCalledWith([
+        'vector_a',
+        'vector_b',
+      ]);
+
+      expect(mockCollection.generate.hybrid).toHaveBeenCalledWith(
+        'What is this?',
+        { groupedTask: 'What is this?' },
+        {
+          limit: 5,
+          returnMetadata: ['distance', 'certainty', 'score'],
+          targetVector: mockJoinStrategy,
+        }
+      );
+    });
+
     it('throws timeout error when query takes too long', async () => {
       const mockCollection = {
         generate: {
@@ -361,10 +436,20 @@ describe('RagChatAPI', () => {
       const result = await api.getCollectionInfos();
 
       expect(result).toEqual([
-        { name: 'CollectionA', hasVectorizer: false, generativeModule: null },
-        { name: 'CollectionB', hasVectorizer: true, generativeModule: 'openai' },
-        { name: 'CollectionC', hasVectorizer: false, generativeModule: null },
-        { name: 'CollectionD', hasVectorizer: true, generativeModule: 'cohere' },
+        { name: 'CollectionA', hasVectorizer: false, generativeModule: null, vectorNames: [] },
+        {
+          name: 'CollectionB',
+          hasVectorizer: true,
+          generativeModule: 'openai',
+          vectorNames: ['text2vec-openai'],
+        },
+        { name: 'CollectionC', hasVectorizer: false, generativeModule: null, vectorNames: [] },
+        {
+          name: 'CollectionD',
+          hasVectorizer: true,
+          generativeModule: 'cohere',
+          vectorNames: ['text2vec-cohere'],
+        },
       ]);
     });
 

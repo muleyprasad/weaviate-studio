@@ -1052,3 +1052,75 @@
   border-top: 1px solid var(--vscode-panel-border, #333);
   line-height: 1.4;
 }
+
+/* Multi-vector dropdown select styles */
+.rag-multi-vector-select-container {
+  position: relative;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.rag-multi-vector-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  background-color: var(--vscode-dropdown-background, #3c3c3c);
+  color: var(--vscode-dropdown-foreground, #fff);
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, #6b6b6b));
+  border-radius: 3px;
+  cursor: pointer;
+  max-width: 120px;
+}
+
+.rag-multi-vector-select-trigger:hover {
+  background-color: var(--vscode-dropdown-background-hover, var(--vscode-input-background, #454545));
+}
+
+.rag-dropdown-chevron {
+  font-size: 8px;
+  opacity: 0.8;
+}
+
+.rag-multi-vector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 4px;
+  padding: 4px 0;
+  background-color: var(--vscode-dropdown-background, #2d2d2d);
+  border: 1px solid var(--vscode-dropdown-border, #3c3c3c);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.rag-multi-vector-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--vscode-dropdown-foreground, #fff);
+  user-select: none;
+}
+
+.rag-multi-vector-option:hover {
+  background-color: var(--vscode-list-hoverBackground, #3c3c3c);
+}
+
+.rag-multi-vector-option input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.rag-multi-vector-option-text {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
