@@ -328,7 +328,8 @@ export class QueryEditorPanel {
       return `${base}/v1/graphql`;
     }
 
-    const protocol = conn.httpSecure ? 'https' : 'http';
+    // Start from connection flags; a fully-qualified URL in httpHost may override scheme.
+    let secure = Boolean(conn.httpSecure);
     let host = conn.httpHost || 'localhost';
     let port = conn.httpPort;
 
@@ -336,26 +337,51 @@ export class QueryEditorPanel {
     if (/^https?:\/\//i.test(host)) {
       try {
         const parsed = new URL(host);
+        // URL.hostname is unbracketed for IPv6 (e.g. "::1")
         host = parsed.hostname;
         if (parsed.port) {
           port = parseInt(parsed.port, 10);
+        }
+        // Prefer scheme from the pasted URL when present
+        if (parsed.protocol === 'https:') {
+          secure = true;
+        } else if (parsed.protocol === 'http:') {
+          secure = false;
         }
       } catch {
         host = host.replace(/^https?:\/\//i, '');
       }
     }
 
-    // Handle port suffix in hostname (e.g. "localhost:8080")
-    if (host.includes(':')) {
-      const parts = host.split(':');
-      host = parts[0];
-      if (parts[1] && !port) {
-        port = parseInt(parts[1], 10);
+    // Port suffix handling:
+    // - "localhost:8080" / "127.0.0.1:8080" → extract port
+    // - "[2001:db8::1]:8080" → extract IPv6 + port
+    // - bare IPv6 ("2001:db8::1") → leave host alone (do not split on ':')
+    if (host.startsWith('[')) {
+      const m = host.match(/^\[([^\]]+)\](?::(\d+))?$/);
+      if (m) {
+        host = m[1];
+        if (m[2] && (port === undefined || port === null)) {
+          port = parseInt(m[2], 10);
+        }
+      }
+    } else if (!host.includes('::') && (host.match(/:/g) || []).length === 1) {
+      // Exactly one colon → hostname/IPv4 with optional port (not multi-colon IPv6)
+      const lastColon = host.lastIndexOf(':');
+      const maybePort = host.slice(lastColon + 1);
+      if (/^\d+$/.test(maybePort)) {
+        if (port === undefined || port === null) {
+          port = parseInt(maybePort, 10);
+        }
+        host = host.slice(0, lastColon);
       }
     }
 
-    const finalPort = port || (conn.httpSecure ? 443 : 8080);
-    return `${protocol}://${host}:${finalPort}/v1/graphql`;
+    const finalPort = port || (secure ? 443 : 8080);
+    const protocol = secure ? 'https' : 'http';
+    // Bracket IPv6 hostnames for a valid URL
+    const hostForUrl = host.includes(':') ? `[${host}]` : host;
+    return `${protocol}://${hostForUrl}:${finalPort}/v1/graphql`;
   }
 
   private async _performGraphQLHttp(query: string, signal?: AbortSignal): Promise<any> {

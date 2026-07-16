@@ -159,6 +159,24 @@ describe('QueryEditorPanel.createOrShow unique key behaviour', () => {
       expect(panelInstance._buildGraphQLEndpoint()).toBe('https://my-weaviate.com:443/v1/graphql');
     });
 
+    it('prefers https scheme from pasted URL even when httpSecure is false', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'https://my-weaviate.com',
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('https://my-weaviate.com:443/v1/graphql');
+    });
+
+    it('prefers http scheme from pasted URL even when httpSecure is true', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'http://localhost:8080',
+        httpSecure: true,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://localhost:8080/v1/graphql');
+    });
+
     it('extracts port suffix from httpHost if httpPort is missing', () => {
       panelInstance._getActiveConnection = jest.fn().mockReturnValue({
         type: 'custom',
@@ -185,6 +203,34 @@ describe('QueryEditorPanel.createOrShow unique key behaviour', () => {
         httpSecure: false,
       });
       expect(panelInstance._buildGraphQLEndpoint()).toBe('http://127.0.0.1:8080/v1/graphql');
+    });
+
+    it('brackets bare IPv6 hosts and does not split on colons', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: '2001:db8::1',
+        httpPort: 8080,
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://[2001:db8::1]:8080/v1/graphql');
+    });
+
+    it('parses bracketed IPv6 with port suffix', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: '[2001:db8::1]:9000',
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://[2001:db8::1]:9000/v1/graphql');
+    });
+
+    it('parses full IPv6 URL pasted into httpHost', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'http://[::1]:8080',
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://[::1]:8080/v1/graphql');
     });
   });
 });

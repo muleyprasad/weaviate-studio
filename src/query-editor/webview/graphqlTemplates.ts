@@ -646,24 +646,24 @@ export function validateAndSanitizeQuery(query: string): {
       typeName.toLowerCase() === 'blob'
     ) {
       errors.push(
-        `Invalid inline fragment type "${typeName}" — scalar Weaviate types are selected as plain fields, not fragments`
+        `Invalid inline fragment type "${typeName}" - scalar Weaviate types are selected as plain fields, not fragments`
       );
     }
   }
 
   // Empty selection sets (e.g. `prop { }`) are invalid GraphQL
   if (/\{\s*\}/.test(query.replace(/#[^\n]*/g, ''))) {
-    errors.push('Empty selection set `{ }` found — nested fields require at least one selection');
+    errors.push('Empty selection set `{ }` found - nested fields require at least one selection');
   }
 
-  // Soft guidance — do not block the editor from loading the sample
+  // Soft guidance - do not block the editor from loading the sample
   if (/tenant:\s*"YOUR_TENANT_ID"/.test(query)) {
     warnings.push(
-      'Placeholder tenant "YOUR_TENANT_ID" present — replace with a real tenant name before running'
+      'Placeholder tenant "YOUR_TENANT_ID" present - replace with a real tenant name before running'
     );
   }
   if (/vector:\s*\[0\.1,\s*0\.2,\s*0\.3\]/.test(query)) {
-    warnings.push('Placeholder vector [0.1, 0.2, 0.3] present — replace with a real embedding');
+    warnings.push('Placeholder vector [0.1, 0.2, 0.3] present - replace with a real embedding');
   }
 
   // Sanitize by removing potential harmful content (basic implementation)
