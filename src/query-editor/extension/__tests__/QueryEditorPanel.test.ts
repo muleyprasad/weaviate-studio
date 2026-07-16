@@ -117,4 +117,74 @@ describe('QueryEditorPanel.createOrShow unique key behaviour', () => {
     });
     expect((QueryEditorPanel as any).panels.size).toBe(1);
   });
+
+  describe('_buildGraphQLEndpoint endpoint builder sanitization', () => {
+    let panelInstance: any;
+
+    beforeEach(() => {
+      QueryEditorPanel.createOrShow(dummyContext, {
+        connectionId: 'c1',
+        collectionName: 'ColA',
+        tabId: 'test-endpoint',
+      });
+      panelInstance = Array.from((QueryEditorPanel as any).panels.values())[0];
+    });
+
+    it('returns custom endpoint correctly when host has no protocol/port', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'localhost',
+        httpPort: 8080,
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://localhost:8080/v1/graphql');
+    });
+
+    it('strips leading http:// protocol from httpHost', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'http://localhost',
+        httpPort: 8080,
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://localhost:8080/v1/graphql');
+    });
+
+    it('strips leading https:// protocol and detects secure port from it', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'https://my-weaviate.com',
+        httpSecure: true,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('https://my-weaviate.com:443/v1/graphql');
+    });
+
+    it('extracts port suffix from httpHost if httpPort is missing', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'localhost:9000',
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://localhost:9000/v1/graphql');
+    });
+
+    it('prefers explicit httpPort over suffix in httpHost', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'localhost:9000',
+        httpPort: 1234,
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://localhost:1234/v1/graphql');
+    });
+
+    it('correctly handles full pasted URL into httpHost', () => {
+      panelInstance._getActiveConnection = jest.fn().mockReturnValue({
+        type: 'custom',
+        httpHost: 'http://127.0.0.1:8080',
+        httpSecure: false,
+      });
+      expect(panelInstance._buildGraphQLEndpoint()).toBe('http://127.0.0.1:8080/v1/graphql');
+    });
+  });
 });

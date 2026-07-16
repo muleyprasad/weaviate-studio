@@ -61,7 +61,7 @@ describe('Sample query flow', () => {
   }
 
   it('posts a schema-aware sampleQuery using collections.listAll()', async () => {
-    const listAll = jest.fn().mockResolvedValue([
+    const listAll = (jest.fn() as any).mockResolvedValue([
       {
         name: 'ColA',
         properties: [
@@ -84,7 +84,7 @@ describe('Sample query flow', () => {
       (call: any[]) => call[0].type === 'sampleQuery'
     );
     expect(sampleQueryMsg).toBeDefined();
-    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    const q: string = (sampleQueryMsg![0] as any).data.sampleQuery;
     expect(q).toContain('ColA');
     expect(q).toContain('name');
     expect(q).toContain('aliases');
@@ -94,7 +94,7 @@ describe('Sample query flow', () => {
   });
 
   it('includes tenant placeholder when multi-tenancy is enabled', async () => {
-    const listAll = jest.fn().mockResolvedValue([
+    const listAll = (jest.fn() as any).mockResolvedValue([
       {
         name: 'TenantCol',
         properties: [{ name: 'title', dataType: ['text'] }],
@@ -107,7 +107,7 @@ describe('Sample query flow', () => {
         listAll,
         get: jest.fn().mockReturnValue({
           config: {
-            get: jest.fn().mockResolvedValue({
+            get: (jest.fn() as any).mockResolvedValue({
               multiTenancy: { enabled: true },
               properties: [{ name: 'title', dataType: ['text'] }],
             }),
@@ -122,13 +122,13 @@ describe('Sample query flow', () => {
       (call: any[]) => call[0].type === 'sampleQuery'
     );
     expect(sampleQueryMsg).toBeDefined();
-    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    const q: string = (sampleQueryMsg![0] as any).data.sampleQuery;
     expect(q).toContain('tenant:');
     expect(q).toContain('YOUR_TENANT_ID');
   });
 
   it('falls back to a minimal query when schema fetch fails', async () => {
-    const listAll = jest.fn().mockRejectedValue(new Error('network down'));
+    const listAll = (jest.fn() as any).mockRejectedValue(new Error('network down'));
 
     const { panelInstance, webviewPost } = createPanelWithClient({
       collections: { listAll },
@@ -140,7 +140,7 @@ describe('Sample query flow', () => {
       (call: any[]) => call[0].type === 'sampleQuery'
     );
     expect(sampleQueryMsg).toBeDefined();
-    const q: string = sampleQueryMsg![0].data.sampleQuery;
+    const q: string = (sampleQueryMsg![0] as any).data.sampleQuery;
     expect(q).toContain('ColA');
     expect(q).toContain('_additional');
   });

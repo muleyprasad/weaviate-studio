@@ -329,9 +329,33 @@ export class QueryEditorPanel {
     }
 
     const protocol = conn.httpSecure ? 'https' : 'http';
-    const host = conn.httpHost || 'localhost';
-    const port = conn.httpPort || (conn.httpSecure ? 443 : 8080);
-    return `${protocol}://${host}:${port}/v1/graphql`;
+    let host = conn.httpHost || 'localhost';
+    let port = conn.httpPort;
+
+    // Strip leading protocol if user accidentally included it in host field
+    if (/^https?:\/\//i.test(host)) {
+      try {
+        const parsed = new URL(host);
+        host = parsed.hostname;
+        if (parsed.port) {
+          port = parseInt(parsed.port, 10);
+        }
+      } catch {
+        host = host.replace(/^https?:\/\//i, '');
+      }
+    }
+
+    // Handle port suffix in hostname (e.g. "localhost:8080")
+    if (host.includes(':')) {
+      const parts = host.split(':');
+      host = parts[0];
+      if (parts[1] && !port) {
+        port = parseInt(parts[1], 10);
+      }
+    }
+
+    const finalPort = port || (conn.httpSecure ? 443 : 8080);
+    return `${protocol}://${host}:${finalPort}/v1/graphql`;
   }
 
   private async _performGraphQLHttp(query: string, signal?: AbortSignal): Promise<any> {

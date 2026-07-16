@@ -957,19 +957,19 @@ export function buildQueryHeaderComments(
   const lines: string[] = [];
   lines.push(`# Schema-aware ${options?.kind || 'query'} for ${collectionName}`);
   if (isMultiTenantCollection(classSchema)) {
-    lines.push('# Multi-tenancy is enabled — set tenant to a real tenant name before running');
+    lines.push('# Multi-tenancy is enabled - set tenant to a real tenant name before running');
   }
   const vectors = getNamedVectorNames(classSchema);
   if (vectors.length > 1 || (vectors.length === 1 && vectors[0] !== 'default')) {
-    lines.push(`# Named vectors: ${vectors.join(', ')} — templates may set targetVectors`);
+    lines.push(`# Named vectors: ${vectors.join(', ')} - templates may set targetVectors`);
   }
   if (options?.excludedBlobs?.length) {
     lines.push(
-      `# Excluded blob fields (large payloads): ${options.excludedBlobs.join(', ')} — add manually if needed`
+      `# Excluded blob fields (large payloads): ${options.excludedBlobs.join(', ')} - add manually if needed`
     );
   }
   if (!hasTextVectorizerModule(classSchema) && options?.kind === 'nearText') {
-    lines.push('# No text vectorizer detected — nearText may fail; prefer nearVector if so');
+    lines.push('# No text vectorizer detected - nearText may fail; prefer nearVector if so');
   }
   return lines.map((l) => `${indent}${l}`).join('\n') + '\n';
 }
@@ -1101,7 +1101,7 @@ ${indent}}`;
     const nested = (prop.nestedProperties || []).slice(0, maxNestedProps);
     if (nested.length === 0) {
       // Do not emit bare object or __typename — Weaviate nested types need real fields.
-      return `${indent}# ${prop.name}: nested fields unavailable in schema — add a sub-selection manually`;
+      return `${indent}# ${prop.name}: nested fields unavailable in schema - add a sub-selection manually`;
     }
     const nestedPropsStr = nested
       .map((np) => {
