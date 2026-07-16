@@ -166,8 +166,14 @@ export class QueryEditorPanel {
       description: (prop as any).description,
     };
 
-    // Extract nested properties for object-type properties
-    if (result.dataType.includes('object') && (prop as any).nestedProperties) {
+    // Extract nested properties for object / object[] properties
+    const isObjectType = result.dataType.some(
+      (dt: string) =>
+        String(dt)
+          .replace(/\[\]\s*$/, '')
+          .toLowerCase() === 'object'
+    );
+    if (isObjectType && (prop as any).nestedProperties) {
       result.nestedProperties = ((prop as any).nestedProperties as PropertyConfig[]).map((nested) =>
         this._mapPropertySchema(nested)
       );

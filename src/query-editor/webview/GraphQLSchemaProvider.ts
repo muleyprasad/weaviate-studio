@@ -161,16 +161,28 @@ export class SchemaProvider {
             );
           }
 
-          const properties = (rawProps || []).map((prop: any) => ({
-            name: prop?.name || '',
-            dataType: Array.isArray(prop?.dataType) ? prop.dataType : [prop?.dataType || 'string'],
-            description: prop?.description,
-            tokenization: prop?.tokenization,
-            indexSearchable: prop?.indexSearchable,
-            indexFilterable: prop?.indexFilterable,
-            moduleConfig: prop?.moduleConfig,
-            vectorizerConfig: prop?.vectorizerConfig,
-          }));
+          const mapProperty = (prop: any): any => {
+            const dataType = Array.isArray(prop?.dataType)
+              ? prop.dataType
+              : [prop?.dataType || 'string'];
+            const mapped: any = {
+              name: prop?.name || '',
+              dataType,
+              description: prop?.description,
+              tokenization: prop?.tokenization,
+              indexSearchable: prop?.indexSearchable,
+              indexFilterable: prop?.indexFilterable,
+              moduleConfig: prop?.moduleConfig,
+              vectorizerConfig: prop?.vectorizerConfig,
+            };
+            // Preserve nested fields for object / object[] (needed for sample query generation)
+            if (Array.isArray(prop?.nestedProperties) && prop.nestedProperties.length > 0) {
+              mapped.nestedProperties = prop.nestedProperties.map(mapProperty);
+            }
+            return mapped;
+          };
+
+          const properties = (rawProps || []).map(mapProperty);
 
           return {
             class: (collection as any).name || (collection as any).class || '',
