@@ -406,6 +406,9 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // Initialize telemetry
+  // Priority: VS Code user setting (weaviate.telemetry.connectionString)
+  //           > build-time injected env var (APPLICATION_INSIGHTS_CONNECTION_STRING)
+  //           > .env file in dev / nothing in production
   const telemetryService = getTelemetryService();
   const connectionString = vscode.workspace
     .getConfiguration('weaviate')
