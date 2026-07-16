@@ -926,6 +926,10 @@ ${indent}}`;
   if (kind === 'object') {
     const nestedTypeName = `${collectionName}_${prop.name}_object`;
     if (!isValidGraphQLTypeName(nestedTypeName)) {
+      // The generated inline-fragment type name contains characters that are not allowed
+      // in GraphQL identifiers (e.g. hyphens in the collection or property name).  Fall
+      // back to a bare field selection so the query remains valid — the user can add a
+      // manual sub-selection if needed.
       return `${indent}${prop.name}`;
     }
     const nested = (prop.nestedProperties || []).slice(0, maxNestedProps);
@@ -978,7 +982,10 @@ ${indent}}`;
         let body: string;
         if (referencedClass?.properties?.length) {
           const refPrimitiveProps = referencedClass.properties
-            .filter((p) => classifyProperty(p) === 'primitive' || classifyProperty(p) === 'unknown')
+            .filter((p) => {
+              const k = classifyProperty(p);
+              return k === 'primitive' || k === 'unknown';
+            })
             .slice(0, maxNestedProps);
           if (refPrimitiveProps.length > 0) {
             const lines = refPrimitiveProps.map((p) => `${indent}    ${p.name}`);
@@ -1130,13 +1137,20 @@ export interface QueryConfig {
 }
 
 /**
- * Generate a sample query for a collection based on its schema
- * @param collectionName The name of the collection
- * @param properties Optional array of property names to include
- * @param limit Optional limit for the query (default: 10)
- * @param schema Optional schema information for proper relationship handling
- * @returns GraphQL query string
+ * Generate a sample GraphQL Get query for a collection.
+ *
+ * @param collectionName - The Weaviate collection/class name.
+ * @param properties     - Explicit list of property names to select. When empty, the full
+ *                         schema is used (all properties are auto-classified and formatted).
+ * @param limit          - Result limit (default 10).
+ * @param schema         - Full schema used to resolve cross-reference targets and nested fields.
+ * @returns A GraphQL query string ready to paste into the editor.
+ *
+ * **Indentation contract**: each entry in `propertyStrings` is already indented by six
+ * spaces (the depth of a property inside `Get { Collection { … } }`).  Callers that
+ * post-process the returned string should account for this.
  */
+
 export function generateSampleQuery(
   collectionName: string,
   properties: string[] = [],

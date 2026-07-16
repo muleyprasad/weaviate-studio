@@ -272,6 +272,7 @@ describe('graphqlTemplates helpers', () => {
       isObjectDataType,
       isReferenceDataType,
       isTextDataType,
+      isArrayDataType,
       getBaseDataType,
       classifyProperty,
       isValidGraphQLTypeName,
@@ -285,6 +286,21 @@ describe('graphqlTemplates helpers', () => {
       expect(isPrimitiveDataType('uuid')).toBe(true);
       expect(getBaseDataType(['text[]'])).toBe('text');
       expect(isTextDataType(['text[]'])).toBe(true);
+    });
+
+    it('isArrayDataType detects [] suffix', () => {
+      expect(isArrayDataType(['text[]'])).toBe(true);
+      expect(isArrayDataType(['number[]'])).toBe(true);
+      expect(isArrayDataType(['object[]'])).toBe(true);
+      expect(isArrayDataType('uuid[]')).toBe(true);
+      // Non-array types must return false
+      expect(isArrayDataType(['text'])).toBe(false);
+      expect(isArrayDataType(['object'])).toBe(false);
+      expect(isArrayDataType('Person')).toBe(false);
+      // Edge cases
+      expect(isArrayDataType(undefined)).toBe(false);
+      expect(isArrayDataType(null)).toBe(false);
+      expect(isArrayDataType([])).toBe(false);
     });
 
     it('classifies geo and object types', () => {
