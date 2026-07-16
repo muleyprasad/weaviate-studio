@@ -470,6 +470,64 @@ describe('graphqlTemplates helpers', () => {
       expect(q).toContain('content');
     });
 
+    it('honours singular config.targetVector', () => {
+      const { formatTargetVectorsArg } = require('../graphqlTemplates');
+      const line = formatTargetVectorsArg(
+        { class: 'X', properties: [], vectorNames: ['default'] },
+        { targetVector: 'content_vec' }
+      );
+      expect(line).toBe('targetVectors: ["content_vec"]');
+    });
+
+    it('does not mutate config.fullSchema in generateDynamicSampleQuery', () => {
+      const { generateDynamicSampleQuery } = require('../graphqlTemplates');
+      const otherClass = {
+        class: 'Other',
+        properties: [{ name: 'a', dataType: ['text'] }],
+      };
+      const fullSchema = { classes: [otherClass] };
+      const originalClassesRef = fullSchema.classes;
+      const classSchema = {
+        class: 'Primary',
+        properties: [{ name: 'title', dataType: ['text'] }],
+      };
+
+      generateDynamicSampleQuery('Primary', classSchema, 5, { fullSchema });
+
+      // Same array reference — not replaced/mutated
+      expect(fullSchema.classes).toBe(originalClassesRef);
+      expect(fullSchema.classes).toHaveLength(1);
+      expect(fullSchema.classes[0].class).toBe('Other');
+    });
+
+    it('puts tenant before groupBy/limit in Aggregate groupBy queries', () => {
+      const { generateDynamicGroupByQuery } = require('../graphqlTemplates');
+      const classSchema = {
+        class: 'Tenanted',
+        multiTenancy: { enabled: true },
+        properties: [{ name: 'category', dataType: ['text'] }],
+      };
+      const q = generateDynamicGroupByQuery('Tenanted', classSchema, {
+        tenantName: 'acme',
+      });
+      const tenantIdx = q.indexOf('tenant:');
+      const groupByIdx = q.indexOf('groupBy:');
+      const limitIdx = q.indexOf('limit:');
+      expect(tenantIdx).toBeGreaterThan(-1);
+      expect(tenantIdx).toBeLessThan(groupByIdx);
+      expect(groupByIdx).toBeLessThan(limitIdx);
+    });
+
+    it('buildQueryHeaderComments respects custom indent', () => {
+      const { buildQueryHeaderComments } = require('../graphqlTemplates');
+      const header = buildQueryHeaderComments(
+        'Article',
+        { class: 'Article', properties: [] },
+        { kind: 'sample Get', indent: '    ' }
+      );
+      expect(header).toMatch(/^    # Schema-aware sample Get for Article/m);
+    });
+
     it('caps default sample properties instead of dumping the full schema', () => {
       const { generateSampleQuery } = require('../graphqlTemplates');
       const props = Array.from({ length: 30 }, (_, i) => ({

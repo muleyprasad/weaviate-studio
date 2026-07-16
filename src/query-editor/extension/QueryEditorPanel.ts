@@ -225,22 +225,26 @@ export class QueryEditorPanel {
           let moduleConfig = base.moduleConfig;
           let vectorizer = base.vectorizer;
 
-          // Enrich from full config when listAll() omits MT / named-vector details
-          try {
-            const name = collection.name || base.class;
-            if (name && this._weaviateClient?.collections?.get) {
-              const coll = this._weaviateClient.collections.get(name);
-              if (coll?.config?.get) {
-                const cfg = await coll.config.get();
-                vectorizers =
-                  (cfg as any).vectorizers ?? (cfg as any).vectorizerConfig ?? vectorizers;
-                multiTenancy = (cfg as any).multiTenancy ?? multiTenancy;
-                moduleConfig = (cfg as any).moduleConfig ?? moduleConfig;
-                vectorizer = (cfg as any).vectorizer ?? vectorizer;
+          // Lazy-fetch full config only when listAll() omitted MT / named-vector details
+          // (avoids N+1 config.get() round-trips on large clusters).
+          const needsEnrichment = vectorizers === undefined || multiTenancy === undefined;
+          if (needsEnrichment) {
+            try {
+              const name = collection.name || base.class;
+              if (name && this._weaviateClient?.collections?.get) {
+                const coll = this._weaviateClient.collections.get(name);
+                if (coll?.config?.get) {
+                  const cfg = await coll.config.get();
+                  vectorizers =
+                    (cfg as any).vectorizers ?? (cfg as any).vectorizerConfig ?? vectorizers;
+                  multiTenancy = (cfg as any).multiTenancy ?? multiTenancy;
+                  moduleConfig = (cfg as any).moduleConfig ?? moduleConfig;
+                  vectorizer = (cfg as any).vectorizer ?? vectorizer;
+                }
               }
+            } catch {
+              // Proceed with listAll() data
             }
-          } catch {
-            // Proceed with listAll() data
           }
 
           const vectorNames =

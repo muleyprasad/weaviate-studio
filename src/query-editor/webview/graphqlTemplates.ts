@@ -930,8 +930,8 @@ export function buildCollectionArgs(
 /** Optional targetVectors line for nearVector / nearText / hybrid when named vectors exist. */
 export function formatTargetVectorsArg(classSchema?: ClassSchema, config?: QueryConfig): string {
   let names: string[] = [];
-  if (Array.isArray(config?.targetVectors) && config!.targetVectors!.length > 0) {
-    names = config!.targetVectors!;
+  if (Array.isArray(config?.targetVectors) && config.targetVectors.length > 0) {
+    names = config.targetVectors;
   } else if (config?.targetVector) {
     names = [config.targetVector];
   } else {
@@ -951,8 +951,9 @@ export function formatTargetVectorsArg(classSchema?: ClassSchema, config?: Query
 export function buildQueryHeaderComments(
   collectionName: string,
   classSchema?: ClassSchema,
-  options?: { kind?: string; excludedBlobs?: string[] }
+  options?: { kind?: string; excludedBlobs?: string[]; indent?: string }
 ): string {
+  const indent = options?.indent ?? '  ';
   const lines: string[] = [];
   lines.push(`# Schema-aware ${options?.kind || 'query'} for ${collectionName}`);
   if (isMultiTenantCollection(classSchema)) {
@@ -970,7 +971,7 @@ export function buildQueryHeaderComments(
   if (!hasTextVectorizerModule(classSchema) && options?.kind === 'nearText') {
     lines.push('# No text vectorizer detected — nearText may fail; prefer nearVector if so');
   }
-  return lines.map((l) => `  ${l}`).join('\n') + '\n';
+  return lines.map((l) => `${indent}${l}`).join('\n') + '\n';
 }
 
 /**
@@ -1780,11 +1781,22 @@ export function generateDynamicSampleQuery(
   limit: number = 10,
   config?: QueryConfig
 ): string {
-  // Delegate to the shared sample generator for consistent safe defaults
-  const schema = config?.fullSchema || (classSchema ? { classes: [classSchema] } : undefined);
-  if (classSchema && schema && !schema.classes?.some((c) => c.class === classSchema.class)) {
-    schema.classes = [...(schema.classes || []), classSchema];
-  }
+  // Delegate to the shared sample generator for consistent safe defaults.
+  // Always build a new schema object — never mutate config.fullSchema.
+  const existingClasses = config?.fullSchema?.classes ?? [];
+  const hasClass =
+    !!classSchema &&
+    existingClasses.some(
+      (c) =>
+        c.class === classSchema.class || c.class?.toLowerCase() === classSchema.class?.toLowerCase()
+    );
+  const schema =
+    classSchema || existingClasses.length
+      ? {
+          classes: [...existingClasses, ...(classSchema && !hasClass ? [classSchema] : [])],
+        }
+      : undefined;
+
   return generateSampleQuery(collectionName, [], limit, schema, {
     ...config,
     maxProperties: config?.maxProperties ?? 8,
@@ -2219,16 +2231,19 @@ export function generateDynamicGroupByQuery(
     config?.groupByPath ||
     classSchema?.properties?.find((p) => isTextDataType(p.dataType))?.name ||
     'category';
+  // tenant → groupBy → limit (readable order; GraphQL arg order is not semantic)
   const tenantRequired = isMultiTenantCollection(classSchema) || Boolean(config?.tenantName);
-  const tenantLine = tenantRequired
-    ? `\n      tenant: "${config?.tenantName?.trim() || 'YOUR_TENANT_ID'}"`
-    : '';
+  const argLines: string[] = [];
+  if (tenantRequired) {
+    argLines.push(`tenant: "${config?.tenantName?.trim() || 'YOUR_TENANT_ID'}"`);
+  }
+  argLines.push(`groupBy: ["${groupByPath}"]`);
+  argLines.push('limit: 10');
 
   return `{
   Aggregate {
     ${collectionName} (
-      groupBy: ["${groupByPath}"]
-      limit: 10${tenantLine}
+      ${argLines.join('\n      ')}
     ) {
       groupedBy {
         value

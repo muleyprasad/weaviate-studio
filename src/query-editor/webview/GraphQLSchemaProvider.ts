@@ -141,35 +141,39 @@ export class SchemaProvider {
           let vectorizers = (collection as any).vectorizers ?? (collection as any).vectorizerConfig;
           let multiTenancy = (collection as any).multiTenancy;
 
-          // If vectorizer details are missing, attempt to fetch full config for this collection
-          try {
-            const collHandle: any = (weaviateClient as any)?.collections?.get?.(
-              (collection as any).name || (collection as any).class
-            );
+          // Lazy-fetch full config only when listAll() omitted key fields (avoids N+1 round-trips)
+          const needsEnrichment =
+            vectorizers === undefined || multiTenancy === undefined || !rawProps?.length;
+          if (needsEnrichment) {
+            try {
+              const collHandle: any = (weaviateClient as any)?.collections?.get?.(
+                (collection as any).name || (collection as any).class
+              );
 
-            const cfg =
-              collHandle && typeof collHandle.config === 'function'
-                ? await collHandle.config()
-                : collHandle && typeof collHandle.getConfig === 'function'
-                  ? await collHandle.getConfig()
-                  : collHandle?.config && typeof collHandle.config.get === 'function'
-                    ? await collHandle.config.get()
-                    : undefined;
+              const cfg =
+                collHandle && typeof collHandle.config === 'function'
+                  ? await collHandle.config()
+                  : collHandle && typeof collHandle.getConfig === 'function'
+                    ? await collHandle.getConfig()
+                    : collHandle?.config && typeof collHandle.config.get === 'function'
+                      ? await collHandle.config.get()
+                      : undefined;
 
-            if (cfg && typeof cfg === 'object') {
-              // Prefer values from cfg when available
-              description = cfg.description ?? description;
-              rawProps = Array.isArray(cfg.properties) ? cfg.properties : rawProps;
-              vectorizer = cfg.vectorizer ?? vectorizer;
-              moduleConfig = cfg.moduleConfig ?? moduleConfig;
-              vectorizers = cfg.vectorizers ?? cfg.vectorizerConfig ?? vectorizers;
-              multiTenancy = cfg.multiTenancy ?? multiTenancy;
+              if (cfg && typeof cfg === 'object') {
+                // Prefer values from cfg when available
+                description = cfg.description ?? description;
+                rawProps = Array.isArray(cfg.properties) ? cfg.properties : rawProps;
+                vectorizer = cfg.vectorizer ?? vectorizer;
+                moduleConfig = cfg.moduleConfig ?? moduleConfig;
+                vectorizers = cfg.vectorizers ?? cfg.vectorizerConfig ?? vectorizers;
+                multiTenancy = cfg.multiTenancy ?? multiTenancy;
+              }
+            } catch (e) {
+              console.warn(
+                'Could not fetch full collection config; proceeding with listAll() data',
+                e
+              );
             }
-          } catch (e) {
-            console.warn(
-              'Could not fetch full collection config; proceeding with listAll() data',
-              e
-            );
           }
 
           const mapProperty = (prop: any): any => {
