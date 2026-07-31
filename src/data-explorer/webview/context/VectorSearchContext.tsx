@@ -10,7 +10,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react';
-import type { WeaviateObject, JoinStrategy } from '../../types';
+import type { WeaviateObject, JoinStrategy, QueryProfile } from '../../types';
 
 // ============================================================================
 // Types
@@ -76,6 +76,9 @@ export interface VectorSearchContextState {
   vectorWeights: Record<string, number>;
   multiTargetActive: boolean;
   muveraFlagsByVector: Record<string, boolean>;
+  // Query profiling state
+  queryProfileEnabled: boolean;
+  queryProfileResult: QueryProfile | null;
 }
 
 // ============================================================================
@@ -100,7 +103,10 @@ type VectorSearchAction =
   | { type: 'SET_JOIN_STRATEGY'; strategy: JoinStrategy }
   | { type: 'SET_VECTOR_WEIGHT'; vectorName: string; weight: number }
   | { type: 'NORMALIZE_WEIGHTS' }
-  | { type: 'SET_MUVERA_FLAGS'; flags: Record<string, boolean> };
+  | { type: 'SET_MUVERA_FLAGS'; flags: Record<string, boolean> }
+  // Query profiling actions
+  | { type: 'SET_QUERY_PROFILE_ENABLED'; enabled: boolean }
+  | { type: 'SET_QUERY_PROFILE_RESULT'; result: QueryProfile | null };
 
 // ============================================================================
 // Initial State
@@ -139,6 +145,9 @@ const initialState: VectorSearchContextState = {
   vectorWeights: {},
   multiTargetActive: false,
   muveraFlagsByVector: {},
+  // Query profiling state
+  queryProfileEnabled: false,
+  queryProfileResult: null,
 };
 
 // ============================================================================
@@ -207,6 +216,8 @@ function vectorSearchReducer(
         isSearching: false,
         searchError: null,
         hasSearched: true,
+        // Clear stale profile result when new results arrive
+        // (profile result is set separately via SET_QUERY_PROFILE_RESULT)
       };
 
     case 'SET_SEARCHING':
@@ -231,6 +242,7 @@ function vectorSearchReducer(
         searchError: null,
         isSearching: false,
         hasSearched: false,
+        queryProfileResult: null,
       };
 
     case 'FIND_SIMILAR':
@@ -304,6 +316,20 @@ function vectorSearchReducer(
         muveraFlagsByVector: action.flags,
       };
 
+    case 'SET_QUERY_PROFILE_ENABLED':
+      return {
+        ...state,
+        queryProfileEnabled: action.enabled,
+        // Clear previous profile result when toggling
+        queryProfileResult: action.enabled ? state.queryProfileResult : null,
+      };
+
+    case 'SET_QUERY_PROFILE_RESULT':
+      return {
+        ...state,
+        queryProfileResult: action.result,
+      };
+
     default:
       return state;
   }
@@ -332,6 +358,9 @@ export interface VectorSearchContextActions {
   setVectorWeight: (vectorName: string, weight: number) => void;
   normalizeWeights: () => void;
   setMuveraFlags: (flags: Record<string, boolean>) => void;
+  // Query profiling actions
+  setQueryProfileEnabled: (enabled: boolean) => void;
+  setQueryProfileResult: (result: QueryProfile | null) => void;
 }
 
 // ============================================================================
@@ -426,6 +455,15 @@ export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
 
       setMuveraFlags: (flags: Record<string, boolean>) => {
         dispatch({ type: 'SET_MUVERA_FLAGS', flags });
+      },
+
+      // Query profiling actions
+      setQueryProfileEnabled: (enabled: boolean) => {
+        dispatch({ type: 'SET_QUERY_PROFILE_ENABLED', enabled });
+      },
+
+      setQueryProfileResult: (result: QueryProfile | null) => {
+        dispatch({ type: 'SET_QUERY_PROFILE_RESULT', result });
       },
     }),
     []

@@ -47,7 +47,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 - **Multiple Connections:** Manage several Weaviate instances at once
 - **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
-- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
+- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), query profiling, and JSON/CSV export
 - **RBAC & Security:** Manage users, roles, and groups with native RBAC support and API key rotation
 - **Read-Only Mode:** Connection-level guards to prevent accidental modifications to production data
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
@@ -102,6 +102,7 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Visual filter builder with 10+ operators and AND/OR logic
 - Four vector search modes: Text, Object, Vector, and Hybrid (BM25 + semantic)
 - Alpha slider for balancing keyword vs semantic search
+- **Query profiling** — per-shard timing breakdowns for search optimization (requires Weaviate ≥ 1.36.9)
 - Export to JSON/CSV with flexible scopes (current page, filtered results, or entire collection)
 - Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E) for power users
 - User preferences persistence per collection

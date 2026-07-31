@@ -49,6 +49,7 @@ import type {
   PropertyNumericStats,
   PropertyDateRange,
   PropertyBooleanCounts,
+  QueryProfile,
 } from '../types';
 import type {
   WeaviateFilter,
@@ -255,7 +256,12 @@ export class DataExplorerAPI {
       }
 
       // Execute appropriate query based on vector search type
-      const result = await this.executeQuery(collection, baseOptions, params.vectorSearch);
+      const result = await this.executeQuery(
+        collection,
+        baseOptions,
+        params.vectorSearch,
+        params.queryProfile
+      );
 
       // Transform result to our format
       const objects: WeaviateObject[] = result.objects.map(
@@ -359,7 +365,7 @@ export class DataExplorerAPI {
         }
       }
 
-      return { objects, total, unfilteredTotal };
+      return { objects, total, unfilteredTotal, queryProfile: result.queryProfile };
     } catch (error) {
       console.error('Error fetching objects from collection:', {
         collection: params.collectionName,
@@ -430,18 +436,27 @@ export class DataExplorerAPI {
   private async executeQuery(
     collection: Collection,
     options: WeaviateQueryOptions,
-    vectorSearch?: VectorSearchParams
+    vectorSearch?: VectorSearchParams,
+    queryProfile?: boolean
   ): Promise<WeaviateQueryResult> {
     // Determine query mode
     if (!vectorSearch || vectorSearch.type === 'none') {
       // Boolean-only query mode (default)
+      if (queryProfile) {
+        return collection.query.fetchObjects({
+          ...options,
+          returnMetadata: ['all', 'queryProfile'],
+        } as Record<string, unknown>) as unknown as WeaviateQueryResult;
+      }
       return collection.query.fetchObjects(options);
     }
 
     // Build vector search options using Weaviate vector query types
     const vectorOptions: WeaviateVectorQueryOptions = {
       limit: options.limit,
-      returnMetadata: options.returnMetadata,
+      returnMetadata: queryProfile
+        ? (['all', 'queryProfile'] as unknown as WeaviateQueryOptions['returnMetadata'])
+        : options.returnMetadata,
     };
 
     if (options.returnProperties) {
@@ -552,7 +567,9 @@ export class DataExplorerAPI {
       const hybridOptions: WeaviateHybridQueryOptions = {
         ...vectorOptions,
         alpha: vectorSearch.alpha ?? 0.5, // 0 = pure BM25, 1 = pure vector
-        returnMetadata: ['score', 'distance', 'certainty', 'explainScore'],
+        returnMetadata: queryProfile
+          ? (['all', 'queryProfile'] as unknown as WeaviateQueryOptions['returnMetadata'])
+          : ['score', 'distance', 'certainty', 'explainScore'],
       };
 
       // Add fusion type if specified (default: rankedFusion)

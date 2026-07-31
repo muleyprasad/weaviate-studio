@@ -19,9 +19,20 @@ export type WeaviateMetadataField =
   | 'explainScore';
 
 /**
+ * Extended metadata selection that includes query profiling
+ * 'queryProfile' must be explicitly requested and is not included in 'all'
+ */
+export type WeaviateMetadataSelection = WeaviateMetadataField | 'all' | 'queryProfile';
+
+/**
  * Array of metadata fields to return in query results
  */
 export type WeaviateQueryMetadata = WeaviateMetadataField[];
+
+/**
+ * Extended metadata array that supports query profiling
+ */
+export type WeaviateExtendedQueryMetadata = WeaviateMetadataSelection[];
 
 /**
  * Weaviate filter object
@@ -124,6 +135,7 @@ export interface WeaviateRawObject {
  */
 export interface WeaviateQueryResult {
   objects: WeaviateRawObject[];
+  queryProfile?: import('../types').QueryProfile;
 }
 
 /**

@@ -25,3 +25,6 @@ export { JoinStrategySelector } from './JoinStrategySelector';
 export { WeightEditor } from './WeightEditor';
 export { MuveraBadge } from './MuveraBadge';
 export { CopyAsCode } from './CopyAsCode';
+
+// Query Profiling Components
+export { QueryProfilePanel } from './QueryProfilePanel';

@@ -25,8 +25,13 @@ import { HybridSearchInput } from './HybridSearchInput';
 import { SearchResults } from './SearchResults';
 import { VectorOptionsDrawer } from './VectorOptionsDrawer';
 import { CopyAsCode } from './CopyAsCode';
+import { QueryProfilePanel } from './QueryProfilePanel';
 import { useNamedVectors } from '../../hooks/useNamedVectors';
-import { supportsMultiTargetNear, supportsMultiTargetHybrid } from '../../utils/versionCheck';
+import {
+  supportsMultiTargetNear,
+  supportsMultiTargetHybrid,
+  supportsQueryProfiling,
+} from '../../utils/versionCheck';
 import { validateMultiTargetConfig } from '../../utils/multiTargetBuilder';
 
 interface VectorSearchPanelProps {
@@ -59,6 +64,8 @@ export function VectorSearchPanel({
     selectedTargetVectors,
     joinStrategy,
     vectorWeights,
+    queryProfileEnabled,
+    queryProfileResult,
   } = state;
 
   // Get named vectors from schema
@@ -77,6 +84,15 @@ export function VectorSearchPanel({
     // For text, object, vector modes
     return supportsMultiTargetNear(serverVersion);
   }, [dataState.serverVersion, searchMode]);
+
+  // Check if query profiling is supported by the server
+  const queryProfilingSupported = useMemo(() => {
+    const serverVersion = dataState.serverVersion;
+    if (!serverVersion) {
+      return false;
+    }
+    return supportsQueryProfiling(serverVersion);
+  }, [dataState.serverVersion]);
 
   // Handle keyboard escape to close panel (only add listener when open)
   useEffect(() => {
@@ -545,6 +561,26 @@ export function VectorSearchPanel({
                   ))}
                 </select>
               </div>
+
+              {/* Query Profiling Toggle */}
+              {queryProfilingSupported && (
+                <div className="parameter-item">
+                  <div className="qp-toggle-row">
+                    <input
+                      type="checkbox"
+                      id="query-profile-toggle"
+                      checked={queryProfileEnabled}
+                      onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                      disabled={isSearching}
+                    />
+                    <label htmlFor="query-profile-toggle">
+                      <span className="codicon codicon-pulse" aria-hidden="true"></span>
+                      Profile query
+                    </label>
+                    <span className="qp-toggle-hint">timing breakdown</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -612,6 +648,11 @@ export function VectorSearchPanel({
               hasSearched={hasSearched}
             />
           </div>
+
+          {/* Query Profile Results */}
+          {queryProfileEnabled && queryProfileResult && (
+            <QueryProfilePanel profile={queryProfileResult} />
+          )}
         </div>
       </div>
     </div>

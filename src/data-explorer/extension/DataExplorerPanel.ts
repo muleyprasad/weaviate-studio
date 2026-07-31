@@ -431,6 +431,7 @@ export class DataExplorerPanel {
         where: message.where, // Pass filter conditions to API
         matchMode: message.matchMode, // Pass AND/OR logic to API
         vectorSearch: message.vectorSearch, // Pass vector search params to API
+        queryProfile: message.queryProfile, // Pass query profiling flag to API
       });
 
       this.postMessage({
@@ -438,6 +439,7 @@ export class DataExplorerPanel {
         objects: result.objects,
         total: result.total,
         unfilteredTotal: result.unfilteredTotal,
+        queryProfile: result.queryProfile,
         requestId: message.requestId, // Echo back request ID
       });
     } catch (error) {

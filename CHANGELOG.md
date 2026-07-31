@@ -5,6 +5,16 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-31
+
+### ✨ Added
+
+- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable the "Profile query" toggle in the Vector Search panel to see per-shard waterfall visualizations: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Color-coded bars highlight bottlenecks. Multi-shard collections show per-shard tabs with node attribution. (PR #XX)
+
+### 🔧 Improved
+
+- **Upgraded weaviate-client** from v3.11.0 to v3.14.0 — adds query profiling support (`returnMetadata: ['all', 'queryProfile']`), boost parameter for queries, diversity selection for near-queries, and search cancellation.
+
 ## [1.9.1] - 2026-07-16
 
 ### 🐛 Fixed

@@ -196,6 +196,24 @@ export interface FilterCondition {
 // Filter match mode for combining filters
 export type FilterMatchMode = 'AND' | 'OR';
 
+// =====================================================
+// Query Profiling Types (Weaviate ≥ 1.36.9)
+// =====================================================
+
+export interface SearchProfile {
+  details: Record<string, string>;
+}
+
+export interface ShardProfile {
+  name: string;
+  node: string;
+  searches: Record<string, SearchProfile>;
+}
+
+export interface QueryProfile {
+  shards: ShardProfile[];
+}
+
 // Vector search types for Phase 3
 export type VectorSearchType = 'none' | 'nearText' | 'nearVector' | 'nearObject' | 'hybrid';
 
@@ -249,6 +267,7 @@ export interface FetchObjectsParams {
   where?: FilterCondition[]; // Phase 2: Filter support
   matchMode?: FilterMatchMode; // Phase 2: AND/OR logic
   vectorSearch?: VectorSearchParams; // Phase 3: Vector search support
+  queryProfile?: boolean; // Query profiling (Weaviate ≥ 1.36.9)
 }
 
 // Fetch response type
@@ -256,6 +275,7 @@ export interface FetchObjectsResponse {
   objects: WeaviateObject[];
   total: number;
   unfilteredTotal?: number; // Total count without filters (only set when filters are active)
+  queryProfile?: QueryProfile; // Query profiling data (when requested)
 }
 
 // Message types for extension <-> webview communication
@@ -315,6 +335,8 @@ export interface ExtensionMessage {
   isMultiTenant?: boolean;
   // Server metadata
   serverVersion?: string;
+  // Query profiling
+  queryProfile?: QueryProfile;
   // Phase 5: Aggregations and Export
   aggregations?: AggregationResult;
   exportResult?: ExportResult;
@@ -341,6 +363,8 @@ export interface WebviewMessage {
   requestId?: string; // For tracking and cancelling requests
   // Multi-tenancy
   tenant?: string;
+  // Query profiling
+  queryProfile?: boolean;
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;

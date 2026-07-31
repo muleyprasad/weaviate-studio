@@ -31,6 +31,18 @@ Four search modes to find similar objects:
    - Score breakdown showing keyword, semantic, and combined scores
    - Property selection for targeted search
 
+### Query Profiling
+
+Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 1.36.9):
+
+- **Enable**: Check "Profile query" in Search Parameters before running a search
+- **Per-shard breakdown**: Each shard shows its node, search type sections, and timing waterfall
+- **Vector search metrics**: Total time, HNSW layer traversal, rescoring, filter evaluation, object hydration
+- **Keyword/BM25 metrics**: Term reading time, BlockMax WAND scoring time
+- **Color-coded bars**: Green (< 33%), yellow (33–66%), red (> 66%) highlight bottlenecks
+- **Multi-shard tabs**: Navigate between shards in multi-shard collections
+- **Non-timing metrics**: Filter match counts, flat-search (brute-force) indicators
+
 ### Export
 
 - **Multiple formats** - JSON or CSV
@@ -86,7 +98,8 @@ Four search modes to find similar objects:
    - **Object**: Click "Find Similar" from any object's action menu
    - **Vector**: Paste an embedding vector (advanced users)
 3. Adjust distance threshold and result limit as needed
-4. Click "Search" to view results with similarity scores
+4. Optionally enable **"Profile query"** to get a timing breakdown (Weaviate ≥ 1.36.9)
+5. Click "Search" to view results with similarity scores
 
 ### Export Data
 
@@ -171,8 +184,8 @@ Four search modes to find similar objects:
 
 ## Requirements
 
-- **Weaviate**: v1.23 or later
-- **Weaviate TypeScript Client**: v3.0 or later
+- **Weaviate**: v1.23 or later (v1.36.9+ for query profiling)
+- **Weaviate TypeScript Client**: v3.14 or later
 - **VS Code**: 1.80 or later
 
 ## Contributing

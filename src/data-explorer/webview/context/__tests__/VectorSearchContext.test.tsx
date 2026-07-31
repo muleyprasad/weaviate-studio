@@ -1030,4 +1030,136 @@ describe('VectorSearchContext', () => {
       expect(result.current.state.hasSearched).toBe(true);
     });
   });
+
+  describe('Query Profiling', () => {
+    test('query profiling is disabled by default', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('enables query profiling', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(true);
+    });
+
+    test('disables query profiling and clears result', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: {
+              vector: { details: { total_took: '10ms' } },
+            },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(false);
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('stores query profile result', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: {
+              vector: {
+                details: {
+                  total_took: '48.2ms',
+                  vector_search_took: '8.4ms',
+                  objects_took: '36.8ms',
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+      expect(result.current.state.queryProfileResult!.shards).toHaveLength(1);
+      expect(result.current.state.queryProfileResult!.shards[0].searches.vector).toBeDefined();
+    });
+
+    test('clears query profile result on clearSearch', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '5ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+
+      act(() => {
+        result.current.actions.clearSearch();
+      });
+
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('resets query profiling state on collection change', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '5ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      act(() => {
+        result.current.actions.resetForCollectionChange();
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+  });
 });
