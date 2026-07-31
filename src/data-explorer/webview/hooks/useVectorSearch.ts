@@ -130,10 +130,8 @@ export function useVectorSearch() {
 
       searchActions.setSearchResults(results);
 
-      // Store query profile result if present
-      if (queryProfile) {
-        searchActions.setQueryProfileResult(queryProfile);
-      }
+      // Always set profile result (null clears any stale data from a previous query)
+      searchActions.setQueryProfileResult(queryProfile ?? null);
     },
     [searchActions]
   );

@@ -1021,4 +1021,158 @@ describe('DataExplorerAPI - Vector Search', () => {
       expect(result.objects[0].metadata?.lastUpdateTime).toBe('2024-01-02T00:00:00.000Z');
     });
   });
+
+  describe('Query Profiling', () => {
+    const mockQueryProfile = {
+      shards: [
+        {
+          name: 'shard-1',
+          node: 'node-0',
+          searches: {
+            vector: {
+              details: {
+                total_took: '48.2ms',
+                vector_search_took: '8.4ms',
+                objects_took: '36.8ms',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    function enableProfileOnMock() {
+      // Override mock to return queryProfile in the response
+      const createProfiledResult = () =>
+        Promise.resolve({
+          objects: mockObjects,
+          queryProfile: mockQueryProfile,
+        });
+
+      (mockCollection.query.nearText as jest.Mock).mockImplementation((text, options) => {
+        queryMethodCalls.push({ method: 'nearText', args: [text, options] });
+        return createProfiledResult();
+      });
+      (mockCollection.query.nearVector as jest.Mock).mockImplementation((vector, options) => {
+        queryMethodCalls.push({ method: 'nearVector', args: [vector, options] });
+        return createProfiledResult();
+      });
+      (mockCollection.query.nearObject as jest.Mock).mockImplementation((objectId, options) => {
+        queryMethodCalls.push({ method: 'nearObject', args: [objectId, options] });
+        return createProfiledResult();
+      });
+      (mockCollection.query.hybrid as jest.Mock).mockImplementation((text, options) => {
+        queryMethodCalls.push({ method: 'hybrid', args: [text, options] });
+        return createProfiledResult();
+      });
+      (mockCollection.query.fetchObjects as jest.Mock).mockImplementation((options) => {
+        queryMethodCalls.push({ method: 'fetchObjects', args: [options] });
+        return createProfiledResult();
+      });
+    }
+
+    test('nearText passes returnMetadata with queryProfile when enabled', async () => {
+      enableProfileOnMock();
+
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'nearText', text: 'test' },
+        queryProfile: true,
+      });
+
+      const call = queryMethodCalls.find((c) => c.method === 'nearText');
+      expect(call).toBeDefined();
+      expect(call!.args[1].returnMetadata).toEqual(['all', 'queryProfile']);
+    });
+
+    test('nearVector passes returnMetadata with queryProfile when enabled', async () => {
+      enableProfileOnMock();
+
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'nearVector', vector: [0.1, 0.2, 0.3] },
+        queryProfile: true,
+      });
+
+      const call = queryMethodCalls.find((c) => c.method === 'nearVector');
+      expect(call).toBeDefined();
+      expect(call!.args[1].returnMetadata).toEqual(['all', 'queryProfile']);
+    });
+
+    test('hybrid passes returnMetadata with queryProfile when enabled', async () => {
+      enableProfileOnMock();
+
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'hybrid', text: 'test', alpha: 0.5 },
+        queryProfile: true,
+      });
+
+      const call = queryMethodCalls.find((c) => c.method === 'hybrid');
+      expect(call).toBeDefined();
+      expect(call!.args[1].returnMetadata).toEqual(['all', 'queryProfile']);
+    });
+
+    test('fetchObjects (boolean) passes returnMetadata with queryProfile when enabled', async () => {
+      enableProfileOnMock();
+
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        queryProfile: true,
+      });
+
+      const call = queryMethodCalls.find((c) => c.method === 'fetchObjects');
+      expect(call).toBeDefined();
+      expect(call!.args[0].returnMetadata).toEqual(['all', 'queryProfile']);
+    });
+
+    test('queryProfile is extracted from response and returned', async () => {
+      enableProfileOnMock();
+
+      const result = await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'nearText', text: 'test' },
+        queryProfile: true,
+      });
+
+      expect(result.queryProfile).toEqual(mockQueryProfile);
+      expect(result.queryProfile!.shards).toHaveLength(1);
+      expect(result.queryProfile!.shards[0].searches.vector).toBeDefined();
+    });
+
+    test('queryProfile is undefined when not requested', async () => {
+      const result = await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'nearText', text: 'test' },
+      });
+
+      expect(result.queryProfile).toBeUndefined();
+    });
+
+    test('returnMetadata does not include queryProfile when disabled', async () => {
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch: { type: 'nearText', text: 'test' },
+        queryProfile: false,
+      });
+
+      const call = queryMethodCalls.find((c) => c.method === 'nearText');
+      expect(call).toBeDefined();
+      expect(call!.args[1].returnMetadata).not.toEqual(['all', 'queryProfile']);
+    });
+  });
 });

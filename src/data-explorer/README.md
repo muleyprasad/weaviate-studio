@@ -186,7 +186,7 @@ Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 
 
 - **Weaviate**: v1.23 or later (v1.36.9+ for query profiling)
 - **Weaviate TypeScript Client**: v3.14 or later
-- **VS Code**: 1.80 or later
+- **VS Code**: 1.101 or later
 
 ## Contributing
 

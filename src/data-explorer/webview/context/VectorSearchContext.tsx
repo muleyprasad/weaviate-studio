@@ -216,8 +216,6 @@ function vectorSearchReducer(
         isSearching: false,
         searchError: null,
         hasSearched: true,
-        // Clear stale profile result when new results arrive
-        // (profile result is set separately via SET_QUERY_PROFILE_RESULT)
       };
 
     case 'SET_SEARCHING':
@@ -225,6 +223,8 @@ function vectorSearchReducer(
         ...state,
         isSearching: action.isSearching,
         searchError: action.isSearching ? null : state.searchError,
+        // Clear stale profile when a new search begins
+        queryProfileResult: action.isSearching ? null : state.queryProfileResult,
       };
 
     case 'SET_SEARCH_ERROR':
@@ -232,6 +232,8 @@ function vectorSearchReducer(
         ...state,
         searchError: action.error,
         isSearching: false,
+        // A failed query must not display a previous query's profile
+        queryProfileResult: null,
       };
 
     case 'CLEAR_SEARCH':
