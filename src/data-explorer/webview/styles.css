@@ -2225,6 +2225,40 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground);
 }
 
+.manual-vector-notice {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 50%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 9%, transparent);
+    color: var(--vscode-foreground);
+}
+
+.manual-vector-notice .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 16px;
+}
+
+.manual-vector-notice strong {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 12px;
+}
+
+.manual-vector-notice p {
+    margin: 0;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.manual-vector-notice code {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
 /* Object Search Input */
 .object-uuid-input {
     width: 100%;

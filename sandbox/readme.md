@@ -80,6 +80,8 @@ node seed-query-profiling.cjs
 
 The seed command waits for Weaviate to become ready for up to 90 seconds, so run it directly after `docker compose ... up -d`.
 
+> This is a **minimal profiling smoke test**. `seed-query-profiling.cjs` intentionally creates only the `ProfileTest` collection and never runs the repository’s larger `populate.py` dataset loader. Re-running it resets only `ProfileTest`.
+
 > The original `docker-compose.yml` is for the broader RAG sandbox and includes `text2vec-transformers`. Use `docker-compose.profiling.yml` for this profiling test; it deliberately requires no transformer service.
 
 Then connect Weaviate Studio using the following values:
@@ -93,13 +95,33 @@ Open the `ProfileTest` collection, choose **Vector Search → Raw Vector**, ente
 
 > Re-running `seed-query-profiling.cjs` resets only the `ProfileTest` collection, so it is safe to repeat during UI testing.
 
-### 4. Install Python dependencies
+### 4. Full sandbox dataset (optional)
+
+If you want the repository’s complete set of legacy and RAG collections as well as `ProfileTest`, use the full sandbox instead. It requires the transformer sidecar because `populate.py` creates vectorized collections.
+
+```bash
+# Stop the minimal profiling sandbox first.
+docker compose -f docker-compose.profiling.yml down --remove-orphans
+
+# Start the full sandbox and confirm BOTH services are running.
+docker compose up -d
+docker compose ps
+
+# Load the full collection set, then add the profiling collection.
+pip install weaviate-client requests
+python3 populate.py --skip-github
+node seed-query-profiling.cjs
+```
+
+`docker compose ps` must show both `weaviate` and `text2vec-transformers` before `populate.py` runs. The profiling seed adds or refreshes only `ProfileTest`; it does not delete the other collections.
+
+### 5. Install Python dependencies
 
 ```bash
 pip install weaviate-client requests
 ```
 
-### 5. Populate seed data
+### 6. Populate seed data
 
 ```bash
 # All collections (legacy + RAG)
@@ -114,7 +136,7 @@ python3 populate.py --verify-only     # Just check what's already loaded
 
 By default all rows are imported (embeddings are free). To limit import size, set `BOOKS_LIMIT` and `PODCASTS_LIMIT` in `populate.py` to a non-zero value. Note: importing ~20k objects through the local transformer can take a while on CPU.
 
-### 6. Connect from Weaviate Studio
+### 7. Connect from Weaviate Studio
 
 | Setting  | Value                   |
 | -------- | ----------------------- |
