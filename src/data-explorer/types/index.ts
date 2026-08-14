@@ -308,6 +308,8 @@ export type WebviewMessageCommand =
   // Multi-tenancy
   | 'getTenants'
   | 'setTenant'
+  // Query profiling preference
+  | 'setQueryProfilePreference'
   // Phase 5: Aggregations and Export
   | 'getAggregations'
   | 'exportObjects'
@@ -365,6 +367,7 @@ export interface WebviewMessage {
   tenant?: string;
   // Query profiling
   queryProfile?: boolean;
+  queryProfileEnabled?: boolean;
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;

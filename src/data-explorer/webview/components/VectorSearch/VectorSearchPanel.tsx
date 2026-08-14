@@ -3,7 +3,7 @@
  * Supports four search modes: Text (Semantic), Similar Object, Raw Vector, Hybrid
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   CollectionConfig,
   WeaviateObject,
@@ -136,6 +136,14 @@ export function VectorSearchPanel({
 
   // Get named vectors from schema
   const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
+  const [isProfileDetailsOpen, setIsProfileDetailsOpen] = useState(false);
+
+  // Close a previously opened profile whenever it is cleared or profiling is turned off.
+  useEffect(() => {
+    if (!queryProfileEnabled || !queryProfileResult) {
+      setIsProfileDetailsOpen(false);
+    }
+  }, [queryProfileEnabled, queryProfileResult]);
 
   // Check version support for multi-target features
   const versionSupported = useMemo(() => {
@@ -626,64 +634,62 @@ export function VectorSearchPanel({
             </div>
           </div>
 
-          {/* Keep the capability visible even on older servers, so users understand why it cannot be enabled. */}
-          <section
-            className={`query-profile-option ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
-            aria-labelledby="query-profile-heading"
-          >
-            <div className="query-profile-option-heading">
-              <span className="codicon codicon-pulse" aria-hidden="true"></span>
-              <h3 id="query-profile-heading">Query profiling</h3>
-              <span className="query-profile-version">
-                {queryProfilingSupported ? 'Weaviate 1.36.9+' : 'Requires Weaviate 1.36.9+'}
-              </span>
-            </div>
-            <p>
-              {queryProfilingSupported
-                ? 'Show per-shard timing details after the next search.'
-                : 'This connected server does not support query profiling. Upgrade to Weaviate 1.36.9 or newer to enable it.'}
-            </p>
-            <label className="query-profile-check" htmlFor="query-profile-toggle">
-              <input
-                type="checkbox"
-                id="query-profile-toggle"
-                checked={queryProfileEnabled}
-                onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
-                disabled={isSearching || !queryProfilingSupported}
-              />
-              <span>Profile query</span>
-            </label>
-            <span className="query-profile-status" role="status">
-              {!queryProfilingSupported
-                ? 'Unavailable for this server.'
-                : queryProfileEnabled
-                  ? queryProfileResult
-                    ? 'Latest profile appears above the search results.'
-                    : 'Enabled for the next search.'
-                  : 'Off — enable it when investigating query performance.'}
-            </span>
-          </section>
-
           {/* Search Button and Actions */}
           <div className="search-action">
-            <button
-              type="button"
-              className="search-btn primary"
-              onClick={handleSearch}
-              disabled={!canSearch}
-            >
-              {isSearching ? (
-                <>
-                  <span className="loading-spinner-small" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <span className="codicon codicon-search" aria-hidden="true"></span>
-                  Run Vector Search
-                </>
-              )}
-            </button>
+            <div className="search-action-primary-row">
+              <button
+                type="button"
+                className="search-btn primary"
+                onClick={handleSearch}
+                disabled={!canSearch}
+              >
+                {isSearching ? (
+                  <>
+                    <span className="loading-spinner-small" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <span className="codicon codicon-search" aria-hidden="true"></span>
+                    Run Vector Search
+                  </>
+                )}
+              </button>
+
+              <div
+                className={`query-profile-compact ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
+                title={
+                  queryProfilingSupported
+                    ? 'Include per-shard timing data in each search. This preference is remembered.'
+                    : 'Query profiling requires Weaviate 1.36.9 or newer.'
+                }
+              >
+                <label htmlFor="query-profile-toggle">
+                  <input
+                    type="checkbox"
+                    id="query-profile-toggle"
+                    checked={queryProfileEnabled}
+                    onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                    disabled={isSearching || !queryProfilingSupported}
+                  />
+                  <span className="codicon codicon-pulse" aria-hidden="true"></span>
+                  <span>Profile</span>
+                </label>
+                {queryProfileEnabled && queryProfileResult && (
+                  <button
+                    type="button"
+                    className="query-profile-details-button"
+                    onClick={() => setIsProfileDetailsOpen((open) => !open)}
+                    aria-expanded={isProfileDetailsOpen}
+                    aria-controls="query-profile-details"
+                  >
+                    <span className="codicon codicon-graph-line" aria-hidden="true"></span>
+                    {isProfileDetailsOpen ? 'Hide profile' : 'View profile'}
+                  </button>
+                )}
+                {!queryProfilingSupported && <span className="query-profile-requires">1.36.9+</span>}
+              </div>
+            </div>
 
             <div className="search-action-secondary">
               {searchResults.length > 0 && (
@@ -717,21 +723,11 @@ export function VectorSearchPanel({
             </div>
           </div>
 
-          {/* Show timing before the result list, so it is not hidden below a long set of matching objects. */}
-          {queryProfileEnabled && queryProfileResult && (
-            <>
-              <section className="query-profile-result-summary" aria-live="polite">
-                <div>
-                  <span className="codicon codicon-pulse" aria-hidden="true"></span>
-                  <strong>Query Profile ready</strong>
-                </div>
-                <span>
-                  {queryProfileResult.shards?.length || 0}{' '}
-                  {queryProfileResult.shards?.length === 1 ? 'shard profiled' : 'shards profiled'}
-                </span>
-              </section>
+          {/* Keep expensive diagnostic details out of the main result flow until requested. */}
+          {queryProfileEnabled && queryProfileResult && isProfileDetailsOpen && (
+            <div id="query-profile-details" className="query-profile-disclosure" aria-live="polite">
               <QueryProfileDetails profile={queryProfileResult} />
-            </>
+            </div>
           )}
 
           {/* Search Results */}

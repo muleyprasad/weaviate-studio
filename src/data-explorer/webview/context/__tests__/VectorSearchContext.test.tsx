@@ -1136,7 +1136,7 @@ describe('VectorSearchContext', () => {
       expect(result.current.state.queryProfileResult).toBeNull();
     });
 
-    test('resets query profiling state on collection change', () => {
+    test('preserves the profiling preference but clears results on collection change', () => {
       const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
 
       const mockProfile = {
@@ -1158,7 +1158,7 @@ describe('VectorSearchContext', () => {
         result.current.actions.resetForCollectionChange();
       });
 
-      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileEnabled).toBe(true);
       expect(result.current.state.queryProfileResult).toBeNull();
     });
 

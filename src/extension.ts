@@ -1560,7 +1560,8 @@ export function activate(context: vscode.ExtensionContext) {
           connectionId,
           collectionName,
           getClient,
-          targetUuid
+          targetUuid,
+          context.globalState
         );
       }
     ),

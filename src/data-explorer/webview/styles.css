@@ -2421,85 +2421,74 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground, #666);
 }
 
-/* ===== Query Profiling Option ===== */
-.query-profile-option {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 6px 12px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
-    background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 8%, transparent);
-}
-
-.query-profile-option-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-}
-
-.query-profile-option-heading .codicon {
-    color: var(--vscode-textLink-foreground, #3794FF);
-    font-size: 15px;
-}
-
-.query-profile-option-heading h3 {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-}
-
-.query-profile-version {
-    margin-left: auto;
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-}
-
-.query-profile-option p {
-    grid-column: 1 / -1;
-    margin: 0;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-}
-
-.query-profile-check {
+/* ===== Compact Query Profiling Control ===== */
+.query-profile-compact {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    width: fit-content;
-    font-size: 12px;
-    color: var(--vscode-foreground);
-    cursor: pointer;
+    gap: 6px;
+    min-width: max-content;
+    padding: 0 8px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #555));
+    border-radius: 6px;
+    background: var(--vscode-editor-background);
+    font-size: 11px;
 }
 
-.query-profile-check input[type="checkbox"] {
+.query-profile-compact label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 36px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.query-profile-compact input[type="checkbox"] {
     width: 14px;
     height: 14px;
     margin: 0;
     accent-color: var(--vscode-button-background, #0E639C);
 }
 
-.query-profile-status {
-    align-self: center;
-    justify-self: end;
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
-    text-align: right;
+.query-profile-compact label .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 13px;
 }
 
-.query-profile-option.is-unavailable {
-    background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 10%, transparent);
+.query-profile-details-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    font-size: 11px;
+    cursor: pointer;
 }
 
-.query-profile-option.is-unavailable .query-profile-option-heading .codicon {
-    color: var(--vscode-editorWarning-foreground, #cca700);
+.query-profile-details-button:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
 }
 
-.query-profile-option.is-unavailable .query-profile-check {
+.query-profile-details-button .codicon {
+    font-size: 12px;
+}
+
+.query-profile-compact.is-unavailable {
+    opacity: 0.7;
+}
+
+.query-profile-compact.is-unavailable label {
     cursor: not-allowed;
-    opacity: 0.72;
+}
+
+.query-profile-requires {
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
 }
 
 /* ===== Search Action Button ===== */
@@ -2509,6 +2498,16 @@ input[type="checkbox"]:focus-visible {
     gap: 8px;
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.search-action-primary-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.search-action-primary-row .search-btn {
+    flex: 1;
 }
 
 /* Row that holds secondary buttons (Clear + Copy as Code) */
@@ -2571,45 +2570,29 @@ input[type="checkbox"]:focus-visible {
     animation: spin 0.8s linear infinite;
 }
 
-/* ===== Query Profile Result ===== */
-.query-profile-result-summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 12px 16px 0;
-    padding: 9px 12px;
-    border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 55%, transparent);
-    border-radius: 4px;
-    background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 10%, transparent);
-    color: var(--vscode-foreground);
-    font-size: 11px;
-}
-
-.query-profile-result-summary > div {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-}
-
-.query-profile-result-summary .codicon {
-    color: var(--vscode-textLink-foreground, #3794FF);
-    font-size: 14px;
-}
-
-.query-profile-result-summary > span {
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
+/* ===== Query Profile Disclosure ===== */
+.query-profile-disclosure {
+    margin: 8px 16px 0;
 }
 
 .query-profile-details {
-    margin: 0 16px 8px;
+    margin: 0;
     border: 1px solid var(--vscode-panel-border, #333);
-    border-top: 0;
-    border-radius: 0 0 4px 4px;
+    border-radius: 4px;
     background: var(--vscode-editor-background);
     color: var(--vscode-foreground);
     font-size: 11px;
+}
+
+@media (max-width: 620px) {
+    .search-action-primary-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .query-profile-compact {
+        align-self: flex-start;
+    }
 }
 
 .query-profile-details-heading,

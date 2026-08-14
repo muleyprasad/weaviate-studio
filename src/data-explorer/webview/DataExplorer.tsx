@@ -38,6 +38,7 @@ declare global {
       collectionName: string;
       connectionId: string;
       targetUuid?: string;
+      queryProfileEnabled?: boolean;
     };
   }
 }

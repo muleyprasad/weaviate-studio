@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react';
 import type { WeaviateObject, JoinStrategy, QueryProfile } from '../../types';
+import { getVSCodeAPI } from '../utils/vscodeApi';
 
 // ============================================================================
 // Types
@@ -150,6 +151,38 @@ const initialState: VectorSearchContextState = {
   queryProfileResult: null,
 };
 
+interface PersistedVectorSearchState {
+  queryProfileEnabled?: boolean;
+}
+
+function createInitialState(): VectorSearchContextState {
+  try {
+    const injectedPreference = window.initialData?.queryProfileEnabled;
+    const persisted = getVSCodeAPI().getState() as PersistedVectorSearchState | undefined;
+    return {
+      ...initialState,
+      queryProfileEnabled:
+        typeof injectedPreference === 'boolean'
+          ? injectedPreference
+          : persisted?.queryProfileEnabled === true,
+    };
+  } catch {
+    // The webview API is unavailable in unit tests and before VS Code initializes it.
+    return initialState;
+  }
+}
+
+function persistQueryProfilePreference(enabled: boolean): void {
+  try {
+    const vscode = getVSCodeAPI();
+    const persisted = (vscode.getState() as PersistedVectorSearchState | undefined) || {};
+    vscode.setState({ ...persisted, queryProfileEnabled: enabled });
+    vscode.postMessage({ command: 'setQueryProfilePreference', queryProfileEnabled: enabled });
+  } catch {
+    // Keep the in-memory preference working even when retained webview state is unavailable.
+  }
+}
+
 // ============================================================================
 // Reducer
 // ============================================================================
@@ -266,8 +299,9 @@ function vectorSearchReducer(
       // Reset all vector search state when collection changes
       return {
         ...initialState,
-        // Keep panel open state if it was open
+        // Keep panel open state and the user’s diagnostic preference across collections.
         showVectorSearchPanel: state.showVectorSearchPanel,
+        queryProfileEnabled: state.queryProfileEnabled,
       };
 
     case 'TOGGLE_VECTOR_OPTIONS':
@@ -385,7 +419,7 @@ interface VectorSearchProviderProps {
 }
 
 export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
-  const [state, dispatch] = useReducer(vectorSearchReducer, initialState);
+  const [state, dispatch] = useReducer(vectorSearchReducer, undefined, createInitialState);
 
   // Memoize actions to prevent unnecessary re-renders
   const actions = useMemo<VectorSearchContextActions>(
@@ -461,6 +495,7 @@ export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
 
       // Query profiling actions
       setQueryProfileEnabled: (enabled: boolean) => {
+        persistQueryProfilePreference(enabled);
         dispatch({ type: 'SET_QUERY_PROFILE_ENABLED', enabled });
       },
 
