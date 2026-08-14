@@ -7,11 +7,21 @@ description: Full version history and release notes for Weaviate Studio — new 
 
 All notable changes to the Weaviate Studio extension.
 
+## [Unreleased]
+
+### 🔧 Improved
+
+- **Compact, persistent query profiling** — **Profile** is now a small checkbox beside **Run Vector Search**. After a profiled query completes, select **View profile** to open the per-shard **Timing breakdown** only when you need it. The choice is remembered across collection changes and Data Explorer panel reopens. See the [Data Explorer profiling guide](/features/data-explorer#query-profiling) for the complete workflow.
+
+### 📚 Documentation
+
+- **Profiling sandbox and feature guidance** — The public sandbox guide now documents the local text-vectorized `ProfileTest`, `TravelGuide`, and `ProductCatalog` demo collections and the current Profile → Run Vector Search → View profile workflow.
+
 ## [1.10.0] - 2026-07-31
 
 ### ✨ Added
 
-- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable the "Profile query" toggle in the Vector Search panel to see per-shard waterfall visualizations: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Color-coded bars highlight bottlenecks. Multi-shard collections show per-shard tabs with node attribution.
+- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable **Profile** in the Vector Search panel, run a search, and select **View profile** to inspect per-shard timing data: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Multi-shard collections include shard and node attribution.
 
 ### 🔧 Improved
 

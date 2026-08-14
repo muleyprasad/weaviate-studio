@@ -5,11 +5,21 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🔧 Improved
+
+- **Compact, persistent query profiling** — The opt-in **Profile** checkbox now sits beside **Run Vector Search** instead of occupying a large panel. After a profiled search completes, select **View profile** to reveal the per-shard timing breakdown only when needed. The preference is remembered across collection changes and Data Explorer panel reopens.
+
+### 📚 Documentation
+
+- **Profiling workflow and sandbox guidance** — Updated the README, Data Explorer guide, component documentation, and public sandbox guide with the current Profile → Run Vector Search → View profile workflow and the text-searchable profiling sandbox.
+
 ## [1.10.0] - 2026-07-31
 
 ### ✨ Added
 
-- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable the "Profile query" toggle in the Vector Search panel to see per-shard waterfall visualizations: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Color-coded bars highlight bottlenecks. Multi-shard collections show per-shard tabs with node attribution. (PR #XX)
+- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable **Profile** in the Vector Search panel, run a search, and select **View profile** to inspect per-shard timing data: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Multi-shard collections include shard and node attribution. (PR #87)
 
 ### 🔧 Improved
 

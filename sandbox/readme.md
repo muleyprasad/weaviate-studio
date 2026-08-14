@@ -95,9 +95,9 @@ Then connect Weaviate Studio using the following values:
 | Endpoint | `http://localhost:8080` |
 | API Key  | `test-key-123`          |
 
-Open the `ProfileTest` collection and choose **Vector Search**. Search for `independence day of india`, enable **Profile query**, and select **Run Vector Search**. The timing breakdown appears directly above the search results.
+Open the `ProfileTest` collection and choose **Vector Search**. In **Text (Semantic)** mode, search for `independence day of india`, enable **Profile** beside **Run Vector Search**, and run the search. When the results arrive, select **View profile** to reveal the timing breakdown; select **Hide profile** to collapse it again. The profiling preference is remembered across collection changes and Data Explorer panel reopens.
 
-> `TravelGuide` and `ProductCatalog` provide additional ordinary semantic-search collections for exploring the UI.
+> `TravelGuide` and `ProductCatalog` provide additional ordinary semantic-search collections for exploring the UI. The local transformer means no cloud API key is required for these Text (Semantic) searches.
 
 ### 4. Install Python dependencies
 

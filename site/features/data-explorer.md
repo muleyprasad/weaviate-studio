@@ -44,61 +44,56 @@ Combines BM25 keyword matching with vector semantic search. Features:
 ## Query Profiling
 
 ::: tip Requires Weaviate ≥ 1.36.9
-Query profiling uses the same instrumentation as Weaviate's slow query log. The toggle only appears when connected to a compatible server.
+Query profiling is available when the connected server supports query-profile metadata. On unsupported servers, the **Profile** control is disabled and identifies the minimum required version.
 :::
 
-Query profiling returns an inline timing breakdown for each search, showing exactly where time was spent across all shards and nodes. It's designed for debugging and optimization — not for always-on production use.
+Query profiling is an **opt-in diagnostic tool** for understanding where a search spends time. It keeps the normal result workflow uncluttered: turn it on beside the primary search action, run the query, and open the detail panel only when the returned timings are useful.
 
-### Enabling Profiling
+### Profile a Search
 
-1. Open the **Vector Search** panel (`Ctrl+K`)
-2. In **Search Parameters**, check **Profile query**
-3. Run any search (text, object, vector, or hybrid)
-4. The **Query Profile** panel appears below the results
+1. Open **Vector Search** from Data Explorer.
+2. Check **Profile**, immediately beside **Run Vector Search**.
+3. Run a Text (Semantic), Similar Object, Raw Vector, or Hybrid search that your collection supports.
+4. After results arrive, select **View profile**. Select **Hide profile** to collapse the details again.
 
-### What You'll See
+> **Remembered preference:** The extension remembers the Profile setting across collection changes and Data Explorer panel reopens. Turn it off when you no longer want timing metadata requested with searches.
 
-The profile is organized by **shard**, with tabs for multi-shard collections. Each shard shows:
+![A profiled vector search in Weaviate Studio. The compact Profile checkbox sits next to Run Vector Search, and View profile reveals a per-shard Timing breakdown.](/images/query-profiling-timing-breakdown.png)
 
-- **Shard name** and **node** that executed the search
-- **Search type sections** (Vector Search, Keyword/BM25, Object) — only sections that ran are shown
+### Timing Breakdown
 
-#### Vector Search Metrics
+The disclosure lists every shard that returned profiling data. Each shard identifies its node and includes only the search sections and metrics that were reported for that query. A vector search can, for example, show object hydration, HNSW traversal, total processing time, flat-search status, and vector-search time.
 
-| Metric                      | What it measures                                                |
-| --------------------------- | --------------------------------------------------------------- |
-| **Total**                   | Wall time for the entire shard search                           |
-| **Vector Search**           | Time in the vector index (HNSW graph traversal)                 |
-| **HNSW Layer N**            | Per-layer traversal time (Layer 0 usually dominates)            |
-| **Rescore (decompression)** | Time reading full-precision vectors when compression is enabled |
-| **Filter Allow List**       | Time resolving `where` filters via the inverted index           |
-| **Filter IDs Matched**      | Number of document IDs matched by filters                       |
-| **Object Hydration**        | Time loading final objects from disk                            |
-| **Flat Search**             | `true` when filters were selective enough for brute-force scan  |
+| Metric | What it helps you understand |
+| --- | --- |
+| **Total** | The reported wall time for the shard search. |
+| **Vector Search** | Time spent in the vector index. |
+| **HNSW Layer N** | Per-layer HNSW graph traversal time; Layer 0 commonly represents the largest traversal workload. |
+| **Rescore (decompression)** | Time reading full-precision vectors when compression is enabled. |
+| **Filter Allow List** | Time resolving a `where` filter through the inverted index. |
+| **Filter IDs Matched** | The number of object IDs admitted by the filter. |
+| **Object Hydration** | Time loading the final objects. |
+| **Flat Search** | Whether Weaviate used a brute-force scan for that search. |
 
-#### Keyword / BM25 Metrics
+For hybrid or keyword-oriented requests, Weaviate can also return keyword/BM25 metrics such as **Term Time** and **BMW Time**. The exact set of rows depends on the query and server response.
 
-| Metric        | What it measures                                        |
-| ------------- | ------------------------------------------------------- |
-| **Term Time** | Time reading per-term posting lists from inverted index |
-| **BMW Time**  | Time in BlockMax WAND traversal and scoring             |
+### Use the Result
 
-### Reading the Waterfall
+| If the breakdown shows | Investigate |
+| --- | --- |
+| **Object Hydration** is large | Reduce the result limit, select fewer properties, or evaluate the size of returned objects. |
+| **Filter Allow List** is large | Make the filter more selective and review the collection’s inverted-index configuration. |
+| **HNSW Layer 0** or **Vector Search** is large | Review vector-index settings such as `ef`, query dimensionality, and search workload. |
+| **Rescore** is large | Check disk I/O and the trade-offs of the configured vector-compression strategy. |
 
-Each timing metric shows a **color-coded bar** proportional to its share of total time:
+### Troubleshooting
 
-- 🟢 **Green** — under 33% of total (healthy)
-- 🟡 **Yellow** — 33–66% (worth investigating)
-- 🔴 **Red** — over 66% (likely bottleneck)
-
-### Common Patterns
-
-| Pattern                     | Likely cause                              | Tuning lever                           |
-| --------------------------- | ----------------------------------------- | -------------------------------------- |
-| Object Hydration dominates  | Large objects or high `limit`             | Reduce limit, select fewer properties  |
-| Filter Allow List dominates | Broad filter matching many IDs            | Tighten filter selectivity             |
-| HNSW Layer 0 dominates      | Expensive graph traversal                 | Tune `ef`, check vector dimensionality |
-| Rescore dominates           | Compression enabled, disk-bound rescoring | Check disk I/O, consider RQ over PQ    |
+| Situation | What to do |
+| --- | --- |
+| **Profile** is disabled | Confirm that the connection uses Weaviate 1.36.9 or later. |
+| No **View profile** action appears after a search | Confirm that Profile was enabled before running the query, then rerun it. |
+| The detail panel says no timings were returned | The server did not return per-shard profile data for that request; try another compatible query or check the server configuration. |
+| Text (Semantic) search fails | Use a collection with a text vectorizer, or switch to Raw Vector / another supported search mode. |
 
 ## Exporting Data
 
