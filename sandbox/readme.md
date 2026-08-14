@@ -62,19 +62,29 @@ OPENAI_API_KEY=sk-…
 
 > **Without an OpenAI key:** data import and vector search work fine. Only generative queries require the key.
 
-### 2. Start Weaviate
+### 2. Start the query-profiling sandbox
+
+Use the standalone profiling configuration for this PR. It starts only Weaviate with manual vectors enabled, so it does **not** depend on the optional `text2vec-transformers` container.
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.profiling.yml up -d
+```
+
+Wait for Weaviate to report healthy:
+
+```bash
+curl -f -H 'Authorization: Bearer test-key-123' http://localhost:8080/v1/.well-known/ready
 ```
 
 ### 3. Query profiling smoke test
 
-The sandbox runs **Weaviate 1.36.9**, the minimum version required for query profiling. After the service is healthy, seed a small collection with deterministic manual vectors:
+The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. After the service is healthy, seed a small collection with deterministic manual vectors:
 
 ```bash
 node seed-query-profiling.cjs
 ```
+
+> The original `docker-compose.yml` is for the broader RAG sandbox and includes `text2vec-transformers`. Use `docker-compose.profiling.yml` for this profiling test; it deliberately requires no transformer service.
 
 Then connect Weaviate Studio using the following values:
 

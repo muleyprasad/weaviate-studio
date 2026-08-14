@@ -1,0 +1,18 @@
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.38.8
+    restart: on-failure:0
+    ports:
+      - 8080:8080
+      - 50051:50051
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
+      AUTHENTICATION_APIKEY_ENABLED: 'true'
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'test-key-123'
+      AUTHENTICATION_APIKEY_USERS: 'test-key-123'
+      AUTHORIZATION_ADMINLIST_ENABLED: 'true'
+      AUTHORIZATION_ADMINLIST_USERS: 'test-key-123'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      CLUSTER_HOSTNAME: 'node1'
