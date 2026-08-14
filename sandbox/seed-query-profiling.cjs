@@ -1,71 +1,67 @@
 #!/usr/bin/env node
 
 /**
- * Seeds a small manual-vector collection for Query Profiling smoke tests.
- * Run after `docker compose up -d` from the sandbox directory.
+ * Seeds searchable text collections for the local query-profiling smoke test.
+ * Run after `docker compose -f docker-compose.profiling.yml up -d`.
  */
 
 const baseUrl = process.env.WEAVIATE_URL || 'http://127.0.0.1:8080';
 const apiKey = process.env.WEAVIATE_API_KEY || 'test-key-123';
-const collectionName = 'ProfileTest';
-const readinessTimeoutMs = 90_000;
+const readinessTimeoutMs = 120_000;
 const readinessPollIntervalMs = 1_500;
+
+const collections = [
+  {
+    name: 'ProfileTest',
+    description: 'Searchable documents for query-profiling smoke tests',
+    objects: [
+      { content: 'India independence day history and the national celebration', category: 'history' },
+      { content: 'Indian national independence celebration and civic traditions', category: 'history' },
+      { content: 'Vector database performance tuning for production workloads', category: 'technology' },
+      { content: 'Query performance, shard timing, and vector search diagnostics', category: 'technology' },
+      { content: 'Cooking with seasonal vegetables and regional ingredients', category: 'food' },
+    ],
+  },
+  {
+    name: 'TravelGuide',
+    description: 'Searchable travel recommendations for local exploration tests',
+    objects: [
+      { content: 'Kyoto itinerary featuring temples, gardens, and quiet tea houses', category: 'Japan' },
+      { content: 'Lisbon weekend guide with tiled streets, seafood, and hilltop views', category: 'Portugal' },
+      { content: 'Iceland road trip planning for waterfalls, glaciers, and hot springs', category: 'Iceland' },
+      { content: 'Melbourne coffee and laneway art walking tour', category: 'Australia' },
+    ],
+  },
+  {
+    name: 'ProductCatalog',
+    description: 'Searchable products for semantic search and filtering experiments',
+    objects: [
+      { content: 'Noise cancelling wireless headphones with a thirty hour battery', category: 'electronics' },
+      { content: 'Ergonomic office chair with adjustable lumbar support', category: 'furniture' },
+      { content: 'Stainless steel insulated bottle for everyday commuting', category: 'lifestyle' },
+      { content: 'Compact mechanical keyboard with quiet tactile switches', category: 'electronics' },
+    ],
+  },
+];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForReady() {
-  const deadline = Date.now() + readinessTimeoutMs;
-  let lastStatus = 'connection not established';
-
-  console.log('Waiting for Weaviate to become ready...');
-
-  while (Date.now() < deadline) {
-    for (const withApiKey of [true, false]) {
-      try {
-        const response = await fetch(`${baseUrl}/v1/.well-known/ready`, {
-          headers: withApiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-        });
-
-        if (response.ok) {
-          console.log('Weaviate is ready.');
-          return;
-        }
-
-        lastStatus = `HTTP ${response.status}`;
-        if (!withApiKey && response.status !== 401) {
-          break;
-        }
-      } catch (error) {
-        lastStatus = error instanceof Error ? error.message : String(error);
-      }
-    }
-
-    await sleep(readinessPollIntervalMs);
-  }
-
-  throw new Error(
-    `Weaviate did not become ready within ${readinessTimeoutMs / 1000}s (${lastStatus}). Check docker compose logs weaviate.`
-  );
+async function send(path, options = {}, withApiKey = true) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: {
+      ...(withApiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  return { response, text: await response.text() };
 }
 
 async function request(path, options = {}) {
-  const send = async (withApiKey) => {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...options,
-      headers: {
-        ...(withApiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-    });
-    return { response, text: await response.text() };
-  };
-
-  // The committed compose sandbox uses an API key. Retrying without the header also
-  // makes the helper convenient for a temporary anonymous local development instance.
-  let result = await send(true);
+  let result = await send(path, options, true);
   if (result.response.status === 401) {
-    result = await send(false);
+    result = await send(path, options, false);
   }
 
   if (!result.response.ok && result.response.status !== 404) {
@@ -75,6 +71,66 @@ async function request(path, options = {}) {
   }
 
   return result.text ? JSON.parse(result.text) : null;
+}
+
+async function waitForReady() {
+  const deadline = Date.now() + readinessTimeoutMs;
+  let lastStatus = 'connection not established';
+  console.log('Waiting for Weaviate and the text vectorizer to become ready...');
+
+  while (Date.now() < deadline) {
+    try {
+      const result = await send('/v1/.well-known/ready');
+      if (result.response.ok) {
+        console.log('Weaviate is ready.');
+        return;
+      }
+      lastStatus = `HTTP ${result.response.status}`;
+    } catch (error) {
+      lastStatus = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(readinessPollIntervalMs);
+  }
+
+  throw new Error(
+    `Weaviate did not become ready within ${readinessTimeoutMs / 1000}s (${lastStatus}). Check docker compose logs.`
+  );
+}
+
+async function createCollection({ name, description, objects }) {
+  await request(`/v1/schema/${name}`, { method: 'DELETE' });
+  await request('/v1/schema', {
+    method: 'POST',
+    body: JSON.stringify({
+      class: name,
+      description,
+      vectorizer: 'text2vec-transformers',
+      moduleConfig: {
+        'text2vec-transformers': { vectorizeClassName: false },
+      },
+      properties: [
+        { name: 'content', dataType: ['text'], description: 'Searchable text' },
+        { name: 'category', dataType: ['text'], description: 'Document category' },
+      ],
+    }),
+  });
+
+  const result = await request('/v1/batch/objects', {
+    method: 'POST',
+    body: JSON.stringify({
+      objects: objects.map(({ content, category }) => ({
+        class: name,
+        properties: { content, category },
+      })),
+    }),
+  });
+
+  const failed = result.filter((item) => item.result?.errors);
+  if (failed.length > 0) {
+    throw new Error(`Failed to seed ${name}: ${JSON.stringify(failed)}`);
+  }
+
+  console.log(`  ✓ ${name}: ${objects.length} searchable objects`);
 }
 
 async function seed() {
@@ -92,50 +148,13 @@ async function seed() {
     throw new Error(`Query profiling requires Weaviate 1.36.9+. Connected server: ${version}`);
   }
 
-  await request(`/v1/schema/${collectionName}`, { method: 'DELETE' });
-
-  await request('/v1/schema', {
-    method: 'POST',
-    body: JSON.stringify({
-      class: collectionName,
-      description: 'Small manual-vector collection for query profiling smoke tests',
-      vectorizer: 'none',
-      vectorIndexType: 'hnsw',
-      vectorIndexConfig: { distance: 'cosine' },
-      properties: [
-        { name: 'content', dataType: ['text'], description: 'Searchable test content' },
-        { name: 'category', dataType: ['text'], description: 'Test category' },
-      ],
-    }),
-  });
-
-  const objects = [
-    { content: 'India independence day history', category: 'history', vector: [1, 0, 0] },
-    { content: 'Indian national independence celebration', category: 'history', vector: [0.96, 0.1, 0] },
-    { content: 'Vector database performance tuning', category: 'technology', vector: [0, 1, 0] },
-    { content: 'Query performance and shard timing', category: 'technology', vector: [0, 0.9, 0.1] },
-    { content: 'Cooking with seasonal vegetables', category: 'food', vector: [0, 0, 1] },
-  ];
-
-  const result = await request('/v1/batch/objects', {
-    method: 'POST',
-    body: JSON.stringify({
-      objects: objects.map(({ content, category, vector }) => ({
-        class: collectionName,
-        properties: { content, category },
-        vector,
-      })),
-    }),
-  });
-
-  const failed = result.filter((item) => item.result?.errors);
-  if (failed.length > 0) {
-    throw new Error(`Failed to seed ${failed.length} object(s): ${JSON.stringify(failed)}`);
+  console.log(`Seeding searchable demo data on Weaviate ${version}:`);
+  for (const collection of collections) {
+    await createCollection(collection);
   }
 
-  console.log(`Seeded ${objects.length} objects in ${collectionName} on Weaviate ${version}.`);
-  console.log('In Weaviate Studio, open ProfileTest → Vector Search → Raw Vector.');
-  console.log('Enter [1, 0, 0], enable Profile query, then select Run Vector Search.');
+  console.log('\nIn Weaviate Studio, choose ProfileTest → Vector Search.');
+  console.log('Search for "independence day of india", enable Profile query, then run the search.');
 }
 
 seed().catch((error) => {

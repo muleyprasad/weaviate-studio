@@ -176,28 +176,38 @@ export function VectorSearchPanel({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, actions]);
 
-  // A vector config can exist while still explicitly using the manual `none` vectorizer.
-  // Derive capability from the parsed vectorizer module, not merely from config presence.
-  const isManualVectorCollection = useMemo(
-    () =>
-      namedVectors.length > 0 &&
-      namedVectors.every((vector) => vector.vectorizerName.toLowerCase() === 'none'),
-    [namedVectors]
-  );
+  // Type for vectorizer config entries
+  interface VectorizerConfigEntry {
+    name?: string;
+    [key: string]: unknown;
+  }
 
-  const hasVectorizer = useMemo(
-    () =>
-      namedVectors.some((vector) => {
-        const name = vector.vectorizerName.toLowerCase();
-        return name !== 'none' && name !== 'unknown';
-      }),
-    [namedVectors]
-  );
+  // Check if collection has a vectorizer configured
+  const hasVectorizer = useMemo(() => {
+    if (!schema?.vectorizerConfig) {
+      return false;
+    }
+    // Check if vectorizer is configured and not 'none'
+    const config = schema.vectorizerConfig as
+      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
+    if (Array.isArray(config)) {
+      return config.length > 0;
+    }
+    return Object.keys(config || {}).length > 0;
+  }, [schema]);
 
-  const vectorizerName = useMemo(
-    () => namedVectors.find((vector) => vector.vectorizerName.toLowerCase() !== 'none')?.vectorizerName,
-    [namedVectors]
-  );
+  // Get vectorizer name for display
+  const vectorizerName = useMemo(() => {
+    if (!schema?.vectorizerConfig) {
+      return undefined;
+    }
+    const config = schema.vectorizerConfig as
+      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
+    if (Array.isArray(config) && config.length > 0) {
+      return config[0]?.name || 'default';
+    }
+    return Object.keys(config || {})[0] || undefined;
+  }, [schema]);
 
   // Get expected vector dimensions
   const expectedDimensions = useMemo(() => {
@@ -225,18 +235,6 @@ export function VectorSearchPanel({
     },
     [actions]
   );
-
-  // A manual-vector collection cannot service semantic or hybrid queries. Switch away
-  // from the default Text tab as soon as its schema is available, before a request can run.
-  useEffect(() => {
-    if (
-      isOpen &&
-      isManualVectorCollection &&
-      (searchMode === 'text' || searchMode === 'hybrid')
-    ) {
-      actions.setSearchMode('vector');
-    }
-  }, [isOpen, isManualVectorCollection, searchMode, actions]);
 
   // Handle search parameter changes
   const handleParamChange = useCallback(
@@ -492,27 +490,13 @@ export function VectorSearchPanel({
             )}
 
             {searchMode === 'vector' && (
-              <>
-                {isManualVectorCollection && (
-                  <div className="manual-vector-notice" role="status">
-                    <span className="codicon codicon-info" aria-hidden="true"></span>
-                    <div>
-                      <strong>Manual-vector collection</strong>
-                      <p>
-                        This collection has no text vectorizer. Enter a numeric vector to search; for
-                        the local profiling sandbox, use <code>[1, 0, 0]</code>.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <VectorInput
-                  value={searchParams.vector}
-                  onChange={(value) => handleParamChange('vector', value)}
-                  onSearch={handleSearch}
-                  expectedDimensions={expectedDimensions}
-                  isSearching={isSearching}
-                />
-              </>
+              <VectorInput
+                value={searchParams.vector}
+                onChange={(value) => handleParamChange('vector', value)}
+                onSearch={handleSearch}
+                expectedDimensions={expectedDimensions}
+                isSearching={isSearching}
+              />
             )}
 
             {searchMode === 'hybrid' && (

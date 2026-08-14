@@ -64,25 +64,29 @@ OPENAI_API_KEY=sk-…
 
 ### 2. Start the query-profiling sandbox
 
-Use the standalone profiling configuration for this PR. It starts only Weaviate with manual vectors enabled, so it does **not** depend on the optional `text2vec-transformers` container.
+Use the standalone profiling configuration for this PR. It starts Weaviate together with a local `text2vec-transformers` service, so collections support the normal **Text (Semantic)** search experience without any cloud API key.
 
 ```bash
 docker compose -f docker-compose.profiling.yml up -d
 ```
 
+The first startup downloads the local embedding model and can take a few minutes. Do not run the seed script until the transformer container is listed as healthy:
+
+```bash
+docker compose -f docker-compose.profiling.yml ps
+```
+
 ### 3. Query profiling smoke test
 
-The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. Seed a small collection with deterministic manual vectors:
+The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. Seed three small, searchable collections:
 
 ```bash
 node seed-query-profiling.cjs
 ```
 
-The seed command waits for Weaviate to become ready for up to 90 seconds, so run it directly after `docker compose ... up -d`.
+The script waits for Weaviate readiness and creates `ProfileTest`, `TravelGuide`, and `ProductCatalog`. Re-running it refreshes only those three demo collections.
 
-> This is a **minimal profiling smoke test**. `seed-query-profiling.cjs` intentionally creates only the `ProfileTest` collection and never runs the repository’s larger `populate.py` dataset loader. Re-running it resets only `ProfileTest`.
-
-> The original `docker-compose.yml` is for the broader RAG sandbox and includes `text2vec-transformers`. Use `docker-compose.profiling.yml` for this profiling test; it deliberately requires no transformer service.
+> Use this dedicated compose file for the profiling test. Unlike the previous manual-vector-only setup, its collections use local text embeddings, so the ordinary Vector Search flow remains usable.
 
 Then connect Weaviate Studio using the following values:
 
@@ -91,37 +95,17 @@ Then connect Weaviate Studio using the following values:
 | Endpoint | `http://localhost:8080` |
 | API Key  | `test-key-123`          |
 
-Open the `ProfileTest` collection, choose **Vector Search → Raw Vector**, enter `[1, 0, 0]`, enable **Profile query**, and select **Run Vector Search**. The timing breakdown appears directly above the search results.
+Open the `ProfileTest` collection and choose **Vector Search**. Search for `independence day of india`, enable **Profile query**, and select **Run Vector Search**. The timing breakdown appears directly above the search results.
 
-> Re-running `seed-query-profiling.cjs` resets only the `ProfileTest` collection, so it is safe to repeat during UI testing.
+> `TravelGuide` and `ProductCatalog` provide additional ordinary semantic-search collections for exploring the UI.
 
-### 4. Full sandbox dataset (optional)
-
-If you want the repository’s complete set of legacy and RAG collections as well as `ProfileTest`, use the full sandbox instead. It requires the transformer sidecar because `populate.py` creates vectorized collections.
-
-```bash
-# Stop the minimal profiling sandbox first.
-docker compose -f docker-compose.profiling.yml down --remove-orphans
-
-# Start the full sandbox and confirm BOTH services are running.
-docker compose up -d
-docker compose ps
-
-# Load the full collection set, then add the profiling collection.
-pip install weaviate-client requests
-python3 populate.py --skip-github
-node seed-query-profiling.cjs
-```
-
-`docker compose ps` must show both `weaviate` and `text2vec-transformers` before `populate.py` runs. The profiling seed adds or refreshes only `ProfileTest`; it does not delete the other collections.
-
-### 5. Install Python dependencies
+### 4. Install Python dependencies
 
 ```bash
 pip install weaviate-client requests
 ```
 
-### 6. Populate seed data
+### 5. Populate seed data
 
 ```bash
 # All collections (legacy + RAG)
@@ -136,7 +120,7 @@ python3 populate.py --verify-only     # Just check what's already loaded
 
 By default all rows are imported (embeddings are free). To limit import size, set `BOOKS_LIMIT` and `PODCASTS_LIMIT` in `populate.py` to a non-zero value. Note: importing ~20k objects through the local transformer can take a while on CPU.
 
-### 7. Connect from Weaviate Studio
+### 6. Connect from Weaviate Studio
 
 | Setting  | Value                   |
 | -------- | ----------------------- |

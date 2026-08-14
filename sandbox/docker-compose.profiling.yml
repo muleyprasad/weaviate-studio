@@ -14,5 +14,21 @@ services:
       AUTHORIZATION_ADMINLIST_ENABLED: 'true'
       AUTHORIZATION_ADMINLIST_USERS: 'test-key-123'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
+      ENABLE_MODULES: 'text2vec-transformers'
+      TRANSFORMERS_INFERENCE_API: 'http://text2vec-transformers:8080'
       CLUSTER_HOSTNAME: 'node1'
+    depends_on:
+      text2vec-transformers:
+        condition: service_healthy
+
+  text2vec-transformers:
+    image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-multi-qa-MiniLM-L6-cos-v1
+    environment:
+      ENABLE_CUDA: '0'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --spider http://localhost:8080/.well-known/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
