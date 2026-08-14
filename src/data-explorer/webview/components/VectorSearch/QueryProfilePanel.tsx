@@ -348,8 +348,10 @@ export function QueryProfilePanel({ profile }: QueryProfilePanelProps) {
                 className={`qp-shard-tab ${i === activeShard ? 'active' : ''}`}
                 onClick={() => setActiveShard(i)}
                 title={`Shard: ${s.name} | Node: ${s.node}`}
+                aria-label={`Show shard ${i + 1}, ${s.name}, on node ${s.node}`}
+                aria-pressed={i === activeShard}
               >
-                {i + 1}
+                Shard {i + 1}
               </button>
             ))}
           </div>

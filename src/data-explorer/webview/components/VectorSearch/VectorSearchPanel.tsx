@@ -561,28 +561,37 @@ export function VectorSearchPanel({
                   ))}
                 </select>
               </div>
-
-              {/* Query Profiling Toggle */}
-              {queryProfilingSupported && (
-                <div className="parameter-item">
-                  <div className="qp-toggle-row">
-                    <input
-                      type="checkbox"
-                      id="query-profile-toggle"
-                      checked={queryProfileEnabled}
-                      onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
-                      disabled={isSearching}
-                    />
-                    <label htmlFor="query-profile-toggle">
-                      <span className="codicon codicon-pulse" aria-hidden="true"></span>
-                      Profile query
-                    </label>
-                    <span className="qp-toggle-hint">timing breakdown</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* Query profiling is intentionally adjacent to the primary action so users can discover it before running a query. */}
+          {queryProfilingSupported && (
+            <section className="query-profile-option" aria-labelledby="query-profile-heading">
+              <div className="query-profile-option-heading">
+                <span className="codicon codicon-pulse" aria-hidden="true"></span>
+                <h3 id="query-profile-heading">Query profiling</h3>
+                <span className="query-profile-version">Weaviate 1.36.9+</span>
+              </div>
+              <p>Show per-shard timing details after the next search.</p>
+              <label className="query-profile-check" htmlFor="query-profile-toggle">
+                <input
+                  type="checkbox"
+                  id="query-profile-toggle"
+                  checked={queryProfileEnabled}
+                  onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                  disabled={isSearching}
+                />
+                <span>Profile query</span>
+              </label>
+              <span className="query-profile-status" role="status">
+                {queryProfileEnabled
+                  ? queryProfileResult
+                    ? 'Latest profile is shown below the results.'
+                    : 'Enabled for the next search.'
+                  : 'Off — enable it when investigating query performance.'}
+              </span>
+            </section>
+          )}
 
           {/* Search Button and Actions */}
           <div className="search-action">

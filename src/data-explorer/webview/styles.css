@@ -2421,6 +2421,74 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground, #666);
 }
 
+/* ===== Query Profiling Option ===== */
+.query-profile-option {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 8%, transparent);
+}
+
+.query-profile-option-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.query-profile-option-heading .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 15px;
+}
+
+.query-profile-option-heading h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.query-profile-version {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.query-profile-option p {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.query-profile-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: fit-content;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+}
+
+.query-profile-check input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--vscode-button-background, #0E639C);
+}
+
+.query-profile-status {
+    align-self: center;
+    justify-self: end;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    text-align: right;
+}
+
 /* ===== Search Action Button ===== */
 .search-action {
     display: flex;
