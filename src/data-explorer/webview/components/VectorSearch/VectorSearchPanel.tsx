@@ -25,7 +25,6 @@ import { HybridSearchInput } from './HybridSearchInput';
 import { SearchResults } from './SearchResults';
 import { VectorOptionsDrawer } from './VectorOptionsDrawer';
 import { CopyAsCode } from './CopyAsCode';
-import { QueryProfilePanel } from './QueryProfilePanel';
 import { useNamedVectors } from '../../hooks/useNamedVectors';
 import {
   supportsMultiTargetNear,
@@ -40,6 +39,73 @@ interface VectorSearchPanelProps {
   onResultSelect: (object: WeaviateObject) => void;
   onSearch: () => void;
   preSelectedObject?: WeaviateObject | null;
+}
+
+function formatProfileMetricLabel(key: string): string {
+  const labels: Record<string, string> = {
+    total_took: 'Total',
+    vector_search_took: 'Vector search',
+    objects_took: 'Object hydration',
+    filters_build_allow_list_took: 'Filter allow list',
+    knn_search_rescore_took: 'Rescore',
+  };
+
+  if (labels[key]) {
+    return labels[key];
+  }
+
+  const layerMatch = key.match(/^knn_search_layer_(\d+)_took$/);
+  if (layerMatch) {
+    return `HNSW layer ${layerMatch[1]}`;
+  }
+
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function QueryProfileDetails({
+  profile,
+}: {
+  profile: NonNullable<ReturnType<typeof useVectorSearchState>>['queryProfileResult'];
+}) {
+  const shards = Array.isArray(profile?.shards) ? profile.shards : [];
+
+  if (shards.length === 0) {
+    return (
+      <section className="query-profile-details" aria-label="Query profile details">
+        <span className="codicon codicon-info" aria-hidden="true"></span>
+        No per-shard timing details were returned for this query.
+      </section>
+    );
+  }
+
+  return (
+    <section className="query-profile-details" aria-label="Query profile details">
+      <div className="query-profile-details-heading">
+        <span>Timing breakdown</span>
+        <span>{shards.length === 1 ? '1 shard' : `${shards.length} shards`}</span>
+      </div>
+      {shards.map((shard) => (
+        <div className="query-profile-shard" key={`${shard.name}-${shard.node}`}>
+          <div className="query-profile-shard-heading">
+            <span className="codicon codicon-database" aria-hidden="true"></span>
+            <strong>{shard.name}</strong>
+            <span>{shard.node}</span>
+          </div>
+          {Object.entries(shard.searches || {}).map(([searchType, search]) => (
+            <div className="query-profile-search-type" key={searchType}>
+              <span>{searchType === 'vector' ? 'Vector search' : `${searchType} search`}</span>
+              {Object.entries(search.details || {}).map(([key, value]) => (
+                <div className="query-profile-metric" key={key}>
+                  <span>{formatProfileMetricLabel(key)}</span>
+                  <code>{value}</code>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
 }
 
 export function VectorSearchPanel({
@@ -123,9 +189,7 @@ export function VectorSearchPanel({
     }
     // Check if vectorizer is configured and not 'none'
     const config = schema.vectorizerConfig as
-      | VectorizerConfigEntry[]
-      | Record<string, unknown>
-      | undefined;
+      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
     if (Array.isArray(config)) {
       return config.length > 0;
     }
@@ -138,9 +202,7 @@ export function VectorSearchPanel({
       return undefined;
     }
     const config = schema.vectorizerConfig as
-      | VectorizerConfigEntry[]
-      | Record<string, unknown>
-      | undefined;
+      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
     if (Array.isArray(config) && config.length > 0) {
       return config[0]?.name || 'default';
     }
@@ -564,34 +626,43 @@ export function VectorSearchPanel({
             </div>
           </div>
 
-          {/* Query profiling is intentionally adjacent to the primary action so users can discover it before running a query. */}
-          {queryProfilingSupported && (
-            <section className="query-profile-option" aria-labelledby="query-profile-heading">
-              <div className="query-profile-option-heading">
-                <span className="codicon codicon-pulse" aria-hidden="true"></span>
-                <h3 id="query-profile-heading">Query profiling</h3>
-                <span className="query-profile-version">Weaviate 1.36.9+</span>
-              </div>
-              <p>Show per-shard timing details after the next search.</p>
-              <label className="query-profile-check" htmlFor="query-profile-toggle">
-                <input
-                  type="checkbox"
-                  id="query-profile-toggle"
-                  checked={queryProfileEnabled}
-                  onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
-                  disabled={isSearching}
-                />
-                <span>Profile query</span>
-              </label>
-              <span className="query-profile-status" role="status">
-                {queryProfileEnabled
+          {/* Keep the capability visible even on older servers, so users understand why it cannot be enabled. */}
+          <section
+            className={`query-profile-option ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
+            aria-labelledby="query-profile-heading"
+          >
+            <div className="query-profile-option-heading">
+              <span className="codicon codicon-pulse" aria-hidden="true"></span>
+              <h3 id="query-profile-heading">Query profiling</h3>
+              <span className="query-profile-version">
+                {queryProfilingSupported ? 'Weaviate 1.36.9+' : 'Requires Weaviate 1.36.9+'}
+              </span>
+            </div>
+            <p>
+              {queryProfilingSupported
+                ? 'Show per-shard timing details after the next search.'
+                : 'This connected server does not support query profiling. Upgrade to Weaviate 1.36.9 or newer to enable it.'}
+            </p>
+            <label className="query-profile-check" htmlFor="query-profile-toggle">
+              <input
+                type="checkbox"
+                id="query-profile-toggle"
+                checked={queryProfileEnabled}
+                onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                disabled={isSearching || !queryProfilingSupported}
+              />
+              <span>Profile query</span>
+            </label>
+            <span className="query-profile-status" role="status">
+              {!queryProfilingSupported
+                ? 'Unavailable for this server.'
+                : queryProfileEnabled
                   ? queryProfileResult
-                    ? 'Latest profile is shown below the results.'
+                    ? 'Latest profile appears above the search results.'
                     : 'Enabled for the next search.'
                   : 'Off — enable it when investigating query performance.'}
-              </span>
-            </section>
-          )}
+            </span>
+          </section>
 
           {/* Search Button and Actions */}
           <div className="search-action">
@@ -646,6 +717,23 @@ export function VectorSearchPanel({
             </div>
           </div>
 
+          {/* Show timing before the result list, so it is not hidden below a long set of matching objects. */}
+          {queryProfileEnabled && queryProfileResult && (
+            <>
+              <section className="query-profile-result-summary" aria-live="polite">
+                <div>
+                  <span className="codicon codicon-pulse" aria-hidden="true"></span>
+                  <strong>Query Profile ready</strong>
+                </div>
+                <span>
+                  {queryProfileResult.shards?.length || 0}{' '}
+                  {queryProfileResult.shards?.length === 1 ? 'shard profiled' : 'shards profiled'}
+                </span>
+              </section>
+              <QueryProfileDetails profile={queryProfileResult} />
+            </>
+          )}
+
           {/* Search Results */}
           <div className="search-results-container">
             <SearchResults
@@ -657,11 +745,6 @@ export function VectorSearchPanel({
               hasSearched={hasSearched}
             />
           </div>
-
-          {/* Query Profile Results */}
-          {queryProfileEnabled && queryProfileResult && (
-            <QueryProfilePanel profile={queryProfileResult} />
-          )}
         </div>
       </div>
     </div>

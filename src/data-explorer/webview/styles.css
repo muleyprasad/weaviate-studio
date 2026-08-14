@@ -2489,6 +2489,19 @@ input[type="checkbox"]:focus-visible {
     text-align: right;
 }
 
+.query-profile-option.is-unavailable {
+    background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 10%, transparent);
+}
+
+.query-profile-option.is-unavailable .query-profile-option-heading .codicon {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.query-profile-option.is-unavailable .query-profile-check {
+    cursor: not-allowed;
+    opacity: 0.72;
+}
+
 /* ===== Search Action Button ===== */
 .search-action {
     display: flex;
@@ -2556,6 +2569,109 @@ input[type="checkbox"]:focus-visible {
     border-top-color: white;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+/* ===== Query Profile Result ===== */
+.query-profile-result-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 16px 0;
+    padding: 9px 12px;
+    border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 55%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794FF) 10%, transparent);
+    color: var(--vscode-foreground);
+    font-size: 11px;
+}
+
+.query-profile-result-summary > div {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.query-profile-result-summary .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 14px;
+}
+
+.query-profile-result-summary > span {
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.query-profile-details {
+    margin: 0 16px 8px;
+    border: 1px solid var(--vscode-panel-border, #333);
+    border-top: 0;
+    border-radius: 0 0 4px 4px;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    font-size: 11px;
+}
+
+.query-profile-details-heading,
+.query-profile-shard-heading,
+.query-profile-metric {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.query-profile-details-heading {
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.query-profile-shard {
+    padding: 8px 10px 4px;
+}
+
+.query-profile-shard-heading {
+    color: var(--vscode-foreground);
+    font-size: 11px;
+}
+
+.query-profile-shard-heading .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.query-profile-shard-heading > span:last-child {
+    margin-left: auto;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 10px;
+}
+
+.query-profile-search-type {
+    margin: 7px 0 0 20px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.query-profile-search-type > span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.query-profile-metric {
+    justify-content: space-between;
+    padding: 3px 0;
+}
+
+.query-profile-metric code {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 10px;
 }
 
 /* ===== Search Results Container ===== */

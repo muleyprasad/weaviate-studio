@@ -1,6 +1,6 @@
 services:
   weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.33.1
+    image: cr.weaviate.io/semitechnologies/weaviate:1.36.9
     restart: on-failure:0
     ports:
       - 8080:8080
