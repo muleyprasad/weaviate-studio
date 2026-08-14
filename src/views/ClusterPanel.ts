@@ -71,7 +71,7 @@ export class ClusterPanel {
     if (existing) {
       existing._panel.reveal(column);
       // Only send update if we have real data; if null, caller will send updateData separately.
-      if (nodeStatusData != null) {
+      if (nodeStatusData !== null && nodeStatusData !== undefined) {
         existing.postMessage({
           command: 'updateData',
           nodeStatusData,

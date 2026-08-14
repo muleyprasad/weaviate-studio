@@ -1496,7 +1496,7 @@ function ClusterPanelWebview() {
   const prevNodeStatusDataRef = useRef<Node[]>([]);
 
   const applyInitOrUpdate = useCallback((message: any) => {
-    if (message.nodeStatusData == null) {
+    if (message.nodeStatusData === null || message.nodeStatusData === undefined) {
       // null means the extension has no cached data yet and is fetching in the background.
       // Keep isLoading=true so the spinner stays visible until updateData arrives.
       if (message.openClusterViewOnConnect !== undefined) {
@@ -1832,7 +1832,9 @@ function ClusterPanelWebview() {
             >
               Checks
               {(() => {
-                if (!checksResult) return '';
+                if (!checksResult) {
+                  return '';
+                }
                 const issueCount = [
                   checksResult.multiTenancy?.hasIssues,
                   checksResult.autoTenantConfig?.hasIssues,

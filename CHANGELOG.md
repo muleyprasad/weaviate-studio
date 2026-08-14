@@ -5,17 +5,7 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### 🔧 Improved
-
-- **Compact, persistent query profiling** — The opt-in **Profile** checkbox now sits beside **Run Vector Search** instead of occupying a large panel. After a profiled search completes, select **View profile** to reveal the per-shard timing breakdown only when needed. The preference is remembered across collection changes and Data Explorer panel reopens.
-
-### 📚 Documentation
-
-- **Profiling workflow and sandbox guidance** — Updated the README, Data Explorer guide, component documentation, and public sandbox guide with the current Profile → Run Vector Search → View profile workflow and the text-searchable profiling sandbox.
-
-## [1.10.0] - 2026-07-31
+## [1.10.0] - 2026-08-14
 
 ### ✨ Added
 
@@ -27,7 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Improved
 
+- **Compact, persistent query profiling** — The opt-in **Profile** checkbox now sits beside **Run Vector Search** instead of occupying a large panel. After a profiled search completes, select **View profile** to reveal the per-shard timing breakdown only when needed. The preference is remembered across collection changes and Data Explorer panel reopens.
 - **Upgraded weaviate-client** from v3.11.0 to v3.14.0 — adds query profiling support (`returnMetadata: ['all', 'queryProfile']`), boost parameter for queries, diversity selection for near-queries, and search cancellation.
+
+### 📚 Documentation
+
+- **Profiling workflow and sandbox guidance** — Updated the README, Data Explorer guide, component documentation, and public sandbox guide with the current Profile → Run Vector Search → View profile workflow and the text-searchable profiling sandbox.
 
 ## [1.9.1] - 2026-07-16
 

@@ -865,7 +865,8 @@ export class DataExplorerPanel {
           connectionId: this._connectionId,
           targetUuid: this._initialTargetUuid ?? null,
           queryProfileEnabled:
-            this.globalState?.get<boolean>(DataExplorerPanel.QUERY_PROFILE_PREFERENCE_KEY, false) ?? false,
+            this.globalState?.get<boolean>(DataExplorerPanel.QUERY_PROFILE_PREFERENCE_KEY, false) ??
+            false,
         })};
       </script>
     `;

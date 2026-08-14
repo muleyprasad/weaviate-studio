@@ -7,17 +7,7 @@ description: Full version history and release notes for Weaviate Studio — new 
 
 All notable changes to the Weaviate Studio extension.
 
-## [Unreleased]
-
-### 🔧 Improved
-
-- **Compact, persistent query profiling** — **Profile** is now a small checkbox beside **Run Vector Search**. After a profiled query completes, select **View profile** to open the per-shard **Timing breakdown** only when you need it. The choice is remembered across collection changes and Data Explorer panel reopens. See the [Data Explorer profiling guide](/features/data-explorer#query-profiling) for the complete workflow.
-
-### 📚 Documentation
-
-- **Profiling sandbox and feature guidance** — The public sandbox guide now documents the local text-vectorized `ProfileTest`, `TravelGuide`, and `ProductCatalog` demo collections and the current Profile → Run Vector Search → View profile workflow.
-
-## [1.10.0] - 2026-07-31
+## [1.10.0] - 2026-08-14
 
 ### ✨ Added
 
@@ -29,7 +19,12 @@ All notable changes to the Weaviate Studio extension.
 
 ### 🔧 Improved
 
+- **Compact, persistent query profiling** — **Profile** is now a small checkbox beside **Run Vector Search**. After a profiled query completes, select **View profile** to open the per-shard **Timing breakdown** only when you need it. The choice is remembered across collection changes and Data Explorer panel reopens. See the [Data Explorer profiling guide](/features/data-explorer#query-profiling) for the complete workflow.
 - **Upgraded weaviate-client** from v3.11.0 to v3.14.0 — adds query profiling support, boost parameter, diversity selection, and search cancellation.
+
+### 📚 Documentation
+
+- **Profiling sandbox and feature guidance** — The public sandbox guide now documents the local text-vectorized `ProfileTest`, `TravelGuide`, and `ProductCatalog` demo collections and the current Profile → Run Vector Search → View profile workflow.
 
 ## [1.9.1] - 2026-07-16
 

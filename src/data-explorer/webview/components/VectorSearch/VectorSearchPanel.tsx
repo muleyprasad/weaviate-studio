@@ -197,7 +197,9 @@ export function VectorSearchPanel({
     }
     // Check if vectorizer is configured and not 'none'
     const config = schema.vectorizerConfig as
-      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
+      | VectorizerConfigEntry[]
+      | Record<string, unknown>
+      | undefined;
     if (Array.isArray(config)) {
       return config.length > 0;
     }
@@ -210,7 +212,9 @@ export function VectorSearchPanel({
       return undefined;
     }
     const config = schema.vectorizerConfig as
-      VectorizerConfigEntry[] | Record<string, unknown> | undefined;
+      | VectorizerConfigEntry[]
+      | Record<string, unknown>
+      | undefined;
     if (Array.isArray(config) && config.length > 0) {
       return config[0]?.name || 'default';
     }
@@ -687,7 +691,9 @@ export function VectorSearchPanel({
                     {isProfileDetailsOpen ? 'Hide profile' : 'View profile'}
                   </button>
                 )}
-                {!queryProfilingSupported && <span className="query-profile-requires">1.36.9+</span>}
+                {!queryProfilingSupported && (
+                  <span className="query-profile-requires">1.36.9+</span>
+                )}
               </div>
             </div>
 
