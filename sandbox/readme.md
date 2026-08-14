@@ -68,13 +68,32 @@ OPENAI_API_KEY=sk-…
 docker compose up -d
 ```
 
-### 3. Install Python dependencies
+### 3. Query profiling smoke test
+
+The sandbox runs **Weaviate 1.36.9**, the minimum version required for query profiling. After the service is healthy, seed a small collection with deterministic manual vectors:
+
+```bash
+node seed-query-profiling.cjs
+```
+
+Then connect Weaviate Studio using the following values:
+
+| Setting  | Value                   |
+| -------- | ----------------------- |
+| Endpoint | `http://localhost:8080` |
+| API Key  | `test-key-123`          |
+
+Open the `ProfileTest` collection, choose **Vector Search → Raw Vector**, enter `[1, 0, 0]`, enable **Profile query**, and select **Run Vector Search**. The timing breakdown appears directly above the search results.
+
+> Re-running `seed-query-profiling.cjs` resets only the `ProfileTest` collection, so it is safe to repeat during UI testing.
+
+### 4. Install Python dependencies
 
 ```bash
 pip install weaviate-client requests
 ```
 
-### 4. Populate seed data
+### 5. Populate seed data
 
 ```bash
 # All collections (legacy + RAG)
@@ -89,7 +108,7 @@ python3 populate.py --verify-only     # Just check what's already loaded
 
 By default all rows are imported (embeddings are free). To limit import size, set `BOOKS_LIMIT` and `PODCASTS_LIMIT` in `populate.py` to a non-zero value. Note: importing ~20k objects through the local transformer can take a while on CPU.
 
-### 5. Connect from Weaviate Studio
+### 6. Connect from Weaviate Studio
 
 | Setting  | Value                   |
 | -------- | ----------------------- |
