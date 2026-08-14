@@ -10,7 +10,8 @@
  */
 
 import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react';
-import type { WeaviateObject, JoinStrategy } from '../../types';
+import type { WeaviateObject, JoinStrategy, QueryProfile } from '../../types';
+import { getVSCodeAPI } from '../utils/vscodeApi';
 
 // ============================================================================
 // Types
@@ -76,6 +77,9 @@ export interface VectorSearchContextState {
   vectorWeights: Record<string, number>;
   multiTargetActive: boolean;
   muveraFlagsByVector: Record<string, boolean>;
+  // Query profiling state
+  queryProfileEnabled: boolean;
+  queryProfileResult: QueryProfile | null;
 }
 
 // ============================================================================
@@ -100,7 +104,10 @@ type VectorSearchAction =
   | { type: 'SET_JOIN_STRATEGY'; strategy: JoinStrategy }
   | { type: 'SET_VECTOR_WEIGHT'; vectorName: string; weight: number }
   | { type: 'NORMALIZE_WEIGHTS' }
-  | { type: 'SET_MUVERA_FLAGS'; flags: Record<string, boolean> };
+  | { type: 'SET_MUVERA_FLAGS'; flags: Record<string, boolean> }
+  // Query profiling actions
+  | { type: 'SET_QUERY_PROFILE_ENABLED'; enabled: boolean }
+  | { type: 'SET_QUERY_PROFILE_RESULT'; result: QueryProfile | null };
 
 // ============================================================================
 // Initial State
@@ -139,7 +146,42 @@ const initialState: VectorSearchContextState = {
   vectorWeights: {},
   multiTargetActive: false,
   muveraFlagsByVector: {},
+  // Query profiling state
+  queryProfileEnabled: false,
+  queryProfileResult: null,
 };
+
+interface PersistedVectorSearchState {
+  queryProfileEnabled?: boolean;
+}
+
+function createInitialState(): VectorSearchContextState {
+  try {
+    const injectedPreference = window.initialData?.queryProfileEnabled;
+    const persisted = getVSCodeAPI().getState() as PersistedVectorSearchState | undefined;
+    return {
+      ...initialState,
+      queryProfileEnabled:
+        typeof injectedPreference === 'boolean'
+          ? injectedPreference
+          : persisted?.queryProfileEnabled === true,
+    };
+  } catch {
+    // The webview API is unavailable in unit tests and before VS Code initializes it.
+    return initialState;
+  }
+}
+
+function persistQueryProfilePreference(enabled: boolean): void {
+  try {
+    const vscode = getVSCodeAPI();
+    const persisted = (vscode.getState() as PersistedVectorSearchState | undefined) || {};
+    vscode.setState({ ...persisted, queryProfileEnabled: enabled });
+    vscode.postMessage({ command: 'setQueryProfilePreference', queryProfileEnabled: enabled });
+  } catch {
+    // Keep the in-memory preference working even when retained webview state is unavailable.
+  }
+}
 
 // ============================================================================
 // Reducer
@@ -214,6 +256,8 @@ function vectorSearchReducer(
         ...state,
         isSearching: action.isSearching,
         searchError: action.isSearching ? null : state.searchError,
+        // Clear stale profile when a new search begins
+        queryProfileResult: action.isSearching ? null : state.queryProfileResult,
       };
 
     case 'SET_SEARCH_ERROR':
@@ -221,6 +265,8 @@ function vectorSearchReducer(
         ...state,
         searchError: action.error,
         isSearching: false,
+        // A failed query must not display a previous query's profile
+        queryProfileResult: null,
       };
 
     case 'CLEAR_SEARCH':
@@ -231,6 +277,7 @@ function vectorSearchReducer(
         searchError: null,
         isSearching: false,
         hasSearched: false,
+        queryProfileResult: null,
       };
 
     case 'FIND_SIMILAR':
@@ -252,8 +299,9 @@ function vectorSearchReducer(
       // Reset all vector search state when collection changes
       return {
         ...initialState,
-        // Keep panel open state if it was open
+        // Keep panel open state and the user’s diagnostic preference across collections.
         showVectorSearchPanel: state.showVectorSearchPanel,
+        queryProfileEnabled: state.queryProfileEnabled,
       };
 
     case 'TOGGLE_VECTOR_OPTIONS':
@@ -304,6 +352,20 @@ function vectorSearchReducer(
         muveraFlagsByVector: action.flags,
       };
 
+    case 'SET_QUERY_PROFILE_ENABLED':
+      return {
+        ...state,
+        queryProfileEnabled: action.enabled,
+        // Clear previous profile result when toggling
+        queryProfileResult: action.enabled ? state.queryProfileResult : null,
+      };
+
+    case 'SET_QUERY_PROFILE_RESULT':
+      return {
+        ...state,
+        queryProfileResult: action.result,
+      };
+
     default:
       return state;
   }
@@ -332,6 +394,9 @@ export interface VectorSearchContextActions {
   setVectorWeight: (vectorName: string, weight: number) => void;
   normalizeWeights: () => void;
   setMuveraFlags: (flags: Record<string, boolean>) => void;
+  // Query profiling actions
+  setQueryProfileEnabled: (enabled: boolean) => void;
+  setQueryProfileResult: (result: QueryProfile | null) => void;
 }
 
 // ============================================================================
@@ -354,7 +419,7 @@ interface VectorSearchProviderProps {
 }
 
 export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
-  const [state, dispatch] = useReducer(vectorSearchReducer, initialState);
+  const [state, dispatch] = useReducer(vectorSearchReducer, undefined, createInitialState);
 
   // Memoize actions to prevent unnecessary re-renders
   const actions = useMemo<VectorSearchContextActions>(
@@ -426,6 +491,16 @@ export function VectorSearchProvider({ children }: VectorSearchProviderProps) {
 
       setMuveraFlags: (flags: Record<string, boolean>) => {
         dispatch({ type: 'SET_MUVERA_FLAGS', flags });
+      },
+
+      // Query profiling actions
+      setQueryProfileEnabled: (enabled: boolean) => {
+        persistQueryProfilePreference(enabled);
+        dispatch({ type: 'SET_QUERY_PROFILE_ENABLED', enabled });
+      },
+
+      setQueryProfileResult: (result: QueryProfile | null) => {
+        dispatch({ type: 'SET_QUERY_PROFILE_RESULT', result });
       },
     }),
     []

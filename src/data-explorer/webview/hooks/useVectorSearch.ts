@@ -16,6 +16,7 @@ import type {
   WeaviateObject,
   ExtensionMessage,
   WeaviateExplainScoreRaw,
+  QueryProfile,
 } from '../../types';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -104,8 +105,8 @@ export function useVectorSearch() {
 
   // Handle vector search response
   const handleSearchResponse = useCallback(
-    (objects: WeaviateObject[]) => {
-      debugLog('Response received', { count: objects.length });
+    (objects: WeaviateObject[], queryProfile?: QueryProfile) => {
+      debugLog('Response received', { count: objects.length, hasProfile: !!queryProfile });
       // Transform objects to VectorSearchResult format
       const results: VectorSearchResult[] = objects.map((obj) => {
         // Parse explainScore for hybrid search results
@@ -128,6 +129,9 @@ export function useVectorSearch() {
       });
 
       searchActions.setSearchResults(results);
+
+      // Always set profile result (null clears any stale data from a previous query)
+      searchActions.setQueryProfileResult(queryProfile ?? null);
     },
     [searchActions]
   );
@@ -160,10 +164,11 @@ export function useVectorSearch() {
       switch (message.command) {
         case 'objectsLoaded':
           if (message.objects) {
-            handleSearchResponse(message.objects);
+            handleSearchResponse(message.objects, message.queryProfile);
           } else {
-            // Empty results
+            // Empty results must also clear profile metadata from any prior response.
             searchActions.setSearchResults([]);
+            searchActions.setQueryProfileResult(null);
           }
           break;
 
@@ -340,6 +345,7 @@ export function useVectorSearch() {
       limit: searchParams.limit,
       offset: 0,
       vectorSearch: vectorSearchPayload,
+      queryProfile: searchState.queryProfileEnabled || undefined,
       requestId,
     } as WebviewMessage & { vectorSearch: unknown });
   }, [searchState, searchActions, dataState.collectionName, postMessage]);

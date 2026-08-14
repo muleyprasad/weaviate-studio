@@ -62,19 +62,50 @@ OPENAI_API_KEY=sk-…
 
 > **Without an OpenAI key:** data import and vector search work fine. Only generative queries require the key.
 
-### 2. Start Weaviate
+### 2. Start the query-profiling sandbox
+
+Use the standalone profiling configuration for this PR. It starts Weaviate together with a local `text2vec-transformers` service, so collections support the normal **Text (Semantic)** search experience without any cloud API key.
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.profiling.yml up -d
 ```
 
-### 3. Install Python dependencies
+The first startup downloads the local embedding model and can take a few minutes. Do not run the seed script until the transformer container is listed as healthy:
+
+```bash
+docker compose -f docker-compose.profiling.yml ps
+```
+
+### 3. Query profiling smoke test
+
+The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. Seed three small, searchable collections:
+
+```bash
+node seed-query-profiling.cjs
+```
+
+The script waits for Weaviate readiness and creates `ProfileTest`, `TravelGuide`, and `ProductCatalog`. Re-running it refreshes only those three demo collections.
+
+> Use this dedicated compose file for the profiling test. Unlike the previous manual-vector-only setup, its collections use local text embeddings, so the ordinary Vector Search flow remains usable.
+
+Then connect Weaviate Studio using the following values:
+
+| Setting  | Value                   |
+| -------- | ----------------------- |
+| Endpoint | `http://localhost:8080` |
+| API Key  | `test-key-123`          |
+
+Open the `ProfileTest` collection and choose **Vector Search**. In **Text (Semantic)** mode, search for `independence day of india`, enable **Profile** beside **Run Vector Search**, and run the search. When the results arrive, select **View profile** to reveal the timing breakdown; select **Hide profile** to collapse it again. The profiling preference is remembered across collection changes and Data Explorer panel reopens.
+
+> `TravelGuide` and `ProductCatalog` provide additional ordinary semantic-search collections for exploring the UI. The local transformer means no cloud API key is required for these Text (Semantic) searches.
+
+### 4. Install Python dependencies
 
 ```bash
 pip install weaviate-client requests
 ```
 
-### 4. Populate seed data
+### 5. Populate seed data
 
 ```bash
 # All collections (legacy + RAG)
@@ -89,7 +120,7 @@ python3 populate.py --verify-only     # Just check what's already loaded
 
 By default all rows are imported (embeddings are free). To limit import size, set `BOOKS_LIMIT` and `PODCASTS_LIMIT` in `populate.py` to a non-zero value. Note: importing ~20k objects through the local transformer can take a while on CPU.
 
-### 5. Connect from Weaviate Studio
+### 6. Connect from Weaviate Studio
 
 | Setting  | Value                   |
 | -------- | ----------------------- |

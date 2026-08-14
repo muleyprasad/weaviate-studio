@@ -5,6 +5,25 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-14
+
+### ✨ Added
+
+- **Query Profiling in Data Explorer** — Per-query timing breakdowns for vector, keyword, and hybrid searches, powered by Weaviate's query profiling API (server ≥ 1.36.9). Enable **Profile** in the Vector Search panel, run a search, and select **View profile** to inspect per-shard timing data: total time, vector search (HNSW layer traversal, rescoring), filter evaluation, object hydration, and BM25 scoring stages. Multi-shard collections include shard and node attribution. (PR #87)
+
+### ⚠️ Breaking
+
+- **VS Code 1.101 or later is now required** — The extension runtime requirement was raised from VS Code 1.80 to 1.101 to support the Node.js runtime required by the upgraded Weaviate client. Users on earlier VS Code releases must upgrade before installing this version.
+
+### 🔧 Improved
+
+- **Compact, persistent query profiling** — The opt-in **Profile** checkbox now sits beside **Run Vector Search** instead of occupying a large panel. After a profiled search completes, select **View profile** to reveal the per-shard timing breakdown only when needed. The preference is remembered across collection changes and Data Explorer panel reopens.
+- **Upgraded weaviate-client** from v3.11.0 to v3.14.0 — adds query profiling support (`returnMetadata: ['all', 'queryProfile']`), boost parameter for queries, diversity selection for near-queries, and search cancellation.
+
+### 📚 Documentation
+
+- **Profiling workflow and sandbox guidance** — Updated the README, Data Explorer guide, component documentation, and public sandbox guide with the current Profile → Run Vector Search → View profile workflow and the text-searchable profiling sandbox.
+
 ## [1.9.1] - 2026-07-16
 
 ### 🐛 Fixed

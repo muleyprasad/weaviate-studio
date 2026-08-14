@@ -47,7 +47,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 - **Multiple Connections:** Manage several Weaviate instances at once
 - **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
-- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), and JSON/CSV export
+- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), discreet opt-in query profiling, and JSON/CSV export
 - **RBAC & Security:** Manage users, roles, and groups with native RBAC support and API key rotation
 - **Read-Only Mode:** Connection-level guards to prevent accidental modifications to production data
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
@@ -73,6 +73,19 @@ python3 populate.py
 ```
 
 This spins up a fully-configured Weaviate instance with sample jeopardy questions, vector embeddings, and backup support enabled. [Learn more →](sandbox/readme.md)
+
+### Try Query Profiling Locally
+
+For the release-ready profiling workflow, start the dedicated sandbox with its local text-vectorizer and seed the three searchable demo collections:
+
+```bash
+cd sandbox
+docker compose -f docker-compose.profiling.yml up -d
+docker compose -f docker-compose.profiling.yml ps
+node seed-query-profiling.cjs
+```
+
+Connect to `http://localhost:8080` with API key `test-key-123`. The sandbox creates `ProfileTest`, `TravelGuide`, and `ProductCatalog`; `TravelGuide` and `ProductCatalog` support normal **Text (Semantic)** search. In Data Explorer, select **Vector Search**, enable **Profile** beside **Run Vector Search**, run a search, then select **View profile** when you need the timing breakdown. The preference is remembered across Data Explorer panels and collection changes. [Profiling sandbox instructions →](sandbox/readme.md#2-start-the-query-profiling-sandbox)
 
 ### Connecting to Weaviate
 
@@ -102,9 +115,11 @@ This spins up a fully-configured Weaviate instance with sample jeopardy question
 - Visual filter builder with 10+ operators and AND/OR logic
 - Four vector search modes: Text, Object, Vector, and Hybrid (BM25 + semantic)
 - Alpha slider for balancing keyword vs semantic search
+- **Query profiling** — check **Profile** beside **Run Vector Search** to request per-shard timing data; after results arrive, select **View profile** to reveal the on-demand timing breakdown (requires Weaviate ≥ 1.36.9)
 - Export to JSON/CSV with flexible scopes (current page, filtered results, or entire collection)
 - Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E) for power users
 - User preferences persistence per collection
+- Query profiling preference persistence across collection changes and Data Explorer panel reopens
 - Virtual scrolling for large datasets (1000+ objects)
 - See [Data Explorer README](src/data-explorer/README.md) for full details
 

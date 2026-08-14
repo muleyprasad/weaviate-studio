@@ -815,18 +815,19 @@ describe('useVectorSearch', () => {
       expect(contextResult.current.search.isSearching).toBe(false);
     });
 
-    test('handles undefined objects in response', () => {
+    test('clears profile metadata when a response has no objects', () => {
       const { result: contextResult } = renderHook(
         () => ({
           search: useVectorSearch(),
-          context: require('../../context').useVectorSearchActions(),
+          actions: require('../../context').useVectorSearchActions(),
+          state: require('../../context').useVectorSearchState(),
         }),
         { wrapper }
       );
 
       act(() => {
-        contextResult.current.context.setSearchMode('text');
-        contextResult.current.context.setSearchParams({ query: 'test' });
+        contextResult.current.actions.setSearchMode('text');
+        contextResult.current.actions.setSearchParams({ query: 'test' });
       });
 
       act(() => {
@@ -834,6 +835,11 @@ describe('useVectorSearch', () => {
       });
 
       const requestId = mockPostMessage.mock.calls[0][0].requestId;
+
+      act(() => {
+        contextResult.current.actions.setQueryProfileResult({ shards: [] });
+      });
+      expect(contextResult.current.state.queryProfileResult).toEqual({ shards: [] });
 
       act(() => {
         window.dispatchEvent(
@@ -848,6 +854,7 @@ describe('useVectorSearch', () => {
       });
 
       expect(contextResult.current.search.searchResults).toEqual([]);
+      expect(contextResult.current.state.queryProfileResult).toBeNull();
     });
 
     test('calculates certainty from distance when not provided', () => {

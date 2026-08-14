@@ -1030,4 +1030,235 @@ describe('VectorSearchContext', () => {
       expect(result.current.state.hasSearched).toBe(true);
     });
   });
+
+  describe('Query Profiling', () => {
+    test('query profiling is disabled by default', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('enables query profiling', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(true);
+    });
+
+    test('disables query profiling and clears result', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: {
+              vector: { details: { total_took: '10ms' } },
+            },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(false);
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(false);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('stores query profile result', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: {
+              vector: {
+                details: {
+                  total_took: '48.2ms',
+                  vector_search_took: '8.4ms',
+                  objects_took: '36.8ms',
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+      expect(result.current.state.queryProfileResult!.shards).toHaveLength(1);
+      expect(result.current.state.queryProfileResult!.shards[0].searches.vector).toBeDefined();
+    });
+
+    test('clears query profile result on clearSearch', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '5ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(mockProfile);
+
+      act(() => {
+        result.current.actions.clearSearch();
+      });
+
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('preserves the profiling preference but clears results on collection change', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const mockProfile = {
+        shards: [
+          {
+            name: 'shard-1',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '5ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(mockProfile);
+      });
+
+      act(() => {
+        result.current.actions.resetForCollectionChange();
+      });
+
+      expect(result.current.state.queryProfileEnabled).toBe(true);
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+
+    test('starting a new search clears the previous profile', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const profileA = {
+        shards: [
+          {
+            name: 'shard-a',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '10ms' } } },
+          },
+        ],
+      };
+
+      // Simulate: search A completes with profile
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(profileA);
+        result.current.actions.setSearchResults([]);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(profileA);
+
+      // Simulate: search B starts
+      act(() => {
+        result.current.actions.setSearching(true);
+      });
+
+      // Profile A must be gone while B runs
+      expect(result.current.state.queryProfileResult).toBeNull();
+      expect(result.current.state.isSearching).toBe(true);
+    });
+
+    test('search error clears any retained profile', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const profileA = {
+        shards: [
+          {
+            name: 'shard-a',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '10ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(profileA);
+      });
+
+      expect(result.current.state.queryProfileResult).toEqual(profileA);
+
+      // Simulate: next search fails
+      act(() => {
+        result.current.actions.setSearching(true);
+      });
+      act(() => {
+        result.current.actions.setSearchError('Connection lost');
+      });
+
+      expect(result.current.state.queryProfileResult).toBeNull();
+      expect(result.current.state.searchError).toBe('Connection lost');
+    });
+
+    test('response without profile data sets result to null, not stale data', () => {
+      const { result } = renderHook(() => useVectorSearchContext(), { wrapper });
+
+      const profileA = {
+        shards: [
+          {
+            name: 'shard-a',
+            node: 'node-0',
+            searches: { vector: { details: { total_took: '10ms' } } },
+          },
+        ],
+      };
+
+      act(() => {
+        result.current.actions.setQueryProfileEnabled(true);
+        result.current.actions.setQueryProfileResult(profileA);
+      });
+
+      // Simulate: new search starts (clears profile)
+      act(() => {
+        result.current.actions.setSearching(true);
+      });
+
+      expect(result.current.state.queryProfileResult).toBeNull();
+
+      // Simulate: response arrives without profile (profiling disabled for this query)
+      act(() => {
+        result.current.actions.setQueryProfileResult(null);
+        result.current.actions.setSearchResults([]);
+      });
+
+      // Must remain null, not revert to profileA
+      expect(result.current.state.queryProfileResult).toBeNull();
+    });
+  });
 });

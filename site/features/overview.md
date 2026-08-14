@@ -11,7 +11,7 @@ Weaviate Studio provides a comprehensive suite of tools for managing your Weavia
 
 | Feature                                                 | Description                                                         |
 | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| [**Data Explorer**](/features/data-explorer)            | Interactive table browser with filtering, vector search, and export |
+| [**Data Explorer**](/features/data-explorer)            | Interactive table browser with filtering, vector search, opt-in query profiling, and export |
 | [**Generative Search**](/features/generative-search)    | RAG-powered natural language queries across collections             |
 | [**GraphQL Editor**](/features/graphql-templates)       | Monaco editor with schema-aware templates and autocomplete          |
 | [**RBAC & Security**](/features/rbac-security)          | Manage users, roles, and groups with API key rotation               |
@@ -56,4 +56,4 @@ The sidebar tree gives you a complete overview of your Weaviate instances:
 
 ## Supported Weaviate Versions
 
-The extension requires a Weaviate server that supports the **Collections API** (v1.24+). Multi-vector search (Muvera) requires **v1.26+** for near queries and **v1.27+** for hybrid queries.
+The extension requires a Weaviate server that supports the **Collections API** (v1.24+). Query profiling requires **v1.36.9+**. Multi-vector search (Muvera) requires **v1.26+** for near queries and **v1.27+** for hybrid queries.

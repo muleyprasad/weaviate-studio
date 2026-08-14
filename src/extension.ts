@@ -1560,7 +1560,8 @@ export function activate(context: vscode.ExtensionContext) {
           connectionId,
           collectionName,
           getClient,
-          targetUuid
+          targetUuid,
+          context.globalState
         );
       }
     ),
@@ -1803,7 +1804,7 @@ export function activate(context: vscode.ExtensionContext) {
           cachedNodeData,
           connection?.name || 'Unknown',
           async (message, postMessage) => {
-            if (message.command === 'ready' && cachedNodeData == null) {
+            if (message.command === 'ready' && cachedNodeData === null) {
               // No cached data — fetch now and push to the panel when ready.
               // The webview already received 'init' with null and is showing loading state.
               try {

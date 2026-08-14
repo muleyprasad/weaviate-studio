@@ -7,6 +7,7 @@
 export const MULTI_TARGET_NEAR_MIN = '1.26.0';
 export const MULTI_TARGET_HYBRID_MIN = '1.27.0';
 export const MUVERA_MIN = '1.31.0';
+export const QUERY_PROFILING_MIN = '1.36.9';
 
 /**
  * Parse a semantic version string into [major, minor, patch]
@@ -91,4 +92,12 @@ export function supportsMultiTargetHybrid(serverVersion: string): boolean {
  */
 export function supportsMUVERA(serverVersion: string): boolean {
   return isVersionAtLeast(serverVersion, 1, 31, 0);
+}
+
+/**
+ * Check if query profiling is supported
+ * Introduced in Weaviate v1.36.9, GA in v1.38
+ */
+export function supportsQueryProfiling(serverVersion: string): boolean {
+  return isVersionAtLeast(serverVersion, 1, 36, 9);
 }

@@ -25,6 +25,7 @@ import type {
 export class DataExplorerPanel {
   public static currentPanel: DataExplorerPanel | undefined;
   private static panels: Map<string, DataExplorerPanel> = new Map();
+  private static readonly QUERY_PROFILE_PREFERENCE_KEY = 'weaviate.queryProfileEnabled';
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
@@ -45,7 +46,8 @@ export class DataExplorerPanel {
     connectionId: string,
     collectionName: string,
     private readonly getClient: () => WeaviateClient | undefined,
-    targetUuid?: string
+    targetUuid?: string,
+    private readonly globalState?: vscode.Memento
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -104,7 +106,8 @@ export class DataExplorerPanel {
     connectionId: string,
     collectionName: string,
     getClient: () => WeaviateClient | undefined,
-    targetUuid?: string
+    targetUuid?: string,
+    globalState?: vscode.Memento
   ): DataExplorerPanel {
     const panelKey = `${connectionId}:${collectionName}`;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -146,7 +149,8 @@ export class DataExplorerPanel {
       connectionId,
       collectionName,
       getClient,
-      targetUuid
+      targetUuid,
+      globalState
     );
 
     DataExplorerPanel.panels.set(panelKey, dataExplorerPanel);
@@ -256,6 +260,20 @@ export class DataExplorerPanel {
 
         case 'setTenant':
           await this._handleSetTenant(message);
+          break;
+
+        case 'setQueryProfilePreference':
+          if (typeof message.queryProfileEnabled !== 'boolean') {
+            this.postMessage({
+              command: 'error',
+              error: 'Invalid query profiling preference',
+            });
+            return;
+          }
+          await this.globalState?.update(
+            DataExplorerPanel.QUERY_PROFILE_PREFERENCE_KEY,
+            message.queryProfileEnabled
+          );
           break;
 
         case 'getObjectDetail':
@@ -431,6 +449,7 @@ export class DataExplorerPanel {
         where: message.where, // Pass filter conditions to API
         matchMode: message.matchMode, // Pass AND/OR logic to API
         vectorSearch: message.vectorSearch, // Pass vector search params to API
+        queryProfile: message.queryProfile, // Pass query profiling flag to API
       });
 
       this.postMessage({
@@ -438,6 +457,7 @@ export class DataExplorerPanel {
         objects: result.objects,
         total: result.total,
         unfilteredTotal: result.unfilteredTotal,
+        queryProfile: result.queryProfile,
         requestId: message.requestId, // Echo back request ID
       });
     } catch (error) {
@@ -844,6 +864,9 @@ export class DataExplorerPanel {
           collectionName: this._collectionName,
           connectionId: this._connectionId,
           targetUuid: this._initialTargetUuid ?? null,
+          queryProfileEnabled:
+            this.globalState?.get<boolean>(DataExplorerPanel.QUERY_PROFILE_PREFERENCE_KEY, false) ??
+            false,
         })};
       </script>
     `;

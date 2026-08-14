@@ -3,7 +3,7 @@
  * Supports four search modes: Text (Semantic), Similar Object, Raw Vector, Hybrid
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   CollectionConfig,
   WeaviateObject,
@@ -26,7 +26,11 @@ import { SearchResults } from './SearchResults';
 import { VectorOptionsDrawer } from './VectorOptionsDrawer';
 import { CopyAsCode } from './CopyAsCode';
 import { useNamedVectors } from '../../hooks/useNamedVectors';
-import { supportsMultiTargetNear, supportsMultiTargetHybrid } from '../../utils/versionCheck';
+import {
+  supportsMultiTargetNear,
+  supportsMultiTargetHybrid,
+  supportsQueryProfiling,
+} from '../../utils/versionCheck';
 import { validateMultiTargetConfig } from '../../utils/multiTargetBuilder';
 
 interface VectorSearchPanelProps {
@@ -35,6 +39,73 @@ interface VectorSearchPanelProps {
   onResultSelect: (object: WeaviateObject) => void;
   onSearch: () => void;
   preSelectedObject?: WeaviateObject | null;
+}
+
+function formatProfileMetricLabel(key: string): string {
+  const labels: Record<string, string> = {
+    total_took: 'Total',
+    vector_search_took: 'Vector search',
+    objects_took: 'Object hydration',
+    filters_build_allow_list_took: 'Filter allow list',
+    knn_search_rescore_took: 'Rescore',
+  };
+
+  if (labels[key]) {
+    return labels[key];
+  }
+
+  const layerMatch = key.match(/^knn_search_layer_(\d+)_took$/);
+  if (layerMatch) {
+    return `HNSW layer ${layerMatch[1]}`;
+  }
+
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function QueryProfileDetails({
+  profile,
+}: {
+  profile: NonNullable<ReturnType<typeof useVectorSearchState>>['queryProfileResult'];
+}) {
+  const shards = Array.isArray(profile?.shards) ? profile.shards : [];
+
+  if (shards.length === 0) {
+    return (
+      <section className="query-profile-details" aria-label="Query profile details">
+        <span className="codicon codicon-info" aria-hidden="true"></span>
+        No per-shard timing details were returned for this query.
+      </section>
+    );
+  }
+
+  return (
+    <section className="query-profile-details" aria-label="Query profile details">
+      <div className="query-profile-details-heading">
+        <span>Timing breakdown</span>
+        <span>{shards.length === 1 ? '1 shard' : `${shards.length} shards`}</span>
+      </div>
+      {shards.map((shard) => (
+        <div className="query-profile-shard" key={`${shard.name}-${shard.node}`}>
+          <div className="query-profile-shard-heading">
+            <span className="codicon codicon-database" aria-hidden="true"></span>
+            <strong>{shard.name}</strong>
+            <span>{shard.node}</span>
+          </div>
+          {Object.entries(shard.searches || {}).map(([searchType, search]) => (
+            <div className="query-profile-search-type" key={searchType}>
+              <span>{searchType === 'vector' ? 'Vector search' : `${searchType} search`}</span>
+              {Object.entries(search.details || {}).map(([key, value]) => (
+                <div className="query-profile-metric" key={key}>
+                  <span>{formatProfileMetricLabel(key)}</span>
+                  <code>{value}</code>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </section>
+  );
 }
 
 export function VectorSearchPanel({
@@ -59,10 +130,20 @@ export function VectorSearchPanel({
     selectedTargetVectors,
     joinStrategy,
     vectorWeights,
+    queryProfileEnabled,
+    queryProfileResult,
   } = state;
 
   // Get named vectors from schema
   const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
+  const [isProfileDetailsOpen, setIsProfileDetailsOpen] = useState(false);
+
+  // Close a previously opened profile whenever it is cleared or profiling is turned off.
+  useEffect(() => {
+    if (!queryProfileEnabled || !queryProfileResult) {
+      setIsProfileDetailsOpen(false);
+    }
+  }, [queryProfileEnabled, queryProfileResult]);
 
   // Check version support for multi-target features
   const versionSupported = useMemo(() => {
@@ -77,6 +158,15 @@ export function VectorSearchPanel({
     // For text, object, vector modes
     return supportsMultiTargetNear(serverVersion);
   }, [dataState.serverVersion, searchMode]);
+
+  // Check if query profiling is supported by the server
+  const queryProfilingSupported = useMemo(() => {
+    const serverVersion = dataState.serverVersion;
+    if (!serverVersion) {
+      return false;
+    }
+    return supportsQueryProfiling(serverVersion);
+  }, [dataState.serverVersion]);
 
   // Handle keyboard escape to close panel (only add listener when open)
   useEffect(() => {
@@ -550,24 +640,62 @@ export function VectorSearchPanel({
 
           {/* Search Button and Actions */}
           <div className="search-action">
-            <button
-              type="button"
-              className="search-btn primary"
-              onClick={handleSearch}
-              disabled={!canSearch}
-            >
-              {isSearching ? (
-                <>
-                  <span className="loading-spinner-small" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <span className="codicon codicon-search" aria-hidden="true"></span>
-                  Run Vector Search
-                </>
-              )}
-            </button>
+            <div className="search-action-primary-row">
+              <button
+                type="button"
+                className="search-btn primary"
+                onClick={handleSearch}
+                disabled={!canSearch}
+              >
+                {isSearching ? (
+                  <>
+                    <span className="loading-spinner-small" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <span className="codicon codicon-search" aria-hidden="true"></span>
+                    Run Vector Search
+                  </>
+                )}
+              </button>
+
+              <div
+                className={`query-profile-compact ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
+                title={
+                  queryProfilingSupported
+                    ? 'Include per-shard timing data in each search. This preference is remembered.'
+                    : 'Query profiling requires Weaviate 1.36.9 or newer.'
+                }
+              >
+                <label htmlFor="query-profile-toggle">
+                  <input
+                    type="checkbox"
+                    id="query-profile-toggle"
+                    checked={queryProfileEnabled}
+                    onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                    disabled={isSearching || !queryProfilingSupported}
+                  />
+                  <span className="codicon codicon-pulse" aria-hidden="true"></span>
+                  <span>Profile</span>
+                </label>
+                {queryProfileEnabled && queryProfileResult && (
+                  <button
+                    type="button"
+                    className="query-profile-details-button"
+                    onClick={() => setIsProfileDetailsOpen((open) => !open)}
+                    aria-expanded={isProfileDetailsOpen}
+                    aria-controls="query-profile-details"
+                  >
+                    <span className="codicon codicon-graph-line" aria-hidden="true"></span>
+                    {isProfileDetailsOpen ? 'Hide profile' : 'View profile'}
+                  </button>
+                )}
+                {!queryProfilingSupported && (
+                  <span className="query-profile-requires">1.36.9+</span>
+                )}
+              </div>
+            </div>
 
             <div className="search-action-secondary">
               {searchResults.length > 0 && (
@@ -600,6 +728,13 @@ export function VectorSearchPanel({
               />
             </div>
           </div>
+
+          {/* Keep expensive diagnostic details out of the main result flow until requested. */}
+          {queryProfileEnabled && queryProfileResult && isProfileDetailsOpen && (
+            <div id="query-profile-details" className="query-profile-disclosure" aria-live="polite">
+              <QueryProfileDetails profile={queryProfileResult} />
+            </div>
+          )}
 
           {/* Search Results */}
           <div className="search-results-container">

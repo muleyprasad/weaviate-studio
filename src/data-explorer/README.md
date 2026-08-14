@@ -31,6 +31,18 @@ Four search modes to find similar objects:
    - Score breakdown showing keyword, semantic, and combined scores
    - Property selection for targeted search
 
+### Query Profiling
+
+Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 1.36.9):
+
+- **Enable**: Check the compact **Profile** checkbox beside **Run Vector Search** before running a search
+- **Persistent preference**: The extension remembers the choice across collection changes and Data Explorer panel reopens
+- **On-demand details**: After a profiled search returns, select **View profile** to reveal the timing breakdown; select **Hide profile** to return to the normal results flow
+- **Per-shard breakdown**: Each shard shows its node, search type sections, and returned timing metrics
+- **Vector search metrics**: Total time, HNSW layer traversal, rescoring, filter evaluation, and object hydration
+- **Keyword/BM25 metrics**: Term reading time and BlockMax WAND scoring time when Weaviate returns them
+- **Non-timing metrics**: Filter match counts and flat-search (brute-force) indicators
+
 ### Export
 
 - **Multiple formats** - JSON or CSV
@@ -45,7 +57,7 @@ Four search modes to find similar objects:
 
 - **Virtual scrolling** for smooth performance with large datasets (1000+ objects)
 - **Keyboard shortcuts** - Ctrl+F (filters), Ctrl+K (vector search), Ctrl+E (export), Ctrl+R (refresh)
-- **User preferences persistence** - column visibility, sort order, and panel states saved per collection
+- **User preferences persistence** - column visibility, sort order, and panel states saved per collection; the query-profiling preference is retained across collection changes and Data Explorer panel reopens
 - **Loading states** with skeleton screens and progress indicators
 - **Error handling** with recovery options and user-friendly messages
 - **Accessibility** - ARIA labels, keyboard navigation, and high contrast mode support
@@ -86,7 +98,9 @@ Four search modes to find similar objects:
    - **Object**: Click "Find Similar" from any object's action menu
    - **Vector**: Paste an embedding vector (advanced users)
 3. Adjust distance threshold and result limit as needed
-4. Click "Search" to view results with similarity scores
+4. Optionally enable **Profile** beside **Run Vector Search** to request timing data (Weaviate ≥ 1.36.9). This preference is remembered.
+5. Click **Run Vector Search** to view results with similarity scores.
+6. After a profiled search returns, select **View profile** to open the per-shard timing breakdown only when you need it.
 
 ### Export Data
 
@@ -171,9 +185,9 @@ Four search modes to find similar objects:
 
 ## Requirements
 
-- **Weaviate**: v1.23 or later
-- **Weaviate TypeScript Client**: v3.0 or later
-- **VS Code**: 1.80 or later
+- **Weaviate**: v1.23 or later (v1.36.9+ for query profiling)
+- **Weaviate TypeScript Client**: v3.14 or later
+- **VS Code**: 1.101 or later
 
 ## Contributing
 

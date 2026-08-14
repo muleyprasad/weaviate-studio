@@ -1,16 +1,12 @@
 services:
   weaviate:
-    image: cr.weaviate.io/semitechnologies/weaviate:1.36.9
+    image: cr.weaviate.io/semitechnologies/weaviate:1.38.8
     restart: on-failure:0
     ports:
       - 8080:8080
       - 50051:50051
-    volumes:
-      - weaviate_data:/var/lib/weaviate
-      - weaviate_backups:/var/lib/weaviate/backups
     environment:
       QUERY_DEFAULTS_LIMIT: 25
-      # Authentication – API key auth with a local sandbox key
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
       AUTHENTICATION_APIKEY_ENABLED: 'true'
       AUTHENTICATION_APIKEY_ALLOWED_KEYS: 'test-key-123'
@@ -18,24 +14,21 @@ services:
       AUTHORIZATION_ADMINLIST_ENABLED: 'true'
       AUTHORIZATION_ADMINLIST_USERS: 'test-key-123'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      # Vectorization: local transformers (free, no API key needed for imports)
-      # Generative: OpenAI (requires OPENAI_API_KEY only when running RAG queries)
       DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
-      ENABLE_MODULES: 'text2vec-transformers,generative-openai,backup-filesystem'
+      ENABLE_MODULES: 'text2vec-transformers'
       TRANSFORMERS_INFERENCE_API: 'http://text2vec-transformers:8080'
-      # Set OPENAI_API_KEY in .env – only needed for generative / RAG queries
-      OPENAI_APIKEY: ${OPENAI_API_KEY:-}
       CLUSTER_HOSTNAME: 'node1'
-      # Backup filesystem configuration
-      BACKUP_FILESYSTEM_PATH: '/var/lib/weaviate/backups'
     depends_on:
-      - text2vec-transformers
+      text2vec-transformers:
+        condition: service_healthy
 
   text2vec-transformers:
     image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-multi-qa-MiniLM-L6-cos-v1
     environment:
-      ENABLE_CUDA: '0' # Set to '1' if you have GPU
-
-volumes:
-  weaviate_data:
-  weaviate_backups:
+      ENABLE_CUDA: '0'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --spider http://localhost:8080/.well-known/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s

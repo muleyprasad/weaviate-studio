@@ -2421,6 +2421,76 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground, #666);
 }
 
+/* ===== Compact Query Profiling Control ===== */
+.query-profile-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: max-content;
+    padding: 0 8px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #555));
+    border-radius: 6px;
+    background: var(--vscode-editor-background);
+    font-size: 11px;
+}
+
+.query-profile-compact label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 36px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.query-profile-compact input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--vscode-button-background, #0E639C);
+}
+
+.query-profile-compact label .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 13px;
+}
+
+.query-profile-details-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 3px 7px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--vscode-button-secondaryBackground, #3A3A3A);
+    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.query-profile-details-button:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.query-profile-details-button .codicon {
+    font-size: 12px;
+}
+
+.query-profile-compact.is-unavailable {
+    opacity: 0.7;
+}
+
+.query-profile-compact.is-unavailable label {
+    cursor: not-allowed;
+}
+
+.query-profile-requires {
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+}
+
 /* ===== Search Action Button ===== */
 .search-action {
     display: flex;
@@ -2428,6 +2498,16 @@ input[type="checkbox"]:focus-visible {
     gap: 8px;
     padding: 16px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.search-action-primary-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.search-action-primary-row .search-btn {
+    flex: 1;
 }
 
 /* Row that holds secondary buttons (Clear + Copy as Code) */
@@ -2488,6 +2568,93 @@ input[type="checkbox"]:focus-visible {
     border-top-color: white;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+/* ===== Query Profile Disclosure ===== */
+.query-profile-disclosure {
+    margin: 8px 16px 0;
+}
+
+.query-profile-details {
+    margin: 0;
+    border: 1px solid var(--vscode-panel-border, #333);
+    border-radius: 4px;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    font-size: 11px;
+}
+
+@media (max-width: 620px) {
+    .search-action-primary-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .query-profile-compact {
+        align-self: flex-start;
+    }
+}
+
+.query-profile-details-heading,
+.query-profile-shard-heading,
+.query-profile-metric {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.query-profile-details-heading {
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    color: var(--vscode-descriptionForeground);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.query-profile-shard {
+    padding: 8px 10px 4px;
+}
+
+.query-profile-shard-heading {
+    color: var(--vscode-foreground);
+    font-size: 11px;
+}
+
+.query-profile-shard-heading .codicon {
+    color: var(--vscode-textLink-foreground, #3794FF);
+}
+
+.query-profile-shard-heading > span:last-child {
+    margin-left: auto;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 10px;
+}
+
+.query-profile-search-type {
+    margin: 7px 0 0 20px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.query-profile-search-type > span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.query-profile-metric {
+    justify-content: space-between;
+    padding: 3px 0;
+}
+
+.query-profile-metric code {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 10px;
 }
 
 /* ===== Search Results Container ===== */
