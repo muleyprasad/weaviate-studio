@@ -70,19 +70,15 @@ Use the standalone profiling configuration for this PR. It starts only Weaviate 
 docker compose -f docker-compose.profiling.yml up -d
 ```
 
-Wait for Weaviate to report healthy:
-
-```bash
-curl -f -H 'Authorization: Bearer test-key-123' http://localhost:8080/v1/.well-known/ready
-```
-
 ### 3. Query profiling smoke test
 
-The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. After the service is healthy, seed a small collection with deterministic manual vectors:
+The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. Seed a small collection with deterministic manual vectors:
 
 ```bash
 node seed-query-profiling.cjs
 ```
+
+The seed command waits for Weaviate to become ready for up to 90 seconds, so run it directly after `docker compose ... up -d`.
 
 > The original `docker-compose.yml` is for the broader RAG sandbox and includes `text2vec-transformers`. Use `docker-compose.profiling.yml` for this profiling test; it deliberately requires no transformer service.
 

@@ -8,6 +8,45 @@
 const baseUrl = process.env.WEAVIATE_URL || 'http://127.0.0.1:8080';
 const apiKey = process.env.WEAVIATE_API_KEY || 'test-key-123';
 const collectionName = 'ProfileTest';
+const readinessTimeoutMs = 90_000;
+const readinessPollIntervalMs = 1_500;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForReady() {
+  const deadline = Date.now() + readinessTimeoutMs;
+  let lastStatus = 'connection not established';
+
+  console.log('Waiting for Weaviate to become ready...');
+
+  while (Date.now() < deadline) {
+    for (const withApiKey of [true, false]) {
+      try {
+        const response = await fetch(`${baseUrl}/v1/.well-known/ready`, {
+          headers: withApiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        });
+
+        if (response.ok) {
+          console.log('Weaviate is ready.');
+          return;
+        }
+
+        lastStatus = `HTTP ${response.status}`;
+        if (!withApiKey && response.status !== 401) {
+          break;
+        }
+      } catch (error) {
+        lastStatus = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    await sleep(readinessPollIntervalMs);
+  }
+
+  throw new Error(
+    `Weaviate did not become ready within ${readinessTimeoutMs / 1000}s (${lastStatus}). Check docker compose logs weaviate.`
+  );
+}
 
 async function request(path, options = {}) {
   const send = async (withApiKey) => {
@@ -39,6 +78,7 @@ async function request(path, options = {}) {
 }
 
 async function seed() {
+  await waitForReady();
   const meta = await request('/v1/meta');
   const version = meta?.version || 'unknown';
   const versionParts = version.split('.').map(Number);
