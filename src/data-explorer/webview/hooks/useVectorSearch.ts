@@ -166,8 +166,9 @@ export function useVectorSearch() {
           if (message.objects) {
             handleSearchResponse(message.objects, message.queryProfile);
           } else {
-            // Empty results
+            // Empty results must also clear profile metadata from any prior response.
             searchActions.setSearchResults([]);
+            searchActions.setQueryProfileResult(null);
           }
           break;
 
