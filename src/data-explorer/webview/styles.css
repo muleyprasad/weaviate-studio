@@ -2491,6 +2491,25 @@ input[type="checkbox"]:focus-visible {
     font-size: 10px;
 }
 
+/* ===== MMR Diversity Selection (compact control, mirrors query-profile-compact) ===== */
+.mmr-compact .mmr-balance {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+}
+
+.mmr-compact input[type='range'] {
+    width: 80px;
+}
+
+.mmr-balance-value {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    opacity: 0.8;
+    min-width: 28px;
+}
+
 /* ===== Search Action Button ===== */
 .search-action {
     display: flex;

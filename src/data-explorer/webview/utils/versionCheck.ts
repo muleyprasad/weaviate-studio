@@ -8,6 +8,7 @@ export const MULTI_TARGET_NEAR_MIN = '1.26.0';
 export const MULTI_TARGET_HYBRID_MIN = '1.27.0';
 export const MUVERA_MIN = '1.31.0';
 export const QUERY_PROFILING_MIN = '1.36.9';
+export const MMR_MIN = '1.39.0';
 
 /**
  * Parse a semantic version string into [major, minor, patch]
@@ -100,4 +101,12 @@ export function supportsMUVERA(serverVersion: string): boolean {
  */
 export function supportsQueryProfiling(serverVersion: string): boolean {
   return isVersionAtLeast(serverVersion, 1, 36, 9);
+}
+
+/**
+ * Check if MMR diversity selection is supported
+ * GA in Weaviate v1.39.0 (near-text / near-vector / near-object queries)
+ */
+export function supportsMMR(serverVersion: string): boolean {
+  return isVersionAtLeast(serverVersion, 1, 39, 0);
 }

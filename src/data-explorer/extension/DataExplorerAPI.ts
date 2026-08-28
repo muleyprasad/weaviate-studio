@@ -482,6 +482,12 @@ export class DataExplorerAPI {
       vectorOptions.distanceMetric = vectorSearch.distanceMetric;
     }
 
+    // MMR diversity selection (Weaviate ≥ 1.39, near-* queries).
+    // The webview version-gates the UI; we simply pass the option through.
+    if (vectorSearch.diversity) {
+      vectorOptions.diversity = vectorSearch.diversity;
+    }
+
     // Add target vector for named vectors or multi-target configuration
     if (vectorSearch.targetVector) {
       // Handle both single string (single target vector) and multi-target payload objects

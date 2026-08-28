@@ -6,6 +6,7 @@ import {
   supportsMultiTargetNear,
   supportsMultiTargetHybrid,
   supportsMUVERA,
+  supportsMMR,
 } from '../versionCheck';
 
 describe('versionCheck', () => {
@@ -63,6 +64,33 @@ describe('versionCheck', () => {
 
     test('returns false for invalid version', () => {
       expect(supportsQueryProfiling('invalid')).toBe(false);
+    });
+  });
+
+  describe('supportsMMR', () => {
+    test('returns true for 1.39.0', () => {
+      expect(supportsMMR('1.39.0')).toBe(true);
+    });
+
+    test('returns true for versions above 1.39.0', () => {
+      expect(supportsMMR('1.39.1')).toBe(true);
+      expect(supportsMMR('1.40.0')).toBe(true);
+      expect(supportsMMR('2.0.0')).toBe(true);
+    });
+
+    test('returns false for versions below 1.39.0', () => {
+      expect(supportsMMR('1.38.9')).toBe(false);
+      expect(supportsMMR('1.36.9')).toBe(false);
+      expect(supportsMMR('1.31.0')).toBe(false);
+    });
+
+    test('returns false for invalid version', () => {
+      expect(supportsMMR('invalid')).toBe(false);
+    });
+
+    test('handles v-prefixed versions', () => {
+      expect(supportsMMR('v1.39.0')).toBe(true);
+      expect(supportsMMR('v1.38.0')).toBe(false);
     });
   });
 
