@@ -30,6 +30,7 @@ import {
   supportsMultiTargetNear,
   supportsMultiTargetHybrid,
   supportsQueryProfiling,
+  supportsMMR,
 } from '../../utils/versionCheck';
 import { validateMultiTargetConfig } from '../../utils/multiTargetBuilder';
 
@@ -166,6 +167,15 @@ export function VectorSearchPanel({
       return false;
     }
     return supportsQueryProfiling(serverVersion);
+  }, [dataState.serverVersion]);
+
+  // Check if MMR diversity selection is supported by the server (GA in Weaviate 1.39)
+  const mmrSupported = useMemo(() => {
+    const serverVersion = dataState.serverVersion;
+    if (!serverVersion) {
+      return false;
+    }
+    return supportsMMR(serverVersion);
   }, [dataState.serverVersion]);
 
   // Handle keyboard escape to close panel (only add listener when open)
@@ -695,6 +705,50 @@ export function VectorSearchPanel({
                   <span className="query-profile-requires">1.36.9+</span>
                 )}
               </div>
+
+              {/* MMR diversity selection (near-* modes; hybrid pending client 3.15 — see #88) */}
+              {searchMode !== 'hybrid' && (
+                <div
+                  className={`query-profile-compact mmr-compact ${!mmrSupported ? 'is-unavailable' : ''}`}
+                  title={
+                    mmrSupported
+                      ? 'Re-rank results with MMR to reduce redundancy. Balance trades diversity (0) against relevance (1).'
+                      : 'MMR diversity selection requires Weaviate 1.39 or newer.'
+                  }
+                >
+                  <label htmlFor="mmr-toggle">
+                    <input
+                      type="checkbox"
+                      id="mmr-toggle"
+                      checked={searchParams.mmrEnabled}
+                      onChange={(e) => actions.setSearchParams({ mmrEnabled: e.target.checked })}
+                      disabled={isSearching || !mmrSupported}
+                    />
+                    <span className="codicon codicon-symbol-array" aria-hidden="true"></span>
+                    <span>Diversify</span>
+                  </label>
+                  {searchParams.mmrEnabled && mmrSupported && (
+                    <span className="mmr-balance">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={searchParams.mmrBalance}
+                        onChange={(e) =>
+                          actions.setSearchParams({ mmrBalance: parseFloat(e.target.value) })
+                        }
+                        disabled={isSearching}
+                        aria-label="MMR balance (0 = most diverse, 1 = most relevant)"
+                      />
+                      <span className="mmr-balance-value">
+                        {searchParams.mmrBalance.toFixed(2)}
+                      </span>
+                    </span>
+                  )}
+                  {!mmrSupported && <span className="query-profile-requires">1.39+</span>}
+                </div>
+              )}
             </div>
 
             <div className="search-action-secondary">
