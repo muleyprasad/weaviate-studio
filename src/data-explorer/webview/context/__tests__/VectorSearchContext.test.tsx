@@ -818,6 +818,9 @@ describe('VectorSearchContext', () => {
         fusionType: 'rankedFusion',
         searchProperties: [],
         enableQueryRewriting: false,
+        mmrEnabled: false,
+        mmrBalance: 0.5,
+        mmrLimit: undefined,
         targetVector: undefined,
       });
     });

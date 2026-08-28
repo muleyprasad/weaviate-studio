@@ -237,6 +237,14 @@ export interface NamedVectorInfo {
   properties?: string[];
 }
 
+// MMR diversity selection (Weaviate ≥ 1.39)
+// Mirrors `DiversityConfig` in weaviate-client: { type: 'mmr', limit?, balance? }
+export interface MmrDiversityOptions {
+  type: 'mmr';
+  balance?: number; // 0 = max diversity, 1 = max relevance (default 0.5)
+  limit?: number; // Candidate pool size MMR re-ranks (server default when omitted)
+}
+
 export interface VectorSearchParams {
   type: VectorSearchType;
   // nearText parameters
@@ -250,6 +258,8 @@ export interface VectorSearchParams {
   distance?: number;
   distanceMetric?: string;
   targetVector?: string | MultiTargetPayload;
+  // MMR diversity selection (Weaviate ≥ 1.39, near-* queries)
+  diversity?: MmrDiversityOptions;
   // Hybrid search parameters
   alpha?: number; // 0 = pure BM25, 1 = pure vector
   fusionType?: 'rankedFusion' | 'relativeScoreFusion';

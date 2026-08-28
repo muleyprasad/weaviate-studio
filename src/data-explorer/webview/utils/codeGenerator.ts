@@ -46,6 +46,15 @@ export function generateTypeScriptSnippet(params: {
     options.push(`    alpha: ${searchParams.hybridAlpha}`);
   }
 
+  // Add MMR diversity selection if applicable (Weaviate ≥ 1.39, near-* queries)
+  if (searchParams.mmrEnabled && searchMode !== 'hybrid') {
+    const mmrParts = [`type: "mmr"`, `balance: ${searchParams.mmrBalance}`];
+    if (searchParams.mmrLimit !== undefined) {
+      mmrParts.push(`limit: ${searchParams.mmrLimit}`);
+    }
+    options.push(`    diversity: { ${mmrParts.join(', ')} }`);
+  }
+
   // Add target vector or multi-target configuration
   if (targetVector) {
     if (typeof targetVector === 'string') {
@@ -135,6 +144,16 @@ export function generatePythonSnippet(params: {
 
   if (searchMode === 'hybrid') {
     kwargs.push(`alpha=${searchParams.hybridAlpha}`);
+  }
+
+  // Add MMR diversity selection if applicable (Weaviate ≥ 1.39, near-* queries;
+  // requires a Python client version with 1.39 MMR support)
+  if (searchParams.mmrEnabled && searchMode !== 'hybrid') {
+    const mmrParts = [`"type": "mmr"`, `"balance": ${searchParams.mmrBalance}`];
+    if (searchParams.mmrLimit !== undefined) {
+      mmrParts.push(`"limit": ${searchParams.mmrLimit}`);
+    }
+    kwargs.push(`diversity={${mmrParts.join(', ')}}`);
   }
 
   if (targetVector) {
