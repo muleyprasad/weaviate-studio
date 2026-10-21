@@ -78,7 +78,7 @@ docker compose -f docker-compose.profiling.yml ps
 
 ### 3. Query profiling smoke test
 
-The profiling sandbox runs **Weaviate 1.38.8**, which supports query profiling. Seed three small, searchable collections:
+The profiling sandbox runs **Weaviate 1.38.22**, which supports query profiling. Seed three small, searchable collections:
 
 ```bash
 node seed-query-profiling.cjs
