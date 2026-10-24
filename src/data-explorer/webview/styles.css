@@ -255,11 +255,16 @@
 /* Removed - checkboxes not needed */
 
 .header-cell.actions-cell {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
+    position: sticky;
+    right: 0;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
     text-align: center;
     padding: 8px 12px;
+    background-color: var(--vscode-editor-background);
+    z-index: 12;
+    border-left: 1px solid var(--vscode-panel-border, #333);
 }
 
 /* Removed - checkboxes not needed */
@@ -371,6 +376,15 @@
     font-size: 14px;
 }
 
+.actions-header-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+    color: var(--vscode-foreground);
+}
+
 /* ===== Table Body ===== */
 .data-table-body {
     background-color: var(--vscode-editor-background);
@@ -408,11 +422,24 @@
 /* Removed - checkboxes not needed */
 
 .data-cell.actions-cell {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
+    position: sticky;
+    right: 0;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
     text-align: center;
     padding: 10px 12px;
+    background-color: var(--vscode-editor-background);
+    z-index: 6;
+    border-left: 1px solid var(--vscode-panel-border, #333);
+}
+
+.data-row:hover .data-cell.actions-cell {
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+}
+
+.data-row.selected .data-cell.actions-cell {
+    background-color: var(--vscode-list-activeSelectionBackground, rgba(14, 99, 156, 0.3));
 }
 
 .data-cell.pinned {
@@ -1485,6 +1512,20 @@ body:has(.vector-search-panel.open) .detail-panel {
 
 .detail-panel-actions .action-btn.secondary:hover {
     background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.detail-panel-actions .action-btn.danger {
+    background-color: var(--vscode-button-dangerBackground, #c72e2e);
+    color: var(--vscode-button-dangerForeground, #ffffff);
+}
+
+.detail-panel-actions .action-btn.danger:hover:not(:disabled) {
+    background-color: var(--vscode-button-dangerHoverBackground, #e03838);
+}
+
+.detail-panel-actions .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ===== Accessibility ===== */

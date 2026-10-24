@@ -13,12 +13,16 @@ interface DetailPanelProps {
   object: WeaviateObject | null;
   onClose: () => void;
   onFindSimilar?: (uuid: string) => void;
+  onEdit?: (uuid: string) => void;
+  onDelete?: (uuid: string) => void;
 }
 
 export const DetailPanel = React.memo(function DetailPanel({
   object,
   onClose,
   onFindSimilar,
+  onEdit,
+  onDelete,
 }: DetailPanelProps) {
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -228,9 +232,47 @@ export const DetailPanel = React.memo(function DetailPanel({
 
         {/* Actions */}
         <div className="detail-panel-actions">
+          {onEdit && (
+            <button
+              type="button"
+              className="action-btn primary"
+              onClick={() => onEdit(object.uuid)}
+              disabled={dataState.readOnly}
+              title={
+                dataState.readOnly
+                  ? 'Editing is disabled on read-only connections'
+                  : 'Edit this object'
+              }
+              aria-label="Edit object"
+            >
+              <span className="codicon codicon-edit" aria-hidden="true"></span>
+              Edit
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className="action-btn danger"
+              onClick={() => {
+                onDelete(object.uuid);
+                onClose();
+              }}
+              disabled={dataState.readOnly}
+              title={
+                dataState.readOnly
+                  ? 'Deleting is disabled on read-only connections'
+                  : 'Delete this object'
+              }
+              aria-label="Delete object"
+            >
+              <span className="codicon codicon-trash" aria-hidden="true"></span>
+              Delete
+            </button>
+          )}
           {onFindSimilar && (
             <button
-              className="action-btn primary"
+              type="button"
+              className="action-btn secondary"
               onClick={handleFindSimilar}
               title="Find objects similar to this one"
             >
@@ -238,7 +280,7 @@ export const DetailPanel = React.memo(function DetailPanel({
               Find Similar
             </button>
           )}
-          <button className="action-btn secondary" onClick={onClose}>
+          <button type="button" className="action-btn secondary" onClick={onClose}>
             Close
           </button>
         </div>

@@ -134,6 +134,50 @@ describe('ImportDialog', () => {
     expect(screen.getByText('Item 1: boom')).toBeInTheDocument();
   });
 
+  test('partial failure with successful records refreshes immediately and stays open', () => {
+    render(<ImportDialog {...baseProps} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Paste' }));
+    fireEvent.change(screen.getByLabelText('Pasted import payload'), {
+      target: { value: '[{"a":1},{"bad":2}]' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Import/ }));
+    const requestId = mockedPost.mock.calls[0][0].requestId;
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          command: 'importComplete',
+          requestId,
+          importResult: { importedCount: 1, failedCount: 1, errors: ['Item 2: invalid'] },
+        },
+      })
+    );
+
+    expect(baseProps.onImported).toHaveBeenCalledTimes(1);
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/1 object, 1 failed/)).toBeInTheDocument();
+    expect(screen.getByText('Item 2: invalid')).toBeInTheDocument();
+  });
+
+  test('clears form state when closed and re-opened', () => {
+    const { rerender } = render(<ImportDialog {...baseProps} isOpen={true} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Paste' }));
+    const textarea = screen.getByLabelText('Pasted import payload') as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: { value: '[{"a":1}]' },
+    });
+    expect(textarea.value).toBe('[{"a":1}]');
+
+    // Close dialog
+    rerender(<ImportDialog {...baseProps} isOpen={false} />);
+    // Reopen dialog
+    rerender(<ImportDialog {...baseProps} isOpen={true} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Paste' }));
+    const reopenedTextarea = screen.getByLabelText('Pasted import payload') as HTMLTextAreaElement;
+    expect(reopenedTextarea.value).toBe('');
+  });
+
   test('import errors are shown inline', () => {
     render(<ImportDialog {...baseProps} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Paste' }));

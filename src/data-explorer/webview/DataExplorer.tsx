@@ -133,11 +133,6 @@ function DataExplorerContent() {
     return () => window.removeEventListener('message', handleMessage);
   }, [refresh]);
 
-  const editingObject = React.useMemo(
-    () => dataState.objects.find((obj) => obj.uuid === editingUuid) || null,
-    [dataState.objects, editingUuid]
-  );
-
   // Handle opening detail panel
   const handleOpenDetail = useCallback(
     (uuid: string) => {
@@ -146,7 +141,6 @@ function DataExplorerContent() {
     [uiActions]
   );
 
-  // Handle closing detail panel
   const handleCloseDetail = useCallback(() => {
     uiActions.closeDetailPanel();
   }, [uiActions]);
@@ -176,6 +170,20 @@ function DataExplorerContent() {
     vectorSearchState.searchResults,
     dataState.fetchedObjectDetail,
   ]);
+
+  const editingObject = React.useMemo(() => {
+    if (!editingUuid) {
+      return null;
+    }
+    const fromTable = dataState.objects.find((obj) => obj.uuid === editingUuid);
+    if (fromTable) {
+      return fromTable;
+    }
+    if (selectedObject?.uuid === editingUuid) {
+      return selectedObject;
+    }
+    return null;
+  }, [dataState.objects, editingUuid, selectedObject]);
 
   // Get schema properties for filter builder
   // Note: 'id' (UUID) is NOT included as a filterable property because Weaviate doesn't
@@ -342,6 +350,22 @@ function DataExplorerContent() {
           {/* Phase 6: Import button (writes are blocked on read-only connections) */}
           <ImportButton onClick={handleOpenImportDialog} disabled={dataState.readOnly} />
 
+          {/* Refresh button */}
+          <button
+            type="button"
+            className="toolbar-btn refresh-btn"
+            onClick={refresh}
+            disabled={isLoading}
+            title="Refresh data"
+            aria-label="Refresh data"
+          >
+            <span
+              className={`codicon codicon-refresh ${isLoading ? 'codicon-modifier-spin' : ''}`}
+              aria-hidden="true"
+            />
+            Refresh
+          </button>
+
           {/* Column manager button */}
           <button
             type="button"
@@ -407,8 +431,8 @@ function DataExplorerContent() {
           <DataTable
             onOpenDetail={handleOpenDetail}
             onFindSimilar={handleFindSimilar}
-            onEditObject={dataState.readOnly ? undefined : handleEditObject}
-            onDeleteObject={dataState.readOnly ? undefined : handleDeleteObject}
+            onEditObject={handleEditObject}
+            onDeleteObject={handleDeleteObject}
             refresh={refresh}
             isLoading={isLoading}
           />
@@ -422,6 +446,8 @@ function DataExplorerContent() {
             object={selectedObject}
             onClose={handleCloseDetail}
             onFindSimilar={handleFindSimilar}
+            onEdit={handleEditObject}
+            onDelete={handleDeleteObject}
           />
         </ErrorBoundary>
       )}

@@ -32,15 +32,26 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
   const requestIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const resetForm = useCallback(() => {
+    setFileName(null);
+    setFileText(null);
+    setUrl('');
+    setPasteText('');
+    setImporting(false);
+    setError(null);
+    setResult(null);
+    requestIdRef.current = null;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setImporting(false);
-      setError(null);
-      setResult(null);
-      requestIdRef.current = null;
+      resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, resetForm]);
 
   // Handle messages from extension
   useEffect(() => {
@@ -58,11 +69,14 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
         setImporting(false);
         requestIdRef.current = null;
         const importResult = message.importResult as ImportResult | undefined;
+        if (importResult && importResult.importedCount > 0) {
+          onImported();
+        }
         if (importResult && (importResult.failedCount > 0 || importResult.errors.length > 0)) {
           // Partial failure: stay open and show the summary
           setResult(importResult);
         } else {
-          onImported();
+          resetForm();
           onClose();
         }
       } else if (message.command === 'error' && message.requestId?.startsWith('import-')) {
@@ -74,7 +88,7 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [isOpen, onClose, onImported]);
+  }, [isOpen, onClose, onImported, resetForm]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -130,25 +144,32 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
     });
   }, [canImport, collectionName, currentPayload, fileText, format, source]);
 
+  const handleClose = useCallback(() => {
+    if (!importing) {
+      resetForm();
+      onClose();
+    }
+  }, [importing, resetForm, onClose]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape' && !importing) {
-        onClose();
+        handleClose();
       }
     },
-    [onClose, importing]
+    [handleClose, importing]
   );
 
   const handleBackdropClick = useCallback(() => {
     if (!importing) {
-      onClose();
+      handleClose();
     }
-  }, [onClose, importing]);
+  }, [handleClose, importing]);
 
   const handleDone = useCallback(() => {
-    onImported();
+    resetForm();
     onClose();
-  }, [onImported, onClose]);
+  }, [resetForm, onClose]);
 
   if (!isOpen) {
     return null;
@@ -168,7 +189,7 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
           <button
             type="button"
             className="dialog-close-btn"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={importing}
             aria-label="Close dialog"
           >
@@ -313,7 +334,7 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
           <button
             type="button"
             className="dialog-btn secondary"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={importing}
           >
             {result ? 'Close' : 'Cancel'}

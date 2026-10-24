@@ -146,8 +146,9 @@ export function TableHeader({
 
         {/* Actions column */}
         <th className="header-cell actions-cell" role="columnheader">
-          <div className="actions-header" aria-label="Actions">
+          <div className="actions-header" aria-label="Actions" title="Row actions">
             <span className="codicon codicon-gear" aria-hidden="true"></span>
+            <span className="actions-header-label">Actions</span>
           </div>
         </th>
       </tr>
