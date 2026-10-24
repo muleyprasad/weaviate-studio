@@ -592,13 +592,13 @@
 }
 
 .row-action-btn {
-    background: none;
-    border: none;
+    background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.15));
+    border: 1px solid var(--vscode-button-border, transparent);
     cursor: pointer;
-    padding: 6px;
-    font-size: 16px;
-    opacity: 0.7;
-    transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+    padding: 4px;
+    font-size: 14px;
+    opacity: 0.9;
+    transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
     border-radius: 4px;
     color: var(--vscode-foreground);
     display: inline-flex;
@@ -608,15 +608,21 @@
     height: 28px;
 }
 
+.row-action-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
 .row-action-btn .codicon {
     font-size: 16px;
     display: inline-block;
 }
 
-.row-action-btn:hover {
+.row-action-btn:hover:not(:disabled) {
     opacity: 1;
-    transform: scale(1.1);
-    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+    transform: scale(1.08);
+    background-color: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
 }
 
 .row-action-btn:focus-visible {

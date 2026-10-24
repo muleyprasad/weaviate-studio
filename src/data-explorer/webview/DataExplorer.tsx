@@ -362,7 +362,17 @@ function DataExplorerContent() {
             <span
               className={`codicon codicon-refresh ${isLoading ? 'codicon-modifier-spin' : ''}`}
               aria-hidden="true"
-            />
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                style={{ verticalAlign: 'middle', marginRight: 4 }}
+              >
+                <path d="M13.65 2.35A7.95 7.95 0 0 0 8 0a8 8 0 1 0 8 8h-1.5a6.5 6.5 0 1 1-1.9-4.6l-2.1 2.1h5.5V0l-2.35 2.35z" />
+              </svg>
+            </span>
             Refresh
           </button>
 
