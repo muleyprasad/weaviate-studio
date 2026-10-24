@@ -3,7 +3,7 @@
  * Renders a single object row with type-specific cells
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { CellRenderer } from './CellRenderer';
 import type { WeaviateObject, CollectionConfig } from '../../../types';
 
@@ -17,6 +17,9 @@ interface TableRowProps {
   onSelect: (uuid: string) => void;
   onRowClick: (uuid: string) => void;
   onFindSimilar?: (uuid: string) => void;
+  onEdit?: (uuid: string) => void;
+  onDelete?: (uuid: string) => void;
+  readOnly?: boolean;
 }
 
 function TableRowComponent({
@@ -29,7 +32,12 @@ function TableRowComponent({
   onSelect,
   onRowClick,
   onFindSimilar,
+  onEdit,
+  onDelete,
+  readOnly = false,
 }: TableRowProps) {
+  // Two-step delete confirmation state
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const handleCheckboxChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       e.stopPropagation();
@@ -67,6 +75,33 @@ function TableRowComponent({
     },
     [onFindSimilar, object.uuid]
   );
+
+  const handleEditClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setConfirmingDelete(false);
+      onEdit?.(object.uuid);
+    },
+    [onEdit, object.uuid]
+  );
+
+  const handleDeleteClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (confirmingDelete) {
+        setConfirmingDelete(false);
+        onDelete?.(object.uuid);
+      } else {
+        setConfirmingDelete(true);
+      }
+    },
+    [confirmingDelete, onDelete, object.uuid]
+  );
+
+  const handleCancelDeleteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmingDelete(false);
+  }, []);
 
   const getCellValue = (column: string): unknown => {
     if (column === 'uuid') {
@@ -135,6 +170,57 @@ function TableRowComponent({
           >
             <span className="codicon codicon-eye" aria-hidden="true"></span>
           </button>
+          {confirmingDelete ? (
+            <>
+              <button
+                type="button"
+                className="row-action-btn delete-confirm-btn"
+                onClick={handleDeleteClick}
+                title="Confirm delete"
+                aria-label="Confirm delete"
+              >
+                <span className="codicon codicon-check" aria-hidden="true"></span>
+              </button>
+              <button
+                type="button"
+                className="row-action-btn"
+                onClick={handleCancelDeleteClick}
+                title="Cancel delete"
+                aria-label="Cancel delete"
+              >
+                <span className="codicon codicon-close" aria-hidden="true"></span>
+              </button>
+            </>
+          ) : (
+            <>
+              {onEdit && (
+                <button
+                  type="button"
+                  className="row-action-btn edit-btn"
+                  onClick={handleEditClick}
+                  disabled={readOnly}
+                  title={readOnly ? 'Editing is disabled on read-only connections' : 'Edit object'}
+                  aria-label="Edit object"
+                >
+                  <span className="codicon codicon-edit" aria-hidden="true"></span>
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className="row-action-btn delete-btn"
+                  onClick={handleDeleteClick}
+                  disabled={readOnly}
+                  title={
+                    readOnly ? 'Deleting is disabled on read-only connections' : 'Delete object'
+                  }
+                  aria-label="Delete object"
+                >
+                  <span className="codicon codicon-trash" aria-hidden="true"></span>
+                </button>
+              )}
+            </>
+          )}
         </div>
       </td>
     </tr>
@@ -180,6 +266,16 @@ function arePropsEqual(prevProps: TableRowProps, nextProps: TableRowProps): bool
 
   // Re-render if column widths reference changes
   if (prevProps.columnWidths !== nextProps.columnWidths) {
+    return false;
+  }
+
+  // Re-render if read-only state changes (affects action buttons)
+  if (prevProps.readOnly !== nextProps.readOnly) {
+    return false;
+  }
+
+  // Re-render if action handlers change
+  if (prevProps.onEdit !== nextProps.onEdit || prevProps.onDelete !== nextProps.onDelete) {
     return false;
   }
 

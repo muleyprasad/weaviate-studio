@@ -605,6 +605,99 @@
     color: var(--vscode-charts-green, #10B981);
 }
 
+.row-action-btn.edit-btn:hover {
+    color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.row-action-btn.delete-btn:hover,
+.row-action-btn.delete-confirm-btn {
+    color: var(--vscode-errorForeground, #f48771);
+}
+
+.row-action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Phase 6: import dialog */
+.import-source-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.import-source-tab {
+    background: none;
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.import-source-tab.selected {
+    background-color: var(--vscode-button-background, #0E639C);
+    color: var(--vscode-button-foreground, #FFFFFF);
+    border-color: transparent;
+}
+
+.import-source-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.import-source-pane {
+    margin-top: 4px;
+}
+
+.import-url-input {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.import-paste-area,
+.edit-object-area {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    resize: vertical;
+}
+
+.import-hint {
+    font-size: 11px;
+    opacity: 0.7;
+    margin: 8px 0 0;
+}
+
+.import-file-name {
+    font-size: 12px;
+    margin: 8px 0 0;
+}
+
+.import-result {
+    margin-top: 16px;
+    font-size: 12px;
+}
+
+.import-result ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
 /* ===== Skeleton Loading ===== */
 .skeleton-row {
     animation: skeleton-pulse 1.5s ease-in-out infinite;

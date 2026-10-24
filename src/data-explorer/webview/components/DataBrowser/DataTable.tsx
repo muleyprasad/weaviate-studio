@@ -21,11 +21,20 @@ import {
 interface DataTableProps {
   onOpenDetail: (uuid: string) => void;
   onFindSimilar?: (uuid: string) => void;
+  onEditObject?: (uuid: string) => void;
+  onDeleteObject?: (uuid: string) => void;
   refresh: () => void;
   isLoading: boolean;
 }
 
-export function DataTable({ onOpenDetail, onFindSimilar, refresh, isLoading }: DataTableProps) {
+export function DataTable({
+  onOpenDetail,
+  onFindSimilar,
+  onEditObject,
+  onDeleteObject,
+  refresh,
+  isLoading,
+}: DataTableProps) {
   const dataState = useDataState();
   const uiState = useUIState();
   const uiActions = useUIActions();
@@ -271,6 +280,9 @@ export function DataTable({ onOpenDetail, onFindSimilar, refresh, isLoading }: D
                     onSelect={handleSelectRow}
                     onRowClick={handleRowClick}
                     onFindSimilar={onFindSimilar}
+                    onEdit={onEditObject}
+                    onDelete={onDeleteObject}
+                    readOnly={dataState.readOnly}
                   />
                 );
               })}
