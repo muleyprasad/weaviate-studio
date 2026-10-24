@@ -1,6 +1,12 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDataFetch } from '../useDataFetch';
-import { DataProvider, UIProvider, FilterProvider, VectorSearchProvider } from '../../context';
+import {
+  DataProvider,
+  UIProvider,
+  FilterProvider,
+  VectorSearchProvider,
+  useDataState,
+} from '../../context';
 import React from 'react';
 
 /**
@@ -494,6 +500,22 @@ describe('useDataFetch', () => {
       });
 
       // Should not throw or cause errors
+    });
+
+    test('updates read-only state when the connection changes', () => {
+      const { result } = renderHook(() => ({ fetch: useDataFetch(), state: useDataState() }), {
+        wrapper,
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { command: 'readOnlyChanged', readOnly: true },
+          })
+        );
+      });
+
+      expect(result.current.state.readOnly).toBe(true);
     });
 
     test('handles error message', () => {

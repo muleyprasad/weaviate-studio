@@ -13,12 +13,16 @@ interface DetailPanelProps {
   object: WeaviateObject | null;
   onClose: () => void;
   onFindSimilar?: (uuid: string) => void;
+  onEdit?: (uuid: string) => void;
+  onDelete?: (uuid: string) => void;
 }
 
 export const DetailPanel = React.memo(function DetailPanel({
   object,
   onClose,
   onFindSimilar,
+  onEdit,
+  onDelete,
 }: DetailPanelProps) {
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -228,9 +232,65 @@ export const DetailPanel = React.memo(function DetailPanel({
 
         {/* Actions */}
         <div className="detail-panel-actions">
+          {onEdit && (
+            <button
+              type="button"
+              className="action-btn primary"
+              onClick={() => onEdit(object.uuid)}
+              disabled={dataState.readOnly}
+              title={
+                dataState.readOnly
+                  ? 'Editing is disabled on read-only connections'
+                  : 'Edit this object'
+              }
+              aria-label="Edit object"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                aria-hidden="true"
+                style={{ marginRight: 6 }}
+              >
+                <path d="M13.23 1A2.78 2.78 0 0 0 11.26 1.8L2 11.05V14h2.95l9.26-9.26a2.77 2.77 0 0 0 0-3.93 2.76 2.76 0 0 0-1.98-.81zm0 1c.47 0 .93.18 1.28.53a1.78 1.78 0 0 1 0 2.52L12.7 6.86 10.14 4.3l1.8-1.8a1.78 1.78 0 0 1 1.29-.5zM9.44 5L12 7.56 4.53 15.03H2v-2.53L9.44 5z" />
+              </svg>
+              Edit
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className="action-btn danger"
+              onClick={() => {
+                onDelete(object.uuid);
+                onClose();
+              }}
+              disabled={dataState.readOnly}
+              title={
+                dataState.readOnly
+                  ? 'Deleting is disabled on read-only connections'
+                  : 'Delete this object'
+              }
+              aria-label="Delete object"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                aria-hidden="true"
+                style={{ marginRight: 6 }}
+              >
+                <path d="M11 2H9c0-.55-.45-1-1-1H8c-.55 0-1 .45-1 1H5c-.55 0-1 .45-1 1v1h8V3c0-.55-.45-1-1-1zm-6 3v9c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V5H5zm2 8H6V7h1v6zm2 0H8V7h1v6zm2 0h-1V7h1v6z" />
+              </svg>
+              Delete
+            </button>
+          )}
           {onFindSimilar && (
             <button
-              className="action-btn primary"
+              type="button"
+              className="action-btn secondary"
               onClick={handleFindSimilar}
               title="Find objects similar to this one"
             >
@@ -238,7 +298,7 @@ export const DetailPanel = React.memo(function DetailPanel({
               Find Similar
             </button>
           )}
-          <button className="action-btn secondary" onClick={onClose}>
+          <button type="button" className="action-btn secondary" onClick={onClose}>
             Close
           </button>
         </div>

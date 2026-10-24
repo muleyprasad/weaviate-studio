@@ -296,6 +296,11 @@ export type ExtensionMessageCommand =
   | 'exportComplete'
   | 'exportProgress'
   | 'exportCancelled'
+  // Phase 6: Import and row actions
+  | 'importComplete'
+  | 'objectUpdated'
+  | 'objectDeleted'
+  | 'readOnlyChanged'
   // Integration: deep-link to a specific object from external panels
   | 'openObjectDetail';
 
@@ -314,6 +319,10 @@ export type WebviewMessageCommand =
   | 'getAggregations'
   | 'exportObjects'
   | 'cancelExport'
+  // Phase 6: Import and row actions
+  | 'importObjects'
+  | 'updateObject'
+  | 'deleteObject'
   // Integration
   | 'openRagChat';
 
@@ -349,6 +358,9 @@ export interface ExtensionMessage {
   };
   // Integration
   uuid?: string; // For openObjectDetail deep-link
+  // Phase 6: Import and row actions
+  importResult?: ImportResult;
+  readOnly?: boolean; // Connection read-only state (schemaLoaded/init)
 }
 
 export interface WebviewMessage {
@@ -371,6 +383,10 @@ export interface WebviewMessage {
   // Phase 5: Aggregations and Export
   aggregationParams?: AggregationParams;
   exportParams?: ExportParams;
+  // Phase 6: Import and row actions
+  importParams?: ImportParams;
+  updateObjectParams?: UpdateObjectParams;
+  deleteObjectParams?: DeleteObjectParams;
   // Integration: openRagChat carries active filters to pass to RAG Chat
   activeFilters?: FilterCondition[];
   filterMatchMode?: FilterMatchMode;
@@ -548,6 +564,71 @@ export interface ExportParams {
   where?: FilterCondition[]; // For filtered scope
   matchMode?: FilterMatchMode;
   tenant?: string; // For multi-tenant collections
+}
+
+/**
+ * Import source options (Phase 6)
+ * file: content read from a local file in the webview
+ * url: remote URL fetched by the extension host
+ * paste: raw text pasted into the dialog
+ */
+export type ImportSource = 'file' | 'url' | 'paste';
+
+/**
+ * Import payload format
+ */
+export type ImportFormat = 'json' | 'csv';
+
+/**
+ * A single parsed object ready for insert
+ */
+export interface ImportObject {
+  id?: string;
+  properties: Record<string, unknown>;
+  vector?: number[];
+}
+
+/**
+ * Parameters for import API call.
+ * The webview sends raw text (or a URL); parsing happens in the extension host.
+ */
+export interface ImportParams {
+  collectionName: string;
+  source: ImportSource;
+  format: ImportFormat;
+  /** Raw payload text for file/paste sources; the URL for url source */
+  payload: string;
+  tenant?: string; // For multi-tenant collections
+}
+
+/**
+ * Result of an import operation
+ */
+export interface ImportResult {
+  collectionName: string;
+  importedCount: number;
+  failedCount: number;
+  /** Capped list of human-readable failure reasons */
+  errors: string[];
+}
+
+/**
+ * Parameters for updating a single object (Phase 6)
+ */
+export interface UpdateObjectParams {
+  collectionName: string;
+  uuid: string;
+  properties: Record<string, unknown>;
+  tenant?: string;
+}
+
+/**
+ * Parameters for deleting a single object (Phase 6)
+ */
+export interface DeleteObjectParams {
+  collectionName: string;
+  uuid: string;
+  tenant?: string;
 }
 
 /**

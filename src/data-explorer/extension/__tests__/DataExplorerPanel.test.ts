@@ -397,6 +397,8 @@ describe('DataExplorerPanel', () => {
         command: 'schemaLoaded',
         schema: { name: 'TestCollection', properties: [] },
         collectionName: 'TestCollection',
+        // Phase 6: schemaLoaded carries the connection read-only state
+        readOnly: false,
       });
     });
 

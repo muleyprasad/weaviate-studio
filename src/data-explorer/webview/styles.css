@@ -255,11 +255,16 @@
 /* Removed - checkboxes not needed */
 
 .header-cell.actions-cell {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
+    position: sticky;
+    right: 0;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
     text-align: center;
     padding: 8px 12px;
+    background-color: var(--vscode-editor-background);
+    z-index: 12;
+    border-left: 1px solid var(--vscode-panel-border, #333);
 }
 
 /* Removed - checkboxes not needed */
@@ -371,6 +376,15 @@
     font-size: 14px;
 }
 
+.actions-header-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+    color: var(--vscode-foreground);
+}
+
 /* ===== Table Body ===== */
 .data-table-body {
     background-color: var(--vscode-editor-background);
@@ -408,11 +422,24 @@
 /* Removed - checkboxes not needed */
 
 .data-cell.actions-cell {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
+    position: sticky;
+    right: 0;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
     text-align: center;
     padding: 10px 12px;
+    background-color: var(--vscode-editor-background);
+    z-index: 6;
+    border-left: 1px solid var(--vscode-panel-border, #333);
+}
+
+.data-row:hover .data-cell.actions-cell {
+    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+}
+
+.data-row.selected .data-cell.actions-cell {
+    background-color: var(--vscode-list-activeSelectionBackground, rgba(14, 99, 156, 0.3));
 }
 
 .data-cell.pinned {
@@ -565,13 +592,13 @@
 }
 
 .row-action-btn {
-    background: none;
-    border: none;
+    background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.15));
+    border: 1px solid var(--vscode-button-border, transparent);
     cursor: pointer;
-    padding: 6px;
-    font-size: 16px;
-    opacity: 0.7;
-    transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+    padding: 4px;
+    font-size: 14px;
+    opacity: 0.9;
+    transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
     border-radius: 4px;
     color: var(--vscode-foreground);
     display: inline-flex;
@@ -581,15 +608,21 @@
     height: 28px;
 }
 
+.row-action-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
 .row-action-btn .codicon {
     font-size: 16px;
     display: inline-block;
 }
 
-.row-action-btn:hover {
+.row-action-btn:hover:not(:disabled) {
     opacity: 1;
-    transform: scale(1.1);
-    background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+    transform: scale(1.08);
+    background-color: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
 }
 
 .row-action-btn:focus-visible {
@@ -603,6 +636,99 @@
 
 .row-action-btn.find-similar-btn:hover {
     color: var(--vscode-charts-green, #10B981);
+}
+
+.row-action-btn.edit-btn:hover {
+    color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.row-action-btn.delete-btn:hover,
+.row-action-btn.delete-confirm-btn {
+    color: var(--vscode-errorForeground, #f48771);
+}
+
+.row-action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Phase 6: import dialog */
+.import-source-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.import-source-tab {
+    background: none;
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.import-source-tab.selected {
+    background-color: var(--vscode-button-background, #0E639C);
+    color: var(--vscode-button-foreground, #FFFFFF);
+    border-color: transparent;
+}
+
+.import-source-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.import-source-pane {
+    margin-top: 4px;
+}
+
+.import-url-input {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.import-paste-area,
+.edit-object-area {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--vscode-input-background, #3C3C3C);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, #3C3C3C);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    resize: vertical;
+}
+
+.import-hint {
+    font-size: 11px;
+    opacity: 0.7;
+    margin: 8px 0 0;
+}
+
+.import-file-name {
+    font-size: 12px;
+    margin: 8px 0 0;
+}
+
+.import-result {
+    margin-top: 16px;
+    font-size: 12px;
+}
+
+.import-result ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
 }
 
 /* ===== Skeleton Loading ===== */
@@ -1392,6 +1518,20 @@ body:has(.vector-search-panel.open) .detail-panel {
 
 .detail-panel-actions .action-btn.secondary:hover {
     background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
+}
+
+.detail-panel-actions .action-btn.danger {
+    background-color: var(--vscode-button-dangerBackground, #c72e2e);
+    color: var(--vscode-button-dangerForeground, #ffffff);
+}
+
+.detail-panel-actions .action-btn.danger:hover:not(:disabled) {
+    background-color: var(--vscode-button-dangerHoverBackground, #e03838);
+}
+
+.detail-panel-actions .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* ===== Accessibility ===== */

@@ -45,6 +45,11 @@ import type {
   ExportParams,
   ExportResult,
   ExportOptions,
+  ImportParams,
+  ImportResult,
+  ImportObject,
+  UpdateObjectParams,
+  DeleteObjectParams,
   PropertyTopValues,
   PropertyNumericStats,
   PropertyDateRange,
@@ -78,6 +83,12 @@ import {
   isTimeoutError,
   createTimeoutError,
 } from '../../shared/timeout';
+import { parseImportPayload, MAX_IMPORT_ERRORS } from './importUtils';
+
+type BatchInsertResult = {
+  hasErrors?: boolean;
+  errors?: Record<string, { message?: string } | string>;
+};
 
 /**
  * API class for interacting with Weaviate collections in the Data Explorer
@@ -1403,6 +1414,178 @@ export class DataExplorerAPI {
       console.error('Error exporting objects:', error);
       if (isTimeoutError(error)) {
         throw createTimeoutError('Export', `collection "${params.collectionName}"`);
+      }
+      throw error;
+    }
+  }
+
+  // =====================================================
+  // Phase 6: Import and Row Actions
+  // =====================================================
+
+  /**
+   * Returns a tenant-aware collection handle for write operations
+   */
+  private getWriteCollection(collectionName: string, tenant?: string): any {
+    return tenant
+      ? this.client.collections.use(collectionName).withTenant(tenant)
+      : this.client.collections.get(collectionName);
+  }
+
+  /**
+   * Validates a UUID string. Throws with context on failure.
+   */
+  private assertValidUuid(uuid: string, operation: string): void {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuid || typeof uuid !== 'string' || !uuidRegex.test(uuid)) {
+      throw new Error(`${operation} failed: invalid UUID "${uuid}"`);
+    }
+  }
+
+  /**
+   * Imports objects from a raw JSON/CSV payload into a collection.
+   * Parsing errors throw; per-object insert failures are collected
+   * in the result so partial imports survive.
+   */
+  async importObjects(params: ImportParams, signal?: AbortSignal): Promise<ImportResult> {
+    if (!params.collectionName) {
+      throw new Error('Import failed: collection name is required');
+    }
+
+    const { objects, warnings } = parseImportPayload(params.payload, params.format);
+    const errors: string[] = [...warnings];
+
+    const pushError = (message: string): void => {
+      if (errors.length < MAX_IMPORT_ERRORS) {
+        errors.push(message);
+      }
+    };
+
+    const processBatchResult = (result: unknown, itemOffset: number, itemCount: number): void => {
+      const batchResult = (result || {}) as BatchInsertResult;
+      const errorEntries = Object.entries(batchResult.errors || {});
+
+      if (!batchResult.hasErrors && errorEntries.length === 0) {
+        importedCount += itemCount;
+        return;
+      }
+
+      const failedIndexes = new Set<number>();
+      for (const [rawIndex, rawError] of errorEntries) {
+        const index = Number(rawIndex);
+        const message =
+          typeof rawError === 'string' ? rawError : rawError?.message || 'Batch insert failed';
+
+        if (Number.isInteger(index) && index >= 0 && index < itemCount) {
+          failedIndexes.add(index);
+          pushError(`Item ${itemOffset + index + 1}: ${message}`);
+        } else {
+          pushError(`Batch insert failed: ${message}`);
+        }
+      }
+
+      // The SDK should provide an indexed error for every failed object. If it
+      // reports an error without details, fail the whole request conservatively
+      // instead of claiming that the objects were imported.
+      if (failedIndexes.size === 0) {
+        failedCount += itemCount;
+        if (errorEntries.length === 0) {
+          pushError(`Items ${itemOffset + 1}-${itemOffset + itemCount}: batch insert failed`);
+        }
+        return;
+      }
+
+      importedCount += itemCount - failedIndexes.size;
+      failedCount += failedIndexes.size;
+    };
+
+    const collection = this.getWriteCollection(params.collectionName, params.tenant);
+    const CHUNK_SIZE = 100;
+    let importedCount = 0;
+    let failedCount = 0;
+
+    for (let offset = 0; offset < objects.length; offset += CHUNK_SIZE) {
+      if (signal?.aborted) {
+        throw new Error('Import cancelled');
+      }
+      const chunk = objects.slice(offset, CHUNK_SIZE + offset);
+      const payload = chunk.map((obj: ImportObject) => ({
+        ...(obj.id ? { id: obj.id } : {}),
+        properties: obj.properties,
+        ...(obj.vector ? { vectors: obj.vector } : {}),
+      }));
+
+      try {
+        const result = await collection.data.insertMany(payload);
+        processBatchResult(result, offset, chunk.length);
+      } catch {
+        // Chunk failed: retry one-by-one to salvage what we can
+        for (let i = 0; i < chunk.length; i++) {
+          if (signal?.aborted) {
+            throw new Error('Import cancelled');
+          }
+          try {
+            const result = await collection.data.insertMany([payload[i]]);
+            processBatchResult(result, offset + i, 1);
+          } catch (error) {
+            failedCount += 1;
+            const reason = error instanceof Error ? error.message : 'Unknown error';
+            pushError(`Item ${offset + i + 1}: ${reason}`);
+          }
+        }
+      }
+    }
+
+    return {
+      collectionName: params.collectionName,
+      importedCount,
+      failedCount,
+      errors,
+    };
+  }
+
+  /**
+   * Updates the properties of a single object (PATCH semantics).
+   */
+  async updateObject(params: UpdateObjectParams): Promise<{ uuid: string }> {
+    if (!params.collectionName) {
+      throw new Error('Update failed: collection name is required');
+    }
+    this.assertValidUuid(params.uuid, 'Update');
+    if (!params.properties || typeof params.properties !== 'object') {
+      throw new Error('Update failed: properties must be an object');
+    }
+
+    try {
+      const collection = this.getWriteCollection(params.collectionName, params.tenant);
+      await collection.data.update({ id: params.uuid, properties: params.properties });
+      return { uuid: params.uuid };
+    } catch (error) {
+      console.error('Error updating object:', error);
+      if (isTimeoutError(error)) {
+        throw createTimeoutError('Update', `object "${params.uuid}"`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a single object by UUID.
+   */
+  async deleteObject(params: DeleteObjectParams): Promise<{ uuid: string }> {
+    if (!params.collectionName) {
+      throw new Error('Delete failed: collection name is required');
+    }
+    this.assertValidUuid(params.uuid, 'Delete');
+
+    try {
+      const collection = this.getWriteCollection(params.collectionName, params.tenant);
+      await collection.data.deleteById(params.uuid);
+      return { uuid: params.uuid };
+    } catch (error) {
+      console.error('Error deleting object:', error);
+      if (isTimeoutError(error)) {
+        throw createTimeoutError('Delete', `object "${params.uuid}"`);
       }
       throw error;
     }

@@ -17,7 +17,11 @@ import type {
   CollectionConfig,
   AggregationParams,
   ExportParams,
+  ImportParams,
+  UpdateObjectParams,
+  DeleteObjectParams,
 } from '../types';
+import { MAX_IMPORT_PAYLOAD_CHARS } from './importUtils';
 
 /**
  * Manages the Data Explorer webview panel
@@ -47,7 +51,8 @@ export class DataExplorerPanel {
     collectionName: string,
     private readonly getClient: () => WeaviateClient | undefined,
     targetUuid?: string,
-    private readonly globalState?: vscode.Memento
+    private readonly globalState?: vscode.Memento,
+    private readonly isReadOnly?: () => boolean
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -107,7 +112,8 @@ export class DataExplorerPanel {
     collectionName: string,
     getClient: () => WeaviateClient | undefined,
     targetUuid?: string,
-    globalState?: vscode.Memento
+    globalState?: vscode.Memento,
+    isReadOnly?: () => boolean
   ): DataExplorerPanel {
     const panelKey = `${connectionId}:${collectionName}`;
     const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
@@ -150,7 +156,8 @@ export class DataExplorerPanel {
       collectionName,
       getClient,
       targetUuid,
-      globalState
+      globalState,
+      isReadOnly
     );
 
     DataExplorerPanel.panels.set(panelKey, dataExplorerPanel);
@@ -202,12 +209,51 @@ export class DataExplorerPanel {
   }
 
   /**
+   * Whether the backing connection is read-only.
+   * Live lookup so toggles apply to open panels; never throws.
+   */
+  private _isConnectionReadOnly(): boolean {
+    try {
+      return this.isReadOnly?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Blocks a write when the connection is read-only.
+   * Returns true when the caller must stop.
+   */
+  private _blockWriteIfReadOnly(requestId?: string): boolean {
+    if (!this._isConnectionReadOnly()) {
+      return false;
+    }
+    this.postMessage({
+      command: 'error',
+      error: 'Connection is read-only. Disable read-only mode to modify data.',
+      requestId,
+    });
+    return true;
+  }
+
+  /**
    * Closes all panels for a specific connection
    */
   public static closeForConnection(connectionId: string): void {
     DataExplorerPanel.panels.forEach((panel, key) => {
       if (key.startsWith(`${connectionId}:`)) {
         panel.dispose();
+      }
+    });
+  }
+
+  /**
+   * Updates the read-only state in every open Data Explorer for a connection.
+   */
+  public static updateReadOnlyForConnection(connectionId: string, readOnly: boolean): void {
+    DataExplorerPanel.panels.forEach((panel, key) => {
+      if (key.startsWith(`${connectionId}:`)) {
+        panel.postMessage({ command: 'readOnlyChanged', readOnly });
       }
     });
   }
@@ -314,6 +360,19 @@ export class DataExplorerPanel {
           this._handleCancelExport(message);
           break;
 
+        // Phase 6: Import and row actions
+        case 'importObjects':
+          await this._handleImportObjects(message);
+          break;
+
+        case 'updateObject':
+          await this._handleUpdateObject(message);
+          break;
+
+        case 'deleteObject':
+          await this._handleDeleteObject(message);
+          break;
+
         case 'openRagChat':
           // Open RAG Chat for this collection, passing active filters if any
           // Pass forceNew: false so it doesn't destroy an existing panel and clear history
@@ -378,6 +437,7 @@ export class DataExplorerPanel {
           isMultiTenant: true,
           tenants,
           serverVersion: serverVersion || undefined,
+          readOnly: this._isConnectionReadOnly(),
         });
 
         // Do NOT fetch objects - wait for tenant selection
@@ -399,6 +459,7 @@ export class DataExplorerPanel {
       collectionName: this._collectionName,
       isMultiTenant: false,
       serverVersion: serverVersion || undefined,
+      readOnly: this._isConnectionReadOnly(),
     });
 
     // Fetch initial objects for non-multi-tenant collections
@@ -488,6 +549,7 @@ export class DataExplorerPanel {
       command: 'schemaLoaded',
       schema,
       collectionName: this._collectionName,
+      readOnly: this._isConnectionReadOnly(),
     });
   }
 
@@ -754,6 +816,228 @@ export class DataExplorerPanel {
       // No active export
       this.postMessage({
         command: 'exportCancelled',
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Handles import objects request (Phase 6).
+   * For url sources the host fetches the payload; file/paste text arrives inline.
+   */
+  private async _handleImportObjects(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
+      return;
+    }
+    if (this._blockWriteIfReadOnly(message.requestId)) {
+      return;
+    }
+
+    try {
+      const params: ImportParams = {
+        collectionName: this._collectionName,
+        source: message.importParams?.source || 'paste',
+        format: message.importParams?.format || 'json',
+        payload: message.importParams?.payload || '',
+      };
+
+      if (this._selectedTenant) {
+        params.tenant = this._selectedTenant;
+      }
+
+      if (params.source === 'url') {
+        params.payload = await this._fetchImportUrl(params.payload);
+      }
+
+      const importResult = await this._api.importObjects(params);
+
+      vscode.window.showInformationMessage(
+        `Imported ${importResult.importedCount} object${importResult.importedCount === 1 ? '' : 's'}` +
+          (importResult.failedCount > 0 ? ` (${importResult.failedCount} failed)` : '') +
+          ` into ${this._collectionName}`
+      );
+
+      this.postMessage({
+        command: 'importComplete',
+        importResult,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Import failed';
+      console.error('DataExplorerPanel import error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Fetches an import payload from a remote URL with timeout and size cap.
+   */
+  private async _fetchImportUrl(url: string): Promise<string> {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid import URL');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Import URL must use http or https');
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(parsed.toString(), { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`Import URL returned ${response.status} ${response.statusText}`);
+      }
+      const maxPayloadBytes = MAX_IMPORT_PAYLOAD_CHARS * 4;
+      const contentLength = response.headers?.get?.('content-length');
+      if (contentLength && Number(contentLength) > maxPayloadBytes) {
+        throw new Error('Import payload exceeds the 10 MB limit');
+      }
+
+      // Some test/runtime fetch implementations do not expose a body stream.
+      // Keep the fallback bounded by validating the resulting text.
+      if (!response.body) {
+        const text = await response.text();
+        if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+          throw new Error('Import payload exceeds the 10 MB limit');
+        }
+        return text;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      let byteLength = 0;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          byteLength += value.byteLength;
+          if (byteLength > maxPayloadBytes) {
+            await reader.cancel().catch(() => undefined);
+            throw new Error('Import payload exceeds the 10 MB limit');
+          }
+
+          text += decoder.decode(value, { stream: true });
+          if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+            await reader.cancel().catch(() => undefined);
+            throw new Error('Import payload exceeds the 10 MB limit');
+          }
+        }
+
+        text += decoder.decode();
+        if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+          throw new Error('Import payload exceeds the 10 MB limit');
+        }
+        return text;
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Import URL request timed out after 30s');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Handles single-object update request (Phase 6)
+   */
+  private async _handleUpdateObject(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
+      return;
+    }
+    if (this._blockWriteIfReadOnly(message.requestId)) {
+      return;
+    }
+
+    try {
+      const params: UpdateObjectParams = {
+        collectionName: this._collectionName,
+        uuid: message.updateObjectParams?.uuid || message.uuid || '',
+        properties: message.updateObjectParams?.properties || {},
+      };
+      if (this._selectedTenant) {
+        params.tenant = this._selectedTenant;
+      }
+
+      const result = await this._api.updateObject(params);
+      this.postMessage({
+        command: 'objectUpdated',
+        uuid: result.uuid,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Update failed';
+      console.error('DataExplorerPanel update error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
+        requestId: message.requestId,
+      });
+    }
+  }
+
+  /**
+   * Handles single-object delete request (Phase 6)
+   */
+  private async _handleDeleteObject(message: WebviewMessage): Promise<void> {
+    if (!this._api) {
+      this.postMessage({
+        command: 'error',
+        error: 'Weaviate connection lost. Please reconnect.',
+        requestId: message.requestId,
+      });
+      return;
+    }
+    if (this._blockWriteIfReadOnly(message.requestId)) {
+      return;
+    }
+
+    try {
+      const params: DeleteObjectParams = {
+        collectionName: this._collectionName,
+        uuid: message.deleteObjectParams?.uuid || message.uuid || '',
+      };
+      if (this._selectedTenant) {
+        params.tenant = this._selectedTenant;
+      }
+
+      const result = await this._api.deleteObject(params);
+      this.postMessage({
+        command: 'objectDeleted',
+        uuid: result.uuid,
+        requestId: message.requestId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Delete failed';
+      console.error('DataExplorerPanel delete error:', error);
+      this.postMessage({
+        command: 'error',
+        error: errorMessage,
         requestId: message.requestId,
       });
     }

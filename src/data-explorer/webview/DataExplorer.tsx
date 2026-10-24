@@ -22,6 +22,8 @@ import { DetailPanel } from './components/ObjectDetail/DetailPanel';
 import { FilterPanel, FilterChips } from './components/FilterBuilder';
 import { VectorSearchPanel } from './components/VectorSearch';
 import { ExportDialog, ExportButton } from './components/Export';
+import { ImportDialog, ImportButton } from './components/Import';
+import { EditObjectDialog } from './components/DataBrowser/EditObjectDialog';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KeyboardShortcutsHelp } from './components/common';
 import { TenantSelector, TenantSelectionModal } from './components/TenantSelector';
@@ -66,6 +68,71 @@ function DataExplorerContent() {
     setShowExportDialog(false);
   }, []);
 
+  // Phase 6: Import dialog state
+  const [showImportDialog, setShowImportDialog] = React.useState(false);
+
+  const handleOpenImportDialog = useCallback(() => {
+    setShowImportDialog(true);
+  }, []);
+
+  const handleCloseImportDialog = useCallback(() => {
+    setShowImportDialog(false);
+  }, []);
+
+  const handleImported = useCallback(() => {
+    refresh();
+  }, [refresh]);
+
+  // Phase 6: Row edit/delete state
+  const [editingUuid, setEditingUuid] = React.useState<string | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
+  const handleEditObject = useCallback((uuid: string) => {
+    setDeleteError(null);
+    setEditingUuid(uuid);
+  }, []);
+
+  const handleCloseEditDialog = useCallback(() => {
+    setEditingUuid(null);
+  }, []);
+
+  const handleEditSaved = useCallback(() => {
+    refresh();
+  }, [refresh]);
+
+  const handleDeleteObject = useCallback(
+    (uuid: string) => {
+      setDeleteError(null);
+      postMessageToExtension({
+        command: 'deleteObject',
+        deleteObjectParams: {
+          collectionName: dataState.collectionName,
+          uuid,
+        },
+        requestId: `del-${Date.now()}`,
+      });
+    },
+    [dataState.collectionName]
+  );
+
+  // Refresh the list after a row delete; surface delete failures inline
+  React.useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const message = event.data;
+      if (!message || typeof message !== 'object') {
+        return;
+      }
+      if (message.command === 'objectDeleted') {
+        refresh();
+      } else if (message.command === 'error' && message.requestId?.startsWith('del-')) {
+        setDeleteError(message.error);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [refresh]);
+
   // Handle opening detail panel
   const handleOpenDetail = useCallback(
     (uuid: string) => {
@@ -74,7 +141,6 @@ function DataExplorerContent() {
     [uiActions]
   );
 
-  // Handle closing detail panel
   const handleCloseDetail = useCallback(() => {
     uiActions.closeDetailPanel();
   }, [uiActions]);
@@ -104,6 +170,20 @@ function DataExplorerContent() {
     vectorSearchState.searchResults,
     dataState.fetchedObjectDetail,
   ]);
+
+  const editingObject = React.useMemo(() => {
+    if (!editingUuid) {
+      return null;
+    }
+    const fromTable = dataState.objects.find((obj) => obj.uuid === editingUuid);
+    if (fromTable) {
+      return fromTable;
+    }
+    if (selectedObject?.uuid === editingUuid) {
+      return selectedObject;
+    }
+    return null;
+  }, [dataState.objects, editingUuid, selectedObject]);
 
   // Get schema properties for filter builder
   // Note: 'id' (UUID) is NOT included as a filterable property because Weaviate doesn't
@@ -153,6 +233,12 @@ function DataExplorerContent() {
     if (showExportDialog) {
       setShowExportDialog(false);
     }
+    if (showImportDialog) {
+      setShowImportDialog(false);
+    }
+    if (editingUuid) {
+      setEditingUuid(null);
+    }
     if (uiState.showDetailPanel) {
       uiActions.closeDetailPanel();
     }
@@ -160,6 +246,8 @@ function DataExplorerContent() {
     filterState.showFilterPanel,
     vectorSearchState.showVectorSearchPanel,
     showExportDialog,
+    showImportDialog,
+    editingUuid,
     uiState.showDetailPanel,
     filterActions,
     vectorSearchActions,
@@ -259,6 +347,35 @@ function DataExplorerContent() {
             disabled={dataState.objects.length === 0}
           />
 
+          {/* Phase 6: Import button (writes are blocked on read-only connections) */}
+          <ImportButton onClick={handleOpenImportDialog} disabled={dataState.readOnly} />
+
+          {/* Refresh button */}
+          <button
+            type="button"
+            className="toolbar-btn refresh-btn"
+            onClick={refresh}
+            disabled={isLoading}
+            title="Refresh data"
+            aria-label="Refresh data"
+          >
+            <span
+              className={`codicon codicon-refresh ${isLoading ? 'codicon-modifier-spin' : ''}`}
+              aria-hidden="true"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                style={{ verticalAlign: 'middle', marginRight: 4 }}
+              >
+                <path d="M13.65 2.35A7.95 7.95 0 0 0 8 0a8 8 0 1 0 8 8h-1.5a6.5 6.5 0 1 1-1.9-4.6l-2.1 2.1h5.5V0l-2.35 2.35z" />
+              </svg>
+            </span>
+            Refresh
+          </button>
+
           {/* Column manager button */}
           <button
             type="button"
@@ -303,11 +420,29 @@ function DataExplorerContent() {
           </div>
         )}
 
+        {/* Phase 6: inline delete failure notice */}
+        {deleteError && (
+          <div className="export-error" role="alert">
+            <span className="codicon codicon-error" aria-hidden="true"></span>
+            <span>{deleteError}</span>
+            <button
+              type="button"
+              className="dialog-close-btn"
+              onClick={() => setDeleteError(null)}
+              aria-label="Dismiss error"
+            >
+              <span className="codicon codicon-close" aria-hidden="true"></span>
+            </button>
+          </div>
+        )}
+
         {/* Data table with error boundary */}
         <ErrorBoundary fallbackMessage="Failed to load data table">
           <DataTable
             onOpenDetail={handleOpenDetail}
             onFindSimilar={handleFindSimilar}
+            onEditObject={handleEditObject}
+            onDeleteObject={handleDeleteObject}
             refresh={refresh}
             isLoading={isLoading}
           />
@@ -321,6 +456,8 @@ function DataExplorerContent() {
             object={selectedObject}
             onClose={handleCloseDetail}
             onFindSimilar={handleFindSimilar}
+            onEdit={handleEditObject}
+            onDelete={handleDeleteObject}
           />
         </ErrorBoundary>
       )}
@@ -354,6 +491,23 @@ function DataExplorerContent() {
         hasFilters={filterState.activeFilters.length > 0}
         where={filterState.activeFilters}
         matchMode={filterState.matchMode}
+      />
+
+      {/* Phase 6: Import dialog */}
+      <ImportDialog
+        isOpen={showImportDialog}
+        onClose={handleCloseImportDialog}
+        collectionName={dataState.collectionName}
+        onImported={handleImported}
+      />
+
+      {/* Phase 6: Edit object dialog */}
+      <EditObjectDialog
+        isOpen={editingUuid !== null}
+        onClose={handleCloseEditDialog}
+        collectionName={dataState.collectionName}
+        object={editingObject}
+        onSaved={handleEditSaved}
       />
 
       {/* Tenant selection modal for multi-tenant collections */}

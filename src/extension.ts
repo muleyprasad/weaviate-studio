@@ -1553,6 +1553,8 @@ export function activate(context: vscode.ExtensionContext) {
 
         const connectionManager = weaviateTreeDataProvider.getConnectionManager();
         const getClient = () => connectionManager.getClient(connectionId);
+        // Live lookup so read-only toggles apply to already-open panels
+        const isReadOnly = () => connectionManager.getConnection(connectionId)?.readOnly === true;
 
         getTelemetryService().trackUsage(TELEMETRY_EVENTS.DATA_EXPLORER_OPENED);
         DataExplorerPanel.createOrShow(
@@ -1561,7 +1563,8 @@ export function activate(context: vscode.ExtensionContext) {
           collectionName,
           getClient,
           targetUuid,
-          context.globalState
+          context.globalState,
+          isReadOnly
         );
       }
     ),
