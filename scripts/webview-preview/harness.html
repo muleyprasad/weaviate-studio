@@ -289,8 +289,15 @@
             }
         };
 
+        // Record what the webview sends so the payloads can be inspected from
+        // DevTools or a browser automation session.
+        window.__vscodeMessages = [];
+
         window.acquireVsCodeApi = () => ({
-            postMessage: reply,
+            postMessage: (message) => {
+                window.__vscodeMessages.push(message);
+                reply(message);
+            },
             getState: () => ({}),
             setState: () => {},
         });

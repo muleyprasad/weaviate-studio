@@ -126,6 +126,26 @@ describe('DataExplorerAPI - Vector Search', () => {
       expect(result.objects).toHaveLength(2);
     });
 
+    test('forwards MMR diversity options to the nearText query', async () => {
+      const vectorSearch: VectorSearchParams = {
+        type: 'nearText',
+        text: 'diverse query',
+        diversity: { type: 'mmr', balance: 0.25, limit: 50 },
+      };
+
+      await api.fetchObjects({
+        collectionName: 'Article',
+        limit: 10,
+        offset: 0,
+        vectorSearch,
+      });
+
+      expect(mockCollection.query.nearText).toHaveBeenCalledWith(
+        'diverse query',
+        expect.objectContaining({ diversity: { type: 'mmr', balance: 0.25, limit: 50 } })
+      );
+    });
+
     test('nearText search includes distance and certainty in results', async () => {
       const vectorSearch: VectorSearchParams = {
         type: 'nearText',

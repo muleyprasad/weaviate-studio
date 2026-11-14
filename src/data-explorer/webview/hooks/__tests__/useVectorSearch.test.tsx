@@ -572,6 +572,116 @@ describe('useVectorSearch', () => {
     });
   });
 
+  describe('MMR Diversity Selection', () => {
+    test('adds diversity to near-text searches when enabled', () => {
+      const { result: contextResult } = renderHook(
+        () => ({
+          search: useVectorSearch(),
+          context: require('../../context').useVectorSearchActions(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        contextResult.current.context.setSearchMode('text');
+        contextResult.current.context.setSearchParams({
+          query: 'diverse results',
+          mmrEnabled: true,
+          mmrBalance: 0.3,
+        });
+      });
+
+      act(() => {
+        contextResult.current.search.executeSearch();
+      });
+
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vectorSearch: expect.objectContaining({
+            type: 'nearText',
+            diversity: { type: 'mmr', balance: 0.3 },
+          }),
+        })
+      );
+    });
+
+    test('includes the candidate-pool limit when set', () => {
+      const { result: contextResult } = renderHook(
+        () => ({
+          search: useVectorSearch(),
+          context: require('../../context').useVectorSearchActions(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        contextResult.current.context.setSearchMode('vector');
+        contextResult.current.context.setSearchParams({
+          vector: '[0.1, 0.2]',
+          mmrEnabled: true,
+          mmrLimit: 100,
+        });
+      });
+
+      act(() => {
+        contextResult.current.search.executeSearch();
+      });
+
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vectorSearch: expect.objectContaining({
+            diversity: { type: 'mmr', balance: 0.5, limit: 100 },
+          }),
+        })
+      );
+    });
+
+    test('omits diversity when the toggle is off', () => {
+      const { result: contextResult } = renderHook(
+        () => ({
+          search: useVectorSearch(),
+          context: require('../../context').useVectorSearchActions(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        contextResult.current.context.setSearchMode('text');
+        contextResult.current.context.setSearchParams({ query: 'plain results' });
+      });
+
+      act(() => {
+        contextResult.current.search.executeSearch();
+      });
+
+      expect(mockPostMessage.mock.calls[0][0].vectorSearch.diversity).toBeUndefined();
+    });
+
+    test('omits diversity for hybrid searches', () => {
+      const { result: contextResult } = renderHook(
+        () => ({
+          search: useVectorSearch(),
+          context: require('../../context').useVectorSearchActions(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        contextResult.current.context.setSearchMode('hybrid');
+        contextResult.current.context.setSearchParams({
+          query: 'hybrid results',
+          mmrEnabled: true,
+        });
+      });
+
+      act(() => {
+        contextResult.current.search.executeSearch();
+      });
+
+      expect(mockPostMessage.mock.calls[0][0].vectorSearch.diversity).toBeUndefined();
+    });
+  });
+
   describe('Request ID Generation and Tracking', () => {
     test('generates unique request ID with vs- prefix', () => {
       const { result: contextResult } = renderHook(
