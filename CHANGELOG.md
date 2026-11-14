@@ -5,6 +5,30 @@ All notable changes to the Weaviate Studio extension will be documented in this 
 The format is based on [Keep a Changelog](https://keep.achangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-11-14
+
+### ✨ Added
+
+- **MMR diversity selection in Vector Search** — Check **Diversify** beside **Profile** to re-rank `nearText`, `nearObject`, and `nearVector` results with maximal marginal relevance (server ≥ 1.39). A balance slider trades diversity (0) for relevance (1), and servers below 1.39 show a disabled control with a `1.39+` hint instead of failing at query time. Hybrid search stays MMR-free until `weaviate-client` 3.15. (PR #90)
+- **Import data into a collection** — **Import** accepts JSON or CSV from a local file, a URL, or pasted text, reports per-object failures, and respects explicit `id` and `vector` values in the payload; rows without a vector are vectorized at import time by the collection's vectorizer. (PR #92)
+- **Edit and delete rows from the object table** — Edit object properties with PATCH semantics and delete with two-step confirmation, both disabled on read-only connections. (PR #92)
+- **Deep links in the preview harness** — `npm run preview:webview` now accepts `?open=1&mode=hybrid` alongside `?version=` and `?dark=1`, so any search tab can be opened directly for review.
+
+### 🔧 Improved
+
+- **Rebuilt Vector Search panel** — Every mode labels its field and shows the embedding and search flavour in a metadata line, Metric / Max distance / Results sit under a sentence-case **Search options** heading, the run button spans the panel with the copy-as-code panel beside it, and Profile / Diversify share one plain checkbox row. (PR #90)
+- **Max distance is a decimal stepper** — The threshold reads `1.00` and can be nudged by 0.05 with −/+ buttons, clamped to 0–2, while remaining editable for exact values. It replaces the duplicate distance slider that used to hide behind a More options disclosure.
+- **Search options are shared across all four tabs** — Metric, Max distance, Results, Profile, and Diversify keep their values when switching between Semantic, Similar, Raw Vector, and Hybrid; only the query input changes.
+
+### 🐛 Fixed
+
+- **MMR searches were rejected by a 1.39 server** — The request omitted the candidate limit, so Weaviate answered `MMR limit must be at least 1`. The payload now always sends a limit, defaulting to the result count and clamped to the query limit, and the generated TypeScript/Python snippets show the same value.
+- **Result cards titled inconsistently** — Objects without a `title` property used the first text property under 100 characters, so one collection could headline different cards with content and category depending on the order the server returned properties in. The title now comes from the longest text property, which is stable across searches.
+
+### 📚 Documentation
+
+- **Sandbox on Weaviate 1.39.13** — The profiling sandbox moved to 1.39.13 for MMR testing and the Go 1.26 certificate patch (CVE-2026-111943), and `sandbox/verify-mmr.mjs` compares plain and diversified ordering against a live server.
+
 ## [1.10.0] - 2026-08-14
 
 ### ✨ Added

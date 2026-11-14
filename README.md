@@ -47,7 +47,7 @@ interface. Supports self-hosted and cloud Weaviate instances.**
 
 - **Multiple Connections:** Manage several Weaviate instances at once
 - **Generative Search:** Ask natural-language questions across one or more collections—configure top-k results per collection, view source-attributed context objects, and get combined LLM answers
-- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid), discreet opt-in query profiling, and JSON/CSV export
+- **Data Explorer:** Interactive visual browser with advanced filtering, 4 vector search modes (text, object, vector, hybrid) with MMR diversity, discreet opt-in query profiling, data import, row editing, and JSON/CSV export
 - **RBAC & Security:** Manage users, roles, and groups with native RBAC support and API key rotation
 - **Read-Only Mode:** Connection-level guards to prevent accidental modifications to production data
 - **Backup & Restore:** Create, monitor, and restore backups across multiple backends (filesystem, S3, GCS, Azure)
@@ -115,7 +115,9 @@ Connect to `http://localhost:8080` with API key `test-key-123`. The sandbox crea
 - Visual filter builder with 10+ operators and AND/OR logic
 - Four vector search modes: Text, Object, Vector, and Hybrid (BM25 + semantic)
 - Alpha slider for balancing keyword vs semantic search
+- **MMR diversity** — check **Diversify** (Weaviate ≥ 1.39) to re-rank semantic, similar-object, and raw-vector results, with a balance slider trading diversity for relevance
 - **Query profiling** — check **Profile** beside **Run Vector Search** to request per-shard timing data; after results arrive, select **View profile** to reveal the on-demand timing breakdown (requires Weaviate ≥ 1.36.9)
+- Import JSON/CSV from a file, URL, or clipboard with per-object error reporting, alongside row editing and confirmed deletes (disabled on read-only connections)
 - Export to JSON/CSV with flexible scopes (current page, filtered results, or entire collection)
 - Keyboard shortcuts (Ctrl+F, Ctrl+K, Ctrl+E) for power users
 - User preferences persistence per collection
