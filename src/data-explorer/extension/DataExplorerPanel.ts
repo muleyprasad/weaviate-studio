@@ -22,6 +22,11 @@ import type {
   DeleteObjectParams,
 } from '../types';
 import { MAX_IMPORT_PAYLOAD_CHARS } from './importUtils';
+import {
+  assertImportUrlScheme,
+  assertPublicImportHost,
+  MAX_IMPORT_REDIRECTS,
+} from './importUrlGuard';
 
 /**
  * Manages the Data Explorer webview panel
@@ -213,10 +218,14 @@ export class DataExplorerPanel {
    * Live lookup so toggles apply to open panels; never throws.
    */
   private _isConnectionReadOnly(): boolean {
+    if (!this.isReadOnly) {
+      // Unknown connection state: treat it as read-only so writes fail closed.
+      return true;
+    }
     try {
-      return this.isReadOnly?.() === true;
+      return this.isReadOnly() === true;
     } catch {
-      return false;
+      return true;
     }
   }
 
@@ -888,66 +897,45 @@ export class DataExplorerPanel {
     } catch {
       throw new Error('Invalid import URL');
     }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new Error('Import URL must use http or https');
-    }
+    assertImportUrlScheme(parsed);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-      const response = await fetch(parsed.toString(), { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(`Import URL returned ${response.status} ${response.statusText}`);
-      }
-      const maxPayloadBytes = MAX_IMPORT_PAYLOAD_CHARS * 4;
-      const contentLength = response.headers?.get?.('content-length');
-      if (contentLength && Number(contentLength) > maxPayloadBytes) {
-        throw new Error('Import payload exceeds the 10 MB limit');
-      }
+      let current = parsed;
 
-      // Some test/runtime fetch implementations do not expose a body stream.
-      // Keep the fallback bounded by validating the resulting text.
-      if (!response.body) {
-        const text = await response.text();
-        if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
-          throw new Error('Import payload exceeds the 10 MB limit');
-        }
-        return text;
-      }
+      // Follow redirects by hand so every hop is re-validated: fetch's own
+      // redirect handling would happily land on localhost or a metadata IP.
+      for (let hop = 0; hop <= MAX_IMPORT_REDIRECTS; hop += 1) {
+        await assertPublicImportHost(current);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let text = '';
-      let byteLength = 0;
+        const response = await fetch(current.toString(), {
+          signal: controller.signal,
+          redirect: 'manual',
+        });
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers?.get?.('location');
+          if (!location) {
+            throw new Error('Import URL redirect is missing a Location header');
           }
-
-          byteLength += value.byteLength;
-          if (byteLength > maxPayloadBytes) {
-            await reader.cancel().catch(() => undefined);
-            throw new Error('Import payload exceeds the 10 MB limit');
+          try {
+            current = new URL(location, current);
+          } catch {
+            throw new Error('Import URL redirect target is invalid');
           }
-
-          text += decoder.decode(value, { stream: true });
-          if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
-            await reader.cancel().catch(() => undefined);
-            throw new Error('Import payload exceeds the 10 MB limit');
-          }
+          assertImportUrlScheme(current);
+          continue;
         }
 
-        text += decoder.decode();
-        if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
-          throw new Error('Import payload exceeds the 10 MB limit');
+        if (!response.ok) {
+          throw new Error(`Import URL returned ${response.status} ${response.statusText}`);
         }
-        return text;
-      } finally {
-        reader.releaseLock();
+
+        return await this._readImportResponse(response);
       }
+
+      throw new Error(`Import URL exceeded ${MAX_IMPORT_REDIRECTS} redirects`);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Import URL request timed out after 30s');
@@ -955,6 +943,61 @@ export class DataExplorerPanel {
       throw error;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Reads an import response body, enforcing the payload size cap.
+   */
+  private async _readImportResponse(response: Response): Promise<string> {
+    const maxPayloadBytes = MAX_IMPORT_PAYLOAD_CHARS * 4;
+    const contentLength = response.headers?.get?.('content-length');
+    if (contentLength && Number(contentLength) > maxPayloadBytes) {
+      throw new Error('Import payload exceeds the 10 MB limit');
+    }
+
+    // Some test/runtime fetch implementations do not expose a body stream.
+    // Keep the fallback bounded by validating the resulting text.
+    if (!response.body) {
+      const text = await response.text();
+      if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+        throw new Error('Import payload exceeds the 10 MB limit');
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    let byteLength = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        byteLength += value.byteLength;
+        if (byteLength > maxPayloadBytes) {
+          await reader.cancel().catch(() => undefined);
+          throw new Error('Import payload exceeds the 10 MB limit');
+        }
+
+        text += decoder.decode(value, { stream: true });
+        if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+          await reader.cancel().catch(() => undefined);
+          throw new Error('Import payload exceeds the 10 MB limit');
+        }
+      }
+
+      text += decoder.decode();
+      if (text.length > MAX_IMPORT_PAYLOAD_CHARS) {
+        throw new Error('Import payload exceeds the 10 MB limit');
+      }
+      return text;
+    } finally {
+      reader.releaseLock();
     }
   }
 
@@ -1148,6 +1191,7 @@ export class DataExplorerPanel {
           collectionName: this._collectionName,
           connectionId: this._connectionId,
           targetUuid: this._initialTargetUuid ?? null,
+          readOnly: this._isConnectionReadOnly(),
           queryProfileEnabled:
             this.globalState?.get<boolean>(DataExplorerPanel.QUERY_PROFILE_PREFERENCE_KEY, false) ??
             false,

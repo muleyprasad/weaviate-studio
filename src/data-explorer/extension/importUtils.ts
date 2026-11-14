@@ -37,6 +37,15 @@ function isNumberArray(value: unknown): value is number[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'number');
 }
 
+/** `{ default: [...], title: [...] }` - the SDK's named-vector shape */
+function isNamedVectors(value: unknown): value is Record<string, number[]> {
+  return (
+    isPlainObject(value) &&
+    Object.keys(value).length > 0 &&
+    Object.values(value).every((entry) => isNumberArray(entry) && entry.length > 0)
+  );
+}
+
 function pushWarning(warnings: string[], message: string): void {
   if (warnings.length < MAX_IMPORT_ERRORS) {
     warnings.push(message);
@@ -68,12 +77,29 @@ function normalizeRecord(raw: unknown, label: string, warnings: string[]): Impor
   }
 
   let vector: number[] | undefined;
+  let vectors: Record<string, number[]> | undefined;
   for (const key of VECTOR_KEYS) {
     const value = record[key];
+    if (value === undefined) {
+      continue;
+    }
     if (isNumberArray(value) && value.length > 0) {
-      vector = value;
+      if (!vector) {
+        vector = value;
+      }
       delete record[key];
-      break;
+    } else if (isNamedVectors(value)) {
+      if (!vector && !vectors) {
+        vectors = value;
+      }
+      delete record[key];
+    } else {
+      // Sending a malformed vector as a property would silently store garbage.
+      pushWarning(
+        warnings,
+        `${label}: ignored "${key}" (expected a number array or named vectors)`
+      );
+      delete record[key];
     }
   }
 
@@ -85,12 +111,12 @@ function normalizeRecord(raw: unknown, label: string, warnings: string[]): Impor
     }
   }
 
-  if (Object.keys(properties).length === 0 && !vector && !id) {
+  if (Object.keys(properties).length === 0 && !vector && !vectors && !id) {
     pushWarning(warnings, `${label}: skipped (no properties)`);
     return null;
   }
 
-  return { id, properties, vector };
+  return { id, properties, vector, vectors };
 }
 
 /**
@@ -236,12 +262,24 @@ export function parseCsvImport(text: string): ParsedImport {
     throw new Error('CSV is missing a header row');
   }
 
+  // CSV cells cannot express a vector: a comma-separated list would be stored
+  // as a string property, so say so instead of importing corrupted data.
+  const vectorHeaders = headers.filter((header) => header && VECTOR_KEYS.includes(header));
+  if (vectorHeaders.length > 0) {
+    pushWarning(
+      warnings,
+      `CSV column${vectorHeaders.length === 1 ? '' : 's'} ${vectorHeaders
+        .map((header) => `"${header}"`)
+        .join(', ')} ignored: vectors are only supported in JSON imports`
+    );
+  }
+
   const objects: ImportObject[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const properties: Record<string, unknown> = {};
     headers.forEach((header, col) => {
-      if (!header) {
+      if (!header || VECTOR_KEYS.includes(header)) {
         return;
       }
       const coerced = coerceCsvValue(row[col] ?? '');

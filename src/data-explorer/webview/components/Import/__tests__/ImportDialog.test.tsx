@@ -66,6 +66,19 @@ describe('ImportDialog', () => {
     });
   });
 
+  test('rejects files over the 10 MB client cap', () => {
+    render(<ImportDialog {...baseProps} />);
+    const file = new File(['contents'], 'big.json', { type: 'application/json' });
+    Object.defineProperty(file, 'size', { value: 10 * 1024 * 1024 + 1 });
+
+    fireEvent.change(screen.getByLabelText('Choose import file'), {
+      target: { files: [file] },
+    });
+
+    expect(screen.getByText('File exceeds the 10 MB import limit')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Import/ })).toBeDisabled();
+  });
+
   test('url tab collects a url payload', () => {
     render(<ImportDialog {...baseProps} />);
     fireEvent.click(screen.getByRole('tab', { name: 'URL' }));
@@ -197,15 +210,18 @@ describe('ImportDialog', () => {
     expect(screen.getByText('Invalid JSON: nope')).toBeInTheDocument();
   });
 
-  test('ignores completion messages for another request', () => {
+  test('a late completion for another request still refreshes the grid', () => {
     const onImported = jest.fn();
-    render(<ImportDialog {...baseProps} onImported={onImported} />);
+    const onClose = jest.fn();
+    render(<ImportDialog {...baseProps} onImported={onImported} onClose={onClose} />);
     fireEvent.click(screen.getByRole('tab', { name: 'Paste' }));
     fireEvent.change(screen.getByLabelText('Pasted import payload'), {
       target: { value: '[{"a":1}]' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Import/ }));
 
+    // Objects may already be inserted server-side, so a completion that no longer
+    // matches the tracked request must not leave a stale table behind.
     fireEvent(
       window,
       new MessageEvent('message', {
@@ -217,6 +233,7 @@ describe('ImportDialog', () => {
       })
     );
 
-    expect(onImported).not.toHaveBeenCalled();
+    expect(onImported).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

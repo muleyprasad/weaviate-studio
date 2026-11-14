@@ -42,6 +42,7 @@ jest.mock('crypto', () => ({
 
 // Import after mocking
 import { DataExplorerPanel } from '../DataExplorerPanel';
+import { setHostResolverForTesting } from '../importUrlGuard';
 
 /**
  * Tests for DataExplorerPanel write operations (Phase 6):
@@ -80,6 +81,12 @@ describe('DataExplorerPanel - Write Operations', () => {
     mockClient = { collections: { get: jest.fn() } };
     getClientFn = jest.fn(() => mockClient);
     vscode = jest.requireMock('vscode');
+    // Keep URL import tests offline and deterministic.
+    setHostResolverForTesting(async () => ['93.184.216.34']);
+  });
+
+  afterEach(() => {
+    setHostResolverForTesting(undefined);
   });
 
   function createPanel(isReadOnly = false): any {
@@ -212,6 +219,155 @@ describe('DataExplorerPanel - Write Operations', () => {
       expect(importObjects).toHaveBeenCalledWith(
         expect.objectContaining({ source: 'url', payload: '[{"a":1}]' })
       );
+    });
+
+    test('reports a timeout when the URL fetch exceeds 30s', async () => {
+      const panel = createPanel(false);
+      const postMessageSpy = jest.spyOn(panel, 'postMessage');
+      const originalFetch = (globalThis as any).fetch;
+      const fetchMock = jest.fn(
+        (_url: string, init: any) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => {
+              const error = new Error('Aborted');
+              error.name = 'AbortError';
+              reject(error);
+            });
+          })
+      );
+      (globalThis as any).fetch = fetchMock;
+      jest.useFakeTimers();
+
+      try {
+        const handled = messageHandler(panel)({
+          command: 'importObjects',
+          importParams: {
+            source: 'url',
+            format: 'json',
+            payload: 'https://example.com/slow.json',
+          },
+          requestId: 'imp-timeout',
+        });
+
+        await jest.advanceTimersByTimeAsync(30001);
+        await handled;
+      } finally {
+        jest.useRealTimers();
+        (globalThis as any).fetch = originalFetch;
+      }
+
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'error',
+        error: expect.stringContaining('timed out'),
+        requestId: 'imp-timeout',
+      });
+    });
+
+    test('rejects redirects that point at a local address', async () => {
+      const panel = createPanel(false);
+      const postMessageSpy = jest.spyOn(panel, 'postMessage');
+      const originalFetch = (globalThis as any).fetch;
+      const fetchMock = jest.fn(async () => ({
+        ok: false,
+        status: 302,
+        statusText: 'Found',
+        headers: {
+          get: (name: string) => (name === 'location' ? 'http://127.0.0.1/secret.json' : null),
+        },
+      }));
+      (globalThis as any).fetch = fetchMock;
+
+      try {
+        await messageHandler(panel)({
+          command: 'importObjects',
+          importParams: {
+            source: 'url',
+            format: 'json',
+            payload: 'https://example.com/data.json',
+          },
+          requestId: 'imp-redirect-local',
+        });
+      } finally {
+        (globalThis as any).fetch = originalFetch;
+      }
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'error',
+        error: expect.stringContaining('public host'),
+        requestId: 'imp-redirect-local',
+      });
+    });
+
+    test('follows a redirect to another public host after re-validating it', async () => {
+      const panel = createPanel(false);
+      const importObjects = jest.fn<any>().mockResolvedValue({
+        collectionName: 'TestCollection',
+        importedCount: 1,
+        failedCount: 0,
+        errors: [],
+      });
+      mockApi(panel, { importObjects });
+      const originalFetch = (globalThis as any).fetch;
+      const fetchMock = jest
+        .fn(async () => ({}))
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 302,
+          statusText: 'Found',
+          headers: {
+            get: (name: string) =>
+              name === 'location' ? 'https://cdn.example.com/data.json' : null,
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: { get: () => null },
+          text: async () => '[{"a":2}]',
+        });
+      (globalThis as any).fetch = fetchMock;
+
+      try {
+        await messageHandler(panel)({
+          command: 'importObjects',
+          importParams: {
+            source: 'url',
+            format: 'json',
+            payload: 'https://example.com/data.json',
+          },
+          requestId: 'imp-redirect-ok',
+        });
+      } finally {
+        (globalThis as any).fetch = originalFetch;
+      }
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((fetchMock.mock.calls[1] as any[])[0]).toBe('https://cdn.example.com/data.json');
+      expect(importObjects).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'url', payload: '[{"a":2}]' })
+      );
+    });
+
+    test('blocks writes when no read-only predicate is supplied', async () => {
+      const panel = DataExplorerPanel.createOrShow(mockUri, 'conn1', 'TestCollection', getClientFn);
+      const postMessageSpy = jest.spyOn(panel, 'postMessage');
+      const deleteObject = jest.fn();
+      mockApi(panel, { deleteObject });
+
+      await messageHandler(panel)({
+        command: 'deleteObject',
+        deleteObjectParams: { uuid: VALID_UUID },
+        requestId: 'req-fail-closed',
+      });
+
+      expect(deleteObject).not.toHaveBeenCalled();
+      expect(postMessageSpy).toHaveBeenCalledWith({
+        command: 'error',
+        error: expect.stringContaining('read-only'),
+        requestId: 'req-fail-closed',
+      });
     });
 
     test('rejects non-http urls', async () => {

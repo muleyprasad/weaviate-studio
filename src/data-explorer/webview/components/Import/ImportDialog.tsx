@@ -61,25 +61,36 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
         return;
       }
 
-      if (!isOpen || message.requestId !== requestIdRef.current) {
-        return;
-      }
-
       if (message.command === 'importComplete') {
+        const importResult = message.importResult as ImportResult | undefined;
+        const isCurrentRequest = message.requestId === requestIdRef.current;
+
+        if (!isCurrentRequest) {
+          // A late completion for a request this dialog no longer tracks (it was
+          // reopened or reset). Objects may already be inserted server-side, so
+          // refresh the grid instead of dropping the message.
+          onImported();
+          return;
+        }
+
         setImporting(false);
         requestIdRef.current = null;
-        const importResult = message.importResult as ImportResult | undefined;
-        if (importResult && importResult.importedCount > 0) {
+        if (!importResult) {
+          resetForm();
+          onClose();
+          return;
+        }
+        if (importResult.importedCount > 0) {
           onImported();
         }
-        if (importResult && (importResult.failedCount > 0 || importResult.errors.length > 0)) {
+        if (importResult.failedCount > 0 || importResult.errors.length > 0) {
           // Partial failure: stay open and show the summary
           setResult(importResult);
         } else {
           resetForm();
           onClose();
         }
-      } else if (message.command === 'error' && message.requestId?.startsWith('import-')) {
+      } else if (message.command === 'error' && message.requestId === requestIdRef.current) {
         setError(message.error);
         setImporting(false);
         requestIdRef.current = null;
@@ -129,7 +140,7 @@ export function ImportDialog({ isOpen, onClose, collectionName, onImported }: Im
     setError(null);
     setResult(null);
 
-    const requestId = `import-${Date.now()}`;
+    const requestId = `import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     requestIdRef.current = requestId;
 
     postMessageToExtension({

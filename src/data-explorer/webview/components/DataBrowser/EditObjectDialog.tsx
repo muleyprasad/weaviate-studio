@@ -81,9 +81,15 @@ export function EditObjectDialog({
       return;
     }
 
+    // An empty patch would reassure the user while changing nothing.
+    if (Object.keys(properties).length === 0) {
+      setError('Add at least one property to update');
+      return;
+    }
+
     setSaving(true);
     setError(null);
-    const requestId = `edit-${Date.now()}`;
+    const requestId = `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     requestIdRef.current = requestId;
     postMessageToExtension({
       command: 'updateObject',

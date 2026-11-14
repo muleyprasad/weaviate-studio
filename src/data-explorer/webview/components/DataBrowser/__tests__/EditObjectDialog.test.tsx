@@ -59,6 +59,17 @@ describe('EditObjectDialog', () => {
     expect(mockedPost).not.toHaveBeenCalled();
   });
 
+  test('rejects an empty patch without posting', () => {
+    render(<EditObjectDialog {...baseProps} />);
+    fireEvent.change(screen.getByLabelText('Object properties as JSON'), {
+      target: { value: '{}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedPost).not.toHaveBeenCalled();
+    expect(screen.getByText('Add at least one property to update')).toBeInTheDocument();
+  });
+
   test('save posts updateObject with parsed properties', () => {
     render(<EditObjectDialog {...baseProps} />);
     fireEvent.change(screen.getByLabelText('Object properties as JSON'), {

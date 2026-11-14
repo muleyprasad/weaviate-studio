@@ -27,6 +27,12 @@ export const DetailPanel = React.memo(function DetailPanel({
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCopiedUuid, setShowCopiedUuid] = React.useState(false);
+  // Two-step delete confirmation, matching the table row actions
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+
+  useEffect(() => {
+    setConfirmingDelete(false);
+  }, [object?.uuid]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -73,6 +79,15 @@ export const DetailPanel = React.memo(function DetailPanel({
       onFindSimilar(object.uuid);
     }
   }, [object, onFindSimilar]);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (!object || !onDelete) {
+      return;
+    }
+    setConfirmingDelete(false);
+    onDelete(object.uuid);
+    onClose();
+  }, [object, onDelete, onClose]);
 
   if (!object) {
     return null;
@@ -244,26 +259,45 @@ export const DetailPanel = React.memo(function DetailPanel({
               Edit
             </button>
           )}
-          {onDelete && (
-            <button
-              type="button"
-              className="action-btn danger"
-              onClick={() => {
-                onDelete(object.uuid);
-                onClose();
-              }}
-              disabled={dataState.readOnly}
-              title={
-                dataState.readOnly
-                  ? 'Deleting is disabled on read-only connections'
-                  : 'Delete this object'
-              }
-              aria-label="Delete object"
-            >
-              <span className="codicon codicon-trash" aria-hidden="true"></span>
-              Delete
-            </button>
-          )}
+          {onDelete &&
+            (confirmingDelete ? (
+              <>
+                <button
+                  type="button"
+                  className="action-btn danger"
+                  onClick={handleDeleteConfirm}
+                  title="Delete this object permanently"
+                  aria-label="Confirm delete"
+                >
+                  <span className="codicon codicon-check" aria-hidden="true"></span>
+                  Confirm delete
+                </button>
+                <button
+                  type="button"
+                  className="action-btn secondary"
+                  onClick={() => setConfirmingDelete(false)}
+                  aria-label="Cancel delete"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="action-btn danger"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={dataState.readOnly}
+                title={
+                  dataState.readOnly
+                    ? 'Deleting is disabled on read-only connections'
+                    : 'Delete this object'
+                }
+                aria-label="Delete object"
+              >
+                <span className="codicon codicon-trash" aria-hidden="true"></span>
+                Delete
+              </button>
+            ))}
           {onFindSimilar && (
             <button
               type="button"

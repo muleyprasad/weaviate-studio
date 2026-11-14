@@ -134,3 +134,32 @@ describe('importUtils - dispatcher', () => {
     expect(parseImportPayload('a\n1', 'csv').objects).toHaveLength(1);
   });
 });
+
+describe('importUtils - vectors', () => {
+  test('extracts named vectors instead of storing them as properties', () => {
+    const { objects } = parseJsonImport(
+      JSON.stringify([{ title: 'A', vectors: { default: [0.1, 0.2], title: [0.3, 0.4] } }])
+    );
+
+    expect(objects[0].vectors).toEqual({ default: [0.1, 0.2], title: [0.3, 0.4] });
+    expect(objects[0].properties).toEqual({ title: 'A' });
+    expect(objects[0].vector).toBeUndefined();
+  });
+
+  test('warns and drops a malformed vector', () => {
+    const { objects, warnings } = parseJsonImport(
+      JSON.stringify([{ title: 'A', vector: 'not-a-vector' }])
+    );
+
+    expect(objects[0].properties).toEqual({ title: 'A' });
+    expect(objects[0].vector).toBeUndefined();
+    expect(warnings.join(' ')).toContain('ignored "vector"');
+  });
+
+  test('ignores vector columns in CSV with a warning', () => {
+    const { objects, warnings } = parseCsvImport('title,vector\nA,"0.1,0.2"');
+
+    expect(objects[0].properties).toEqual({ title: 'A' });
+    expect(warnings.join(' ')).toContain('vectors are only supported in JSON');
+  });
+});

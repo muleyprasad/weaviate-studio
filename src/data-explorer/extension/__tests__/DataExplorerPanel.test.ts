@@ -379,7 +379,15 @@ describe('DataExplorerPanel', () => {
     });
 
     it('handles getSchema message', async () => {
-      const panel = DataExplorerPanel.createOrShow(mockUri, 'conn1', 'TestCollection', getClientFn);
+      const panel = DataExplorerPanel.createOrShow(
+        mockUri,
+        'conn1',
+        'TestCollection',
+        getClientFn,
+        undefined,
+        undefined,
+        () => false
+      );
 
       const postMessageSpy = jest.spyOn(panel, 'postMessage');
 

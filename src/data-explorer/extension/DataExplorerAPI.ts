@@ -1462,7 +1462,15 @@ export class DataExplorerAPI {
     };
 
     const processBatchResult = (result: unknown, itemOffset: number, itemCount: number): void => {
-      const batchResult = (result || {}) as BatchInsertResult;
+      // An empty response means we cannot prove the objects landed: count them
+      // as failed instead of assuming a successful insert.
+      if (result === null || result === undefined || typeof result !== 'object') {
+        failedCount += itemCount;
+        pushError(`Items ${itemOffset + 1}-${itemOffset + itemCount}: no response from server`);
+        return;
+      }
+
+      const batchResult = result as BatchInsertResult;
       const errorEntries = Object.entries(batchResult.errors || {});
 
       if (!batchResult.hasErrors && errorEntries.length === 0) {
@@ -1512,7 +1520,7 @@ export class DataExplorerAPI {
       const payload = chunk.map((obj: ImportObject) => ({
         ...(obj.id ? { id: obj.id } : {}),
         properties: obj.properties,
-        ...(obj.vector ? { vectors: obj.vector } : {}),
+        ...(obj.vectors ? { vectors: obj.vectors } : obj.vector ? { vectors: obj.vector } : {}),
       }));
 
       try {

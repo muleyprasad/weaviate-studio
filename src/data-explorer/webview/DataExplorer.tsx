@@ -10,6 +10,7 @@ import {
   FilterProvider,
   VectorSearchProvider,
   useDataState,
+  useDataActions,
   useUIState,
   useUIActions,
   useFilterState,
@@ -40,6 +41,7 @@ declare global {
       collectionName: string;
       connectionId: string;
       targetUuid?: string;
+      readOnly?: boolean;
       queryProfileEnabled?: boolean;
     };
   }
@@ -47,6 +49,7 @@ declare global {
 
 function DataExplorerContent() {
   const dataState = useDataState();
+  const dataActions = useDataActions();
   const uiState = useUIState();
   const uiActions = useUIActions();
   const filterState = useFilterState();
@@ -55,6 +58,15 @@ function DataExplorerContent() {
   const vectorSearchActions = useVectorSearchActions();
   const { isLoading, refresh } = useDataFetch();
   const { executeSearch } = useVectorSearch();
+
+  // Disable writes from the first render: the bootstrap HTML carries the
+  // connection's read-only state, before any extension message arrives.
+  React.useEffect(() => {
+    const injectedReadOnly = window.initialData?.readOnly;
+    if (typeof injectedReadOnly === 'boolean') {
+      dataActions.setReadOnly(injectedReadOnly);
+    }
+  }, [dataActions]);
 
   // Phase 5: Export dialog state
   const [showExportDialog, setShowExportDialog] = React.useState(false);

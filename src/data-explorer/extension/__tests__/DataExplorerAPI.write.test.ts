@@ -46,6 +46,42 @@ describe('DataExplorerAPI - Write Operations', () => {
   });
 
   describe('importObjects', () => {
+    test('sends named vectors as the SDK vectors shape', async () => {
+      const params: ImportParams = {
+        collectionName: 'Article',
+        source: 'paste',
+        format: 'json',
+        payload: JSON.stringify([
+          { title: 'A', vectors: { default: [0.1, 0.2], title: [0.3, 0.4] } },
+        ]),
+      };
+
+      await api.importObjects(params);
+
+      expect(mockData.insertMany).toHaveBeenCalledWith([
+        {
+          properties: { title: 'A' },
+          vectors: { default: [0.1, 0.2], title: [0.3, 0.4] },
+        },
+      ]);
+    });
+
+    test('counts a missing batch response as failed instead of imported', async () => {
+      const params: ImportParams = {
+        collectionName: 'Article',
+        source: 'paste',
+        format: 'json',
+        payload: JSON.stringify([{ title: 'A' }, { title: 'B' }]),
+      };
+      mockData.insertMany.mockResolvedValueOnce(undefined);
+
+      const result = await api.importObjects(params);
+
+      expect(result.importedCount).toBe(0);
+      expect(result.failedCount).toBe(2);
+      expect(result.errors.join(' ')).toContain('no response from server');
+    });
+
     test('imports a JSON array via a single batch', async () => {
       const params: ImportParams = {
         collectionName: 'Article',

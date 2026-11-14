@@ -586,6 +586,8 @@ export interface ImportObject {
   id?: string;
   properties: Record<string, unknown>;
   vector?: number[];
+  /** Named vectors, e.g. `{ default: [...] }` */
+  vectors?: Record<string, number[]>;
 }
 
 /**
