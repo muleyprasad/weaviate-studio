@@ -38,11 +38,18 @@ export function ResultCard({
         return props[field] as string;
       }
     }
-    // Fallback to first text property
-    for (const [key, val] of Object.entries(props)) {
-      if (typeof val === 'string' && val.length > 0 && val.length < 100) {
-        return val;
-      }
+    // Fallback to the longest text property, tie-broken by key. Picking the
+    // first property instead made the same collection title some cards with
+    // their content and others with their category, because the server does
+    // not promise a property order.
+    const [first] = Object.entries(props)
+      .filter(([, value]) => typeof value === 'string' && value.length > 0)
+      .sort((a, b) => {
+        const byLength = (b[1] as string).length - (a[1] as string).length;
+        return byLength !== 0 ? byLength : a[0].localeCompare(b[0]);
+      });
+    if (first) {
+      return first[1] as string;
     }
     return object.uuid;
   }, [object]);
