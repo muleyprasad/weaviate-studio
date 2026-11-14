@@ -141,6 +141,19 @@ export function VectorSearchPanel({
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isCodeOpen, setIsCodeOpen] = useState(false);
 
+  // Distance is edited as text so it reads as a decimal (1.00) instead of a
+  // bare number; the typed text only becomes a search param on commit.
+  const [distanceDraft, setDistanceDraft] = useState('');
+  const [isDistanceEditing, setIsDistanceEditing] = useState(false);
+  const distanceValue = isDistanceEditing ? distanceDraft : searchParams.maxDistance.toFixed(2);
+
+  const commitDistance = (raw: string) => {
+    const next = parseFloat(raw);
+    if (Number.isFinite(next)) {
+      handleParamChange('maxDistance', Math.min(2, Math.max(0, next)));
+    }
+  };
+
   // Close a previously opened profile whenever it is cleared or profiling is turned off.
   useEffect(() => {
     if (!queryProfileEnabled || !queryProfileResult) {
@@ -605,15 +618,21 @@ export function VectorSearchPanel({
                 <div className="distance-input-row">
                   <input
                     id="max-distance"
-                    type="number"
-                    min="0"
-                    max="2"
-                    step="0.05"
-                    value={searchParams.maxDistance}
-                    onChange={(e) => {
-                      const next = parseFloat(e.target.value);
-                      if (Number.isFinite(next)) {
-                        handleParamChange('maxDistance', Math.min(2, Math.max(0, next)));
+                    type="text"
+                    inputMode="decimal"
+                    value={distanceValue}
+                    onChange={(e) => setDistanceDraft(e.target.value)}
+                    onFocus={() => {
+                      setDistanceDraft(searchParams.maxDistance.toFixed(2));
+                      setIsDistanceEditing(true);
+                    }}
+                    onBlur={() => {
+                      setIsDistanceEditing(false);
+                      commitDistance(distanceDraft);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
                       }
                     }}
                     disabled={isSearching}

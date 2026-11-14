@@ -2639,7 +2639,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 .search-option select,
-.search-option input[type="number"] {
+.search-option input[type="text"] {
     width: 100%;
     min-width: 0;
     min-height: 36px;
@@ -2652,10 +2652,6 @@ input[type="checkbox"]:focus-visible {
     cursor: pointer;
 }
 
-.search-option input[type="number"] {
-    font-family: var(--vscode-editor-font-family, monospace);
-}
-
 .distance-input-row {
     display: flex;
     align-items: center;
@@ -2663,17 +2659,12 @@ input[type="checkbox"]:focus-visible {
     min-width: 0;
 }
 
-.distance-input-row input[type="number"] {
+.distance-input-row input {
     flex: 1 1 auto;
     width: 100%;
-    appearance: textfield;
-    -moz-appearance: textfield;
-}
-
-.distance-input-row input[type="number"]::-webkit-inner-spin-button,
-.distance-input-row input[type="number"]::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
+    /* The shared input rule is content-box, so without this the field renders
+       14px taller than the selects beside it. */
+    box-sizing: border-box;
 }
 
 /* Range inputs in the advanced panel keep the slider look. */
