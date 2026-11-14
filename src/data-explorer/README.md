@@ -53,6 +53,15 @@ Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 
 - **Export options** - include/exclude metadata, vectors, and flatten nested objects
 - **Native VS Code save dialog** integration
 
+### Import and Write Operations
+
+- **Import JSON or CSV** from a local file, URL, or pasted content
+- **Chunked imports** with per-object failure reporting
+- **Bring-your-own vectors** using the `vector` JSON field
+- **Edit object properties** with PATCH semantics
+- **Delete objects** with two-step confirmation
+- **Read-only connection protection** disables write controls and blocks writes in the extension host
+
 ### Performance & UX
 
 - **Virtual scrolling** for smooth performance with large datasets (1000+ objects)
@@ -112,6 +121,15 @@ Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 
    - Include vectors (not recommended for CSV)
    - Flatten nested objects (CSV only)
 5. Click "Export" and choose save location
+
+### Import, Edit, and Delete Data
+
+1. Click **Import** and choose File, URL, or Paste.
+2. Select JSON or CSV format and submit the payload.
+3. Review the imported/failed counts and any per-object errors.
+4. Use the row **Edit** action to update an object's properties as JSON.
+5. Use the row **Delete** action and confirm the second click.
+6. These controls are unavailable while the connection is in read-only mode.
 
 ## Keyboard Shortcuts
 

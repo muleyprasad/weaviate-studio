@@ -379,7 +379,15 @@ describe('DataExplorerPanel', () => {
     });
 
     it('handles getSchema message', async () => {
-      const panel = DataExplorerPanel.createOrShow(mockUri, 'conn1', 'TestCollection', getClientFn);
+      const panel = DataExplorerPanel.createOrShow(
+        mockUri,
+        'conn1',
+        'TestCollection',
+        getClientFn,
+        undefined,
+        undefined,
+        () => false
+      );
 
       const postMessageSpy = jest.spyOn(panel, 'postMessage');
 
@@ -397,6 +405,8 @@ describe('DataExplorerPanel', () => {
         command: 'schemaLoaded',
         schema: { name: 'TestCollection', properties: [] },
         collectionName: 'TestCollection',
+        // Phase 6: schemaLoaded carries the connection read-only state
+        readOnly: false,
       });
     });
 

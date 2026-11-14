@@ -337,7 +337,7 @@
   font-weight: 600;
   font-size: 15px;
   margin-bottom: 6px;
-  color: #f44336;
+  color: var(--vscode-errorForeground, #f44336);
   letter-spacing: 0.2px;
 }
 
@@ -408,12 +408,12 @@
 
 .node-status.status-healthy {
   background-color: rgba(0, 128, 0, 0.2);
-  color: #4caf50;
+  color: var(--vscode-charts-green, #4caf50);
 }
 
 .node-status.status-unhealthy {
   background-color: rgba(255, 0, 0, 0.2);
-  color: #f44336;
+  color: var(--vscode-errorForeground, #f44336);
 }
 
 .non-ready-badge {
@@ -422,7 +422,7 @@
   font-size: 12px;
   font-weight: 500;
   background-color: rgba(255, 152, 0, 0.2);
-  color: #ff9800;
+  color: var(--vscode-editorWarning-foreground, #ff9800);
 }
 
 .readonly-badge {
@@ -431,7 +431,7 @@
   font-size: 12px;
   font-weight: 500;
   background-color: rgba(244, 67, 54, 0.2);
-  color: #f44336;
+  color: var(--vscode-errorForeground, #f44336);
 }
 
 .node-info {
@@ -468,7 +468,7 @@
 }
 
 .stat-card.warning .stat-value {
-  color: #ff9800;
+  color: var(--vscode-editorWarning-foreground, #ff9800);
 }
 
 .stat-card.readonly {
@@ -477,7 +477,7 @@
 }
 
 .stat-card.readonly .stat-value {
-  color: #f44336;
+  color: var(--vscode-errorForeground, #f44336);
 }
 
 .stat-label {
@@ -677,24 +677,24 @@
 }
 
 .shard-stat .value[class*='status-'] {
-  color: #2196f3;
+  color: var(--vscode-textLink-foreground, #2196f3);
 }
 
 .shard-stat .value.status-ready {
-  color: #4caf50;
+  color: var(--vscode-charts-green, #4caf50);
 }
 
 .shard-stat .value.status-indexing {
-  color: #ff9800;
+  color: var(--vscode-editorWarning-foreground, #ff9800);
 }
 
 .shard-stat .value.status-readonly {
-  color: #f44336;
+  color: var(--vscode-errorForeground, #f44336);
   font-weight: 600;
 }
 
 .shard-stat .value.status-lazy_loading {
-  color: #ff9800;
+  color: var(--vscode-editorWarning-foreground, #ff9800);
 }
 
 .shard-full-data {

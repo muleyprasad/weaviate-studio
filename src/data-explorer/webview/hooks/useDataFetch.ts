@@ -88,6 +88,11 @@ export function useDataFetch() {
                 dataActions.setServerVersion(message.serverVersion);
               }
 
+              // Phase 6: track connection read-only state for write guards
+              if (typeof message.readOnly === 'boolean') {
+                dataActions.setReadOnly(message.readOnly);
+              }
+
               // Check if multi-tenant
               const isMultiTenant =
                 message.isMultiTenant || !!(message.schema.multiTenancy as any)?.enabled;
@@ -118,6 +123,12 @@ export function useDataFetch() {
                 dataActions.setLoading(false);
                 return;
               }
+            }
+            break;
+
+          case 'readOnlyChanged':
+            if (typeof message.readOnly === 'boolean') {
+              dataActions.setReadOnly(message.readOnly);
             }
             break;
 

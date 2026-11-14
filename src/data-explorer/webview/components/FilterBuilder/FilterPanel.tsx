@@ -136,7 +136,7 @@ export function FilterPanel({ isOpen, properties }: FilterPanelProps) {
         <header className="filter-panel-header">
           <div className="filter-panel-title">
             <span className="codicon codicon-filter" aria-hidden="true"></span>
-            <h2>VISUAL FILTER BUILDER</h2>
+            <h2>Filters</h2>
           </div>
           <button
             type="button"
@@ -145,9 +145,7 @@ export function FilterPanel({ isOpen, properties }: FilterPanelProps) {
             title="Close filter panel"
             aria-label="Close filter panel"
           >
-            <span className="codicon codicon-close" aria-hidden="true">
-              ×
-            </span>
+            <span className="codicon codicon-close" aria-hidden="true"></span>
           </button>
         </header>
 

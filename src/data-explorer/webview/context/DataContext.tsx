@@ -26,6 +26,8 @@ export interface DataContextState {
   isMultiTenant: boolean;
   // Server metadata
   serverVersion: string | null;
+  // Connection capabilities (Phase 6)
+  readOnly: boolean;
   // Data
   objects: WeaviateObject[];
   totalCount: number;
@@ -49,6 +51,7 @@ type DataAction =
   | { type: 'REFRESH' }
   | { type: 'SET_FETCHED_OBJECT_DETAIL'; object: WeaviateObject | null }
   | { type: 'SET_SERVER_VERSION'; version: string | null }
+  | { type: 'SET_READ_ONLY'; readOnly: boolean }
   // Multi-tenancy actions
   | { type: 'SET_TENANTS'; tenants: TenantInfo[]; isMultiTenant: boolean }
   | { type: 'SET_SELECTED_TENANT'; tenant: string | null };
@@ -64,6 +67,7 @@ const initialState: DataContextState = {
   selectedTenant: null,
   isMultiTenant: false,
   serverVersion: null,
+  readOnly: false,
   objects: [],
   totalCount: 0,
   unfilteredTotalCount: 0,
@@ -157,6 +161,12 @@ function dataReducer(state: DataContextState, action: DataAction): DataContextSt
         serverVersion: action.version,
       };
 
+    case 'SET_READ_ONLY':
+      return {
+        ...state,
+        readOnly: action.readOnly,
+      };
+
     default:
       return state;
   }
@@ -176,6 +186,7 @@ export interface DataContextActions {
   refresh: () => void;
   setFetchedObjectDetail: (object: WeaviateObject | null) => void;
   setServerVersion: (version: string | null) => void;
+  setReadOnly: (readOnly: boolean) => void;
   // Multi-tenancy actions
   setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => void;
   setSelectedTenant: (tenant: string | null) => void;
@@ -244,6 +255,10 @@ export function DataProvider({ children, initialCollectionName = '' }: DataProvi
 
       setServerVersion: (version: string | null) => {
         dispatch({ type: 'SET_SERVER_VERSION', version });
+      },
+
+      setReadOnly: (readOnly: boolean) => {
+        dispatch({ type: 'SET_READ_ONLY', readOnly });
       },
 
       setTenants: (tenants: TenantInfo[], isMultiTenant: boolean) => {

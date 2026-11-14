@@ -24,6 +24,13 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
     return ['uuid', ...(dataState.schema?.properties?.map((p) => p.name) || [])];
   }, [dataState.schema]);
 
+  // Empty `visibleColumns` means "show every column", so resolve that default here.
+  // Otherwise no checkbox appears checked, and toggling one column would hide all the others.
+  const effectiveVisibleColumns = useMemo(
+    () => (uiState.visibleColumns.length === 0 ? allColumns : uiState.visibleColumns),
+    [allColumns, uiState.visibleColumns]
+  );
+
   // Filter columns based on search
   const filteredColumns = useMemo(() => {
     return allColumns.filter((col) => col.toLowerCase().includes(search.toLowerCase()));
@@ -66,9 +73,14 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
   const handleToggleColumn = useCallback(
     (column: string) => {
-      uiActions.toggleColumn(column);
+      const isVisible = effectiveVisibleColumns.includes(column);
+      const nextColumns = isVisible
+        ? effectiveVisibleColumns.filter((col) => col !== column)
+        : [...effectiveVisibleColumns, column];
+      // Persist the list in schema order so the table keeps its column order.
+      uiActions.setVisibleColumns(allColumns.filter((col) => nextColumns.includes(col)));
     },
-    [uiActions]
+    [allColumns, effectiveVisibleColumns, uiActions]
   );
 
   const handleTogglePin = useCallback(
@@ -83,21 +95,13 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
   );
 
   const handleShowAll = useCallback(() => {
-    allColumns.forEach((col) => {
-      if (!uiState.visibleColumns.includes(col)) {
-        uiActions.toggleColumn(col);
-      }
-    });
-  }, [allColumns, uiState.visibleColumns, uiActions]);
+    uiActions.setVisibleColumns(allColumns);
+  }, [allColumns, uiActions]);
 
   const handleHideAll = useCallback(() => {
     // Keep at least uuid visible
-    uiState.visibleColumns.forEach((col) => {
-      if (col !== 'uuid') {
-        uiActions.toggleColumn(col);
-      }
-    });
-  }, [uiState.visibleColumns, uiActions]);
+    uiActions.setVisibleColumns(allColumns.filter((col) => col === 'uuid'));
+  }, [allColumns, uiActions]);
 
   if (!isOpen) {
     return null;
@@ -109,7 +113,7 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
         <div className="column-manager-header">
           <h3>Manage Columns</h3>
           <button className="close-btn" onClick={onClose} aria-label="Close column manager">
-            ✕
+            <span className="codicon codicon-close" aria-hidden="true"></span>
           </button>
         </div>
 
@@ -135,7 +139,7 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
         <div className="column-manager-list">
           {filteredColumns.map((column) => {
-            const isVisible = uiState.visibleColumns.includes(column);
+            const isVisible = effectiveVisibleColumns.includes(column);
             const isPinned = uiState.pinnedColumns.includes(column);
             const isUuid = column === 'uuid';
 
@@ -162,7 +166,7 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
                   title={isPinned ? 'Unpin column' : 'Pin column'}
                   aria-label={isPinned ? `Unpin ${column}` : `Pin ${column}`}
                 >
-                  📌
+                  <span className="codicon codicon-pin" aria-hidden="true"></span>
                 </button>
               </div>
             );
@@ -175,7 +179,7 @@ export function ColumnManager({ isOpen, onClose }: ColumnManagerProps) {
 
         <div className="column-manager-footer">
           <span className="column-count">
-            {uiState.visibleColumns.length} of {allColumns.length} columns visible
+            {effectiveVisibleColumns.length} of {allColumns.length} columns visible
           </span>
         </div>
       </div>

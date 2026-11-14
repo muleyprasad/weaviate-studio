@@ -38,10 +38,11 @@ class ErrorBoundary extends Component<Props, State> {
             style={{
               padding: '16px',
               margin: '8px',
-              backgroundColor: 'rgba(231, 76, 60, 0.1)',
-              border: '1px solid rgba(231, 76, 60, 0.3)',
+              backgroundColor:
+                'var(--vscode-inputValidation-errorBackground, rgba(231, 76, 60, 0.1))',
+              border: '1px solid var(--vscode-inputValidation-errorBorder, rgba(231, 76, 60, 0.3))',
               borderRadius: '4px',
-              color: '#e74c3c',
+              color: 'var(--vscode-errorForeground, #e74c3c)',
             }}
           >
             <h3>Something went wrong</h3>
@@ -52,9 +53,9 @@ class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
               style={{
-                backgroundColor: '#3c3c3c',
-                color: '#cccccc',
-                border: '1px solid #555',
+                backgroundColor: 'var(--vscode-button-secondaryBackground, #3c3c3c)',
+                color: 'var(--vscode-button-secondaryForeground, #cccccc)',
+                border: '1px solid var(--vscode-button-border, #555)',
                 borderRadius: '4px',
                 padding: '4px 8px',
                 marginTop: '8px',

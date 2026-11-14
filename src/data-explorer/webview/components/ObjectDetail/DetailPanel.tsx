@@ -13,16 +13,26 @@ interface DetailPanelProps {
   object: WeaviateObject | null;
   onClose: () => void;
   onFindSimilar?: (uuid: string) => void;
+  onEdit?: (uuid: string) => void;
+  onDelete?: (uuid: string) => void;
 }
 
 export const DetailPanel = React.memo(function DetailPanel({
   object,
   onClose,
   onFindSimilar,
+  onEdit,
+  onDelete,
 }: DetailPanelProps) {
   const dataState = useDataState();
   const panelRef = useRef<HTMLDivElement>(null);
   const [showCopiedUuid, setShowCopiedUuid] = React.useState(false);
+  // Two-step delete confirmation, matching the table row actions
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+
+  useEffect(() => {
+    setConfirmingDelete(false);
+  }, [object?.uuid]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -70,6 +80,15 @@ export const DetailPanel = React.memo(function DetailPanel({
     }
   }, [object, onFindSimilar]);
 
+  const handleDeleteConfirm = useCallback(() => {
+    if (!object || !onDelete) {
+      return;
+    }
+    setConfirmingDelete(false);
+    onDelete(object.uuid);
+    onClose();
+  }, [object, onDelete, onClose]);
+
   if (!object) {
     return null;
   }
@@ -114,26 +133,21 @@ export const DetailPanel = React.memo(function DetailPanel({
         <div className="detail-section uuid-section">
           <div className="uuid-display">
             <label>UUID</label>
-            <code className="uuid-value">{object.uuid}</code>
-            <button
-              type="button"
-              className="copy-uuid-btn"
-              onClick={handleCopyUuid}
-              title="Copy UUID"
-              aria-label="Copy UUID to clipboard"
-            >
-              {showCopiedUuid ? (
-                <>
-                  <span className="codicon codicon-check" aria-hidden="true"></span>
-                  Copied
-                </>
-              ) : (
-                <>
-                  <span className="codicon codicon-copy" aria-hidden="true"></span>
-                  Copy
-                </>
-              )}
-            </button>
+            <div className="uuid-value-row">
+              <code className="uuid-value">{object.uuid}</code>
+              <button
+                type="button"
+                className="copy-uuid-btn"
+                onClick={handleCopyUuid}
+                title={showCopiedUuid ? 'Copied' : 'Copy UUID'}
+                aria-label={showCopiedUuid ? 'UUID copied to clipboard' : 'Copy UUID to clipboard'}
+              >
+                <span
+                  className={`codicon ${showCopiedUuid ? 'codicon-check' : 'codicon-copy'}`}
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -228,9 +242,66 @@ export const DetailPanel = React.memo(function DetailPanel({
 
         {/* Actions */}
         <div className="detail-panel-actions">
+          {onEdit && (
+            <button
+              type="button"
+              className="action-btn primary"
+              onClick={() => onEdit(object.uuid)}
+              disabled={dataState.readOnly}
+              title={
+                dataState.readOnly
+                  ? 'Editing is disabled on read-only connections'
+                  : 'Edit this object'
+              }
+              aria-label="Edit object"
+            >
+              <span className="codicon codicon-edit" aria-hidden="true"></span>
+              Edit
+            </button>
+          )}
+          {onDelete &&
+            (confirmingDelete ? (
+              <>
+                <button
+                  type="button"
+                  className="action-btn danger"
+                  onClick={handleDeleteConfirm}
+                  title="Delete this object permanently"
+                  aria-label="Confirm delete"
+                >
+                  <span className="codicon codicon-check" aria-hidden="true"></span>
+                  Confirm delete
+                </button>
+                <button
+                  type="button"
+                  className="action-btn secondary"
+                  onClick={() => setConfirmingDelete(false)}
+                  aria-label="Cancel delete"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="action-btn danger"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={dataState.readOnly}
+                title={
+                  dataState.readOnly
+                    ? 'Deleting is disabled on read-only connections'
+                    : 'Delete this object'
+                }
+                aria-label="Delete object"
+              >
+                <span className="codicon codicon-trash" aria-hidden="true"></span>
+                Delete
+              </button>
+            ))}
           {onFindSimilar && (
             <button
-              className="action-btn primary"
+              type="button"
+              className="action-btn secondary"
               onClick={handleFindSimilar}
               title="Find objects similar to this one"
             >
@@ -238,7 +309,7 @@ export const DetailPanel = React.memo(function DetailPanel({
               Find Similar
             </button>
           )}
-          <button className="action-btn secondary" onClick={onClose}>
+          <button type="button" className="action-btn secondary" onClick={onClose}>
             Close
           </button>
         </div>

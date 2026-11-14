@@ -133,7 +133,7 @@ export function TableHeader({
                 <span className="header-label">
                   {isPinned(column) && (
                     <span className="pin-icon" title="Pinned column">
-                      📌
+                      <span className="codicon codicon-pin" aria-hidden="true"></span>
                     </span>
                   )}
                   {column === 'uuid' ? 'ID' : column}
@@ -146,8 +146,9 @@ export function TableHeader({
 
         {/* Actions column */}
         <th className="header-cell actions-cell" role="columnheader">
-          <div className="actions-header" aria-label="Actions">
-            <span className="codicon codicon-gear" aria-hidden="true"></span>
+          <div className="actions-header" aria-label="Actions" title="Row actions">
+            <span className="codicon codicon-settings-gear" aria-hidden="true"></span>
+            <span className="actions-header-label">Actions</span>
           </div>
         </th>
       </tr>

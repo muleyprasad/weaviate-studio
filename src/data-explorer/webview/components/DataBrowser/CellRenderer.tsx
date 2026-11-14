@@ -156,7 +156,7 @@ function CellRendererComponent({ value, dataTypeHint, columnName, onExpand }: Ce
             title="View object"
             aria-label="View object properties"
           >
-            🔍
+            <span className="codicon codicon-search" aria-hidden="true"></span>
           </button>
           {expanded && !onExpand && (
             <div className="cell-expanded-content">
@@ -196,7 +196,7 @@ function CellRendererComponent({ value, dataTypeHint, columnName, onExpand }: Ce
               title="View array"
               aria-label="View array items"
             >
-              🔍
+              <span className="codicon codicon-search" aria-hidden="true"></span>
             </button>
             {expanded && !onExpand && (
               <div className="cell-expanded-content">

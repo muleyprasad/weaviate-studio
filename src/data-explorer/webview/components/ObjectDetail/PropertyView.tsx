@@ -136,10 +136,13 @@ export function PropertyView({ name, value, dataType, level = 0 }: PropertyViewP
           <button
             className="copy-btn"
             onClick={handleCopy}
-            title="Copy value"
-            aria-label={`Copy ${name} value`}
+            title={showCopied ? 'Copied' : 'Copy value'}
+            aria-label={showCopied ? 'Value copied' : `Copy ${name} value`}
           >
-            {showCopied ? '✓' : '📋'}
+            <span
+              className={`codicon ${showCopied ? 'codicon-check' : 'codicon-copy'}`}
+              aria-hidden="true"
+            ></span>
           </button>
         </div>
       )}

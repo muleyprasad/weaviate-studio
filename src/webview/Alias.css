@@ -298,7 +298,8 @@
 }
 
 .success-message {
-  background: rgba(var(--vscode-terminal-ansiGreen), 0.1);
+  /* terminal-ansiGreen is a colour, not an RGB triplet, so it cannot be wrapped in rgba() */
+  background-color: rgba(var(--vscode-testing-iconPassed-rgb, 0, 200, 0), 0.1);
   border: 1px solid var(--vscode-terminal-ansiGreen);
   color: var(--vscode-terminal-ansiGreen);
 }

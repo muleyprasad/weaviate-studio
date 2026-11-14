@@ -13,6 +13,7 @@ import {
 import { ViewRenderer } from '../views/ViewRenderer';
 import { AddCollectionPanel, WebviewToExtensionMessage } from '../views/AddCollectionPanel';
 import { QueryEditorPanel } from '../query-editor/extension/QueryEditorPanel';
+import { DataExplorerPanel } from '../data-explorer/extension/DataExplorerPanel';
 import { ClusterPanel } from '../views/ClusterPanel';
 import { CollectionConfig, Node, ShardingConfig, VectorConfig } from 'weaviate-client';
 import * as https from 'https';
@@ -4087,6 +4088,7 @@ export class WeaviateTreeDataProvider implements vscode.TreeDataProvider<Weaviat
       readOnly: !connection.readOnly,
     });
     connection.readOnly = !connection.readOnly;
+    DataExplorerPanel.updateReadOnlyForConnection(connectionId, connection.readOnly);
     this.refresh();
   }
 
