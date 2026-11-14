@@ -54,7 +54,7 @@ Weaviate Studio uses **two GitHub Actions workflows**:
 5. Publishes to the Open VSX Registry
 6. Attaches the `.vsix` as a release artifact
 
-The pipeline is wired to run automatically when a Git tag that starts with `v` is pushed.
+The pipeline is wired to run when you **publish a GitHub Release** for the new tag (`release: published`). Pushing the tag on its own only runs lint and tests — it does not publish, so step 4 below is not optional.
 
 ### What the Docs Deploy Workflow Does (`deploy-docs.yml`)
 

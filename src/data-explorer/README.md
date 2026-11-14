@@ -31,6 +31,16 @@ Four search modes to find similar objects:
    - Score breakdown showing keyword, semantic, and combined scores
    - Property selection for targeted search
 
+### MMR Diversity Selection
+
+Re-rank near-\* results with maximal marginal relevance so one dominant cluster cannot fill the result list (requires Weaviate ≥ 1.39):
+
+- **Enable**: Check **Diversify** beside Profile before running a Text, Object, or Vector search
+- **Balance**: The slider trades diversity (0) against relevance (1); at 1 the order matches the plain ranking
+- **Candidate pool**: The request sends a diversity limit defaulting to the requested result count and clamped to the query limit, because the server rejects a missing or oversized limit
+- **Version gate**: Servers below 1.39 show a disabled toggle with a `1.39+` hint
+- **Not in hybrid yet**: Hybrid MMR waits on `weaviate-client` 3.15
+
 ### Query Profiling
 
 Per-query timing breakdowns for diagnosing slow searches (requires Weaviate ≥ 1.36.9):

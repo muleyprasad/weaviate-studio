@@ -7,6 +7,25 @@ description: Full version history and release notes for Weaviate Studio — new 
 
 All notable changes to the Weaviate Studio extension.
 
+## [1.11.0] - 2026-11-14
+
+### ✨ Added
+
+- **MMR diversity selection in Vector Search** — Check **Diversify** beside **Profile** to re-rank `nearText`, `nearObject`, and `nearVector` results with maximal marginal relevance on Weaviate 1.39 or later, with a slider that trades diversity for relevance. Servers below 1.39 show a disabled control with a `1.39+` hint instead of failing at query time. See the [Data Explorer guide](/features/data-explorer#mmr-diversity-selection) for the workflow and the candidate-pool rules.
+- **Import data into a collection** — **Import** accepts JSON or CSV from a local file, a URL, or pasted text, reports per-object failures, and honours explicit `id` and `vector` values; rows without a vector are vectorized at import time. See [Importing and editing data](/features/data-explorer#importing-and-editing-data).
+- **Edit and delete rows** — Edit object properties with PATCH semantics and delete with two-step confirmation, both disabled on read-only connections.
+
+### 🔧 Improved
+
+- **Rebuilt Vector Search panel** — Label-above-field layout, an embedding metadata line, a sentence-case **Search options** heading, a full-width run button with the copy-as-code panel beside it, and one plain checkbox row for Profile and Diversify.
+- **Max distance is a decimal stepper** — The threshold reads `1.00` and can be nudged by 0.05 with −/+ buttons, clamped to 0–2, while staying editable for exact values. It replaces the duplicate distance slider that used to sit behind a More options disclosure.
+- **Search options are shared across all four tabs** — Metric, Max distance, Results, Profile, and Diversify keep their values when switching modes; only the query input changes.
+
+### 🐛 Fixed
+
+- **MMR searches no longer fail on 1.39** — The request omitted the MMR candidate limit, which the server rejects. The payload now always sends a limit, defaulting to the result count and clamped to the query limit.
+- **Consistent result card titles** — Cards without a `title` property no longer headline themselves with a different property per object; the title comes from the longest text property.
+
 ## [1.10.0] - 2026-08-14
 
 ### ✨ Added
