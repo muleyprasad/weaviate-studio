@@ -599,7 +599,8 @@ describe('useVectorSearch', () => {
         expect.objectContaining({
           vectorSearch: expect.objectContaining({
             type: 'nearText',
-            diversity: { type: 'mmr', balance: 0.3 },
+            // The server needs a candidate limit, so it defaults to the result count.
+            diversity: { type: 'mmr', balance: 0.3, limit: 25 },
           }),
         })
       );
@@ -618,6 +619,7 @@ describe('useVectorSearch', () => {
         contextResult.current.context.setSearchMode('vector');
         contextResult.current.context.setSearchParams({
           vector: '[0.1, 0.2]',
+          limit: 100,
           mmrEnabled: true,
           mmrLimit: 100,
         });
@@ -631,6 +633,38 @@ describe('useVectorSearch', () => {
         expect.objectContaining({
           vectorSearch: expect.objectContaining({
             diversity: { type: 'mmr', balance: 0.5, limit: 100 },
+          }),
+        })
+      );
+    });
+
+    test('clamps the candidate pool to the query limit', () => {
+      const { result: contextResult } = renderHook(
+        () => ({
+          search: useVectorSearch(),
+          context: require('../../context').useVectorSearchActions(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        contextResult.current.context.setSearchMode('vector');
+        contextResult.current.context.setSearchParams({
+          vector: '[0.1, 0.2]',
+          limit: 10,
+          mmrEnabled: true,
+          mmrLimit: 100,
+        });
+      });
+
+      act(() => {
+        contextResult.current.search.executeSearch();
+      });
+
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vectorSearch: expect.objectContaining({
+            diversity: { type: 'mmr', balance: 0.5, limit: 10 },
           }),
         })
       );

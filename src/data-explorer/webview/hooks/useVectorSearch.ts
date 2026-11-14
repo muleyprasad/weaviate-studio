@@ -11,6 +11,7 @@ import {
   type VectorSearchResult,
 } from '../context';
 import { getVSCodeAPI } from '../utils/vscodeApi';
+import { mmrCandidateLimit } from '../utils/mmr';
 import type {
   WebviewMessage,
   WeaviateObject,
@@ -331,10 +332,12 @@ export function useVectorSearch() {
     // the current client (3.14) types `diversity` on near-search options; hybrid MMR
     // support arrives with weaviate-client 3.15 and is tracked in issue #88.
     if (searchParams.mmrEnabled && vectorSearchPayload.type !== 'hybrid') {
+      // The server rejects a diversity block with no candidate limit and requires
+      // 1 <= limit <= the query limit, so fall back to the result count and clamp.
       vectorSearchPayload.diversity = {
         type: 'mmr',
         balance: searchParams.mmrBalance,
-        ...(searchParams.mmrLimit !== undefined ? { limit: searchParams.mmrLimit } : {}),
+        limit: mmrCandidateLimit(searchParams),
       };
     }
 
