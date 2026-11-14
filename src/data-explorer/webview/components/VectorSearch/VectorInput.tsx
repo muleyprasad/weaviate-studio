@@ -86,7 +86,6 @@ export function VectorInput({
   return (
     <div className="vector-input">
       <label htmlFor="raw-vector-input" className="input-label">
-        <span className="codicon codicon-symbol-array" aria-hidden="true"></span>
         RAW VECTOR INPUT
       </label>
 
@@ -103,7 +102,7 @@ export function VectorInput({
         aria-describedby="vector-validation"
       />
 
-      <div id="vector-validation" className="vector-validation">
+      <div id="vector-validation" className="vector-validation input-meta">
         {validation.error && (
           <div className="validation-error">
             <span className="codicon codicon-error" aria-hidden="true"></span>
@@ -126,7 +125,9 @@ export function VectorInput({
         )}
       </div>
 
-      <p className="input-hint">Paste a JSON array of numbers representing a vector embedding</p>
+      <div className="input-meta">
+        <span>Paste a JSON array of numbers representing a vector embedding</span>
+      </div>
     </div>
   );
 }

@@ -138,7 +138,8 @@ export function VectorSearchPanel({
   // Get named vectors from schema
   const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
   const [isProfileDetailsOpen, setIsProfileDetailsOpen] = useState(false);
-  const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [isCodeOpen, setIsCodeOpen] = useState(false);
 
   // Close a previously opened profile whenever it is cleared or profiling is turned off.
   useEffect(() => {
@@ -577,72 +578,72 @@ export function VectorSearchPanel({
             />
           )}
 
-          {/* Shared options row: the mode-specific input above is the only difference between modes. */}
-          <div className="search-options" role="group" aria-label="Search options">
-            {/* Distance Metric */}
-            <div className="search-option">
-              <label htmlFor="distance-metric">Metric</label>
-              <select
-                id="distance-metric"
-                value={searchParams.distanceMetric}
-                onChange={(e) => handleParamChange('distanceMetric', e.target.value)}
-                disabled={isSearching}
-              >
-                {distanceMetrics.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Max Distance */}
-            <div className="search-option">
-              <label htmlFor="max-distance">Max distance</label>
-              <div className="distance-input-row">
-                <input
-                  id="max-distance"
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.05"
-                  value={searchParams.maxDistance}
-                  onChange={(e) => {
-                    const next = parseFloat(e.target.value);
-                    if (Number.isFinite(next)) {
-                      handleParamChange('maxDistance', Math.min(2, Math.max(0, next)));
-                    }
-                  }}
+          {/* Shared options: the mode-specific input above is the only difference between modes. */}
+          <div className="search-options">
+            <h3 className="search-options-title">Search options</h3>
+            <div className="search-options-row" role="group" aria-label="Search options">
+              {/* Distance Metric */}
+              <div className="search-option">
+                <label htmlFor="distance-metric">Metric</label>
+                <select
+                  id="distance-metric"
+                  value={searchParams.distanceMetric}
+                  onChange={(e) => handleParamChange('distanceMetric', e.target.value)}
                   disabled={isSearching}
-                  title="1.00 or higher disables the distance filter"
-                />
-                {searchParams.maxDistance >= 1.0 && (
-                  <span className="distance-none">no filter</span>
-                )}
+                >
+                  {distanceMetrics.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {/* Result Limit */}
-            <div className="search-option">
-              <label htmlFor="result-limit">Results</label>
-              <select
-                id="result-limit"
-                value={searchParams.limit}
-                onChange={(e) => handleParamChange('limit', parseInt(e.target.value, 10))}
-                disabled={isSearching}
-              >
-                {limitOptions.map((limit) => (
-                  <option key={limit} value={limit}>
-                    {limit}
-                  </option>
-                ))}
-              </select>
+              {/* Max Distance */}
+              <div className="search-option">
+                <label htmlFor="max-distance">Max distance</label>
+                <div className="distance-input-row">
+                  <input
+                    id="max-distance"
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.05"
+                    value={searchParams.maxDistance}
+                    onChange={(e) => {
+                      const next = parseFloat(e.target.value);
+                      if (Number.isFinite(next)) {
+                        handleParamChange('maxDistance', Math.min(2, Math.max(0, next)));
+                      }
+                    }}
+                    disabled={isSearching}
+                    title="1.00 or higher disables the distance filter"
+                  />
+                </div>
+              </div>
+
+              {/* Result Limit */}
+              <div className="search-option">
+                <label htmlFor="result-limit">Results</label>
+                <select
+                  id="result-limit"
+                  value={searchParams.limit}
+                  onChange={(e) => handleParamChange('limit', parseInt(e.target.value, 10))}
+                  disabled={isSearching}
+                >
+                  {limitOptions.map((limit) => (
+                    <option key={limit} value={limit}>
+                      {limit}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Search Button and Actions */}
           <div className="search-action">
-            <div className="search-action-primary-row">
+            <div className="search-run-row">
               <button
                 type="button"
                 className="search-btn primary"
@@ -662,153 +663,162 @@ export function VectorSearchPanel({
                 )}
               </button>
 
-              <div
-                className={`query-profile-compact ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
+              <button
+                type="button"
+                className="search-icon-btn"
+                onClick={() => setIsCodeOpen((open) => !open)}
+                aria-expanded={isCodeOpen}
+                aria-controls="search-code-snippet"
+                title="Code snippet"
+                aria-label="Code snippet"
+              >
+                <span className="codicon codicon-code" aria-hidden="true"></span>
+              </button>
+            </div>
+
+            <div className="search-toggles">
+              <label
+                className={`search-toggle ${!queryProfilingSupported ? 'is-unavailable' : ''}`}
+                htmlFor="query-profile-toggle"
                 title={
                   queryProfilingSupported
                     ? 'Include per-shard timing data in each search. This preference is remembered.'
                     : 'Query profiling requires Weaviate 1.36.9 or newer.'
                 }
               >
-                <label htmlFor="query-profile-toggle">
-                  <input
-                    type="checkbox"
-                    id="query-profile-toggle"
-                    checked={queryProfileEnabled}
-                    onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
-                    disabled={isSearching || !queryProfilingSupported}
-                  />
-                  <span className="codicon codicon-pulse" aria-hidden="true"></span>
-                  <span>Profile</span>
-                </label>
-                {queryProfileEnabled && queryProfileResult && (
-                  <button
-                    type="button"
-                    className="query-profile-details-button"
-                    onClick={() => setIsProfileDetailsOpen((open) => !open)}
-                    aria-expanded={isProfileDetailsOpen}
-                    aria-controls="query-profile-details"
-                  >
-                    <span className="codicon codicon-graph-line" aria-hidden="true"></span>
-                    {isProfileDetailsOpen ? 'Hide profile' : 'View profile'}
-                  </button>
-                )}
-                {!queryProfilingSupported && (
-                  <span className="query-profile-requires">1.36.9+</span>
-                )}
-              </div>
+                <input
+                  type="checkbox"
+                  id="query-profile-toggle"
+                  checked={queryProfileEnabled}
+                  onChange={(e) => actions.setQueryProfileEnabled(e.target.checked)}
+                  disabled={isSearching || !queryProfilingSupported}
+                />
+                <span>Profile</span>
+                {!queryProfilingSupported && <span className="toggle-hint">1.36.9+</span>}
+              </label>
+
+              {queryProfileEnabled && queryProfileResult && (
+                <button
+                  type="button"
+                  className="toggle-link"
+                  onClick={() => setIsProfileDetailsOpen((open) => !open)}
+                  aria-expanded={isProfileDetailsOpen}
+                  aria-controls="query-profile-details"
+                >
+                  {isProfileDetailsOpen ? 'Hide profile' : 'View profile'}
+                </button>
+              )}
 
               {/* MMR diversity selection (near-* modes; hybrid pending client 3.15 — see #88) */}
               {searchMode !== 'hybrid' && (
-                <div
-                  className={`query-profile-compact mmr-compact ${!mmrSupported ? 'is-unavailable' : ''}`}
+                <label
+                  className={`search-toggle ${!mmrSupported ? 'is-unavailable' : ''}`}
+                  htmlFor="mmr-toggle"
                   title={
                     mmrSupported
                       ? 'Re-rank results with MMR to reduce redundancy. Balance trades diversity (0) against relevance (1).'
                       : 'MMR diversity selection requires Weaviate 1.39 or newer.'
                   }
                 >
-                  <label htmlFor="mmr-toggle">
-                    <input
-                      type="checkbox"
-                      id="mmr-toggle"
-                      checked={searchParams.mmrEnabled}
-                      onChange={(e) => actions.setSearchParams({ mmrEnabled: e.target.checked })}
-                      disabled={isSearching || !mmrSupported}
-                    />
-                    <span>Diversify</span>
-                  </label>
-                  {searchParams.mmrEnabled && mmrSupported && (
-                    <span className="mmr-balance">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={searchParams.mmrBalance}
-                        onChange={(e) =>
-                          actions.setSearchParams({ mmrBalance: parseFloat(e.target.value) })
-                        }
-                        disabled={isSearching}
-                        aria-label="MMR balance (0 = most diverse, 1 = most relevant)"
-                      />
-                      <span className="mmr-balance-value">
-                        {searchParams.mmrBalance.toFixed(2)}
-                      </span>
-                    </span>
-                  )}
-                  {!mmrSupported && <span className="query-profile-requires">1.39+</span>}
-                </div>
+                  <input
+                    type="checkbox"
+                    id="mmr-toggle"
+                    checked={searchParams.mmrEnabled}
+                    onChange={(e) => actions.setSearchParams({ mmrEnabled: e.target.checked })}
+                    disabled={isSearching || !mmrSupported}
+                  />
+                  <span>Diversify</span>
+                  {!mmrSupported && <span className="toggle-hint">1.39+</span>}
+                </label>
               )}
-            </div>
 
-            <div className="search-action-secondary">
+              {searchParams.mmrEnabled && mmrSupported && searchMode !== 'hybrid' && (
+                <span className="mmr-balance">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={searchParams.mmrBalance}
+                    onChange={(e) =>
+                      actions.setSearchParams({ mmrBalance: parseFloat(e.target.value) })
+                    }
+                    disabled={isSearching}
+                    aria-label="MMR balance (0 = most diverse, 1 = most relevant)"
+                  />
+                  <span className="mmr-balance-value">{searchParams.mmrBalance.toFixed(2)}</span>
+                </span>
+              )}
+
               {searchResults.length > 0 && (
                 <button
                   type="button"
-                  className="clear-results-btn secondary"
+                  className="toggle-link"
                   onClick={() => actions.clearSearch()}
                   disabled={isSearching}
                 >
-                  Clear Results
+                  Clear results
                 </button>
               )}
 
+              <span className="toggles-spacer" aria-hidden="true"></span>
+
               <button
                 type="button"
-                className="more-options-btn"
-                onClick={() => setIsMoreOptionsOpen((open) => !open)}
-                aria-expanded={isMoreOptionsOpen}
-                aria-controls="search-more-options"
+                className="toggle-link"
+                onClick={() => setIsAdvancedOpen((open) => !open)}
+                aria-expanded={isAdvancedOpen}
+                aria-controls="search-advanced-options"
               >
-                <span className="codicon codicon-ellipsis" aria-hidden="true"></span>
                 More options
+                <span className="codicon codicon-ellipsis" aria-hidden="true"></span>
               </button>
             </div>
 
             {/* Progressive disclosure: rarely used controls stay out of the run path. */}
-            {isMoreOptionsOpen && (
-              <div id="search-more-options" className="search-more-options">
-                <div className="more-option-row">
-                  <label htmlFor="max-distance-slider">Distance filter</label>
-                  <input
-                    id="max-distance-slider"
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.05"
-                    value={searchParams.maxDistance}
-                    onChange={(e) => handleParamChange('maxDistance', parseFloat(e.target.value))}
-                    disabled={isSearching}
-                  />
-                  <div className="range-labels">
-                    <span>0 (exact)</span>
-                    <span>1.0 (no filter)</span>
-                    <span>2 (distant)</span>
-                  </div>
+            {isAdvancedOpen && (
+              <div id="search-advanced-options" className="search-advanced">
+                <label htmlFor="max-distance-slider" className="advanced-label">
+                  Distance filter
+                </label>
+                <input
+                  id="max-distance-slider"
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.05"
+                  value={searchParams.maxDistance}
+                  onChange={(e) => handleParamChange('maxDistance', parseFloat(e.target.value))}
+                  disabled={isSearching}
+                />
+                <div className="range-labels">
+                  <span>0 (exact)</span>
+                  <span>1.0 (no filter)</span>
+                  <span>2 (distant)</span>
                 </div>
+              </div>
+            )}
 
-                <div className="more-option-row">
-                  <span className="more-option-label">Code snippet</span>
-                  <CopyAsCode
-                    collectionName={schema?.name || ''}
-                    searchMode={searchMode}
-                    searchParams={searchParams}
-                    targetVector={
-                      selectedTargetVectors.length > 1
-                        ? {
-                            combination: joinStrategy,
-                            targetVectors: selectedTargetVectors,
-                            weights:
-                              Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
-                          }
-                        : selectedTargetVectors.length === 1
-                          ? selectedTargetVectors[0]
-                          : undefined
-                    }
-                    disabled={isSearching}
-                  />
-                </div>
+            {isCodeOpen && (
+              <div id="search-code-snippet" className="search-advanced">
+                <CopyAsCode
+                  collectionName={schema?.name || ''}
+                  searchMode={searchMode}
+                  searchParams={searchParams}
+                  targetVector={
+                    selectedTargetVectors.length > 1
+                      ? {
+                          combination: joinStrategy,
+                          targetVectors: selectedTargetVectors,
+                          weights:
+                            Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+                        }
+                      : selectedTargetVectors.length === 1
+                        ? selectedTargetVectors[0]
+                        : undefined
+                  }
+                  disabled={isSearching}
+                />
               </div>
             )}
           </div>

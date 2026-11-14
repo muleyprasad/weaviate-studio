@@ -2390,41 +2390,32 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Search Input Area ===== */
 .search-input-area {
-    padding: 12px 14px;
+    padding: 16px 14px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
 }
 
 .input-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    font-size: 11px;
+    display: block;
+    margin: 0 0 8px 0;
+    font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
     color: var(--vscode-descriptionForeground, #888);
 }
 
-/* Label on the left, embedding name on the right of the same line. */
-.input-label-row {
+/* Metadata line under a field: context on the left, hint on the right. */
+.input-meta {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
-}
-
-.embedding-info {
+    margin-top: 8px;
     font-size: 11px;
-    font-weight: 400;
     color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.embedding-info strong {
+.input-meta strong {
     color: var(--vscode-textLink-foreground, #3794FF);
     font-weight: 600;
 }
@@ -2448,18 +2439,18 @@ input[type="checkbox"]:focus-visible {
     background-color: var(--vscode-input-background, #3C3C3C);
     color: var(--vscode-input-foreground, #FFF);
     border: 1px solid var(--vscode-input-border, #3C3C3C);
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 13px;
     font-family: inherit;
     resize: vertical;
-    min-height: 84px;
+    min-height: 92px;
     transition: border-color 0.2s ease, min-height 0.15s ease;
 }
 
 /* Compact by default, grows while the user is actually typing. */
 .text-search-textarea:focus {
     outline: none;
-    min-height: 132px;
+    min-height: 150px;
     border-color: var(--vscode-focusBorder, #0E639C);
 }
 
@@ -2507,6 +2498,7 @@ input[type="checkbox"]:focus-visible {
     border-radius: 6px;
     font-size: 13px;
     font-family: var(--vscode-editor-font-family, monospace);
+    border-radius: 8px;
 }
 
 .object-uuid-input:focus {
@@ -2569,7 +2561,8 @@ input[type="checkbox"]:focus-visible {
     font-size: 12px;
     font-family: var(--vscode-editor-font-family, monospace);
     resize: vertical;
-    min-height: 84px;
+    min-height: 92px;
+    border-radius: 8px;
     transition: border-color 0.2s ease, min-height 0.15s ease;
 }
 
@@ -2613,13 +2606,23 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground);
 }
 
-/* ===== Shared Search Options (compact inline row) ===== */
+/* ===== Shared Search Options ===== */
 .search-options {
+    padding: 16px 14px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.search-options-title {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.search-options-row {
     display: grid;
     grid-template-columns: 1fr 1.25fr 0.75fr;
-    gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
+    gap: 10px;
 }
 
 .search-option {
@@ -2630,8 +2633,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 .search-option label {
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 12px;
+    font-weight: 400;
     color: var(--vscode-descriptionForeground);
 }
 
@@ -2639,12 +2642,12 @@ input[type="checkbox"]:focus-visible {
 .search-option input[type="number"] {
     width: 100%;
     min-width: 0;
-    min-height: 32px;
-    padding: 5px 8px;
+    min-height: 36px;
+    padding: 6px 10px;
     background-color: var(--vscode-dropdown-background, #3C3C3C);
     color: var(--vscode-dropdown-foreground, #FFF);
     border: 1px solid var(--vscode-dropdown-border, #3C3C3C);
-    border-radius: 4px;
+    border-radius: 8px;
     font-size: 12px;
     cursor: pointer;
 }
@@ -2661,8 +2664,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 .distance-input-row input[type="number"] {
-    flex: 0 0 56px;
-    width: 56px;
+    flex: 1 1 auto;
+    width: 100%;
     appearance: textfield;
     -moz-appearance: textfield;
 }
@@ -2673,15 +2676,8 @@ input[type="checkbox"]:focus-visible {
     margin: 0;
 }
 
-.distance-none {
-    flex-shrink: 0;
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-}
-
 /* Range inputs in the advanced panel keep the slider look. */
-.search-more-options input[type="range"] {
+.search-advanced input[type="range"] {
     width: 100%;
     height: 6px;
     -webkit-appearance: none;
@@ -2691,7 +2687,7 @@ input[type="checkbox"]:focus-visible {
     outline: none;
 }
 
-.search-more-options input[type="range"]::-webkit-slider-thumb {
+.search-advanced input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 16px;
@@ -2709,183 +2705,163 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground, #666);
 }
 
-/* ===== Compact Query Profiling Control ===== */
-.query-profile-compact {
+/* ===== Compact toggles (Profile / Diversify) ===== */
+.search-toggles {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+}
+
+.search-toggle {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-width: max-content;
-    min-height: 44px;
-    padding: 0 8px;
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #555));
-    border-radius: 6px;
-    background: var(--vscode-editor-background);
-    font-size: 11px;
-}
-
-.query-profile-compact label {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 36px;
+    font-size: 12px;
     color: var(--vscode-foreground);
     cursor: pointer;
     user-select: none;
 }
 
-.query-profile-compact input[type="checkbox"] {
+.search-toggle input[type="checkbox"] {
     width: 14px;
     height: 14px;
     margin: 0;
     accent-color: var(--vscode-button-background, #0E639C);
 }
 
-.query-profile-compact label .codicon {
-    color: var(--vscode-textLink-foreground, #3794FF);
-    font-size: 13px;
-}
-
-.query-profile-details-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-height: 26px;
-    padding: 3px 7px;
-    border: 0;
-    border-radius: 4px;
-    background: var(--vscode-button-secondaryBackground, #3A3A3A);
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-    font-size: 11px;
-    cursor: pointer;
-}
-
-.query-profile-details-button:hover {
-    background: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
-}
-
-.query-profile-details-button .codicon {
-    font-size: 12px;
-}
-
-.query-profile-compact.is-unavailable {
-    opacity: 0.7;
-}
-
-.query-profile-compact.is-unavailable label {
+.search-toggle.is-unavailable {
+    opacity: 0.6;
     cursor: not-allowed;
 }
 
-.query-profile-requires {
-    color: var(--vscode-descriptionForeground);
+.search-toggle.is-unavailable input {
+    cursor: not-allowed;
+}
+
+.toggle-hint {
     font-size: 10px;
+    color: var(--vscode-descriptionForeground);
 }
 
-/* ===== MMR Diversity Selection (compact control, mirrors query-profile-compact) ===== */
-/* When the toggle wraps onto its own line it should use that line, keeping the
-   balance slider at the far edge instead of leaving dead space beside it. */
-.mmr-compact {
-    flex: 1 1 auto;
-}
-
-.mmr-compact .mmr-balance {
+.toggle-link {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin-left: auto;
-}
-
-.mmr-compact input[type='range'] {
-    width: 80px;
-}
-
-.mmr-balance-value {
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 11px;
-    opacity: 0.8;
-    min-width: 28px;
-}
-
-/* ===== Search Action Button ===== */
-.search-action {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
-}
-
-.search-action-primary-row {
-    display: flex;
-    align-items: stretch;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-/* Grow into spare width, but never below the label: a squeezed primary
-   action used to wrap "Run Vector Search" onto three lines. */
-.search-action-primary-row .search-btn {
-    flex: 1 1 auto;
-    min-width: max-content;
-}
-
-/* Row that holds the secondary actions (Clear, More options) */
-.search-action-secondary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.more-options-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-    padding: 5px 8px;
-    border: 1px solid transparent;
-    border-radius: 4px;
+    gap: 4px;
+    padding: 0;
+    border: 0;
     background: none;
     color: var(--vscode-textLink-foreground, #3794FF);
     font-size: 12px;
     cursor: pointer;
 }
 
-.more-options-btn:hover {
-    background-color: var(--vscode-list-hoverBackground);
+/* The shared sheet paints every button on hover with !important, which would
+   turn these text links into solid blocks, so opt out of it. */
+.toggle-link:hover {
+    background-color: transparent !important;
+    text-decoration: underline;
 }
 
-.more-options-btn[aria-expanded="true"] {
-    border-color: var(--vscode-panel-border, #333);
+.toggle-link:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-.more-options-btn .codicon {
-    font-size: 14px;
+.toggle-link .codicon {
+    font-size: 13px;
 }
 
-/* Progressive disclosure panel under the actions */
-.search-more-options {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 10px 12px;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border, #333);
-    border-radius: 6px;
+/* Pushes the secondary links (Clear, More options) to the right of the row. */
+.toggles-spacer {
+    flex: 1 1 auto;
 }
 
-.more-option-row {
-    display: flex;
-    flex-direction: column;
+.mmr-balance {
+    display: inline-flex;
+    align-items: center;
     gap: 6px;
 }
 
-.more-option-row > label,
-.more-option-label {
+.mmr-balance input[type="range"] {
+    width: 96px;
+}
+
+.mmr-balance-value {
+    min-width: 28px;
+    font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
+    opacity: 0.8;
+}
+
+/* ===== Search Action Button ===== */
+.search-action {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 14px;
+    border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.search-run-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+/* Grow into spare width, but never below the label: a squeezed primary
+   action used to wrap "Run Vector Search" onto three lines. */
+.search-run-row .search-btn {
+    flex: 1 1 auto;
+    min-width: max-content;
+}
+
+/* Square icon buttons for the advanced panels, level with the run button. */
+.search-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 44px;
+    min-height: 44px;
+    padding: 0;
+    background-color: transparent;
+    color: var(--vscode-foreground);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #555));
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.search-icon-btn:hover:not(:disabled) {
+    background-color: var(--vscode-list-hoverBackground) !important;
+}
+
+.search-icon-btn[aria-expanded="true"] {
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.search-icon-btn .codicon {
+    font-size: 16px;
+}
+
+/* Progressive disclosure panels under the actions */
+.search-advanced {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border, #333);
+    border-radius: 8px;
+}
+
+.advanced-label {
+    font-size: 12px;
     font-weight: 500;
     color: var(--vscode-descriptionForeground);
 }
 
-.search-more-options .copy-as-code {
+.search-advanced .copy-as-code {
     margin-left: 0;
 }
 
@@ -2900,7 +2876,7 @@ input[type="checkbox"]:focus-visible {
     font-weight: 600;
     white-space: nowrap;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.15s ease, opacity 0.15s ease;
 }
@@ -2917,21 +2893,6 @@ input[type="checkbox"]:focus-visible {
 .search-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.clear-results-btn {
-    padding: 8px 16px;
-    background-color: var(--vscode-button-secondaryBackground, #3A3A3A);
-    color: var(--vscode-button-secondaryForeground);
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-}
-
-.clear-results-btn:hover:not(:disabled) {
-    background-color: var(--vscode-button-secondaryHoverBackground, #4A4A4A);
 }
 
 .loading-spinner-small {
@@ -3115,13 +3076,13 @@ input[type="checkbox"]:focus-visible {
 }
 
 .search-results-empty.is-compact .codicon {
-    font-size: 20px;
-    margin-bottom: 4px;
+    font-size: 24px;
+    margin-bottom: 6px;
 }
 
 .search-results-empty.is-compact .empty-content h4 {
     margin-bottom: 2px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--vscode-foreground);
 }

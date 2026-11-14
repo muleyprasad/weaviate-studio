@@ -32,17 +32,9 @@ export function TextSearchInput({
 
   return (
     <div className="text-search-input">
-      <div className="input-label-row">
-        <label htmlFor="text-search-query" className="input-label">
-          <span className="codicon codicon-search" aria-hidden="true"></span>
-          SEMANTIC QUERY
-        </label>
-        {vectorizerName && (
-          <span id="vectorizer-info" className="embedding-info">
-            Embedding: <strong>{vectorizerName}</strong>
-          </span>
-        )}
-      </div>
+      <label htmlFor="text-search-query" className="input-label">
+        SEMANTIC QUERY
+      </label>
 
       <textarea
         id="text-search-query"
@@ -56,7 +48,16 @@ export function TextSearchInput({
         aria-describedby="vectorizer-info"
       />
 
-      <p className="input-hint">Natural language search</p>
+      <div className="input-meta">
+        {vectorizerName ? (
+          <span id="vectorizer-info">
+            Embedding: <strong>{vectorizerName}</strong>
+          </span>
+        ) : (
+          <span />
+        )}
+        <span>Natural language search</span>
+      </div>
     </div>
   );
 }

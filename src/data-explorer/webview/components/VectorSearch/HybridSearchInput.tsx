@@ -52,17 +52,9 @@ export function HybridSearchInput({
     <div className="hybrid-search-input">
       {/* Search Query Input */}
       <div className="search-query-section">
-        <div className="input-label-row">
-          <label htmlFor="hybrid-search-query" className="input-label">
-            <span className="codicon codicon-search" aria-hidden="true"></span>
-            SEARCH QUERY
-          </label>
-          {vectorizerName && (
-            <span className="embedding-info">
-              Embedding: <strong>{vectorizerName}</strong>
-            </span>
-          )}
-        </div>
+        <label htmlFor="hybrid-search-query" className="input-label">
+          SEARCH QUERY
+        </label>
 
         <textarea
           id="hybrid-search-query"
@@ -75,7 +67,16 @@ export function HybridSearchInput({
           disabled={isSearching}
         />
 
-        <p className="input-hint">Matches by keyword (BM25) and meaning (vector)</p>
+        <div className="input-meta">
+          {vectorizerName ? (
+            <span>
+              Embedding: <strong>{vectorizerName}</strong>
+            </span>
+          ) : (
+            <span />
+          )}
+          <span>Keyword (BM25) + meaning (vector)</span>
+        </div>
       </div>
 
       {/* Alpha Slider - Keyword/Semantic Balance */}
