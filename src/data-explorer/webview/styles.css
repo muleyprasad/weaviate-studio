@@ -2782,11 +2782,15 @@ input[type="checkbox"]:focus-visible {
 .search-action-primary-row {
     display: flex;
     align-items: stretch;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
+/* Grow into spare width, but never below the label: a squeezed primary
+   action used to wrap "Run Vector Search" onto three lines. */
 .search-action-primary-row .search-btn {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: max-content;
 }
 
 /* Row that holds secondary buttons (Clear + Copy as Code) */
@@ -2804,6 +2808,7 @@ input[type="checkbox"]:focus-visible {
     padding: 12px 20px;
     font-size: 13px;
     font-weight: 600;
+    white-space: nowrap;
     border: none;
     border-radius: 6px;
     cursor: pointer;

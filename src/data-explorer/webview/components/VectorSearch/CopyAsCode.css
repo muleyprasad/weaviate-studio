@@ -12,9 +12,10 @@
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 500;
-  border: 1px solid var(--vscode-button-border);
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  border: 1px solid var(--vscode-button-border, transparent);
+  /* Secondary: the search itself is the primary action in this panel. */
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
   border-radius: 2px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -25,7 +26,7 @@
 }
 
 .copy-as-code-btn:hover:not(:disabled) {
-  background-color: var(--vscode-button-hoverBackground);
+  background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
 .copy-as-code-btn:disabled {

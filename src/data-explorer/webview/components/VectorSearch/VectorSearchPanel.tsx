@@ -722,7 +722,7 @@ export function VectorSearchPanel({
                       onChange={(e) => actions.setSearchParams({ mmrEnabled: e.target.checked })}
                       disabled={isSearching || !mmrSupported}
                     />
-                    <span className="codicon codicon-symbol-array" aria-hidden="true"></span>
+                    <span className="codicon codicon-versions" aria-hidden="true"></span>
                     <span>Diversify</span>
                   </label>
                   {searchParams.mmrEnabled && mmrSupported && (
