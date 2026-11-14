@@ -138,7 +138,6 @@ export function VectorSearchPanel({
   // Get named vectors from schema
   const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
   const [isProfileDetailsOpen, setIsProfileDetailsOpen] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [isCodeOpen, setIsCodeOpen] = useState(false);
 
   // Distance is edited as text so it reads as a decimal (1.00) instead of a
@@ -806,44 +805,7 @@ export function VectorSearchPanel({
                   Clear results
                 </button>
               )}
-
-              <span className="toggles-spacer" aria-hidden="true"></span>
-
-              <button
-                type="button"
-                className="toggle-link"
-                onClick={() => setIsAdvancedOpen((open) => !open)}
-                aria-expanded={isAdvancedOpen}
-                aria-controls="search-advanced-options"
-              >
-                More options
-                <span className="codicon codicon-ellipsis" aria-hidden="true"></span>
-              </button>
             </div>
-
-            {/* Progressive disclosure: rarely used controls stay out of the run path. */}
-            {isAdvancedOpen && (
-              <div id="search-advanced-options" className="search-advanced">
-                <label htmlFor="max-distance-slider" className="advanced-label">
-                  Distance filter
-                </label>
-                <input
-                  id="max-distance-slider"
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.05"
-                  value={searchParams.maxDistance}
-                  onChange={(e) => handleParamChange('maxDistance', parseFloat(e.target.value))}
-                  disabled={isSearching}
-                />
-                <div className="range-labels">
-                  <span>0 (exact)</span>
-                  <span>1.0 (no filter)</span>
-                  <span>2 (distant)</span>
-                </div>
-              </div>
-            )}
 
             {isCodeOpen && (
               <div id="search-code-snippet" className="search-advanced">
