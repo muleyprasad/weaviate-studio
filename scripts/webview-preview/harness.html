@@ -241,7 +241,10 @@
                         command: 'init',
                         collectionName,
                         schema,
-                        serverVersion: '1.36.9',
+                        // Add ?version=1.39.0 to the preview URL to exercise
+                        // version-gated features without editing this file.
+                        serverVersion:
+                            new URLSearchParams(window.location.search).get('version') || '1.36.9',
                         readOnly: false,
                         isMultiTenant: false,
                         requestId,
