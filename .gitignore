@@ -1,16 +1,47 @@
+# Build output
 out
 dist
 node_modules
+*.vsix
+*.tsbuildinfo
+.eslintcache
+
+# Tests
 .vscode-test/
+coverage
 
 # VitePress docs build output
 site/.vitepress/dist/
 site/.vitepress/cache/
-*.vsix
-coverage
-.DS_Store
-.weaviate-samples/
-firebase-debug.log
+
+# Local environment and secrets
 .env
-.serena
+.firebase-debug.log
+firebase-debug.log
+*.log
+
+# OS files
+.DS_Store
+
+# Sample data
+.weaviate-samples/
+
+# Editor / agent tooling state (local only)
+.agent/
 .claude
+.codeium/
+.freebuff/
+.gemini-clipboard/
+.ruff_cache/
+.serena
+.switchboard/
+
+# Generated code-graph output
+graphify-out/
+
+# Local review output (screenshots taken with the webview preview harness)
+screenshots/
+
+# Python caches (sandbox scripts)
+__pycache__/
+*.pyc
