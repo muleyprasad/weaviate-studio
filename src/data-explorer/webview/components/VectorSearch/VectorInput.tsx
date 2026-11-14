@@ -97,7 +97,7 @@ export function VectorInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Paste vector array, e.g.:&#10;[0.123, -0.456, 0.789, ...]"
-        rows={6}
+        rows={4}
         disabled={isSearching}
         spellCheck={false}
         aria-describedby="vector-validation"

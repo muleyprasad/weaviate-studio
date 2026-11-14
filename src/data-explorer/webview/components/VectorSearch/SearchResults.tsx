@@ -65,11 +65,11 @@ export function SearchResults({
     }
 
     return (
-      <div className="search-results-empty">
+      <div className="search-results-empty is-compact">
         <span className="codicon codicon-search" aria-hidden="true"></span>
         <div className="empty-content">
-          <h4>No Results Yet</h4>
-          <p>Enter a search query and click "Run Vector Search" to find similar objects.</p>
+          <h4>No results yet</h4>
+          <p>Run a search to see matching objects.</p>
         </div>
       </div>
     );

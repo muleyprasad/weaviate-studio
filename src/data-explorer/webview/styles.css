@@ -2286,7 +2286,8 @@ input[type="checkbox"]:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
+    height: 48px;
+    padding: 0 14px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
     flex-shrink: 0;
     /* Inherit the panel background so the header matches the rest of the panel */
@@ -2303,6 +2304,7 @@ input[type="checkbox"]:focus-visible {
     margin: 0;
     font-size: 16px;
     font-weight: 600;
+    line-height: 1.2;
     letter-spacing: normal;
     text-transform: none;
     color: var(--vscode-foreground);
@@ -2346,8 +2348,10 @@ input[type="checkbox"]:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 12px 8px;
+    gap: 5px;
+    min-height: 42px;
+    padding: 0 6px;
+    font-size: 11px;
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -2386,20 +2390,43 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Search Input Area ===== */
 .search-input-area {
-    padding: 16px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
 }
 
 .input-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    gap: 6px;
+    margin: 0;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--vscode-descriptionForeground, #888);
-    margin-bottom: 10px;
+}
+
+/* Label on the left, embedding name on the right of the same line. */
+.input-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.embedding-info {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.embedding-info strong {
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-weight: 600;
 }
 
 .input-label .codicon {
@@ -2408,7 +2435,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 .input-hint {
-    margin: 8px 0 0 0;
+    margin: 6px 0 0 0;
     font-size: 11px;
     color: var(--vscode-descriptionForeground, #666);
 }
@@ -2416,7 +2443,8 @@ input[type="checkbox"]:focus-visible {
 /* Text Search Input */
 .text-search-textarea {
     width: 100%;
-    padding: 12px;
+    box-sizing: border-box;
+    padding: 10px 12px;
     background-color: var(--vscode-input-background, #3C3C3C);
     color: var(--vscode-input-foreground, #FFF);
     border: 1px solid var(--vscode-input-border, #3C3C3C);
@@ -2424,12 +2452,14 @@ input[type="checkbox"]:focus-visible {
     font-size: 13px;
     font-family: inherit;
     resize: vertical;
-    min-height: 80px;
-    transition: border-color 0.2s ease;
+    min-height: 84px;
+    transition: border-color 0.2s ease, min-height 0.15s ease;
 }
 
+/* Compact by default, grows while the user is actually typing. */
 .text-search-textarea:focus {
     outline: none;
+    min-height: 132px;
     border-color: var(--vscode-focusBorder, #0E639C);
 }
 
@@ -2437,21 +2467,6 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-input-placeholderForeground, #888);
 }
 
-.vectorizer-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    padding: 8px 10px;
-    background-color: rgba(55, 148, 255, 0.1);
-    border-radius: 4px;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-}
-
-.vectorizer-info strong {
-    color: var(--vscode-textLink-foreground, #3794FF);
-}
 
 .vectorizer-warning {
     display: flex;
@@ -2483,7 +2498,9 @@ input[type="checkbox"]:focus-visible {
 /* Object Search Input */
 .object-uuid-input {
     width: 100%;
-    padding: 10px 12px;
+    box-sizing: border-box;
+    height: 44px;
+    padding: 0 12px;
     background-color: var(--vscode-input-background, #3C3C3C);
     color: var(--vscode-input-foreground, #FFF);
     border: 1px solid var(--vscode-input-border, #3C3C3C);
@@ -2543,7 +2560,8 @@ input[type="checkbox"]:focus-visible {
 /* Vector Input */
 .vector-textarea {
     width: 100%;
-    padding: 12px;
+    box-sizing: border-box;
+    padding: 10px 12px;
     background-color: var(--vscode-input-background, #3C3C3C);
     color: var(--vscode-input-foreground, #FFF);
     border: 1px solid var(--vscode-input-border, #3C3C3C);
@@ -2551,12 +2569,13 @@ input[type="checkbox"]:focus-visible {
     font-size: 12px;
     font-family: var(--vscode-editor-font-family, monospace);
     resize: vertical;
-    min-height: 100px;
-    transition: border-color 0.2s ease;
+    min-height: 84px;
+    transition: border-color 0.2s ease, min-height 0.15s ease;
 }
 
 .vector-textarea:focus {
     outline: none;
+    min-height: 150px;
     border-color: var(--vscode-focusBorder, #0E639C);
 }
 
@@ -2594,57 +2613,34 @@ input[type="checkbox"]:focus-visible {
     color: var(--vscode-descriptionForeground);
 }
 
-/* ===== Search Parameters ===== */
-.search-parameters {
-    padding: 16px;
+/* ===== Shared Search Options (compact inline row) ===== */
+.search-options {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr 0.75fr;
+    gap: 8px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
 }
 
-.parameters-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 12px 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--vscode-descriptionForeground, #888);
-}
-
-.parameters-title .codicon {
-    font-size: 14px;
-    color: var(--vscode-descriptionForeground, #888);
-}
-
-.parameter-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.parameter-item {
+.search-option {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
+    min-width: 0;
 }
 
-.parameter-item:nth-child(2) {
-    grid-column: 1 / -1;
-}
-
-.parameter-item label {
+.search-option label {
     font-size: 11px;
     font-weight: 500;
     color: var(--vscode-descriptionForeground);
 }
 
-.parameter-item label strong {
-    color: var(--vscode-textLink-foreground, #3794FF);
-}
-
-.parameter-item select {
-    padding: 6px 10px;
+.search-option select,
+.search-option input[type="number"] {
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding: 5px 8px;
     background-color: var(--vscode-dropdown-background, #3C3C3C);
     color: var(--vscode-dropdown-foreground, #FFF);
     border: 1px solid var(--vscode-dropdown-border, #3C3C3C);
@@ -2653,7 +2649,39 @@ input[type="checkbox"]:focus-visible {
     cursor: pointer;
 }
 
-.parameter-item input[type="range"] {
+.search-option input[type="number"] {
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.distance-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.distance-input-row input[type="number"] {
+    flex: 0 0 56px;
+    width: 56px;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.distance-input-row input[type="number"]::-webkit-inner-spin-button,
+.distance-input-row input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.distance-none {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+/* Range inputs in the advanced panel keep the slider look. */
+.search-more-options input[type="range"] {
     width: 100%;
     height: 6px;
     -webkit-appearance: none;
@@ -2663,7 +2691,7 @@ input[type="checkbox"]:focus-visible {
     outline: none;
 }
 
-.parameter-item input[type="range"]::-webkit-slider-thumb {
+.search-more-options input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 16px;
@@ -2687,6 +2715,7 @@ input[type="checkbox"]:focus-visible {
     align-items: center;
     gap: 6px;
     min-width: max-content;
+    min-height: 44px;
     padding: 0 8px;
     border: 1px solid var(--vscode-input-border, var(--vscode-panel-border, #555));
     border-radius: 6px;
@@ -2752,11 +2781,17 @@ input[type="checkbox"]:focus-visible {
 }
 
 /* ===== MMR Diversity Selection (compact control, mirrors query-profile-compact) ===== */
+/* When the toggle wraps onto its own line it should use that line, keeping the
+   balance slider at the far edge instead of leaving dead space beside it. */
+.mmr-compact {
+    flex: 1 1 auto;
+}
+
 .mmr-compact .mmr-balance {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    margin-left: 8px;
+    margin-left: auto;
 }
 
 .mmr-compact input[type='range'] {
@@ -2775,7 +2810,7 @@ input[type="checkbox"]:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 16px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--vscode-panel-border, #333);
 }
 
@@ -2793,11 +2828,65 @@ input[type="checkbox"]:focus-visible {
     min-width: max-content;
 }
 
-/* Row that holds secondary buttons (Clear + Copy as Code) */
+/* Row that holds the secondary actions (Clear, More options) */
 .search-action-secondary {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.more-options-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    color: var(--vscode-textLink-foreground, #3794FF);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.more-options-btn:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.more-options-btn[aria-expanded="true"] {
+    border-color: var(--vscode-panel-border, #333);
+}
+
+.more-options-btn .codicon {
+    font-size: 14px;
+}
+
+/* Progressive disclosure panel under the actions */
+.search-more-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 12px;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border, #333);
+    border-radius: 6px;
+}
+
+.more-option-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.more-option-row > label,
+.more-option-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+}
+
+.search-more-options .copy-as-code {
+    margin-left: 0;
 }
 
 .search-btn {
@@ -2805,7 +2894,8 @@ input[type="checkbox"]:focus-visible {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 12px 20px;
+    min-height: 44px;
+    padding: 10px 18px;
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
@@ -3016,6 +3106,26 @@ input[type="checkbox"]:focus-visible {
     opacity: 0.5;
 }
 
+/* The panel has a lot of space to fill later; the initial empty state should
+   not pretend to be one. */
+.search-results-empty.is-compact {
+    align-items: center;
+    gap: 2px;
+    padding: 24px 16px;
+}
+
+.search-results-empty.is-compact .codicon {
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.search-results-empty.is-compact .empty-content h4 {
+    margin-bottom: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
 .error-content h4,
 .empty-content h4 {
     margin: 0 0 8px 0;
@@ -3219,12 +3329,8 @@ input[type="checkbox"]:focus-visible {
         max-width: unset;
     }
 
-    .parameter-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .parameter-item:nth-child(2) {
-        grid-column: 1;
+    .search-options {
+        grid-template-columns: 1fr 1fr;
     }
 
     .result-card {
@@ -3246,7 +3352,7 @@ input[type="checkbox"]:focus-visible {
 .hybrid-search-input {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .search-query-section {
@@ -3257,7 +3363,8 @@ input[type="checkbox"]:focus-visible {
 
 .hybrid-search-textarea {
     width: 100%;
-    padding: 12px;
+    box-sizing: border-box;
+    padding: 10px 12px;
     background-color: var(--vscode-input-background, #3C3C3C);
     color: var(--vscode-input-foreground, #FFF);
     border: 1px solid var(--vscode-input-border, #3C3C3C);
@@ -3285,7 +3392,7 @@ input[type="checkbox"]:focus-visible {
 
 /* ===== Alpha Slider (Keyword/Semantic Balance) ===== */
 .alpha-slider {
-    padding: 16px;
+    padding: 12px;
     background: var(--vscode-input-background, #2D2D2D);
     border: 1px solid var(--vscode-panel-border, #3C3C3C);
     border-radius: 8px;
@@ -3436,7 +3543,7 @@ input[type="checkbox"]:focus-visible {
 
 /* Alpha label display */
 .alpha-label {
-    margin-top: 12px;
+    margin-top: 8px;
     text-align: center;
 }
 

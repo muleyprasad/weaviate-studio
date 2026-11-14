@@ -138,6 +138,7 @@ export function VectorSearchPanel({
   // Get named vectors from schema
   const { namedVectors, hasMultipleVectors } = useNamedVectors(schema);
   const [isProfileDetailsOpen, setIsProfileDetailsOpen] = useState(false);
+  const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(false);
 
   // Close a previously opened profile whenever it is cleared or profiling is turned off.
   useEffect(() => {
@@ -482,7 +483,7 @@ export function VectorSearchPanel({
                       <h4>Vectorizer Not Configured</h4>
                       <p>
                         Text search requires a vectorizer to be configured for this collection. Use
-                        "Similar Object" or "Raw Vector" mode instead.
+                        "Similar" or "Raw Vector" mode instead.
                       </p>
                     </div>
                   </div>
@@ -528,7 +529,7 @@ export function VectorSearchPanel({
                       <h4>Vectorizer Not Configured</h4>
                       <p>
                         Hybrid search requires a vectorizer to be configured for this collection.
-                        Use "Similar Object" or "Raw Vector" mode instead.
+                        Use "Similar" or "Raw Vector" mode instead.
                       </p>
                     </div>
                   </div>
@@ -549,6 +550,7 @@ export function VectorSearchPanel({
                         enableQueryRewriting: !searchParams.enableQueryRewriting,
                       })
                     }
+                    vectorizerName={vectorizerName}
                     onSearch={handleSearch}
                     isSearching={isSearching}
                   />
@@ -575,74 +577,66 @@ export function VectorSearchPanel({
             />
           )}
 
-          {/* Search Parameters */}
-          <div className="search-parameters">
-            <h3 className="parameters-title">
-              <span className="codicon codicon-settings-gear" aria-hidden="true"></span>
-              Search Parameters
-            </h3>
+          {/* Shared options row: the mode-specific input above is the only difference between modes. */}
+          <div className="search-options" role="group" aria-label="Search options">
+            {/* Distance Metric */}
+            <div className="search-option">
+              <label htmlFor="distance-metric">Metric</label>
+              <select
+                id="distance-metric"
+                value={searchParams.distanceMetric}
+                onChange={(e) => handleParamChange('distanceMetric', e.target.value)}
+                disabled={isSearching}
+              >
+                {distanceMetrics.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <div className="parameter-grid">
-              {/* Distance Metric */}
-              <div className="parameter-item">
-                <label htmlFor="distance-metric">Distance Metric</label>
-                <select
-                  id="distance-metric"
-                  value={searchParams.distanceMetric}
-                  onChange={(e) => handleParamChange('distanceMetric', e.target.value)}
-                  disabled={isSearching}
-                >
-                  {distanceMetrics.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Max Distance */}
-              <div className="parameter-item">
-                <label htmlFor="max-distance">
-                  Max Distance:{' '}
-                  <strong>
-                    {searchParams.maxDistance >= 1.0
-                      ? `${searchParams.maxDistance.toFixed(2)} (no filter)`
-                      : searchParams.maxDistance.toFixed(2)}
-                  </strong>
-                </label>
+            {/* Max Distance */}
+            <div className="search-option">
+              <label htmlFor="max-distance">Max distance</label>
+              <div className="distance-input-row">
                 <input
                   id="max-distance"
-                  type="range"
+                  type="number"
                   min="0"
                   max="2"
                   step="0.05"
                   value={searchParams.maxDistance}
-                  onChange={(e) => handleParamChange('maxDistance', parseFloat(e.target.value))}
+                  onChange={(e) => {
+                    const next = parseFloat(e.target.value);
+                    if (Number.isFinite(next)) {
+                      handleParamChange('maxDistance', Math.min(2, Math.max(0, next)));
+                    }
+                  }}
                   disabled={isSearching}
+                  title="1.00 or higher disables the distance filter"
                 />
-                <div className="range-labels">
-                  <span>0 (exact)</span>
-                  <span>1.0 (no filter)</span>
-                  <span>2 (distant)</span>
-                </div>
+                {searchParams.maxDistance >= 1.0 && (
+                  <span className="distance-none">no filter</span>
+                )}
               </div>
+            </div>
 
-              {/* Result Limit */}
-              <div className="parameter-item">
-                <label htmlFor="result-limit">Result Limit</label>
-                <select
-                  id="result-limit"
-                  value={searchParams.limit}
-                  onChange={(e) => handleParamChange('limit', parseInt(e.target.value, 10))}
-                  disabled={isSearching}
-                >
-                  {limitOptions.map((limit) => (
-                    <option key={limit} value={limit}>
-                      Top {limit} results
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Result Limit */}
+            <div className="search-option">
+              <label htmlFor="result-limit">Results</label>
+              <select
+                id="result-limit"
+                value={searchParams.limit}
+                onChange={(e) => handleParamChange('limit', parseInt(e.target.value, 10))}
+                disabled={isSearching}
+              >
+                {limitOptions.map((limit) => (
+                  <option key={limit} value={limit}>
+                    {limit}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -722,7 +716,6 @@ export function VectorSearchPanel({
                       onChange={(e) => actions.setSearchParams({ mmrEnabled: e.target.checked })}
                       disabled={isSearching || !mmrSupported}
                     />
-                    <span className="codicon codicon-versions" aria-hidden="true"></span>
                     <span>Diversify</span>
                   </label>
                   {searchParams.mmrEnabled && mmrSupported && (
@@ -761,24 +754,63 @@ export function VectorSearchPanel({
                 </button>
               )}
 
-              <CopyAsCode
-                collectionName={schema?.name || ''}
-                searchMode={searchMode}
-                searchParams={searchParams}
-                targetVector={
-                  selectedTargetVectors.length > 1
-                    ? {
-                        combination: joinStrategy,
-                        targetVectors: selectedTargetVectors,
-                        weights: Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
-                      }
-                    : selectedTargetVectors.length === 1
-                      ? selectedTargetVectors[0]
-                      : undefined
-                }
-                disabled={isSearching}
-              />
+              <button
+                type="button"
+                className="more-options-btn"
+                onClick={() => setIsMoreOptionsOpen((open) => !open)}
+                aria-expanded={isMoreOptionsOpen}
+                aria-controls="search-more-options"
+              >
+                <span className="codicon codicon-ellipsis" aria-hidden="true"></span>
+                More options
+              </button>
             </div>
+
+            {/* Progressive disclosure: rarely used controls stay out of the run path. */}
+            {isMoreOptionsOpen && (
+              <div id="search-more-options" className="search-more-options">
+                <div className="more-option-row">
+                  <label htmlFor="max-distance-slider">Distance filter</label>
+                  <input
+                    id="max-distance-slider"
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.05"
+                    value={searchParams.maxDistance}
+                    onChange={(e) => handleParamChange('maxDistance', parseFloat(e.target.value))}
+                    disabled={isSearching}
+                  />
+                  <div className="range-labels">
+                    <span>0 (exact)</span>
+                    <span>1.0 (no filter)</span>
+                    <span>2 (distant)</span>
+                  </div>
+                </div>
+
+                <div className="more-option-row">
+                  <span className="more-option-label">Code snippet</span>
+                  <CopyAsCode
+                    collectionName={schema?.name || ''}
+                    searchMode={searchMode}
+                    searchParams={searchParams}
+                    targetVector={
+                      selectedTargetVectors.length > 1
+                        ? {
+                            combination: joinStrategy,
+                            targetVectors: selectedTargetVectors,
+                            weights:
+                              Object.keys(vectorWeights).length > 0 ? vectorWeights : undefined,
+                          }
+                        : selectedTargetVectors.length === 1
+                          ? selectedTargetVectors[0]
+                          : undefined
+                    }
+                    disabled={isSearching}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Keep expensive diagnostic details out of the main result flow until requested. */}

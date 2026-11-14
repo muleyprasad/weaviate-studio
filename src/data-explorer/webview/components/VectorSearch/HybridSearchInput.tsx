@@ -19,6 +19,7 @@ interface HybridSearchInputProps {
   onPropertiesChange: (properties: string[]) => void;
   onQueryRewritingToggle: () => void;
   onSearch: () => void;
+  vectorizerName?: string;
   isSearching: boolean;
 }
 
@@ -33,6 +34,7 @@ export function HybridSearchInput({
   onPropertiesChange,
   onQueryRewritingToggle,
   onSearch,
+  vectorizerName,
   isSearching,
 }: HybridSearchInputProps) {
   // Handle Enter key to trigger search
@@ -50,10 +52,17 @@ export function HybridSearchInput({
     <div className="hybrid-search-input">
       {/* Search Query Input */}
       <div className="search-query-section">
-        <label htmlFor="hybrid-search-query" className="input-label">
-          <span className="codicon codicon-search" aria-hidden="true"></span>
-          SEARCH QUERY
-        </label>
+        <div className="input-label-row">
+          <label htmlFor="hybrid-search-query" className="input-label">
+            <span className="codicon codicon-search" aria-hidden="true"></span>
+            SEARCH QUERY
+          </label>
+          {vectorizerName && (
+            <span className="embedding-info">
+              Embedding: <strong>{vectorizerName}</strong>
+            </span>
+          )}
+        </div>
 
         <textarea
           id="hybrid-search-query"
@@ -66,10 +75,7 @@ export function HybridSearchInput({
           disabled={isSearching}
         />
 
-        <p className="input-hint">
-          Your query will be used for both keyword matching (BM25) and semantic similarity (vector
-          search)
-        </p>
+        <p className="input-hint">Matches by keyword (BM25) and meaning (vector)</p>
       </div>
 
       {/* Alpha Slider - Keyword/Semantic Balance */}

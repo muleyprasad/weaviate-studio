@@ -91,9 +91,7 @@ export function ObjectSearchInput({
             placeholder="Enter or paste object UUID..."
             disabled={isSearching}
           />
-          <p className="input-hint">
-            Paste a UUID or click "Find Similar" on any object in the table
-          </p>
+          <p className="input-hint">Paste a UUID or use &quot;Find Similar&quot; on a table row</p>
         </>
       )}
     </div>

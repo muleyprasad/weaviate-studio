@@ -32,10 +32,17 @@ export function TextSearchInput({
 
   return (
     <div className="text-search-input">
-      <label htmlFor="text-search-query" className="input-label">
-        <span className="codicon codicon-search" aria-hidden="true"></span>
-        SEMANTIC QUERY
-      </label>
+      <div className="input-label-row">
+        <label htmlFor="text-search-query" className="input-label">
+          <span className="codicon codicon-search" aria-hidden="true"></span>
+          SEMANTIC QUERY
+        </label>
+        {vectorizerName && (
+          <span id="vectorizer-info" className="embedding-info">
+            Embedding: <strong>{vectorizerName}</strong>
+          </span>
+        )}
+      </div>
 
       <textarea
         id="text-search-query"
@@ -43,22 +50,13 @@ export function TextSearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Enter your search query...&#10;e.g., 'machine learning healthcare applications'"
-        rows={4}
+        placeholder="Enter your search query..."
+        rows={3}
         disabled={isSearching}
         aria-describedby="vectorizer-info"
       />
 
-      {vectorizerName && (
-        <div id="vectorizer-info" className="vectorizer-info">
-          <span className="codicon codicon-info" aria-hidden="true"></span>
-          <span>
-            Using: <strong>{vectorizerName}</strong>
-          </span>
-        </div>
-      )}
-
-      <p className="input-hint">Enter natural language to find semantically similar objects</p>
+      <p className="input-hint">Natural language search</p>
     </div>
   );
 }

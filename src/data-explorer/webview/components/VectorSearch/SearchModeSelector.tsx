@@ -20,11 +20,11 @@ export function SearchModeSelector({
   const modes: { id: VectorSearchMode; label: string; icon: string; disabled?: boolean }[] = [
     {
       id: 'text',
-      label: 'Text (Semantic)',
+      label: 'Semantic',
       icon: 'codicon-symbol-string',
       disabled: !hasVectorizer,
     },
-    { id: 'object', label: 'Similar Object', icon: 'codicon-references' },
+    { id: 'object', label: 'Similar', icon: 'codicon-references' },
     { id: 'vector', label: 'Raw Vector', icon: 'codicon-symbol-array' },
     {
       id: 'hybrid',
