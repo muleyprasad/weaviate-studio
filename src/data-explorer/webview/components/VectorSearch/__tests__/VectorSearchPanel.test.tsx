@@ -167,6 +167,16 @@ describe('VectorSearchPanel max distance field', () => {
     expect(actions.setSearchParams).toHaveBeenCalledWith({ maxDistance: 0.7 });
   });
 
+  it('nudges the threshold with the stepper buttons', () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase max distance' }));
+    expect(actions.setSearchParams).toHaveBeenLastCalledWith({ maxDistance: 1.05 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease max distance' }));
+    expect(actions.setSearchParams).toHaveBeenLastCalledWith({ maxDistance: 0.95 });
+  });
+
   it('clamps out-of-range input and ignores text that is not a number', () => {
     renderPanel();
 

@@ -154,6 +154,15 @@ export function VectorSearchPanel({
     }
   };
 
+  // Steppers for the common case: nudging the threshold without typing.
+  const stepDistance = (delta: number) => {
+    const typed = parseFloat(distanceDraft);
+    const base = isDistanceEditing && Number.isFinite(typed) ? typed : searchParams.maxDistance;
+    const next = Math.min(2, Math.max(0, Number((base + delta).toFixed(2))));
+    handleParamChange('maxDistance', next);
+    setIsDistanceEditing(false);
+  };
+
   // Close a previously opened profile whenever it is cleared or profiling is turned off.
   useEffect(() => {
     if (!queryProfileEnabled || !queryProfileResult) {
@@ -616,6 +625,15 @@ export function VectorSearchPanel({
               <div className="search-option">
                 <label htmlFor="max-distance">Max distance</label>
                 <div className="distance-input-row">
+                  <button
+                    type="button"
+                    className="distance-step"
+                    onClick={() => stepDistance(-0.05)}
+                    disabled={isSearching || searchParams.maxDistance <= 0}
+                    aria-label="Decrease max distance"
+                  >
+                    <span className="codicon codicon-remove" aria-hidden="true"></span>
+                  </button>
                   <input
                     id="max-distance"
                     type="text"
@@ -638,6 +656,15 @@ export function VectorSearchPanel({
                     disabled={isSearching}
                     title="1.00 or higher disables the distance filter"
                   />
+                  <button
+                    type="button"
+                    className="distance-step"
+                    onClick={() => stepDistance(0.05)}
+                    disabled={isSearching || searchParams.maxDistance >= 2}
+                    aria-label="Increase max distance"
+                  >
+                    <span className="codicon codicon-add" aria-hidden="true"></span>
+                  </button>
                 </div>
               </div>
 

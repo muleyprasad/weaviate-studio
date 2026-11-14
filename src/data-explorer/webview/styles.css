@@ -2652,19 +2652,66 @@ input[type="checkbox"]:focus-visible {
     cursor: pointer;
 }
 
+/* Steppers and field read as one control: [- 1.00 +], so the threshold can be
+   nudged without typing while the value still shows two decimals. */
 .distance-input-row {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: stretch;
     min-width: 0;
+    height: 36px;
+    box-sizing: border-box;
+    background-color: var(--vscode-dropdown-background, #3C3C3C);
+    border: 1px solid var(--vscode-dropdown-border, #3C3C3C);
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-.distance-input-row input {
+.distance-input-row:focus-within {
+    border-color: var(--vscode-focusBorder, #0E639C);
+}
+
+.distance-input-row input[type="text"] {
     flex: 1 1 auto;
     width: 100%;
-    /* The shared input rule is content-box, so without this the field renders
-       14px taller than the selects beside it. */
+    min-width: 0;
+    padding: 0 4px;
+    border: 0;
+    background-color: transparent;
+    color: var(--vscode-dropdown-foreground, #FFF);
+    font-size: 12px;
+    text-align: center;
     box-sizing: border-box;
+}
+
+.distance-input-row input[type="text"]:focus {
+    outline: none;
+}
+
+.distance-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 26px;
+    padding: 0;
+    border: 0;
+    /* The shared sheet repaints every button on hover with !important. */
+    background-color: transparent !important;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+}
+
+.distance-step:hover:not(:disabled) {
+    background-color: var(--vscode-list-hoverBackground) !important;
+    color: var(--vscode-foreground);
+}
+
+.distance-step:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.distance-step .codicon {
+    font-size: 12px;
 }
 
 /* Range inputs in the advanced panel keep the slider look. */
