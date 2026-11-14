@@ -76,7 +76,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #3fb950;
+  background-color: var(--vscode-charts-green, #3fb950);
   box-shadow: 0 0 4px rgba(63, 185, 80, 0.4);
   flex-shrink: 0;
 }
@@ -684,7 +684,7 @@
 
 .rag-pill-remove:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.15) !important;
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.3)) !important;
 }
 
 /* Small pills shown inside chat history bubbles */
@@ -1026,7 +1026,7 @@
 .rag-saved-flash {
   font-size: 12px;
   font-weight: 600;
-  color: #3fb950;
+  color: var(--vscode-charts-green, #3fb950);
   animation: rag-flash-in 0.3s ease;
 }
 
