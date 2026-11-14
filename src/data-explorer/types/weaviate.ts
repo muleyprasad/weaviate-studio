@@ -92,6 +92,9 @@ export interface WeaviateVectorQueryOptions extends Omit<WeaviateQueryOptions, '
   /** Target vector name for named vectors or multi-target vector join configuration */
   targetVector?: string | unknown; // unknown allows MultiTargetVectorJoin<V> from SDK
 
+  /** MMR diversity selection (Weaviate ≥ 1.39): { type: 'mmr', balance?, limit? } */
+  diversity?: { type: 'mmr'; balance?: number; limit?: number };
+
   /** Allow additional properties for SDK compatibility */
   [key: string]: unknown;
 }

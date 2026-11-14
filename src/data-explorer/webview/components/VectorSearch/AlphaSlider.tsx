@@ -62,25 +62,7 @@ export function AlphaSlider({ value, onChange, disabled = false }: AlphaSliderPr
         ))}
       </div>
 
-      {/* Keyword Weight Bar */}
-      <div className="slider-row">
-        <label>Keyword Weight (BM25)</label>
-        <span className="weight-value">{keywordWeight}</span>
-      </div>
-      <div className="slider-visual keyword">
-        <div className="slider-fill" style={{ width: `${keywordWeight}%` }} />
-      </div>
-
-      {/* Semantic Weight Bar */}
-      <div className="slider-row">
-        <label>Semantic Weight (Vector)</label>
-        <span className="weight-value">{semanticWeight}</span>
-      </div>
-      <div className="slider-visual semantic">
-        <div className="slider-fill" style={{ width: `${semanticWeight}%` }} />
-      </div>
-
-      {/* Actual slider input */}
+      {/* Single slider; the weights below it carry the same information. */}
       <input
         type="range"
         className="alpha-range-input"

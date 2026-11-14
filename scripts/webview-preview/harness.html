@@ -241,7 +241,10 @@
                         command: 'init',
                         collectionName,
                         schema,
-                        serverVersion: '1.36.9',
+                        // Add ?version=1.39.0 to the preview URL to exercise
+                        // version-gated features without editing this file.
+                        serverVersion:
+                            new URLSearchParams(window.location.search).get('version') || '1.36.9',
                         readOnly: false,
                         isMultiTenant: false,
                         requestId,
@@ -289,8 +292,15 @@
             }
         };
 
+        // Record what the webview sends so the payloads can be inspected from
+        // DevTools or a browser automation session.
+        window.__vscodeMessages = [];
+
         window.acquireVsCodeApi = () => ({
-            postMessage: reply,
+            postMessage: (message) => {
+                window.__vscodeMessages.push(message);
+                reply(message);
+            },
             getState: () => ({}),
             setState: () => {},
         });
@@ -302,6 +312,31 @@
     <script defer src="shared-theme.bundle.js"></script>
     <script defer src="vendors.bundle.js"></script>
     <script defer src="{{BUNDLE}}"></script>
+    <script>
+        // Deep links for review: ?open=1 opens the vector search panel and
+        // ?mode=hybrid|semantic|similar|raw selects a tab, so a screenshot can
+        // land on the exact state without a click sequence.
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('open') !== '1') {
+                return;
+            }
+            setTimeout(() => {
+                document.querySelector('button[aria-label="Open vector search"]')?.click();
+                const mode = params.get('mode');
+                if (!mode) {
+                    return;
+                }
+                setTimeout(() => {
+                    const wanted = mode.toLowerCase();
+                    const tab = [...document.querySelectorAll('[role="tab"]')].find((element) =>
+                        element.textContent?.trim().toLowerCase().includes(wanted)
+                    );
+                    tab?.click();
+                }, 150);
+            }, 200);
+        });
+    </script>
 </body>
 
 </html>

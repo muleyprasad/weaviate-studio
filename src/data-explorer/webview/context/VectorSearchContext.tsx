@@ -53,6 +53,10 @@ export interface VectorSearchParameters {
   fusionType: FusionType;
   searchProperties: string[]; // Which properties to search in
   enableQueryRewriting: boolean;
+  // MMR diversity selection (Weaviate ≥ 1.39, near-* modes only)
+  mmrEnabled: boolean;
+  mmrBalance: number; // 0 = max diversity, 1 = max relevance
+  mmrLimit?: number; // Candidate pool size (undefined = server default)
 }
 
 // ============================================================================
@@ -128,6 +132,10 @@ const initialSearchParams: VectorSearchParameters = {
   fusionType: 'rankedFusion',
   searchProperties: [], // Empty = search all text properties
   enableQueryRewriting: false,
+  // MMR diversity selection (off by default; balanced when enabled)
+  mmrEnabled: false,
+  mmrBalance: 0.5,
+  mmrLimit: undefined,
 };
 
 const initialState: VectorSearchContextState = {

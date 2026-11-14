@@ -5,6 +5,7 @@
 
 import type { MultiTargetPayload } from '../../types';
 import type { VectorSearchParameters } from '../context';
+import { mmrCandidateLimit } from './mmr';
 
 /**
  * Generate TypeScript code snippet for current search configuration
@@ -44,6 +45,16 @@ export function generateTypeScriptSnippet(params: {
   // Add hybrid alpha if applicable
   if (searchMode === 'hybrid') {
     options.push(`    alpha: ${searchParams.hybridAlpha}`);
+  }
+
+  // Add MMR diversity selection if applicable (Weaviate ≥ 1.39, near-* queries)
+  if (searchParams.mmrEnabled && searchMode !== 'hybrid') {
+    const mmrParts = [
+      `type: "mmr"`,
+      `balance: ${searchParams.mmrBalance}`,
+      `limit: ${mmrCandidateLimit(searchParams)}`,
+    ];
+    options.push(`    diversity: { ${mmrParts.join(', ')} }`);
   }
 
   // Add target vector or multi-target configuration
@@ -135,6 +146,17 @@ export function generatePythonSnippet(params: {
 
   if (searchMode === 'hybrid') {
     kwargs.push(`alpha=${searchParams.hybridAlpha}`);
+  }
+
+  // Add MMR diversity selection if applicable (Weaviate ≥ 1.39, near-* queries;
+  // requires a Python client version with 1.39 MMR support)
+  if (searchParams.mmrEnabled && searchMode !== 'hybrid') {
+    const mmrParts = [
+      `"type": "mmr"`,
+      `"balance": ${searchParams.mmrBalance}`,
+      `"limit": ${mmrCandidateLimit(searchParams)}`,
+    ];
+    kwargs.push(`diversity={${mmrParts.join(', ')}}`);
   }
 
   if (targetVector) {

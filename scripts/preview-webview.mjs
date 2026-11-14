@@ -125,7 +125,8 @@ async function main() {
   server.listen(port, '127.0.0.1', () => {
     console.log(`[preview] Light theme: http://127.0.0.1:${port}/__preview.html`);
     console.log(`[preview] Dark theme:  http://127.0.0.1:${port}/__preview.html?dark=1`);
-    console.log('[preview] Sample data: scripts/webview-preview/harness.html');
+    console.log(`[preview] 1.39 server: http://127.0.0.1:${port}/__preview.html?version=1.39.0`);
+    console.log('[preview] Version gate: append ?version=<x.y.z> to preview a newer server');
     console.log('[preview] Ctrl+C to stop.');
   });
 

@@ -62,7 +62,6 @@ export function ObjectSearchInput({
   return (
     <div className="object-search-input">
       <label htmlFor="object-search-uuid" className="input-label">
-        <span className="codicon codicon-references" aria-hidden="true"></span>
         REFERENCE OBJECT
       </label>
 
@@ -91,9 +90,9 @@ export function ObjectSearchInput({
             placeholder="Enter or paste object UUID..."
             disabled={isSearching}
           />
-          <p className="input-hint">
-            Paste a UUID or click "Find Similar" on any object in the table
-          </p>
+          <div className="input-meta">
+            <span>Paste a UUID or use &quot;Find Similar&quot; on a table row</span>
+          </div>
         </>
       )}
     </div>

@@ -28,7 +28,6 @@
     "src/data-explorer/webview/styles.css :: .slider-visual.semantic .slider-fill :: background :: linear-gradient(90deg, #10B981, #34D399)",
     "src/data-explorer/webview/styles.css :: .vector-search-backdrop :: background-color :: rgba(0, 0, 0, 0)",
     "src/data-explorer/webview/styles.css :: .vector-search-panel.open .vector-search-backdrop :: background-color :: rgba(0, 0, 0, 0.4)",
-    "src/data-explorer/webview/styles.css :: .vectorizer-info :: background-color :: rgba(55, 148, 255, 0.1)",
     "src/data-explorer/webview/styles.css :: .vectorizer-warning :: background-color :: rgba(255, 180, 0, 0.1)",
     "src/data-explorer/webview/styles.css :: .vectorizer-warning :: border :: 1px solid rgba(255, 180, 0, 0.3)",
     "src/webview/Alias.css :: .success-message :: background-color :: rgba(var(--vscode-testing-iconPassed-rgb, 0, 200, 0), 0.1)",

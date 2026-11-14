@@ -149,3 +149,47 @@ describe('VectorSearchPanel query profiling', () => {
     expect(screen.queryByLabelText('Query profile details')).toBeNull();
   });
 });
+
+describe('VectorSearchPanel max distance field', () => {
+  it('reads as a decimal and commits the parsed number on blur', () => {
+    renderPanel();
+
+    const field = screen.getByLabelText('Max distance') as HTMLInputElement;
+    expect(field.value).toBe('1.00');
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '0.7' } });
+    // Still typing: the params only move once the field is committed.
+    expect(field.value).toBe('0.7');
+    expect(actions.setSearchParams).not.toHaveBeenCalled();
+
+    fireEvent.blur(field);
+    expect(actions.setSearchParams).toHaveBeenCalledWith({ maxDistance: 0.7 });
+  });
+
+  it('nudges the threshold with the stepper buttons', () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase max distance' }));
+    expect(actions.setSearchParams).toHaveBeenLastCalledWith({ maxDistance: 1.05 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease max distance' }));
+    expect(actions.setSearchParams).toHaveBeenLastCalledWith({ maxDistance: 0.95 });
+  });
+
+  it('clamps out-of-range input and ignores text that is not a number', () => {
+    renderPanel();
+
+    const field = screen.getByLabelText('Max distance') as HTMLInputElement;
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '3' } });
+    fireEvent.blur(field);
+    expect(actions.setSearchParams).toHaveBeenCalledWith({ maxDistance: 2 });
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: 'not a number' } });
+    fireEvent.blur(field);
+    expect(actions.setSearchParams).toHaveBeenCalledTimes(1);
+  });
+});
