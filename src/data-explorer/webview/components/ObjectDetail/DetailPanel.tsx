@@ -118,26 +118,21 @@ export const DetailPanel = React.memo(function DetailPanel({
         <div className="detail-section uuid-section">
           <div className="uuid-display">
             <label>UUID</label>
-            <code className="uuid-value">{object.uuid}</code>
-            <button
-              type="button"
-              className="copy-uuid-btn"
-              onClick={handleCopyUuid}
-              title="Copy UUID"
-              aria-label="Copy UUID to clipboard"
-            >
-              {showCopiedUuid ? (
-                <>
-                  <span className="codicon codicon-check" aria-hidden="true"></span>
-                  Copied
-                </>
-              ) : (
-                <>
-                  <span className="codicon codicon-copy" aria-hidden="true"></span>
-                  Copy
-                </>
-              )}
-            </button>
+            <div className="uuid-value-row">
+              <code className="uuid-value">{object.uuid}</code>
+              <button
+                type="button"
+                className="copy-uuid-btn"
+                onClick={handleCopyUuid}
+                title={showCopiedUuid ? 'Copied' : 'Copy UUID'}
+                aria-label={showCopiedUuid ? 'UUID copied to clipboard' : 'Copy UUID to clipboard'}
+              >
+                <span
+                  className={`codicon ${showCopiedUuid ? 'codicon-check' : 'codicon-copy'}`}
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -245,16 +240,7 @@ export const DetailPanel = React.memo(function DetailPanel({
               }
               aria-label="Edit object"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                aria-hidden="true"
-                style={{ marginRight: 6 }}
-              >
-                <path d="M13.23 1A2.78 2.78 0 0 0 11.26 1.8L2 11.05V14h2.95l9.26-9.26a2.77 2.77 0 0 0 0-3.93 2.76 2.76 0 0 0-1.98-.81zm0 1c.47 0 .93.18 1.28.53a1.78 1.78 0 0 1 0 2.52L12.7 6.86 10.14 4.3l1.8-1.8a1.78 1.78 0 0 1 1.29-.5zM9.44 5L12 7.56 4.53 15.03H2v-2.53L9.44 5z" />
-              </svg>
+              <span className="codicon codicon-edit" aria-hidden="true"></span>
               Edit
             </button>
           )}
@@ -274,16 +260,7 @@ export const DetailPanel = React.memo(function DetailPanel({
               }
               aria-label="Delete object"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                aria-hidden="true"
-                style={{ marginRight: 6 }}
-              >
-                <path d="M11 2H9c0-.55-.45-1-1-1H8c-.55 0-1 .45-1 1H5c-.55 0-1 .45-1 1v1h8V3c0-.55-.45-1-1-1zm-6 3v9c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V5H5zm2 8H6V7h1v6zm2 0H8V7h1v6zm2 0h-1V7h1v6z" />
-              </svg>
+              <span className="codicon codicon-trash" aria-hidden="true"></span>
               Delete
             </button>
           )}

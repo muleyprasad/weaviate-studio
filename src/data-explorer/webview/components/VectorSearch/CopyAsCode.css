@@ -6,6 +6,9 @@
 }
 
 .copy-as-code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 500;
@@ -15,6 +18,10 @@
   border-radius: 2px;
   cursor: pointer;
   transition: background-color 0.2s;
+}
+
+.copy-as-code-btn .codicon {
+  font-size: 14px;
 }
 
 .copy-as-code-btn:hover:not(:disabled) {

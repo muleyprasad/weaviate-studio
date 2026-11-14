@@ -69,7 +69,7 @@ export function SearchResults({
         <span className="codicon codicon-search" aria-hidden="true"></span>
         <div className="empty-content">
           <h4>No Results Yet</h4>
-          <p>Enter a search query and click "Search" to find similar objects.</p>
+          <p>Enter a search query and click "Run Vector Search" to find similar objects.</p>
         </div>
       </div>
     );

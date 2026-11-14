@@ -150,9 +150,7 @@ export function FilterRule({ filter, properties, onUpdate, onRemove }: FilterRul
         title="Remove filter"
         aria-label="Remove this filter"
       >
-        <span className="codicon codicon-close" aria-hidden="true">
-          ×
-        </span>
+        <span className="codicon codicon-close" aria-hidden="true"></span>
       </button>
     </div>
   );

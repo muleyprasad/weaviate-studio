@@ -438,7 +438,7 @@ export function VectorSearchPanel({
         <header className="vector-search-header">
           <div className="vector-search-title">
             <span className="codicon codicon-search" aria-hidden="true"></span>
-            <h2>VECTOR SEARCH</h2>
+            <h2>Vector Search</h2>
           </div>
           <button
             type="button"
@@ -447,9 +447,7 @@ export function VectorSearchPanel({
             title="Close vector search panel"
             aria-label="Close vector search panel"
           >
-            <span className="codicon codicon-close" aria-hidden="true">
-              ×
-            </span>
+            <span className="codicon codicon-close" aria-hidden="true"></span>
           </button>
         </header>
 

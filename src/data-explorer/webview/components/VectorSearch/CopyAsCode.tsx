@@ -169,7 +169,11 @@ export function CopyAsCode({
         disabled={disabled}
         title="Copy generated code to clipboard"
       >
-        {copied ? '✓ Copied!' : '📋 Copy as Code'}
+        <span
+          className={`codicon ${copied ? 'codicon-check' : 'codicon-copy'}`}
+          aria-hidden="true"
+        ></span>
+        {copied ? 'Copied!' : 'Copy as Code'}
       </button>
 
       <select

@@ -15,9 +15,11 @@
 
 .weight-editor-header h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--vscode-editor-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
 }
 
 .weight-editor-normalize-btn {
